@@ -1,0 +1,41 @@
+# Local Lucy v8 - Git Ignore
+# Only ui-v8/ is active code for GitHub
+
+# Legacy tools (kept locally, not on GitHub)
+/tools/router/
+/tools/router_py/
+
+# Snapshots (large archives, kept locally)
+/snapshots/
+
+# Archives
+/archive_snapshots/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Logs
+*.log
+
+# Local state
+cache/
+state/*.db
+
+# Virtual env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
