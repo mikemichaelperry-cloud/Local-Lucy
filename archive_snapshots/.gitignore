@@ -1,0 +1,4 @@
+# Large binary files and archives not needed for source control
+retired-snapshot-set-*/
+*.bin
+*.onnx
