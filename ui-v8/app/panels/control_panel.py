@@ -429,8 +429,8 @@ class ControlPanel(QFrame):
         
         # Initialize audio levels file path
         if self._audio_levels_file is None:
-            runtime_dir = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", 
-                Path.home() / ".codex-api-home/lucy/runtime-v8"))
+            default_runtime_dir = Path(__file__).resolve().parents[3]
+            runtime_dir = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(default_runtime_dir)))
             self._audio_levels_file = runtime_dir / "state" / "voice_audio_levels.json"
         
         self._audio_level_timer = QTimer(self)

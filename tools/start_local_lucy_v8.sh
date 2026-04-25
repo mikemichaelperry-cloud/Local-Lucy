@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)"
+WORKSPACE_HOME="$(dirname -- "${DEFAULT_ROOT}")"
 AUTHORITY_ROOT_OVERRIDE="${LUCY_RUNTIME_AUTHORITY_ROOT:-}"
 if [[ -n "${AUTHORITY_ROOT_OVERRIDE}" ]]; then
   ROOT="$(CDPATH= cd -- "${AUTHORITY_ROOT_OVERRIDE}" 2>/dev/null && pwd)" || {
@@ -13,14 +14,16 @@ if [[ -n "${AUTHORITY_ROOT_OVERRIDE}" ]]; then
 else
   ROOT="${DEFAULT_ROOT}"
 fi
-if [[ "$(basename -- "${ROOT}")" != "opt-experimental-v8-dev" ]]; then
-  echo "ERR: active v8 terminal authority requires opt-experimental-v8-dev root, got: ${ROOT}" >&2
+if [[ "$(basename -- "${ROOT}")" != "lucy-v8" && "$(basename -- "${ROOT}")" != "opt-experimental-v8-dev" ]]; then
+  echo "ERR: active v8 terminal authority requires lucy-v8 or opt-experimental-v8-dev root, got: ${ROOT}" >&2
   exit 2
 fi
 cd "$ROOT"
 
 if [[ -n "${LUCY_UI_ROOT:-}" ]]; then
   UI_ROOT="${LUCY_UI_ROOT}"
+elif [[ "$(basename -- "${ROOT}")" == "lucy-v8" ]]; then
+  UI_ROOT="${ROOT}/ui-v8"
 else
   WORKSPACE_ROOT="$(dirname -- "$(dirname -- "${ROOT}")")"
   UI_ROOT="${WORKSPACE_ROOT}/ui-v8"
@@ -39,6 +42,12 @@ export LUCY_RUNTIME_AUTHORITY_ROOT="$ROOT"
 export LUCY_UI_ROOT="${UI_ROOT}"
 export LUCY_TOOLS_DIR="$ROOT/tools"
 export LUCY_CONF_DIR="$ROOT/config"
+
+if [[ -f "${ROOT}/config/latency_optimizations.env" ]]; then
+  # shellcheck disable=SC1091
+  source "${ROOT}/config/latency_optimizations.env"
+fi
+
 export LUCY_ENABLE_INTERNET="${LUCY_ENABLE_INTERNET:-1}"
 export LUCY_SESSION_MEMORY="${LUCY_SESSION_MEMORY:-1}"
 export LUCY_VOICE_ENABLED="${LUCY_VOICE_ENABLED:-1}"
@@ -48,7 +57,12 @@ export LUCY_LOCAL_MODEL="${LUCY_LOCAL_MODEL:-local-lucy}"
 export LUCY_OLLAMA_API_URL="${LUCY_OLLAMA_API_URL:-http://127.0.0.1:11434/api/generate}"
 export LUCY_LOCAL_KEEP_ALIVE="${LUCY_LOCAL_KEEP_ALIVE:-10m}"
 export LUCY_LOCAL_WORKER_TRANSPORT="${LUCY_LOCAL_WORKER_TRANSPORT:-unix}"
-export LUCY_RUNTIME_NAMESPACE_ROOT="${LUCY_RUNTIME_NAMESPACE_ROOT:-${ROOT}/state}"
+export LUCY_RUNTIME_NAMESPACE_ROOT="${LUCY_RUNTIME_NAMESPACE_ROOT:-${ROOT}}"
+export LUCY_RUNTIME_REQUEST_HISTORY_FILE="${LUCY_RUNTIME_REQUEST_HISTORY_FILE:-${ROOT}/state/request_history.jsonl}"
+export LUCY_VOICE_RUNTIME_FILE="${LUCY_VOICE_RUNTIME_FILE:-${ROOT}/state/voice_runtime.json}"
+export LUCY_VOICE_CAPTURE_DIR="${LUCY_VOICE_CAPTURE_DIR:-${ROOT}/voice/ui_ptt}"
+export LUCY_VOICE_PYTHON_BIN="${LUCY_VOICE_PYTHON_BIN:-/usr/bin/python3}"
+export PYTHONPATH="${UI_ROOT}/app:${WORKSPACE_HOME}/.local/lib/python3.10/site-packages:${PYTHONPATH:-}"
 export LUCY_RUNTIME_CONTRACT_REQUIRED=1
 export LUCY_LAUNCHER_LABEL="opt-experimental-v8-dev"
 export LUCY_LAUNCHER_FAMILY="launcher v8"
