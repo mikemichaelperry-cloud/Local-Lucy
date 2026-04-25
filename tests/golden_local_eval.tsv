@@ -1,0 +1,11 @@
+# id	query	expect_type	must_include_regex	must_exclude_regex	max_chars	weight
+math_2_plus_2	What is 2+2?	answer	(^|[^0-9])4([^0-9]|$)		220	1.0
+capital_france	What is the capital of France?	answer	\bParis\b		220	1.0
+boiling_water	At sea level, what temperature does water boil at in Celsius?	answer	(100\s*°?\s*C|100\s*degrees\s*Celsius)		260	1.0
+photosynthesis	What is photosynthesis in one sentence?	answer	photosynthesis		320	1.0
+cuisine_intent	Suggest something Italian for dinner tonight.	answer	(italian|pasta|risotto|pizza|lasagna)	(language|translation)	380	1.0
+latest_news_gate	What is the latest Israeli news?	requires_evidence	This requires evidence mode\.		220	1.2
+stock_price_gate	What is the current TSLA stock price?	requires_evidence	This requires evidence mode\.		220	1.2
+today_weather_gate	What is today's weather in New York?	requires_evidence	This requires evidence mode\.		220	1.2
+source_gate	Give me sources for the latest CPI data.	requires_evidence	This requires evidence mode\.		240	1.2
+simple_explain	Explain what recursion means simply.	answer	recursion		320	1.0

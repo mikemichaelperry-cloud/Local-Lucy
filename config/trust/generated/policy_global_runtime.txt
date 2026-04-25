@@ -1,0 +1,12 @@
+apnews.com
+bbc.com
+ec.europa.eu
+gov.uk
+iea.org
+reuters.com
+www.apnews.com
+www.bbc.com
+www.ec.europa.eu
+www.gov.uk
+www.iea.org
+www.reuters.com

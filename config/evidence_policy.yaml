@@ -1,0 +1,30 @@
+version: 1
+redirects:
+  max: 3
+timeouts:
+  connect_seconds: 5
+  read_seconds: 15
+  total_seconds: 25
+limits:
+  max_bytes: 3000000
+content_types:
+  allow:
+    - text/html
+    - text/plain
+    - application/json
+    - application/xml
+    - application/pdf
+network_blocks:
+  forbid_ip_literals: true
+  forbid_localhost: true
+  forbid_private_ranges: true
+  forbid_link_local: true
+  forbid_metadata_endpoints: true
+html:
+  strip_scripts: true
+  extract_text_only: true
+storage:
+  keep_raw: true
+  keep_extracted: true
+  keep_sha256: true
+  keep_timestamp: true

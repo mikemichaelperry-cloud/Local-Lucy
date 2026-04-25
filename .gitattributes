@@ -1,0 +1,2 @@
+backups/v10-dev-cleanup/2026-07-04/lora/**/optimizer.pt filter=lfs diff=lfs merge=lfs -text
+**/optimizer.pt filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,9 @@
+{
+  "style": "calibrated_sharp",
+  "hedge_reduction": true,
+  "therapy_language_filter": true,
+  "force_conclusion": true,
+  "min_specificity": true,
+  "max_balance_sentences": 1,
+  "contrarian_probability": 0.4
+}

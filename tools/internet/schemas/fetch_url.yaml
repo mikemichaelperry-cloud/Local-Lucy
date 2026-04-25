@@ -1,0 +1,38 @@
+name: fetch_url
+version: 0
+description: "Read-only URL fetch. Enforces strict size/time limits. Returns extracted text plus metadata."
+inputs:
+  url:
+    type: string
+    required: true
+    max_length: 2048
+  max_bytes:
+    type: integer
+    required: false
+    default: 400000
+    min: 10000
+    max: 2000000
+  timeout_s:
+    type: integer
+    required: false
+    default: 15
+    min: 3
+    max: 60
+  allow_redirects:
+    type: boolean
+    required: false
+    default: true
+outputs:
+  content:
+    type: string
+  meta:
+    type: object
+    properties:
+      fetched_at_utc: { type: string }
+      final_url: { type: string }
+      status_code: { type: integer }
+      content_type: { type: string }
+      bytes_read: { type: integer }
+      output_sha256: { type: string }
+      raw_path: { type: string }
+      tool_version: { type: integer }

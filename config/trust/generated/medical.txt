@@ -1,0 +1,14 @@
+cochranelibrary.com
+dailymed.nlm.nih.gov
+jamanetwork.com
+medlineplus.gov
+nejm.org
+pubmed.ncbi.nlm.nih.gov
+thelancet.com
+www.cochranelibrary.com
+www.dailymed.nlm.nih.gov
+www.jamanetwork.com
+www.medlineplus.gov
+www.nejm.org
+www.pubmed.ncbi.nlm.nih.gov
+www.thelancet.com

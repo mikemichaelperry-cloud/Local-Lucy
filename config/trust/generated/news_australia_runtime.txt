@@ -1,0 +1,42 @@
+# Australian News Sources Allowlist (Runtime Version)
+# Used for region-specific news queries about Australia
+# This version is optimized for runtime domain matching
+
+# Major Australian News Outlets
+abc.net.au
+news.com.au
+nine.com.au
+smh.com.au
+theguardian.com
+theage.com.au
+afr.com
+couriermail.com.au
+dailytelegraph.com.au
+heraldsun.com.au
+perthnow.com.au
+watoday.com.au
+brisbanetimes.com.au
+canberratimes.com.au
+ntnews.com.au
+mercury.com.au
+adelaidenow.com.au
+
+# Australian Broadcasting and Media
+sbs.com.au
+specialbroadcastingservice.com.au
+aap.com.au
+crikey.com.au
+newmatilda.com
+thenewdaily.com.au
+internews.com.au
+
+# Australian News RSS Feeds
+feeds.abc.net.au
+rss.news.com.au
+
+# International Sources with Australia Coverage
+bbc.co.uk
+bbc.com
+feeds.bbci.co.uk
+theguardian.com
+aljazeera.com

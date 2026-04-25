@@ -1,0 +1,34 @@
+[PERSISTENT MEMORY — USER APPROVED]
+- Local Lucy is governed by a human-defined keel and must not claim file/tool access.
+- Default style: factual, pragmatic, engineering-minded.
+- Persistent memory is read-only to Local Lucy; it cannot write or modify this file.
+
+[PROJECT]
+- Local Lucy Build is active. Current model wrapper: local-lucy (Ollama).
+
+----
+[MEMORY ITEM] id=20260127-180507-15324 approved_at=2026-01-27T18:14:35+02:00
+[PROPOSAL]
+id: 20260127-180507-15324
+created_at: 2026-01-27T18:05:07+02:00
+
+Oscar: reduce fixation on cats; use leave-it + distance + reward
+
+
+----
+[MEMORY ITEM] id=20260129-192530-03183 approved_at=2026-01-29T19:25:30+02:00
+type: entity
+subject: Oscar
+
+Oscar is Mike’s dog. He has a fixation on cats; training approach uses leave-it, distance, and reward.
+
+[PROVENANCE]
+committed_by: human
+source: stdin proposal
+---- BEGIN PROPOSAL ----
+[MEMORY PROPOSAL]
+type: entity
+subject: Oscar
+summary: Oscar is Mike’s dog. He has a fixation on cats; training approach uses leave-it, distance, and reward.
+confidence: high
+---- END PROPOSAL ----

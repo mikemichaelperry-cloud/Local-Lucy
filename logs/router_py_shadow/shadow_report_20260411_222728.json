@@ -1,0 +1,359 @@
+{
+  "timestamp": "2026-04-11T22:27:28+0300",
+  "summary": {
+    "total_tests": 19,
+    "matches": 0,
+    "mismatches": 19,
+    "errors": 0,
+    "match_rate": 0.0
+  },
+  "performance": {
+    "avg_shell_time_ms": 2858.5263157894738,
+    "avg_python_time_ms": 2089.315789473684,
+    "avg_speedup": 1.4252800236812355
+  },
+  "results": [
+    {
+      "query": "What is 2+2?",
+      "category": "local_math",
+      "match": false,
+      "shell_time_ms": 1627,
+      "python_time_ms": 1059,
+      "speedup": 1.5363550519357885,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "What is the capital of France?",
+      "category": "local_fact",
+      "match": false,
+      "shell_time_ms": 3073,
+      "python_time_ms": 2884,
+      "speedup": 1.0655339805825244,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "How many days in a week?",
+      "category": "local_simple",
+      "match": false,
+      "shell_time_ms": 3659,
+      "python_time_ms": 3253,
+      "speedup": 1.1248078696587764,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "Who was Ada Lovelace?",
+      "category": "background_biography",
+      "match": false,
+      "shell_time_ms": 2706,
+      "python_time_ms": 1839,
+      "speedup": 1.4714518760195758,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "Tell me about the Roman Empire",
+      "category": "background_history",
+      "match": false,
+      "shell_time_ms": 4779,
+      "python_time_ms": 3937,
+      "speedup": 1.2138684277368554,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "What is the history of the Internet?",
+      "category": "background_tech",
+      "match": false,
+      "shell_time_ms": 4898,
+      "python_time_ms": 4217,
+      "speedup": 1.1614892103391037,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "Who was Marie Curie?",
+      "category": "background_science",
+      "match": false,
+      "shell_time_ms": 2715,
+      "python_time_ms": 1850,
+      "speedup": 1.4675675675675677,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "What is the latest news about Ukraine?",
+      "category": "current_news",
+      "match": false,
+      "shell_time_ms": 2566,
+      "python_time_ms": 2244,
+      "speedup": 1.14349376114082,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "Breaking news today",
+      "category": "current_breaking",
+      "match": false,
+      "shell_time_ms": 2263,
+      "python_time_ms": 2262,
+      "speedup": 1.0004420866489832,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "What are the symptoms of flu?",
+      "category": "medical_symptoms",
+      "match": false,
+      "shell_time_ms": 4550,
+      "python_time_ms": 3063,
+      "speedup": 1.4854717597127,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "How to treat a headache?",
+      "category": "medical_treatment",
+      "match": false,
+      "shell_time_ms": 1975,
+      "python_time_ms": 1045,
+      "speedup": 1.8899521531100478,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "Explain quantum mechanics simply",
+      "category": "synthesis_explain",
+      "match": false,
+      "shell_time_ms": 2540,
+      "python_time_ms": 1058,
+      "speedup": 2.4007561436672966,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "Compare capitalism and socialism",
+      "category": "synthesis_compare",
+      "match": false,
+      "shell_time_ms": 6356,
+      "python_time_ms": 4261,
+      "speedup": 1.4916686223891105,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "Tell me about it",
+      "category": "clarify_vague",
+      "match": false,
+      "shell_time_ms": 2708,
+      "python_time_ms": 1853,
+      "speedup": 1.461413923367512,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "What do you think?",
+      "category": "clarify_subjective",
+      "match": false,
+      "shell_time_ms": 2037,
+      "python_time_ms": 1058,
+      "speedup": 1.9253308128544424,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "",
+      "category": "edge_empty",
+      "match": false,
+      "shell_time_ms": 15,
+      "python_time_ms": 25,
+      "speedup": 0.6,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "Hi",
+      "category": "edge_short",
+      "match": false,
+      "shell_time_ms": 1151,
+      "python_time_ms": 1155,
+      "speedup": 0.9965367965367965,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "category": "edge_long",
+      "match": false,
+      "shell_time_ms": 2172,
+      "python_time_ms": 1068,
+      "speedup": 2.033707865168539,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    },
+    {
+      "query": "What's the weather?",
+      "category": "edge_contextual",
+      "match": false,
+      "shell_time_ms": 2522,
+      "python_time_ms": 1566,
+      "speedup": 1.6104725415070242,
+      "differences": [
+        "intent_family: shell=unknown, python=local_answer"
+      ],
+      "shell_route": "LOCAL",
+      "python_route": "LOCAL",
+      "shell_provider": "local",
+      "python_provider": "local",
+      "shell_intent": "unknown",
+      "python_intent": "local_answer",
+      "error": null
+    }
+  ]
+}

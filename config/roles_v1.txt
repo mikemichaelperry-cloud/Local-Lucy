@@ -1,0 +1,14 @@
+president
+prime minister
+ceo
+chief executive officer
+minister of
+defense minister
+foreign minister
+finance minister
+governor
+mayor
+idf chief of staff
+secretary of state
+attorney general
+supreme court chief justice

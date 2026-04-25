@@ -1,0 +1,338 @@
+version: 1
+domains:
+  abc.net.au:
+    tier: 2
+    categories: [news_world]
+    notes: "Legacy compat domain"
+  aljazeera.com:
+    tier: 3
+    categories: [geopolitics, news_world]
+    requires_corroboration: true
+    notes: "Corroborate with higher-trust sources"
+  allaboutcircuits.com:
+    tier: 2
+    categories: [electronics]
+    probe_expectation: "reachable"
+    notes: "Technical articles"
+  analog.com:
+    tier: 1
+    categories: [electronics]
+    notes: "Vendor"
+  anandtech.com:
+    tier: 2
+    categories: [engineering]
+    notes: "Tech outlet"
+  anthropic.com:
+    tier: 1
+    categories: [ai]
+    notes: "Major AI lab official announcements"
+  apnews.com:
+    tier: 1
+    categories: [geopolitics, news_world, policy_global]
+    notes: "Wire service"
+  arstechnica.com:
+    tier: 2
+    categories: [ai, engineering]
+    notes: "Tech outlet"
+  arxiv.org:
+    tier: 1
+    categories: [ai, engineering]
+    notes: "Preprints"
+  avma.org:
+    tier: 1
+    categories: [vet]
+    notes: "Professional organization"
+  aaha.org:
+    tier: 1
+    categories: [vet]
+    notes: "American Animal Hospital Association"
+  akc.org:
+    tier: 2
+    categories: [vet]
+    notes: "American Kennel Club guidance content"
+  aspca.org:
+    tier: 2
+    categories: [vet]
+    notes: "ASPCA poison and pet-care guidance"
+  bbc.co.uk:
+    tier: 2
+    categories: [news_israel, news_world]
+    notes: "Legacy compat domain"
+  bbc.com:
+    tier: 2
+    categories: [news_world, policy_global]
+    notes: "Major outlet"
+  bls.gov:
+    tier: 1
+    categories: [finance]
+    notes: "U.S. Bureau of Labor Statistics releases"
+  ec.europa.eu:
+    tier: 1
+    categories: [policy_global]
+    notes: "European Commission press and policy"
+  boi.org.il:
+    tier: 1
+    categories: [finance]
+    notes: "Official"
+  cochranelibrary.com:
+    tier: 1
+    categories: [medical]
+    probe_expectation: "reachable"
+    notes: "Systematic reviews"
+  dailymed.nlm.nih.gov:
+    tier: 1
+    categories: [medical]
+    notes: "Official NIH DailyMed labeling"
+  digikey.com:
+    tier: 2
+    categories: [electronics]
+    probe_expectation: "reachable"
+    notes: "Distributor"
+  eia.gov:
+    tier: 2
+    categories: [engineering, finance]
+    probe_expectation: "reachable"
+    notes: "Official"
+  federalreserve.gov:
+    tier: 1
+    categories: [finance]
+    notes: "Official"
+  feeds.a.dj.com:
+    tier: 2
+    categories: [finance, news_world]
+    probe_paths: ["/rss/RSSWorldNews.xml"]
+    probe_expectation: "reachable"
+    notes: "Legacy RSS host"
+  feeds.bbci.co.uk:
+    tier: 2
+    categories: [news_israel, news_world]
+    probe_paths: ["/news/world/rss.xml", "/news/world/middle_east/rss.xml"]
+    notes: "Legacy RSS host"
+  feeds.npr.org:
+    tier: 2
+    categories: [news_world]
+    probe_paths: ["/1004/rss.xml"]
+    notes: "Legacy RSS host"
+  feeds.washingtonpost.com:
+    tier: 2
+    categories: [news_world]
+    probe_paths: ["/rss/world"]
+    probe_expectation: "reachable"
+    notes: "Legacy RSS host"
+  ft.com:
+    tier: 2
+    categories: [finance, news_world]
+    notes: "Major outlet"
+  gov.il:
+    tier: 2
+    categories: [finance, geopolitics, news_israel]
+    probe_expectation: "reachable"
+    probe_host: "www.gov.il"
+    notes: "Official"
+  gov.uk:
+    tier: 1
+    categories: [policy_global]
+    notes: "UK government news and policy"
+  haaretz.com:
+    tier: 2
+    categories: [news_israel]
+    notes: "News outlet"
+  huggingface.co:
+    tier: 2
+    categories: [ai]
+    notes: "Model hub; redirect target for paperswithcode"
+  idf.il:
+    tier: 2
+    categories: [geopolitics, news_israel]
+    probe_expectation: "reachable"
+    probe_host: "www.idf.il"
+    notes: "Official"
+  iea.org:
+    tier: 2
+    categories: [engineering, finance, policy_global]
+    notes: "Official"
+  ieee.org:
+    tier: 1
+    categories: [ai, electronics, engineering]
+    notes: "Professional organization"
+  imf.org:
+    tier: 1
+    categories: [finance]
+    notes: "Official"
+  infineon.com:
+    tier: 1
+    categories: [electronics, vendor_docs]
+    notes: "Vendor"
+  jamanetwork.com:
+    tier: 1
+    categories: [medical]
+    probe_expectation: "reachable"
+    notes: "Journal network"
+  jpost.com:
+    tier: 2
+    categories: [news_israel]
+    notes: "News outlet"
+  merckvetmanual.com:
+    tier: 1
+    categories: [vet]
+    notes: "Reference"
+  medlineplus.gov:
+    tier: 1
+    categories: [medical]
+    notes: "Official NIH consumer drug information"
+  petmd.com:
+    tier: 2
+    categories: [vet]
+    notes: "Consumer veterinary guidance"
+  microchip.com:
+    tier: 1
+    categories: [electronics]
+    notes: "Vendor"
+  mouser.com:
+    tier: 2
+    categories: [electronics]
+    notes: "Distributor"
+  nejm.org:
+    tier: 1
+    categories: [medical]
+    probe_expectation: "reachable"
+    notes: "Journal"
+  npr.org:
+    tier: 2
+    categories: [news_world]
+    notes: "Legacy compat domain"
+  nxp.com:
+    tier: 1
+    categories: [electronics, vendor_docs]
+    notes: "Vendor"
+  nytimes.com:
+    tier: 2
+    categories: [news_world]
+    notes: "Legacy compat domain"
+  onsemi.com:
+    tier: 1
+    categories: [electronics]
+    probe_expectation: "reachable"
+    notes: "Vendor"
+  openai.com:
+    tier: 1
+    categories: [ai]
+    probe_expectation: "reachable"
+    notes: "Official docs/blog"
+  paperswithcode.com:
+    tier: 1
+    categories: [ai]
+    probe_paths: ["/"]
+    notes: "Benchmarks"
+  presstv.ir:
+    tier: 3
+    categories: [geopolitics, news_world]
+    requires_corroboration: true
+    notes: "Corroborate with higher-trust sources"
+  pubmed.ncbi.nlm.nih.gov:
+    tier: 1
+    categories: [medical]
+    notes: "NCBI index"
+  reuters.com:
+    tier: 1
+    categories: [geopolitics, news_world, policy_global]
+    probe_expectation: "reachable"
+    notes: "Wire service"
+  rss.nytimes.com:
+    tier: 2
+    categories: [news_world]
+    probe_paths: ["/services/xml/rss/nyt/World.xml"]
+    notes: "Legacy RSS host"
+  rt.com:
+    tier: 3
+    categories: [geopolitics, news_world]
+    requires_corroboration: true
+    notes: "Corroborate with higher-trust sources"
+  sbs.com.au:
+    tier: 2
+    categories: [news_world]
+    notes: "Legacy compat domain"
+  smh.com.au:
+    tier: 2
+    categories: [news_world]
+    notes: "Legacy compat domain"
+  spectrum.ieee.org:
+    tier: 1
+    categories: [ai, electronics, engineering]
+    notes: "IEEE publication"
+  st.com:
+    tier: 1
+    categories: [electronics]
+    notes: "Vendor"
+  technologyreview.com:
+    tier: 2
+    categories: [ai, engineering]
+    notes: "Tech outlet"
+  texasinstruments.com:
+    tier: 1
+    categories: [electronics, vendor_docs]
+    probe_host: "ti.com"
+    notes: "Vendor"
+  theguardian.com:
+    tier: 2
+    categories: [news_israel, news_world]
+    notes: "Legacy compat domain"
+  thelancet.com:
+    tier: 1
+    categories: [medical]
+    probe_expectation: "reachable"
+    notes: "Journal"
+  ti.com:
+    tier: 1
+    categories: [electronics]
+    notes: "Vendor"
+  timesofisrael.com:
+    tier: 2
+    categories: [news_israel]
+    notes: "News outlet"
+  tomshardware.com:
+    tier: 2
+    categories: [engineering]
+    notes: "Tech outlet"
+  vcahospitals.com:
+    tier: 2
+    categories: [vet]
+    notes: "Veterinary network guidance"
+  washingtonpost.com:
+    tier: 2
+    categories: [news_world]
+    notes: "Legacy compat domain"
+  wsava.org:
+    tier: 1
+    categories: [vet]
+    notes: "World Small Animal Veterinary Association"
+  wikipedia.org:
+    tier: 2
+    categories: [reference]
+    notes: "Encyclopedia; only use when explicitly requested"
+  world-nuclear.org:
+    tier: 2
+    categories: [engineering]
+    notes: "Industry organization"
+  rfc-editor.org:
+    tier: 1
+    categories: [engineering, docs]
+    probe_host: "www.rfc-editor.org"
+    notes: "IETF RFC publisher"
+  wsj.com:
+    tier: 2
+    categories: [finance, news_world]
+    probe_expectation: "reachable"
+    notes: "Major outlet"
+  xe.com:
+    tier: 2
+    categories: [finance]
+    notes: "Legacy compat domain"
+  ynet.co.il:
+    tier: 2
+    categories: [news_israel]
+    notes: "News outlet"
+  ynetnews.com:
+    tier: 2
+    categories: [news_israel]
+    notes: "News outlet"

@@ -1,0 +1,16 @@
+version: 1
+urls:
+  BAD_DOMAIN_MISMATCH:
+    url: https://www.rfc-editor.org/rfc/rfc7231
+    domain: httpbin.org
+    tags: [test]
+
+  BAD_LOCALHOST_TEST:
+    url: https://localhost/
+    domain: localhost
+    tags: [test]
+
+  RFC_7231_COPY:
+    url: https://www.rfc-editor.org/rfc/rfc7231
+    domain: www.rfc-editor.org
+    tags: [standards]

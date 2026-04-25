@@ -1,0 +1,6 @@
+version: 1
+urls:
+  RFC_7231:
+    url: https://www.rfc-editor.org/rfc/rfc7231
+    domain: www.rfc-editor.org
+    tags: [standards]

@@ -1,0 +1,28 @@
+# adapter<TAB>mode<TAB>confidence<TAB>pattern<TAB>replacement
+medical	EVIDENCE	high	\barrhythia\b	arrhythmia
+medical	EVIDENCE	medium	\bside affects\b	side effects
+medical	EVIDENCE	medium	\bside affect\b	side effect
+medical	EVIDENCE	medium	\bdosage\b	dose
+medical	EVIDENCE	high	\btadalifil\b	tadalafil
+medical	EVIDENCE	high	\bamoxycillin\b	amoxicillin
+medical	EVIDENCE	high	\bamoxycilin\b	amoxicillin
+medical	EVIDENCE	high	\bamoxcillin\b	amoxicillin
+medical	EVIDENCE	high	\bamoxillin\b	amoxicillin
+medical	EVIDENCE	high	\bpanadol\b	paracetamol
+medical	EVIDENCE	high	\btylenol\b	acetaminophen
+medical	EVIDENCE	high	\badvil\b	ibuprofen
+medical	EVIDENCE	high	\bmotrin\b	ibuprofen
+medical	EVIDENCE	high	\bnurofen\b	ibuprofen
+medical	EVIDENCE	high	\blipitor\b	atorvastatin
+medical	EVIDENCE	high	\bcialis\b	tadalafil
+medical	EVIDENCE	high	\bviagra\b	sildenafil
+medical	EVIDENCE	high	\blevitra\b	vardenafil
+medical	EVIDENCE	high	\bglucophage\b	metformin
+medical	EVIDENCE	medium	\bcorrecft\b	correct
+travel	EVIDENCE	medium	\btravel warning\b	travel advisory
+travel	EVIDENCE	medium	\btravelling\b	traveling
+finance	EVIDENCE	high	\bgoogle stock\b	alphabet stock
+finance	EVIDENCE	high	\bgoogle shares\b	alphabet shares
+institution	EVIDENCE	high	\bboi\b	bank of israel
+institution	EVIDENCE	high	\bcdc\b	centers for disease control and prevention
+software	EVIDENCE	medium	\bchat[ -]?gpt\b	chatgpt

@@ -1,0 +1,1 @@
+../config/fetch_domains_allowlist.txt

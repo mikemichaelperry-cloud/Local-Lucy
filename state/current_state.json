@@ -1,0 +1,15 @@
+{
+  "approval_required": false,
+  "augmentation_policy": "fallback_only",
+  "augmented_provider": "wikipedia",
+  "conversation": "off",
+  "evidence": "on",
+  "last_updated": "2026-04-14T21:41:31Z",
+  "memory": "on",
+  "mode": "auto",
+  "model": "local-lucy",
+  "profile": "opt-experimental-v8-dev",
+  "schema_version": 1,
+  "status": "ready",
+  "voice": "on"
+}

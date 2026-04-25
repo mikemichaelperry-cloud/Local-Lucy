@@ -1,0 +1,17 @@
+version: 1
+fetch_allow_tiers: [1, 2]
+evidence_min_sources_high_stakes: 2
+primary_doc_min_sources: 1
+primary_doc_authoritative_tiers: [1]
+primary_doc_categories: ["electronics", "docs", "vendor_docs"]
+primary_doc_prefer_domains:
+  - "ti.com"
+  - "analog.com"
+  - "st.com"
+  - "microchip.com"
+  - "onsemi.com"
+  - "nxp.com"
+  - "infineon.com"
+  - "texasinstruments.com"
+  - "digikey.com"
+  - "mouser.com"

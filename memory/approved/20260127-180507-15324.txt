@@ -1,0 +1,6 @@
+[PROPOSAL]
+id: 20260127-180507-15324
+created_at: 2026-01-27T18:05:07+02:00
+
+Oscar: reduce fixation on cats; use leave-it + distance + reward
+

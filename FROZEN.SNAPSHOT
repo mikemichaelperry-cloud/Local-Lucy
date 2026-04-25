@@ -1,0 +1,6 @@
+FROZEN_SNAPSHOT=1
+NAME=opt-experimental-v1-FROZEN-20260224
+CREATED_AT=2026-02-24T20:03:44+02:00
+SOURCE=/home/mike/lucy/snapshots/opt-experimental-v1
+NOTE=Frozen baseline created after sha_manifest and full_regression_v2 PASS on 2026-02-24.
+DO_NOT_MODIFY=1

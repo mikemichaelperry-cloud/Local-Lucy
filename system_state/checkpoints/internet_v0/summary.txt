@@ -1,0 +1,1 @@
+SearX(html=200 json=200) gate_search_rc=0 has_url=1 deny_local=1 deny_meta=1 => ACCEPTED

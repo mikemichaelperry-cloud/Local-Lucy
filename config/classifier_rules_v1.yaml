@@ -1,0 +1,166 @@
+classifier_version: "classifier_v1"
+
+normalization:
+  lowercase_ascii: true
+  trim: true
+  collapse_whitespace: true
+
+precedence:
+  - NEWS
+  - EVIDENCE
+  - LOCAL
+
+# IMPORTANT:
+# - Rules are evaluated strictly top-to-bottom.
+# - First decisive hit sets mode.
+# - All hits are recorded in all_rules.
+
+rules:
+
+  # =========================
+  # NEWS (highest precedence)
+  # =========================
+
+  - id: "NEWS-KEYWORD"
+    mode: "NEWS"
+    match_any_word:
+      - "news"
+      - "headlines"
+      - "breaking"
+      - "updates"
+      - "update"
+    match_any_phrase:
+      - "latest news"
+
+  - id: "NEWS-GEO-POLITY"
+    mode: "NEWS"
+    requires:
+      any_word:
+        - "israel"
+        - "gaza"
+        - "hamas"
+        - "hezbollah"
+        - "iran"
+        - "idf"
+        - "knesset"
+        - "un"
+        - "eu"
+      any_time_cue: true
+
+  - id: "NEWS-TODAY-IMPLIED"
+    mode: "NEWS"
+    match_any_prefix:
+      - "what happened"
+      - "what's happening"
+      - "what is happening"
+    requires:
+      any_phrase:
+        - "today"
+        - "now"
+        - "right now"
+        - "this morning"
+        - "tonight"
+
+  # =========================
+  # EVIDENCE
+  # =========================
+
+  - id: "TIME-CUE"
+    mode: "EVIDENCE"
+    match_any_phrase:
+      - "latest"
+      - "most recent"
+      - "today"
+      - "current"
+      - "currently"
+      - "now"
+      - "right now"
+      - "this week"
+      - "this month"
+      - "this year"
+      - "recent"
+      - "recently"
+      - "as of"
+      - "at the moment"
+      - "up to date"
+      - "update on"
+
+  - id: "DATE-RELATIVE"
+    mode: "EVIDENCE"
+    match_any_word:
+      - "yesterday"
+      - "tomorrow"
+    match_any_phrase:
+      - "last night"
+      - "this morning"
+      - "tonight"
+      - "next week"
+
+  - id: "DATE-ABSOLUTE-ISO"
+    mode: "EVIDENCE"
+    match_any_regex:
+      - "\\b\\d{4}-\\d{2}-\\d{2}\\b"
+
+  - id: "DATE-ABSOLUTE-SLASH"
+    mode: "EVIDENCE"
+    match_any_regex:
+      - "\\b\\d{1,2}/\\d{1,2}/\\d{4}\\b"
+
+  - id: "DATE-ABSOLUTE-MONTHNAME"
+    mode: "EVIDENCE"
+    match_any_regex:
+      - "\\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\\s+\\d{1,2}\\b"
+      - "\\b\\d{1,2}\\s+(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\\b"
+
+  - id: "OFFICE-HOLDER"
+    mode: "EVIDENCE"
+    requires:
+      any_phrase:
+        - "who is the"
+        - "who's the"
+        - "who is"
+        - "who's"
+    requires2:
+      any_role: true
+
+  - id: "MARKET-DATA"
+    mode: "EVIDENCE"
+    match_any_phrase:
+      - "price of"
+      - "exchange rate"
+      - "market cap"
+      - "bond yield"
+      - "interest rate"
+    match_any_word:
+      - "stock"
+      - "shares"
+      - "usd"
+      - "eur"
+      - "ils"
+      - "bitcoin"
+      - "btc"
+      - "ethereum"
+      - "eth"
+      - "inflation"
+      - "cpi"
+
+  - id: "REGULATION"
+    mode: "EVIDENCE"
+    requires:
+      any_word:
+        - "law"
+        - "legal"
+        - "regulation"
+        - "rules"
+        - "policy"
+        - "guidelines"
+    requires2:
+      any_word:
+        - "new"
+        - "changed"
+        - "updated"
+        - "current"
+        - "latest"
+        - "as"
+
+default_mode: "LOCAL"

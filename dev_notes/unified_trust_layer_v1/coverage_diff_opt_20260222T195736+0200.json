@@ -1,0 +1,18 @@
+{
+  "added": [],
+  "baseline_domains_file": "/home/mike/lucy/snapshots/opt-experimental-v1/dev_notes/unified_trust_layer_v1/baseline_domains_opt_20260222T195736+0200.txt",
+  "baseline_tier_map_file": "/home/mike/lucy/snapshots/opt-experimental-v1/dev_notes/unified_trust_layer_v1/baseline_tier_map_opt_20260222T195736+0200.tsv",
+  "category_shrink": [],
+  "counts": {
+    "added": 0,
+    "baseline_domains": 57,
+    "category_shrink": 0,
+    "current_domains": 57,
+    "removed": 0,
+    "retier": 0
+  },
+  "current_allowlist": "/home/mike/lucy/snapshots/opt-experimental-v1/config/trust/generated/allowlist_fetch.txt",
+  "removed": [],
+  "retier": [],
+  "root": "/home/mike/lucy/snapshots/opt-experimental-v1"
+}
