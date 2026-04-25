@@ -1,0 +1,17 @@
+{
+  "defaults": {
+    "engine": "auto",
+    "fallback_engine": "",
+    "auto_order": ["kokoro", "piper"]
+  },
+  "engines": {
+    "piper": {
+      "voice": "en_GB-cori-high",
+      "fallback_engine": ""
+    },
+    "kokoro": {
+      "voice": "af_bella",
+      "fallback_engine": "piper"
+    }
+  }
+}

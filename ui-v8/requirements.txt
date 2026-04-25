@@ -1,0 +1,14 @@
+# Local Lucy v8 - Core Dependencies
+# Install with: pip install -r requirements.txt
+
+# UI Framework
+PySide6>=6.4.0,<7.0.0
+
+# Async HTTP for providers
+aiohttp>=3.8.0
+
+# Testing
+pytest>=7.0.0
+
+# Local model support (optional but recommended)
+# Install ollama separately: https://ollama.com
