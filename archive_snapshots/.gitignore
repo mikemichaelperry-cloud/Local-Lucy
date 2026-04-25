@@ -1,4 +1,8 @@
-# Large binary files and archives not needed for source control
+# Archives excluded from git (large binaries + old snapshots)
 retired-snapshot-set-*/
 *.bin
 *.onnx
+*.pt
+*.pth
+*.ckpt
+*.safetensors
