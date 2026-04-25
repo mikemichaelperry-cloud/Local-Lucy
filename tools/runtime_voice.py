@@ -231,7 +231,8 @@ def resolve_voice_python(requested_engine: str | None = None) -> str:
         if explicit_path.exists() and os.access(explicit_path, os.X_OK):
             return str(explicit_path)
 
-    workspace_root = resolve_root().parent.parent
+    root = resolve_root()
+    workspace_root = root if root.name == "lucy-v8" else root.parent.parent
     preferred_engine = clean_text(requested_engine).lower()
     if preferred_engine in {"", "auto"}:
         preferred_engine = "kokoro"
@@ -239,22 +240,25 @@ def resolve_voice_python(requested_engine: str | None = None) -> str:
     adapter_tool = resolve_tts_adapter_tool()
     # ISOLATION: V8 only uses ui-v8, NEVER falls back to ui-v7
     candidate = workspace_root / "ui-v8" / ".venv" / "bin" / "python3"
-    if not candidate.exists() or not os.access(candidate, os.X_OK):
-        raise RuntimeError(
-            f"V8 ISOLATION VIOLATION: ui-v8 Python not found at {candidate}. "
-            f"V8 cannot use V7 components."
-        )
-    
-    if preferred_engine in {"kokoro", "piper"} and adapter_tool.exists():
-        payload = run_tts_adapter_command(
-            python_bin=str(candidate),
-            command="probe",
-            requested_engine=preferred_engine,
-        )
-        if payload.get("ok") and clean_text(payload.get("engine")) == preferred_engine:
-            return str(candidate)
-    
-    return str(candidate)
+    if candidate.exists() and os.access(candidate, os.X_OK):
+        if preferred_engine in {"kokoro", "piper"} and adapter_tool.exists():
+            payload = run_tts_adapter_command(
+                python_bin=str(candidate),
+                command="probe",
+                requested_engine=preferred_engine,
+            )
+            if payload.get("ok") and clean_text(payload.get("engine")) == preferred_engine:
+                return str(candidate)
+        return str(candidate)
+
+    for fallback in (Path(sys.executable), Path("/usr/bin/python3")):
+        if fallback.exists() and os.access(fallback, os.X_OK):
+            return str(fallback)
+
+    raise RuntimeError(
+        f"V8 ISOLATION VIOLATION: ui-v8 Python not found at {candidate}, "
+        "and no system python3 fallback is executable. V8 cannot use V7 components."
+    )
 
 
 def read_pid_file(path: Path) -> int | None:
@@ -566,7 +570,11 @@ def whisper_command_env(stt_bin: str) -> dict[str, str]:
 def detect_tts() -> tuple[str, str, str, str]:
     requested_engine = clean_text(os.environ.get("LUCY_VOICE_TTS_ENGINE")) or "auto"
     _voice_logger.debug(f"Detecting TTS engine (requested: {requested_engine})...")
-    voice_python = resolve_voice_python(requested_engine)
+    try:
+        voice_python = resolve_voice_python(requested_engine)
+    except RuntimeError as exc:
+        _voice_logger.info(f"TTS engine selected: none ({exc})")
+        return "none", "", "none", "none"
     payload = run_tts_adapter_command(
         python_bin=voice_python,
         command="probe",

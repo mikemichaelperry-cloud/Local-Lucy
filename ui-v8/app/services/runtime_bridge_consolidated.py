@@ -86,14 +86,25 @@ class ConsolidatedRuntimeBridge:
     
     def _setup_environment(self):
         """Set required environment variables."""
-        os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", 
-            str(Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev"))
-        os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", 
-            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v8"))
-        os.environ.setdefault("LUCY_UI_ROOT", 
-            str(Path(__file__).parent.parent.parent))
+        # Get the authority root - prefer env var, fallback to project root
+        default_authority_root = Path(__file__).resolve().parents[3]
+        authority_root = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", str(default_authority_root)))
+
+        os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(authority_root))
+        os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(authority_root))
+        os.environ.setdefault("LUCY_UI_ROOT", str(authority_root / "ui-v8"))
         os.environ.setdefault("LUCY_ROUTER_PY", "1")
         os.environ.setdefault("LUCY_EXEC_PY", "1")  # Use Python execution by default
+
+        # Voice runtime file paths (required by runtime_voice.py)
+        os.environ.setdefault("LUCY_VOICE_RUNTIME_FILE",
+            str(authority_root / "state" / "voice_runtime.json"))
+        os.environ.setdefault("LUCY_VOICE_CAPTURE_DIR",
+            str(authority_root / "voice" / "ui_ptt"))
+
+        # Request history file path
+        os.environ.setdefault("LUCY_RUNTIME_REQUEST_HISTORY_FILE",
+            str(authority_root / "state" / "request_history.jsonl"))
     
     def _discover_capabilities(self) -> dict[str, ActionCapability]:
         """Discover available capabilities."""
