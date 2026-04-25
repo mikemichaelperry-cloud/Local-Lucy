@@ -1,0 +1,7 @@
+version: 1
+https_only: true
+exact:
+  - www.rfc-editor.org
+subdomains: []
+ports:
+  - 443

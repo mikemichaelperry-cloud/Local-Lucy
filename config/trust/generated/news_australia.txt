@@ -1,0 +1,72 @@
+# Australian News Sources Allowlist
+# Used for region-specific news queries about Australia
+
+# Major Australian News Outlets
+abc.net.au
+www.abc.net.au
+news.com.au
+www.news.com.au
+nine.com.au
+www.nine.com.au
+smh.com.au
+www.smh.com.au
+theguardian.com
+www.theguardian.com
+theage.com.au
+www.theage.com.au
+afr.com
+www.afr.com
+couriermail.com.au
+www.couriermail.com.au
+dailytelegraph.com.au
+www.dailytelegraph.com.au
+heraldsun.com.au
+www.heraldsun.com.au
+perthnow.com.au
+www.perthnow.com.au
+watoday.com.au
+www.watoday.com.au
+brisbanetimes.com.au
+www.brisbanetimes.com.au
+canberratimes.com.au
+www.canberratimes.com.au
+ntnews.com.au
+www.ntnews.com.au
+mercury.com.au
+www.mercury.com.au
+adelaidenow.com.au
+www.adelaidenow.com.au
+
+# Australian Broadcasting and Media
+sbs.com.au
+www.sbs.com.au
+specialbroadcastingservice.com.au
+www.specialbroadcastingservice.com.au
+aap.com.au
+www.aap.com.au
+crikey.com.au
+www.crikey.com.au
+newmatilda.com
+www.newmatilda.com
+thenewdaily.com.au
+www.thenewdaily.com.au
+internews.com.au
+www.internews.com.au
+
+# Australian News RSS Feeds
+feeds.abc.net.au
+www.feeds.abc.net.au
+rss.news.com.au
+www.rss.news.com.au
+
+# International Sources with Australia Coverage
+bbc.co.uk
+www.bbc.co.uk
+bbc.com
+www.bbc.com
+feeds.bbci.co.uk
+www.feeds.bbci.co.uk
+theguardian.com
+www.theguardian.com
+aljazeera.com
+www.aljazeera.com

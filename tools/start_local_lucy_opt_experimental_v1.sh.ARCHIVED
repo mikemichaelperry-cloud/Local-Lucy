@@ -1,0 +1,433 @@
+#!/usr/bin/env bash
+# ROLE: LEGACY / DEPRECATED SURFACE
+# Retained for compatibility/history; do not use for new workflows.
+# Preferred replacement: tools/start_local_lucy_opt_experimental_v7_dev.sh
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${LUCY_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)}"
+cd "$ROOT"
+
+export LUCY_ROOT="$ROOT"
+export LUCY_TOOLS_DIR="$ROOT/tools"
+export LUCY_CONF_DIR="$ROOT/config"
+export LUCY_ENABLE_INTERNET="${LUCY_ENABLE_INTERNET:-1}"
+export LUCY_SESSION_MEMORY="${LUCY_SESSION_MEMORY:-1}"
+VOICE_TOOL="${ROOT}/tools/lucy_voice_ptt.sh"
+VOICE_INSTALL_TOOL="${ROOT}/tools/install_voice_engines.sh"
+VOICE_VERIFY_TOOL="${ROOT}/tools/verify_voice_engines.sh"
+LAST_ROUTE_FILE="${ROOT}/state/last_route.env"
+LAST_OUTCOME_FILE="${ROOT}/state/last_outcome.env"
+MEM_MAX_TURNS="${LUCY_SESSION_MEMORY_MAX_TURNS:-6}"
+MEM_FILE="${ROOT}/tmp/run/session_memory_launcher_$$.txt"
+
+mkdir -p "${ROOT}/tmp/run"
+: > "${MEM_FILE}"
+trap 'rm -f "${MEM_FILE}"' EXIT
+if [[ "${LUCY_SESSION_MEMORY}" != "0" && "${LUCY_SESSION_MEMORY}" != "1" ]]; then
+  LUCY_SESSION_MEMORY=1
+fi
+if ! [[ "${MEM_MAX_TURNS}" =~ ^[0-9]+$ ]] || [[ "${MEM_MAX_TURNS}" -lt 1 ]]; then
+  MEM_MAX_TURNS=6
+fi
+
+memory_enabled(){
+  [[ "${LUCY_SESSION_MEMORY}" == "1" ]]
+}
+
+memory_clean_answer(){
+  printf '%s\n' "$1" \
+    | sed '/^BEGIN_VALIDATED$/d; /^END_VALIDATED$/d' \
+    | sed -E 's/[[:space:]]+/ /g; s/^ +//; s/ +$//'
+}
+
+memory_trim_file(){
+  local tmpf
+  tmpf="$(mktemp)"
+  awk -v keep="${MEM_MAX_TURNS}" '
+    BEGIN { RS=""; ORS="\n\n" }
+    { blocks[++n]=$0 }
+    END {
+      s=n-keep+1
+      if (s<1) s=1
+      for (i=s; i<=n; i++) print blocks[i]
+    }
+  ' "${MEM_FILE}" > "${tmpf}" 2>/dev/null || true
+  mv "${tmpf}" "${MEM_FILE}"
+}
+
+memory_add_turn(){
+  local user_q="$1"
+  local assist="$2"
+  local assist_one
+  assist_one="$(memory_clean_answer "${assist}" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ +//; s/ +$//')"
+  if [[ "${#assist_one}" -gt 500 ]]; then
+    assist_one="${assist_one:0:500}"
+  fi
+  printf 'User: %s\n' "${user_q}" >> "${MEM_FILE}"
+  printf 'Assistant: %s\n\n' "${assist_one}" >> "${MEM_FILE}"
+  memory_trim_file
+}
+
+memory_status(){
+  local state="off"
+  if memory_enabled; then
+    state="on"
+  fi
+  local turns
+  turns="$(grep -c '^User: ' "${MEM_FILE}" 2>/dev/null || true)"
+  echo "Session memory: ${state} turns=${turns}/${MEM_MAX_TURNS}"
+}
+
+memory_unsafe_query(){
+  local qpol
+  qpol="${ROOT}/tools/query_policy.sh"
+  if [[ -x "${qpol}" ]]; then
+    if "${qpol}" is-memory-unsafe "$1" >/dev/null 2>&1; then
+      return 0
+    fi
+    return 1
+  fi
+  local q_norm
+  q_norm="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s/[[:space:]]+/ /g')"
+  # Do not inject/store memory for news/evidence/web/time-sensitive/high-risk turns.
+  if printf '%s' "${q_norm}" | grep -Eqi '(^|[^[:alnum:]_])(news|headline|headlines|breaking|latest|recent|today|current|new shah|source|sources|citation|citations|evidence|verify|wikipedia|wiki|fetch|browse|search web|website|url|http)([^[:alnum:]_]|$)'; then
+    return 0
+  fi
+  if printf '%s' "${q_norm}" | grep -Eqi '(^|[^[:alnum:]_])(price|stock|quote|market|inflation|exchange rate|currency|fx|weather|temperature|schedule)([^[:alnum:]_]|$)'; then
+    return 0
+  fi
+  if printf '%s' "${q_norm}" | grep -Eqi '(^|[^[:alnum:]_])(tadalafil|tadalifil|cialis|viagra|sildenafil|vardenafil|metformin|statin|insulin|dose|dosage|side effect|interaction|interactions|contraindication|contraindications|medication|drug|drugs|alcohol)([^[:alnum:]_]|$)|react[[:space:]]+with'; then
+    return 0
+  fi
+  return 1
+}
+
+read_route_field(){
+  local key="$1"
+  local file="$2"
+  grep -E "^${key}=" "$file" 2>/dev/null | head -n1 | cut -d= -f2-
+}
+
+show_evidence_status(){
+  local evid_root latest_sess latest_dir pack domains_file domains pack_file pack_bytes mode_text evidence_state
+  evid_root="${ROOT}/evidence"
+  case "${ROUTE_CONTROL_MODE}" in
+    AUTO)
+      mode_text="auto"
+      evidence_state="auto"
+      ;;
+    FORCED_ONLINE)
+      mode_text="online"
+      evidence_state="on"
+      ;;
+    FORCED_OFFLINE)
+      mode_text="offline"
+      evidence_state="off"
+      ;;
+    *)
+      mode_text="unknown"
+      evidence_state="unknown"
+      ;;
+  esac
+
+  echo "Mode: ${mode_text}"
+  echo "Evidence: ${evidence_state}"
+  echo "Evidence root: ${evid_root}"
+
+  if [[ -f "${LAST_ROUTE_FILE}" ]]; then
+    echo "Last route mode: $(read_route_field MODE "${LAST_ROUTE_FILE}")"
+    echo "Last route reason: $(read_route_field ROUTE_REASON "${LAST_ROUTE_FILE}")"
+    latest_sess="$(read_route_field SESSION_ID "${LAST_ROUTE_FILE}")"
+    if [[ -n "${latest_sess}" ]]; then
+      echo "Last session id: ${latest_sess}"
+    fi
+  fi
+
+  latest_dir="$(find "${evid_root}" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' 2>/dev/null | awk '$2 ~ /^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-/ {print}' | sort -nr | head -n1 | cut -d' ' -f2- || true)"
+  if [[ -z "${latest_dir}" ]]; then
+    echo "Latest evidence dir: none"
+    return 0
+  fi
+
+  echo "Latest evidence dir: ${evid_root}/${latest_dir}"
+  pack_file="${evid_root}/${latest_dir}/pack/evidence_pack.txt"
+  domains_file="${evid_root}/${latest_dir}/pack/domains.txt"
+  if [[ -f "${pack_file}" ]]; then
+    pack_bytes="$(wc -c < "${pack_file}" | tr -d ' ')"
+    echo "Latest pack file: ${pack_file}"
+    echo "Latest pack bytes: ${pack_bytes}"
+  fi
+  if [[ -f "${domains_file}" ]]; then
+    domains="$(tr '\n' ' ' < "${domains_file}" | sed -E 's/[[:space:]]+$//')"
+    echo "Latest domains: ${domains:-none}"
+  fi
+}
+
+show_why(){
+  if [[ ! -f "${LAST_OUTCOME_FILE}" ]]; then
+    echo "No query outcome recorded yet."
+    return 0
+  fi
+  echo "Route: $(read_route_field MODE "${LAST_OUTCOME_FILE}")"
+  echo "Route reason: $(read_route_field ROUTE_REASON "${LAST_OUTCOME_FILE}")"
+  echo "Evidence created: $(read_route_field EVIDENCE_CREATED "${LAST_OUTCOME_FILE}")"
+  echo "Outcome code: $(read_route_field OUTCOME_CODE "${LAST_OUTCOME_FILE}")"
+  hint="$(read_route_field ACTION_HINT "${LAST_OUTCOME_FILE}")"
+  if [[ -n "${hint}" ]]; then
+    echo "Next action: ${hint}"
+  fi
+  echo "Session id: $(read_route_field SESSION_ID "${LAST_OUTCOME_FILE}")"
+}
+
+echo "== Local Lucy compatibility launcher (v3 family) =="
+echo "Type /quit to exit."
+echo "Default mode: AUTO (router runs; web/evidence auto when needed)"
+echo "Shortcut: 'run auto' | 'run online' | 'run offline'"
+echo "One-shot+switch: 'run auto: ...' / 'run online: ...' / 'run offline: ...'"
+echo "Commands: /mode auto|online|offline | /status | /help"
+echo "Memory: /memory on|off|show|clear"
+echo "Voice: /voice | /voice-once | /voice-online | /voice-offline | /voice-install | /voice-verify"
+echo
+
+ROUTE_CONTROL_MODE="AUTO"
+
+launch_voice(){
+  local once="${1:-0}"
+  if [[ ! -x "${VOICE_TOOL}" ]]; then
+    echo "ERROR: missing voice tool: ${VOICE_TOOL}"
+    return 0
+  fi
+
+  case "${ROUTE_CONTROL_MODE}" in
+    FORCED_OFFLINE)
+      echo "Launching voice mode in OFFLINE/local route. Press Ctrl+C to return."
+      echo
+      if [[ "${once}" == "1" ]]; then
+        LUCY_VOICE_ROUTE_MODE=offline LUCY_VOICE_ONESHOT=1 LUCY_VOICE_PTT_MODE=tap "${VOICE_TOOL}" || true
+      else
+        LUCY_VOICE_ROUTE_MODE=offline LUCY_VOICE_PTT_MODE=hold "${VOICE_TOOL}" || true
+      fi
+      ;;
+    FORCED_ONLINE)
+      echo "Launching voice mode in ONLINE route (news/evidence heuristics). Press Ctrl+C to return."
+      echo
+      if [[ "${once}" == "1" ]]; then
+        LUCY_VOICE_ROUTE_MODE=online LUCY_VOICE_ONESHOT=1 LUCY_VOICE_PTT_MODE=tap "${VOICE_TOOL}" || true
+      else
+        LUCY_VOICE_ROUTE_MODE=online LUCY_VOICE_PTT_MODE=hold "${VOICE_TOOL}" || true
+      fi
+      ;;
+    AUTO|*)
+      echo "Launching voice mode in AUTO route (same classifier path as text chat). Press Ctrl+C to return."
+      echo
+      if [[ "${once}" == "1" ]]; then
+        LUCY_VOICE_ROUTE_MODE=auto LUCY_VOICE_ONESHOT=1 LUCY_VOICE_PTT_MODE=tap "${VOICE_TOOL}" || true
+      else
+        LUCY_VOICE_ROUTE_MODE=auto LUCY_VOICE_PTT_MODE=hold "${VOICE_TOOL}" || true
+      fi
+      ;;
+  esac
+}
+
+while true; do
+  case "${ROUTE_CONTROL_MODE}" in
+    AUTO) printf "lucy[auto]> " ;;
+    FORCED_ONLINE) printf "lucy[online]> " ;;
+    FORCED_OFFLINE) printf "lucy[offline]> " ;;
+    *) printf "lucy[?]> " ;;
+  esac
+  if ! IFS= read -r q; then
+    echo
+    exit 0
+  fi
+
+  case "${q}" in
+    "/quit"|"/exit")
+      exit 0
+      ;;
+    "/help")
+      echo "Commands:"
+      echo "  /mode auto        router default (auto local/news/evidence)"
+      echo "  /mode online      route normal queries by classifier (news/evidence/local)"
+      echo "  /mode offline     force offline; web/medical prompts require evidence mode"
+      echo "  /status           show current mode"
+      echo "  /evidence-status  show latest evidence session + route reason"
+      echo "  /why              explain route/outcome for the last query"
+      echo "  /memory on|off|show|clear"
+      echo "  /voice            hold-to-talk in current mode"
+      echo "  /voice-once       single PTT turn in current mode"
+      echo "  /voice-online     switch online + launch voice"
+      echo "  /voice-offline    switch offline + launch voice"
+      echo "  /voice-install    install STT/TTS engines"
+      echo "  /voice-verify     verify voice setup"
+      echo "Shortcuts:"
+      echo "  run auto          same as /mode auto"
+      echo "  run online        same as /mode online"
+      echo "  run offline       same as /mode offline"
+      echo "  run auto: ...     switch auto + run query (mode persists)"
+      echo "  run online: ...   switch online + run query (mode persists)"
+      echo "  run offline: ...  switch offline + run query (mode persists)"
+      echo
+      continue
+      ;;
+    "/status")
+      case "${ROUTE_CONTROL_MODE}" in
+        AUTO) echo "Mode: auto (router decides local/news/evidence)" ;;
+        FORCED_ONLINE) echo "Mode: online (forced; web/evidence allowed)" ;;
+        FORCED_OFFLINE) echo "Mode: offline (forced; evidence-required queries blocked)" ;;
+        *) echo "Mode: unknown (${ROUTE_CONTROL_MODE})" ;;
+      esac
+      echo "Backend: ollama"
+      echo "Model: ${LUCY_LOCAL_MODEL:-local-lucy}"
+      memory_status
+      echo "Evidence root: ${ROOT}/evidence"
+      if [[ -f "${LAST_ROUTE_FILE}" ]]; then
+        echo "Last route mode: $(read_route_field MODE "${LAST_ROUTE_FILE}")"
+        echo "Last route reason: $(read_route_field ROUTE_REASON "${LAST_ROUTE_FILE}")"
+        sess="$(read_route_field SESSION_ID "${LAST_ROUTE_FILE}")"
+        if [[ -n "${sess}" ]]; then
+          echo "Last session id: ${sess}"
+        fi
+      fi
+      echo
+      continue
+      ;;
+    "/evidence-status")
+      show_evidence_status
+      echo
+      continue
+      ;;
+    "/why")
+      show_why
+      echo
+      continue
+      ;;
+    "/memory on")
+      LUCY_SESSION_MEMORY=1
+      memory_status
+      echo
+      continue
+      ;;
+    "/memory off")
+      LUCY_SESSION_MEMORY=0
+      memory_status
+      echo
+      continue
+      ;;
+    "/memory clear")
+      : > "${MEM_FILE}"
+      memory_status
+      echo
+      continue
+      ;;
+    "/memory show")
+      memory_status
+      if [[ ! -s "${MEM_FILE}" ]]; then
+        echo "(empty)"
+      else
+        cat "${MEM_FILE}"
+      fi
+      echo
+      continue
+      ;;
+    "/mode auto")
+      ROUTE_CONTROL_MODE="AUTO"
+      echo "Mode: AUTO (router decides local/news/evidence)"
+      echo
+      continue
+      ;;
+    "/mode online")
+      ROUTE_CONTROL_MODE="FORCED_ONLINE"
+      echo "Mode: FORCED_ONLINE (router runs; web/evidence allowed)"
+      echo
+      continue
+      ;;
+    "/mode offline")
+      ROUTE_CONTROL_MODE="FORCED_OFFLINE"
+      echo "Mode: FORCED_OFFLINE (router runs; web/medical require evidence mode)"
+      echo
+      continue
+      ;;
+    "/voice")
+      launch_voice 0
+      echo
+      continue
+      ;;
+    "/voice-once")
+      launch_voice 1
+      echo
+      continue
+      ;;
+    "/voice-online")
+      ROUTE_CONTROL_MODE="FORCED_ONLINE"
+      launch_voice 0
+      echo
+      continue
+      ;;
+    "/voice-offline")
+      ROUTE_CONTROL_MODE="FORCED_OFFLINE"
+      launch_voice 0
+      echo
+      continue
+      ;;
+    "/voice-install")
+      if [[ -x "${VOICE_INSTALL_TOOL}" ]]; then
+        "${VOICE_INSTALL_TOOL}" || true
+      else
+        echo "ERROR: missing voice install tool: ${VOICE_INSTALL_TOOL}"
+      fi
+      echo
+      continue
+      ;;
+    "/voice-verify")
+      if [[ -x "${VOICE_VERIFY_TOOL}" ]]; then
+        "${VOICE_VERIFY_TOOL}" || true
+      else
+        echo "ERROR: missing voice verify tool: ${VOICE_VERIFY_TOOL}"
+      fi
+      echo
+      continue
+      ;;
+  esac
+
+  [[ -z "${q// }" ]] && continue
+  q_norm="$(printf '%s' "$q" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s/[[:space:]]+/ /g')"
+  if [[ "$q_norm" == "run auto" ]]; then
+    ROUTE_CONTROL_MODE="AUTO"
+    echo "Mode: AUTO (router decides local/news/evidence)"
+    echo
+    continue
+  elif [[ "$q_norm" == "run online" ]]; then
+    ROUTE_CONTROL_MODE="FORCED_ONLINE"
+    echo "Mode: FORCED_ONLINE (router runs; web/evidence allowed)"
+    echo
+    continue
+  elif [[ "$q_norm" == "run offline" ]]; then
+    ROUTE_CONTROL_MODE="FORCED_OFFLINE"
+    echo "Mode: FORCED_OFFLINE (router runs; web/medical require evidence mode)"
+    echo
+    continue
+  elif [[ "$q_norm" =~ ^run[[:space:]]+auto:?[[:space:]]+(.+)$ ]]; then
+    ROUTE_CONTROL_MODE="AUTO"
+    q="${BASH_REMATCH[1]}"
+  elif [[ "$q_norm" =~ ^run[[:space:]]+online:?[[:space:]]+(.+)$ ]]; then
+    ROUTE_CONTROL_MODE="FORCED_ONLINE"
+    q="${BASH_REMATCH[1]}"
+  elif [[ "$q_norm" =~ ^run[[:space:]]+offline:?[[:space:]]+(.+)$ ]]; then
+    ROUTE_CONTROL_MODE="FORCED_OFFLINE"
+    q="${BASH_REMATCH[1]}"
+  fi
+  skip_mem_turn=0
+  if memory_enabled && memory_unsafe_query "${q}"; then
+    skip_mem_turn=1
+  fi
+  if memory_enabled && [[ "${skip_mem_turn}" == "0" ]]; then
+    out="$(LUCY_CHAT_MEMORY_FILE="${MEM_FILE}" LUCY_ROUTE_CONTROL_MODE="${ROUTE_CONTROL_MODE}" "$ROOT/lucy_chat.sh" "$q" 2>&1 || true)"
+    printf '%s\n' "${out}"
+    memory_add_turn "$q" "${out}"
+  else
+    LUCY_ROUTE_CONTROL_MODE="${ROUTE_CONTROL_MODE}" "$ROOT/lucy_chat.sh" "$q" || true
+  fi
+  echo
+done

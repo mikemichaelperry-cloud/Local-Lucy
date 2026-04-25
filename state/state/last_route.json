@@ -1,0 +1,29 @@
+{
+  "answer_class": "local_answer",
+  "authority": {
+    "active_root": "/home/mike/lucy-v8/snapshots/opt-experimental-v8-dev",
+    "authority_root": "/home/mike/lucy-v8/snapshots/opt-experimental-v8-dev",
+    "legacy_runtime_namespace_present": false,
+    "legacy_runtime_namespace_root": "/home/mike/lucy/runtime-v7",
+    "legacy_runtime_namespace_status": "absent",
+    "runtime_namespace_root": "/home/mike/lucy-v8/snapshots/opt-experimental-v8-dev/state"
+  },
+  "current_route": "LOCAL",
+  "final_mode": "",
+  "intent_family": "",
+  "mode": "LOCAL",
+  "operator_answer_path": "Local answer",
+  "operator_trust_label": "local",
+  "outcome_code": "answered",
+  "provider_authorization": "not_applicable",
+  "provider_used": "none",
+  "request_id": "2026-04-14T20:05:07Z-1905802",
+  "route": "LOCAL",
+  "route_reason": "router_classifier_mapper",
+  "selected_route": "LOCAL",
+  "source": "local",
+  "source_type": "local",
+  "status": "completed",
+  "trust_class": "",
+  "updated_at": "2026-04-14T20:05:15Z"
+}

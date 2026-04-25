@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODEL="local-lucy-mem"
+PROMPT="$HOME/lucy/config/system_prompt.dev.txt"
+MF="$HOME/lucy/config/Modelfile.local-lucy-mem"
+BK="$HOME/lucy/config/Modelfile.local-lucy-mem.bak.$(date +%F_%H%M%S)"
+
+echo "=== Rebuild Modelfile from system prompt (clean) ==="
+[[ -s "$PROMPT" ]] || { echo "ERROR: missing/empty $PROMPT" >&2; exit 1; }
+
+# Backup existing Modelfile
+if [[ -f "$MF" ]]; then
+  cp -a "$MF" "$BK"
+  echo "Backup: $BK"
+fi
+
+# Create a clean Modelfile
+{
+  echo "FROM llama3.1:8b"
+  echo
+  echo 'SYSTEM """'
+  cat "$PROMPT"
+  echo
+  echo
+  echo
+  echo
+  echo '### TOOL ACCESS'
+  echo
+  echo
+  echo '### TOOL ACCESS'
+  echo 'Tool access is DISABLED.'
+  echo
+  echo '### POLICY TAXONOMY (v0)'
+  echo 'A) Session-evidence queries: user explicitly asks “from this session/text/messages”. Use ONLY session text.'
+  echo 'B) Live/time-sensitive queries: prices/news/weather/stock/today/now/latest/current. Without tools: HARD REFUSE.'
+  echo 'C) Stable general knowledge: allowed from training. Answer normally.'
+  echo 'D) Predictions/speculation: do NOT predict. Refuse briefly.'
+  echo
+  echo '### HARD REFUSAL (EXACTLY ONE LINE)'
+  echo "If (A) required info is missing OR (B) is asked without tools, output EXACTLY one line:" 
+  echo "Not provided in this session's user messages." 
+  echo "Then STOP. No extra text." 
+  echo '"""'
+} > "$MF"
+
+echo "Wrote: $MF"
+echo "=== Sanity check: show first/last lines ==="
+head -n 5 "$MF"
+echo "..."
+tail -n 12 "$MF"
+
+echo "=== Rebuild model: $MODEL ==="
+ollama create "$MODEL" -f "$MF"
+
+echo "=== Done ==="

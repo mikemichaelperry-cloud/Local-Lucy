@@ -1,0 +1,3 @@
+UNIFIED_TRUST_LAYER_VERSION=1
+CANONICAL_TRUST_CATALOG=config/trust/trust_catalog.yaml
+STATUS=active

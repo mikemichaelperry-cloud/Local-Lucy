@@ -1,0 +1,8 @@
+# desktop_path<TAB>name<TAB>comment<TAB>exec_target<TAB>exec_style
+# Recommended current desktop surfaces for active workflows:
+# - v7 DEV is the standard desktop alias for the active terminal authority.
+# - Codex Preprocess is a specialized wrapper over the v7 alias.
+/home/mike/Desktop/Local Lucy — Opt Experimental v7 DEV.desktop	Local Lucy — Opt Experimental v7 DEV	Run Local Lucy from the current opt-experimental-v7-dev desktop path (recommended current launcher)	/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/start_local_lucy_opt_experimental_v7_dev.sh	bash_lc_hold
+/home/mike/Desktop/Local Lucy — Codex Preprocess (opt-experimental-v7).desktop	Local Lucy — Codex Preprocess (opt-experimental-v7)	Run Local Lucy from opt-experimental-v7-dev with local pre-processing before Codex work (specialized wrapper)	/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/start_local_lucy_opt_experimental_v7_dev_codex_preprocess.sh	bash_lc_hold
+# Historical or compatibility desktop surfaces retained below:
+/home/mike/Desktop/Local Lucy — Opt Experimental v3 FROZEN (Stable Candidate).desktop	Local Lucy — Opt Experimental v3 FROZEN (Stable Candidate)	Run Local Lucy from opt-experimental-v3 stable-candidate (historical frozen surface)	/home/mike/lucy/snapshots/opt-experimental-v3-dev-stable-candidate/tools/start_local_lucy_opt_experimental_v3_dev.sh	raw

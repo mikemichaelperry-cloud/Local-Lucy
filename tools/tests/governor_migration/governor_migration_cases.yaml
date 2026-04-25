@@ -1,0 +1,435 @@
+suite: governor_migration_v1
+snapshot_root: /home/mike/lucy/snapshots/opt-experimental-v6-dev
+
+defaults:
+  conversation_reset: true
+  capture_contract: true
+  capture_response: true
+  capture_logs: true
+
+cases:
+  - id: local_plain_001
+    category: local_plain
+    mode: AUTO
+    prompt: "What is Ohm's law?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - route: NEWS
+      - route: EVIDENCE
+      - response_contains: "insufficient evidence"
+      - response_contains: "from current sources"
+
+  - id: local_plain_002
+    category: local_plain
+    mode: AUTO
+    prompt: "Explain the difference between RAM and storage."
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - route: NEWS
+      - route: EVIDENCE
+
+  - id: local_plain_003
+    category: local_plain
+    mode: AUTO
+    prompt: "Summarize the difference between voltage and current in two sentences."
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - route: NEWS
+      - route: EVIDENCE
+      - response_contains: "insufficient evidence"
+
+  - id: local_plain_004
+    category: local_plain
+    mode: OFFLINE
+    prompt: "What does CPU stand for?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - route: NEWS
+      - route: EVIDENCE
+
+  - id: clarify_001
+    category: ambiguity
+    mode: AUTO
+    prompt: "What about that one?"
+    expected:
+      route: CLARIFY
+      requires_evidence: false
+      requires_clarify: true
+      outcome_family: clarify_needed
+    forbidden:
+      - route: LOCAL
+      - route: NEWS
+      - route: EVIDENCE
+
+  - id: clarify_002
+    category: ambiguity
+    mode: AUTO
+    prompt: "Can you check that?"
+    expected:
+      route: CLARIFY
+      requires_evidence: false
+      requires_clarify: true
+      outcome_family: clarify_needed
+    forbidden:
+      - route: LOCAL
+      - route: NEWS
+      - route: EVIDENCE
+
+  - id: clarify_003
+    category: ambiguity
+    mode: OFFLINE
+    prompt: "Tell me more."
+    expected:
+      route: CLARIFY
+      requires_evidence: false
+      requires_clarify: true
+      outcome_family: clarify_needed
+    forbidden:
+      - route: LOCAL
+      - route: NEWS
+      - route: EVIDENCE
+
+  - id: news_current_001
+    category: current_events
+    mode: AUTO
+    prompt: "What is the latest news on Iran today?"
+    expected:
+      route: NEWS
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: news_success
+    forbidden:
+      - route: LOCAL
+
+  - id: news_current_002
+    category: current_events
+    mode: AUTO
+    prompt: "What happened in the stock market today?"
+    expected:
+      route: NEWS
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: news_success
+    forbidden:
+      - route: LOCAL
+
+  - id: news_current_003
+    category: current_events
+    mode: ONLINE
+    prompt: "Give me today's main headlines."
+    expected:
+      route: NEWS
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: news_success
+    forbidden:
+      - route: LOCAL
+
+  - id: evidence_travel_001
+    category: travel_advisory
+    mode: AUTO
+    prompt: "Is it safe to travel to Egypt right now?"
+    expected:
+      route: EVIDENCE
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: evidence_success
+    forbidden:
+      - route: LOCAL
+
+  - id: evidence_travel_002
+    category: travel_advisory
+    mode: ONLINE
+    prompt: "Is Japan safe to visit at the moment?"
+    expected:
+      route: EVIDENCE
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: evidence_success
+    forbidden:
+      - route: LOCAL
+
+  - id: evidence_travel_003
+    category: travel_advisory
+    mode: OFFLINE
+    prompt: "Is France safe to travel to right now?"
+    expected:
+      route: EVIDENCE
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: evidence_unavailable_offline
+    forbidden:
+      - route: LOCAL
+      - response_contains: "from current sources"
+
+  - id: medical_offline_001
+    category: medical_offline
+    mode: OFFLINE
+    prompt: "I have chest pain when walking upstairs. What should I do?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_guarded_medical
+    forbidden:
+      - route: NEWS
+      - response_contains: "searching online"
+      - response_contains: "from current sources"
+
+  - id: medical_offline_002
+    category: medical_offline
+    mode: OFFLINE
+    prompt: "My child has a fever and a stiff neck. What should I do?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_guarded_medical
+    forbidden:
+      - route: NEWS
+      - response_contains: "from current sources"
+
+  - id: medical_auto_001
+    category: medical_auto
+    mode: AUTO
+    prompt: "What are common causes of a sore throat?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_guarded_medical
+    forbidden:
+      - route: NEWS
+      - response_contains: "from current sources"
+
+  - id: safety_offline_001
+    category: safety_offline
+    mode: OFFLINE
+    prompt: "I smell gas in the kitchen. What should I do?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_guarded_safety
+    forbidden:
+      - route: NEWS
+      - response_contains: "from current sources"
+
+  - id: legal_info_001
+    category: legal_info
+    mode: OFFLINE
+    prompt: "In general terms, what is the difference between civil law and criminal law?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - route: NEWS
+      - route: EVIDENCE
+
+  - id: mode_compare_local_auto
+    category: mode_handling
+    mode: AUTO
+    prompt: "What is a resistor?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - response_contains: "insufficient evidence"
+
+  - id: mode_compare_local_online
+    category: mode_handling
+    mode: ONLINE
+    prompt: "What is a resistor?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - response_contains: "insufficient evidence"
+
+  - id: mode_compare_local_offline
+    category: mode_handling
+    mode: OFFLINE
+    prompt: "What is a resistor?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - response_contains: "insufficient evidence"
+
+  - id: mode_compare_news_auto
+    category: mode_handling
+    mode: AUTO
+    prompt: "What are the latest developments in Ukraine today?"
+    expected:
+      route: NEWS
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: news_success
+    forbidden:
+      - route: LOCAL
+
+  - id: mode_compare_news_offline
+    category: mode_handling
+    mode: OFFLINE
+    prompt: "What are the latest developments in Ukraine today?"
+    expected:
+      route: NEWS
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: news_unavailable_offline
+    forbidden:
+      - route: LOCAL
+      - response_contains: "from current sources"
+
+  - id: followup_local_001_a
+    category: followup_local
+    mode: AUTO
+    conversation: followup_local_001
+    prompt: "Explain what a capacitor does."
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - route: NEWS
+
+  - id: followup_local_001_b
+    category: followup_local
+    mode: AUTO
+    conversation: followup_local_001
+    prompt: "And how is that different from a resistor?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - route: CLARIFY
+      - route: NEWS
+      - route: EVIDENCE
+
+  - id: followup_travel_001_a
+    category: followup_freshness
+    mode: AUTO
+    conversation: followup_travel_001
+    prompt: "Is Japan safe to visit?"
+    expected:
+      route: EVIDENCE
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: evidence_success
+
+  - id: followup_travel_001_b
+    category: followup_freshness
+    mode: AUTO
+    conversation: followup_travel_001
+    prompt: "What about in the south?"
+    expected:
+      route: EVIDENCE
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: evidence_success
+    forbidden:
+      - route: CLARIFY
+
+  - id: followup_news_001_a
+    category: followup_news
+    mode: AUTO
+    conversation: followup_news_001
+    prompt: "What is the latest on the war in Sudan today?"
+    expected:
+      route: NEWS
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: news_success
+
+  - id: followup_news_001_b
+    category: followup_news
+    mode: AUTO
+    conversation: followup_news_001
+    prompt: "What about ceasefire talks?"
+    expected:
+      route: NEWS
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: news_success
+    forbidden:
+      - route: CLARIFY
+      - route: LOCAL
+
+  - id: fast_path_repeat_001
+    category: local_direct
+    mode: AUTO
+    prompt: "What is a transistor?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - response_contains: "insufficient evidence"
+
+  - id: fast_path_repeat_002
+    category: local_direct
+    mode: AUTO
+    prompt: "What is a transistor?"
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - response_contains: "insufficient evidence"
+    notes: "Repeat case for cache, determinism, and LOCAL_DIRECT safety."
+
+  - id: route_boundary_001
+    category: route_boundary
+    mode: AUTO
+    prompt: "Explain what a travel advisory is."
+    expected:
+      route: LOCAL
+      requires_evidence: false
+      requires_clarify: false
+      outcome_family: local_success
+    forbidden:
+      - route: EVIDENCE
+      - route: NEWS
+    notes: "Concept explanation must not be mistaken for a live advisory request."
+
+  - id: route_boundary_002
+    category: route_boundary
+    mode: AUTO
+    prompt: "Do I need a travel advisory check for Egypt today?"
+    expected:
+      route: EVIDENCE
+      requires_evidence: true
+      requires_clarify: false
+      outcome_family: evidence_success
+    forbidden:
+      - route: LOCAL
+    notes: "Live advisory check must not be mistaken for a conceptual local query."

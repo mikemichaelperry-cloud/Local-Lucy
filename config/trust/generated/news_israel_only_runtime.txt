@@ -1,0 +1,14 @@
+jpost.com
+timesofisrael.com
+haaretz.com
+ynet.co.il
+ynetnews.com
+gov.il
+idf.il
+www.jpost.com
+www.timesofisrael.com
+www.haaretz.com
+www.ynet.co.il
+www.ynetnews.com
+www.gov.il
+www.idf.il

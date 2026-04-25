@@ -1,0 +1,12 @@
+{
+  "available": true,
+  "last_error": "",
+  "last_request_id": "",
+  "last_transcript": "What's the latest world news?",
+  "last_updated": "2026-04-15T07:29:22Z",
+  "listening": false,
+  "processing": false,
+  "schema_version": 1,
+  "status": "completed",
+  "tts": "kokoro"
+}

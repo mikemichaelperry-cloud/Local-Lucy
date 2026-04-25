@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${SCRIPT_DIR}"
+SUPPORTED_QUERY="What is Git?"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  ./start.sh "What is Git?"
+  ./start.sh --help
+
+This minimal V8 reproducibility slice supports exactly one query:
+  What is Git?
+
+Supported in this minimal V8 reproducibility slice:
+  - repo-local authority root
+  - repo-local state and tmp/logs creation
+  - deterministic local-policy backend path only
+
+Not supported in this slice:
+  - runtime_request.py
+  - runtime_control.py
+  - runtime_lifecycle.py
+  - conversation mode
+  - local-worker fallback
+  - augmented/evidence providers
+  - model-backed generation
+  - UI
+  - voice
+  - desktop launchers
+USAGE
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -lt 1 ]]; then
+  printf '%s\n\n' "ERR: no query provided." >&2
+  usage >&2
+  exit 2
+fi
+
+query="$*"
+if [[ "${query}" != "${SUPPORTED_QUERY}" ]]; then
+  printf '%s\n' "ERR: unsupported query for this minimal V8 reproducibility slice." >&2
+  printf 'Supported query: %s\n' "${SUPPORTED_QUERY}" >&2
+  printf 'Use: ./start.sh "%s"\n' "${SUPPORTED_QUERY}" >&2
+  printf '%s\n' "No other prompts are validated in this slice." >&2
+  exit 2
+fi
+
+mkdir -p "${ROOT}/state" "${ROOT}/tmp/logs"
+
+export LUCY_RUNTIME_AUTHORITY_ROOT="${ROOT}"
+export LUCY_OUTPUT_MODE="CHAT"
+export LUCY_CONVERSATION_MODE_ACTIVE="0"
+export LUCY_CONVERSATION_MODE_FORCE="0"
+export LUCY_LOCAL_WORKER_ENABLED="0"
+export LUCY_EVIDENCE_ENABLED="0"
+
+exec "${ROOT}/lucy_chat.sh" "${SUPPORTED_QUERY}"
+
+# RENAMED: This is a MINIMAL reproducibility slice, NOT a production launcher.
+# It only supports the query "What is Git?" and has no UI/voice/conversation.
+# For production, use: ~/lucy-v8/start_v8_hmi_python.sh

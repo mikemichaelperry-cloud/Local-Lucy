@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-04-11T22:45:27+0300",
+  "query": "Who was Cleopatra?",
+  "match": false,
+  "classification": "intended_improvement",
+  "differences": [
+    "intent_family: shell=unknown, python=local_answer"
+  ],
+  "shell": {
+    "status": "completed",
+    "outcome_code": "unknown",
+    "route": "LOCAL",
+    "provider": "local",
+    "provider_usage_class": "local",
+    "intent_family": "unknown",
+    "confidence": 0.0,
+    "response_text": "Augmented route (unverified answer):\nCleopatra was a queen of ancient Egypt who ruled from 51 to 30 BC.",
+    "error_message": "",
+    "execution_time_ms": 2908,
+    "request_id": ""
+  },
+  "python": {
+    "status": "completed",
+    "outcome_code": "unknown",
+    "route": "LOCAL",
+    "provider": "local",
+    "provider_usage_class": "local",
+    "intent_family": "local_answer",
+    "confidence": 0.71,
+    "response_text": "Augmented route (unverified answer):\nCleopatra was a queen of ancient Egypt who ruled from 51 to 30 BC.",
+    "error_message": "",
+    "execution_time_ms": 1865,
+    "request_id": "fecb84e37e34f734"
+  }
+}

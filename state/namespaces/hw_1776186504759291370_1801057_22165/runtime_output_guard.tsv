@@ -1,0 +1,1 @@
+python dictionary syntax	a dictionary in python is defined using curly brackets `{}` with key-value pairs separated by commas. each key must be unique and a string, while values can be any data type. for example: `{"name": "john", "age": 30}`.

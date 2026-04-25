@@ -1,0 +1,11 @@
+# query<TAB>expected_mode<TAB>expected_decisive_rule
+How do you cook mashed potatoes?	LOCAL	-
+What is the latest Israeli news?	NEWS	NEWS-KEYWORD
+Israel news today	NEWS	NEWS-KEYWORD
+What's happening in Gaza right now?	NEWS	NEWS-GEO-POLITY
+Who is the current CEO of Apple?	EVIDENCE	TIME-CUE
+Who is the CEO of Apple?	EVIDENCE	OFFICE-HOLDER
+What is the USD to ILS exchange rate today?	EVIDENCE	TIME-CUE
+Inflation in Israel 2025	EVIDENCE	MARKET-DATA
+As of February 2026, what are the rules for X?	EVIDENCE	TIME-CUE
+Latest way to cook mashed potatoes	EVIDENCE	TIME-CUE

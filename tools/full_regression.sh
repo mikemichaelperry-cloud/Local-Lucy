@@ -1,0 +1,1 @@
+/home/mike/lucy/tools/full_regression_v2.sh

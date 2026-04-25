@@ -1,0 +1,10 @@
+{
+  "available": true,
+  "status": "idle",
+  "audio_player": "aplay",
+  "engine": "kokoro",
+  "voice": "bf_emma",
+  "listening": false,
+  "stt_engine": "whisper",
+  "error": ""
+}

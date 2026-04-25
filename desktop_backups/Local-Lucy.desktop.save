@@ -1,0 +1,8 @@
+Desktop Entry]
+Type=Application
+Name=Local Lucy
+Comment=Run Local Lucy (runtime REPL)
+Exec=gnome-terminal -- bash -lc 'python3 /home/mike/lucy/runtime/lucy_core.py'
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;AI;

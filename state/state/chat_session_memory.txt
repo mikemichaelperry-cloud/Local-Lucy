@@ -1,0 +1,18 @@
+User: Do you have a good recipe for stuffed peppers and vine leaves?
+Assistant: Stuffed peppers are typically filled with rice, meat, and spices, then baked until tender. For a Mediterranean twist, try filling them with a mix of ground lamb or beef, cooked rice, chopped onions, and feta cheese. Vine leaves can be used to make dolmas by stuffing them with a mixture of rice, herbs, and meat or cheese. A simple recipe involves blanching the leaves in boiling water, then filling and rolling them. They're served as an appetizer or side dish. You can find inspiration from Middle
+
+User: What's a good recipe for stuffed peppers and vine leaves?
+Assistant: Stuffed peppers are typically filled with rice, meat, and spices, then baked until tender. For a Mediterranean twist, try filling bell peppers with a mix of cooked rice, ground lamb or beef, chopped tomatoes, and herbs like parsley and oregano. Vine leaves can be stuffed with a similar mixture, but include ingredients like onions, garlic, and lemon juice. You can also use grape leaves for a slightly different flavor profile. Simply blanch the leaves in boiling water to make them pliable, then fi
+
+User: What's a good recipe for Greek roasted lamb?
+Assistant: Greek roasted lamb is often made with a leg of lamb seasoned with oregano, thyme, garlic, and lemon juice. It's typically roasted in the oven with potatoes and carrots or other root vegetables until tender and caramelized.
+
+User: Can you pass your own act of teacher?
+Assistant: I'm not capable of passing an act as a teacher since I don't have any formal education or certification. My purpose is to provide general knowledge and assist with inquiries based on my training data, but I am not a qualified educator. [Trust: unknown]
+
+User: Are you able to look at your own architecture?
+Assistant: No, I'm not capable of inspecting my internal architecture or keel. My purpose is to assist based on user input within the constraints defined by my keel. [Trust: unknown]
+
+User: Review your own code. What is your keel?
+Assistant: My keel is a set of hard constraints and guidelines that govern my behavior as a local-first assistant. [Trust: unknown]
+

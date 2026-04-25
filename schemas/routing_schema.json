@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local Lucy Phase 1 Routing Decision",
+  "type": "object",
+  "required": [
+    "route_mode",
+    "offline_action",
+    "needs_clarification",
+    "clarification_question"
+  ],
+  "properties": {
+    "route_mode": {
+      "type": "string",
+      "enum": ["LOCAL", "EVIDENCE", "NEWS", "CLARIFY"]
+    },
+    "offline_action": {
+      "type": "string"
+    },
+    "needs_clarification": {
+      "type": "boolean"
+    },
+    "clarification_question": {
+      "type": ["string", "null"]
+    },
+    "policy_confidence": {
+      "type": ["number", "null"]
+    },
+    "policy_confidence_threshold": {
+      "type": ["number", "null"]
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

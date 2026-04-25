@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-04-15T00:12:05.224613",
+  "duration_seconds": 6.717438,
+  "total_queries": 50,
+  "successful_queries": 0,
+  "failed_queries": 50,
+  "success_rate": 0.0,
+  "response_times": {
+    "mean_ms": 134.32935237884521,
+    "min_ms": 8.492708206176758,
+    "max_ms": 155.1821231842041
+  },
+  "memory": {
+    "growth_mb": 0
+  }
+}

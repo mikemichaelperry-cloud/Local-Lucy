@@ -1,0 +1,65 @@
+STABILIZATION_BATTERY_REPORT
+time=2026-02-28T11:12:03+02:00
+root=/home/mike/lucy/snapshots/opt-experimental-v2-dev
+report=/home/mike/lucy/snapshots/opt-experimental-v2-dev/tmp/test_reports/stabilization_battery/20260228T111203+0200/report.txt
+log_dir=/home/mike/lucy/snapshots/opt-experimental-v2-dev/tmp/test_reports/stabilization_battery/20260228T111203+0200/logs
+
+## Phase A - Router and Plan Correctness (No Network)
+
+CHECK A01: Router regression
+RESULT: PASS
+
+CHECK A02: Shared query policy heuristics
+RESULT: PASS
+
+CHECK A03: Router vs fallback drift monitor
+RESULT: PASS
+
+CHECK A04: Plan schema sanity and invariants
+RESULT: PASS
+
+## Phase B - Pipeline Execution Correctness (Deterministic/Fake Root)
+
+CHECK B01: Plan-to-pipeline mapping
+RESULT: PASS
+
+CHECK B02: Executor allow_domains_file passthrough
+RESULT: PASS
+
+CHECK B03: News region filter AU enforcement
+RESULT: PASS
+
+CHECK B04: Forced mode strict routing
+RESULT: PASS
+
+CHECK B05: Router allowlist filter enforcement
+RESULT: PASS
+
+CHECK B06: Medical allowlist plumbing
+RESULT: PASS
+
+CHECK B07: Medical tier/category fetch audit
+RESULT: PASS
+
+## Phase C - Live Network Acceptance (After A+B)
+
+CHECK C00: Live internet health probe (legacy location)
+RESULT: PASS
+
+CHECK C01: Trust probe gate status (GATE_FAIL=0)
+RESULT: PASS
+
+CHECK C02: Medical live route acceptance
+RESULT: PASS
+
+CHECK C03: Non-medical evidence live route acceptance
+RESULT: PASS
+
+CHECK C04: AU news region live route acceptance
+RESULT: PASS
+
+## Summary
+TOTAL_CHECKS=16
+FAILED_CHECKS=0
+WARNED_CHECKS=0
+OVERALL=PASS

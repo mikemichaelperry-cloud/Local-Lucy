@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-04-15T01:28:39.351563",
+  "duration_seconds": 0.437901,
+  "total_queries": 20,
+  "successful_queries": 20,
+  "failed_queries": 0,
+  "success_rate": 100.0,
+  "response_times": {
+    "mean_ms": 21.880972385406494,
+    "p95_ms": 383.8167190551758
+  },
+  "memory": {
+    "growth_mb": 0
+  },
+  "patterns": {
+    "identity": {
+      "total": 3,
+      "success": 3
+    },
+    "weather": {
+      "total": 1,
+      "success": 1
+    },
+    "arithmetic": {
+      "total": 2,
+      "success": 2
+    },
+    "random": {
+      "total": 3,
+      "success": 3
+    },
+    "status": {
+      "total": 7,
+      "success": 7
+    },
+    "creative": {
+      "total": 1,
+      "success": 1
+    },
+    "technical": {
+      "total": 3,
+      "success": 3
+    }
+  }
+}

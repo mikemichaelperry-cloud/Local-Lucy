@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-04-11T22:47:31.856560",
+  "metrics": {
+    "total_queries": 1,
+    "by_classification": {
+      "intended_improvement": 1
+    },
+    "by_hour": {
+      "2026-04-11T22": 1
+    },
+    "error_rate": 0.0,
+    "avg_speedup": 1.559249329758713,
+    "hard_regressions": 0,
+    "suspicious_drifts": 0,
+    "recent_errors": []
+  }
+}

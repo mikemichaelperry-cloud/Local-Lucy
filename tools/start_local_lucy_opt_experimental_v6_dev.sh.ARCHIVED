@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# ROLE: RETIRED NAME / GUARDRAIL
+set -euo pipefail
+
+echo "ERROR: v7 no longer exposes a v6-named primary launcher in this snapshot." >&2
+echo "Use: /home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/start_local_lucy_opt_experimental_v7_dev.sh" >&2
+exit 2

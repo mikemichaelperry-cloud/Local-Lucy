@@ -1,0 +1,26 @@
+version: 0
+name: local-lucy-keel
+updated: null
+
+capabilities:
+  tool_access: disabled
+  internet_access: disabled
+  filesystem_write: disabled
+
+session_policy:
+  memory:
+    default: off
+    enable_env: LUCY_MEM
+    enabled_value: "on"
+    missing_response_exact: "not in memory"
+
+  live_time_sensitive:
+    # prices/news/weather/stocks/latest/current/today/now
+    without_tools_response_exact: "Not provided in this session's user messages."
+
+  speculation:
+    allow_predictions: false
+    refusal_exact: "Not provided in this session's user messages."
+
+refusals:
+  evidence_only_refusal_exact: "Not provided in this session's user messages."

@@ -1,0 +1,9 @@
+use_default_settings: true
+
+server:
+  limiter: false
+  secret_key: "17d058db78a8813fb10947360fb58aad6ee86695edb51c159a7fe4add6d7d241"
+
+search:
+  formats: [html, json, rss, csv]
+  # patched-by-lucy-internet-v0

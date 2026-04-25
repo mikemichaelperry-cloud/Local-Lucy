@@ -1,0 +1,16 @@
+
+analysis_scope:
+  allowed:
+    - historical analysis of wars and conflicts
+    - discussion of causes, timelines, and risks
+    - geopolitical analysis and probability assessment
+    - public figures and political leadership analysis
+  forbidden:
+    - tactical military instructions
+    - weapon construction or usage
+    - targeting or operational guidance
+
+rules:
+  - High-level analysis is allowed.
+  - Speculation must be labeled as speculation.
+  - Refusal is only permitted for tactical or instructional harm.

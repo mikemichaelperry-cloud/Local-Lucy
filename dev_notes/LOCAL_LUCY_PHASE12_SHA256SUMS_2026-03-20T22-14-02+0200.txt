@@ -1,0 +1,4 @@
+8adb2d2e2bb47683a1509c0a57c4fd5154dd9dc7053202c727cc368091bce1f7  /home/mike/lucy/snapshots/opt-experimental-v6-dev/dev_notes/SESSION_HANDOFF_2026-03-20T22-14-02+0200.md
+ed6c847a510709ea9d94166f9decc5ba0bcc89ffe3c6c4d1bb8a3887aa548113  /home/mike/lucy/snapshots/opt-experimental-v6-dev/dev_notes/LOCAL_LUCY_CONSOLIDATED_STATUS_2026-03-20T21-33-04+0200.md
+a2c0c0fb0fc873792bb993eb25fc71e3970bac0c094103d3eba9b0648179a06c  /home/mike/lucy/snapshots/opt-experimental-v6-dev/tools/write_local_lucy_handoff.sh
+c7643b385e0e73e28248fd6186b00a881aad4936c50de0bdea853059f1767b88  /home/mike/lucy/snapshots/opt-experimental-v6-dev/tools/resume_local_lucy_from_handoff.sh

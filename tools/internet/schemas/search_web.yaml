@@ -1,0 +1,33 @@
+name: search_web
+version: 0
+description: "Read-only web search. Returns top results only. No link opening."
+inputs:
+  query:
+    type: string
+    required: true
+    max_length: 256
+  max_results:
+    type: integer
+    required: false
+    default: 5
+    min: 1
+    max: 10
+  domains:
+    type: array
+    required: false
+    items: { type: string }
+outputs:
+  results:
+    type: array
+    items:
+      type: object
+      properties:
+        title: { type: string }
+        url: { type: string }
+        snippet: { type: string }
+  meta:
+    type: object
+    properties:
+      fetched_at_utc: { type: string }
+      output_sha256: { type: string }
+      tool_version: { type: integer }
