@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import audioop
 import json
+import math
 import os
 import re
 import shutil
@@ -12,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import wave
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -25,6 +28,11 @@ from runtime_control import (
     resolve_state_file,
 )
 from voice.playback import PlaybackError, detect_audio_player, play_wav_file
+
+try:
+    from voice.playback_with_levels import play_wav_file_with_levels
+except ImportError:
+    play_wav_file_with_levels = None
 
 # Python Voice Tool integration (V8)
 # Import voice_tool for optional Python-native voice pipeline
@@ -121,6 +129,8 @@ def main() -> int:
                 payload = handle_ptt_stop(runtime_file, state_file, capture_dir)
             print(json.dumps(payload, sort_keys=True))
             return 0
+        if args.command == "internal-record":
+            return run_internal_recorder(Path(args.output).expanduser(), Path(args.runtime_file).expanduser())
         if args.command == "internal-prewarm-tts":
             # Internal command: prewarm TTS worker to reduce latency
             backend = detect_backend()
@@ -160,6 +170,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("status")
     subparsers.add_parser("ptt-start")
     subparsers.add_parser("ptt-stop")
+    internal_record = subparsers.add_parser("internal-record")
+    internal_record.add_argument("--output", required=True)
+    internal_record.add_argument("--runtime-file", required=True)
     internal_prewarm = subparsers.add_parser("internal-prewarm-tts")
     internal_prewarm.help = "Internal: prewarm TTS worker to reduce latency (auto-called by HMI)"
     return parser
@@ -225,12 +238,6 @@ def resolve_kokoro_worker_log_file() -> Path:
 
 
 def resolve_voice_python(requested_engine: str | None = None) -> str:
-    explicit = clean_text(os.environ.get("LUCY_VOICE_PYTHON_BIN"))
-    if explicit:
-        explicit_path = Path(explicit).expanduser()
-        if explicit_path.exists() and os.access(explicit_path, os.X_OK):
-            return str(explicit_path)
-
     root = resolve_root()
     workspace_root = root if root.name == "lucy-v8" else root.parent.parent
     preferred_engine = clean_text(requested_engine).lower()
@@ -238,6 +245,21 @@ def resolve_voice_python(requested_engine: str | None = None) -> str:
         preferred_engine = "kokoro"
 
     adapter_tool = resolve_tts_adapter_tool()
+    explicit = clean_text(os.environ.get("LUCY_VOICE_PYTHON_BIN"))
+    if explicit:
+        explicit_path = Path(explicit).expanduser()
+        if explicit_path.exists() and os.access(explicit_path, os.X_OK):
+            if preferred_engine in {"kokoro", "piper"} and adapter_tool.exists():
+                payload = run_tts_adapter_command(
+                    python_bin=str(explicit_path),
+                    command="probe",
+                    requested_engine=preferred_engine,
+                )
+                if payload.get("ok") and clean_text(payload.get("engine")) == preferred_engine:
+                    return str(explicit_path)
+            else:
+                return str(explicit_path)
+
     # ISOLATION: V8 only uses ui-v8, NEVER falls back to ui-v7
     candidate = workspace_root / "ui-v8" / ".venv" / "bin" / "python3"
     if candidate.exists() and os.access(candidate, os.X_OK):
@@ -251,13 +273,24 @@ def resolve_voice_python(requested_engine: str | None = None) -> str:
                 return str(candidate)
         return str(candidate)
 
+    last_error = ""
     for fallback in (Path(sys.executable), Path("/usr/bin/python3")):
         if fallback.exists() and os.access(fallback, os.X_OK):
+            if preferred_engine in {"kokoro", "piper"} and adapter_tool.exists():
+                payload = run_tts_adapter_command(
+                    python_bin=str(fallback),
+                    command="probe",
+                    requested_engine=preferred_engine,
+                )
+                if payload.get("ok") and clean_text(payload.get("engine")) == preferred_engine:
+                    return str(fallback)
+                last_error = clean_text(payload.get("error"))
+                continue
             return str(fallback)
 
     raise RuntimeError(
-        f"V8 ISOLATION VIOLATION: ui-v8 Python not found at {candidate}, "
-        "and no system python3 fallback is executable. V8 cannot use V7 components."
+        f"V8 voice Python for {preferred_engine} not available at {candidate}"
+        + (f": {last_error}" if last_error else "")
     )
 
 
@@ -696,7 +729,7 @@ def handle_ptt_start(runtime_file: Path, state_file: Path, capture_dir: Path) ->
             raise_with_state("voice busy processing", PTT_START_BUSY)
 
         capture_path = capture_dir / f"ptt_{time.strftime('%Y%m%dT%H%M%S')}_{os.getpid()}.wav"
-        recorder = start_recorder(backend, capture_path)
+        recorder = start_recorder(backend, capture_path, runtime_file)
         runtime_state.update(
             {
                 "available": backend.available,
@@ -897,9 +930,17 @@ def build_turn_payload(
     return payload
 
 
-def start_recorder(backend: VoiceBackend, capture_path: Path) -> subprocess.Popen[str]:
+def start_recorder(backend: VoiceBackend, capture_path: Path, runtime_file: Path) -> subprocess.Popen[str]:
     capture_path.parent.mkdir(parents=True, exist_ok=True)
-    command = recorder_command(backend, capture_path)
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "internal-record",
+        "--output",
+        str(capture_path),
+        "--runtime-file",
+        str(runtime_file),
+    ]
     try:
         process = subprocess.Popen(
             command,
@@ -925,6 +966,159 @@ def recorder_command(backend: VoiceBackend, capture_path: Path) -> list[str]:
     if backend.recorder_engine == "pw-record":
         return [backend.recorder_bin, "--channels", "1", "--rate", "16000", "--format", "s16", str(capture_path)]
     raise RuntimeVoiceError("no recorder available")
+
+
+def recorder_stream_command() -> list[str]:
+    arecord_bin = shutil.which("arecord")
+    if arecord_bin:
+        return [arecord_bin, "-q", "-t", "raw", "-f", "S16_LE", "-r", "16000", "-c", "1", "-"]
+    pw_record_bin = shutil.which("pw-record")
+    if pw_record_bin:
+        return [pw_record_bin, "--channels", "1", "--rate", "16000", "--format", "s16", "-"]
+    raise RuntimeVoiceError("no recorder available")
+
+
+_INTERNAL_RECORD_STOP = False
+
+
+def _handle_internal_record_signal(signum: int, frame: Any) -> None:
+    del signum, frame
+    global _INTERNAL_RECORD_STOP
+    _INTERNAL_RECORD_STOP = True
+
+
+def run_internal_recorder(output_path: Path, runtime_file: Path) -> int:
+    """Record microphone audio while writing input VU levels for the HMI."""
+    global _INTERNAL_RECORD_STOP
+    _INTERNAL_RECORD_STOP = False
+    signal.signal(signal.SIGINT, _handle_internal_record_signal)
+    signal.signal(signal.SIGTERM, _handle_internal_record_signal)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    levels_file = audio_levels_file_for_runtime(runtime_file)
+    command = recorder_stream_command()
+    process: subprocess.Popen[bytes] | None = None
+
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            shell=False,
+        )
+        if process.stdout is None:
+            raise RuntimeVoiceError("recorder stdout unavailable")
+
+        with tempfile.NamedTemporaryFile(
+            suffix=".wav",
+            prefix=".voice_capture.",
+            dir=output_path.parent,
+            delete=False,
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+
+        with wave.open(str(tmp_path), "wb") as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(16000)
+            while not _INTERNAL_RECORD_STOP:
+                chunk = process.stdout.read(2048)
+                if not chunk:
+                    if process.poll() is not None:
+                        break
+                    time.sleep(0.01)
+                    continue
+                wav_file.writeframesraw(chunk)
+                write_audio_levels(levels_file, input_level=pcm_level(chunk), recording=True)
+
+        os.replace(tmp_path, output_path)
+        return 0
+    except Exception as exc:
+        try:
+            write_audio_levels(levels_file, input_level=0, recording=False)
+        except Exception:
+            pass
+        print(f"internal recorder failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=1.0)
+        write_audio_levels(levels_file, input_level=0, recording=False)
+
+
+def audio_levels_file_for_runtime(runtime_file: Path | None = None) -> Path:
+    if runtime_file is not None:
+        return runtime_file.expanduser().parent / "voice_audio_levels.json"
+    runtime_root = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(resolve_root()))).expanduser()
+    return runtime_root / "state" / "voice_audio_levels.json"
+
+
+def read_audio_levels(levels_file: Path) -> dict[str, Any]:
+    try:
+        if levels_file.exists():
+            payload = json.loads(levels_file.read_text(encoding="utf-8"))
+            return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def write_audio_levels(
+    levels_file: Path,
+    *,
+    input_level: int | None = None,
+    output_level: int | None = None,
+    recording: bool | None = None,
+    playing: bool | None = None,
+) -> None:
+    existing = read_audio_levels(levels_file)
+    payload = {
+        "input_level": int(existing.get("input_level", 0)),
+        "output_level": int(existing.get("output_level", 0)),
+        "recording": bool(existing.get("recording", False)),
+        "playing": bool(existing.get("playing", False)),
+        "timestamp": time.time(),
+    }
+    if input_level is not None:
+        payload["input_level"] = max(0, min(100, int(input_level)))
+    if output_level is not None:
+        payload["output_level"] = max(0, min(100, int(output_level)))
+    if recording is not None:
+        payload["recording"] = bool(recording)
+    if playing is not None:
+        payload["playing"] = bool(playing)
+
+    levels_file.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=levels_file.parent,
+        delete=False,
+        prefix=".voice_audio_levels.",
+        suffix=".tmp",
+    ) as handle:
+        json.dump(payload, handle)
+        tmp_path = Path(handle.name)
+    os.replace(tmp_path, levels_file)
+
+
+def pcm_level(data: bytes) -> int:
+    if not data:
+        return 0
+    try:
+        rms = audioop.rms(data, 2)
+    except audioop.error:
+        return 0
+    if rms <= 0:
+        return 0
+    db = 20 * math.log10(rms / 32767.0)
+    return max(0, min(100, int((db + 60) / 60 * 100)))
 
 
 def stop_recorder(record_pid: int | None) -> None:
@@ -1051,19 +1245,14 @@ def _resolve_history_file() -> Path:
     raw = os.environ.get("LUCY_RUNTIME_REQUEST_HISTORY_FILE")
     if raw:
         return Path(raw).expanduser()
-    # Match runtime_request.py default
-    home = Path.home()
-    workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v8" / "state" / "request_history.jsonl"
+    return default_runtime_namespace_root() / "state" / "request_history.jsonl"
 
 
 def _resolve_control_state() -> dict[str, Any]:
     """Load current control state for history entry."""
     state_file = os.environ.get("LUCY_RUNTIME_STATE_FILE")
     if not state_file:
-        home = Path.home()
-        workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-        state_file = workspace_home / ".codex-api-home" / "lucy" / "runtime-v8" / "state" / "current_state.json"
+        state_file = default_runtime_namespace_root() / "state" / "current_state.json"
     else:
         state_file = Path(state_file).expanduser()
     
@@ -1296,6 +1485,7 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
         output_dir = resolve_capture_directory(None)
         output_dir.mkdir(parents=True, exist_ok=True)
         voice_python = resolve_voice_python(backend.tts_engine)
+        levels_file = audio_levels_file_for_runtime(None)
         for index, chunk in enumerate(chunks):
             if backend.tts_engine == "kokoro" and ensure_kokoro_worker():
                 payload = kokoro_worker_request(
@@ -1323,13 +1513,23 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
             engine_name = clean_text(payload.get("engine"))
             prepad_ms = resolve_tts_prepad_ms(engine_name, is_first_chunk=is_first_chunk)
             prime_ms = resolve_kokoro_first_chunk_player_prime_ms() if is_first_chunk and engine_name == "kokoro" else 0
+            player = None if backend.audio_player == "none" else backend.audio_player
             try:
-                play_wav_file(
-                    wav_path,
-                    player=None if backend.audio_player == "none" else backend.audio_player,
-                    prepad_ms=prepad_ms,
-                    prime_ms=prime_ms,
-                )
+                if play_wav_file_with_levels is not None:
+                    play_wav_file_with_levels(
+                        wav_path,
+                        levels_file,
+                        player=player,
+                        prepad_ms=prepad_ms,
+                        prime_ms=prime_ms,
+                    )
+                else:
+                    play_wav_file(
+                        wav_path,
+                        player=player,
+                        prepad_ms=prepad_ms,
+                        prime_ms=prime_ms,
+                    )
             finally:
                 try:
                     wav_path.unlink()
@@ -1346,6 +1546,25 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
 def sanitize_tts_text(text: str) -> str:
     cleaned = text.replace("\r", "\n")
     cleaned = strip_tts_only_boilerplate(cleaned)
+    
+    # Strip HTML tags for TTS
+    # Remove script and style elements first
+    cleaned = re.sub(r'<script[^>]*>.*?</script>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+    cleaned = re.sub(r'<style[^>]*>.*?</style>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+    # Replace common HTML elements with newlines or spaces
+    cleaned = re.sub(r'<br\s*/?>', '\n', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'</p>', '\n', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'<p[^>]*>', '', cleaned, flags=re.IGNORECASE)
+    # Extract link text from anchor tags
+    cleaned = re.sub(r'<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>', lambda m: m.group(2), cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'<a[^>]*>([^<]*)</a>', lambda m: m.group(1), cleaned, flags=re.IGNORECASE)
+    # Remove all remaining HTML tags
+    cleaned = re.sub(r'<[^>]+>', '', cleaned)
+    # Decode common HTML entities
+    cleaned = cleaned.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+    cleaned = cleaned.replace('&quot;', '"').replace('&#39;', "'")
+    cleaned = cleaned.replace('&nbsp;', ' ').replace('&#160;', ' ')
+    
     cleaned = re.sub(r"[ \t]+", " ", cleaned)
     cleaned = re.sub(r"https?://\S+", "", cleaned)
     cleaned = cleaned.replace("`", "")
