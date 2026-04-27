@@ -93,6 +93,18 @@ class VoiceBackend:
     reason: str
 
 
+@dataclass(frozen=True)
+class TranscriptionResult:
+    text: str
+    backend: str = ""
+    fallback_used: bool = False
+    fallback_reason: str = ""
+
+
+# Keywords that indicate a GPU/CUDA failure requiring CPU fallback
+_GPU_ERROR_KEYWORDS = ("cuda", "cublas", "gpu", "out of memory", "oom")
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -391,6 +403,8 @@ def default_voice_runtime() -> dict[str, Any]:
         "last_updated": iso_now(),
         "recorder": "unavailable",
         "stt": "unavailable",
+        "stt_backend": "",
+        "stt_fallback_reason": "",
         "tts": "none",
         "tts_device": "none",
         "audio_player": "none",
@@ -416,6 +430,8 @@ def normalize_voice_runtime(payload: dict[str, Any] | None) -> dict[str, Any]:
     state["last_updated"] = clean_text(state.get("last_updated")) or iso_now()
     state["recorder"] = clean_text(state.get("recorder")) or "unavailable"
     state["stt"] = clean_text(state.get("stt")) or "unavailable"
+    state["stt_backend"] = clean_text(state.get("stt_backend"))
+    state["stt_fallback_reason"] = clean_text(state.get("stt_fallback_reason"))
     state["tts"] = clean_text(state.get("tts")) or "none"
     state["tts_device"] = clean_text(state.get("tts_device")) or "none"
     state["audio_player"] = clean_text(state.get("audio_player")) or "none"
@@ -796,11 +812,13 @@ def handle_ptt_stop(runtime_file: Path, state_file: Path, capture_dir: Path) -> 
                 last_error="",
                 last_transcript="",
                 last_request_id="",
+                stt_backend="",
+                stt_fallback_reason="",
             )
             return build_turn_payload("no_transcript", "", None, "no audio captured")
 
-        transcript = transcribe_capture(backend, capture_path)
-        if not transcript:
+        tx_result = transcribe_capture(backend, capture_path)
+        if not tx_result.text:
             finalize_voice_state(
                 runtime_file,
                 state_file,
@@ -809,10 +827,12 @@ def handle_ptt_stop(runtime_file: Path, state_file: Path, capture_dir: Path) -> 
                 last_error="",
                 last_transcript="",
                 last_request_id="",
+                stt_backend=tx_result.backend,
+                stt_fallback_reason=tx_result.fallback_reason,
             )
             return build_turn_payload("no_transcript", "", None, "no transcript")
 
-        request_payload = submit_transcript(transcript)
+        request_payload = submit_transcript(tx_result.text)
         tts_status = "skipped"
         if request_payload.get("status") == "completed":
             response_text = clean_text(request_payload.get("response_text"))
@@ -828,8 +848,10 @@ def handle_ptt_stop(runtime_file: Path, state_file: Path, capture_dir: Path) -> 
                 backend,
                 status="fault",
                 last_error=error_text,
-                last_transcript=transcript,
+                last_transcript=tx_result.text,
                 last_request_id=clean_text(request_payload.get("request_id")),
+                stt_backend=tx_result.backend,
+                stt_fallback_reason=tx_result.fallback_reason,
             )
             raise_with_state(error_text, PTT_STOP_REQUEST_FAILED)
 
@@ -839,10 +861,12 @@ def handle_ptt_stop(runtime_file: Path, state_file: Path, capture_dir: Path) -> 
             backend,
             status="idle",
             last_error="",
-            last_transcript=transcript,
+            last_transcript=tx_result.text,
             last_request_id=clean_text(request_payload.get("request_id")),
+            stt_backend=tx_result.backend,
+            stt_fallback_reason=tx_result.fallback_reason,
         )
-        payload = build_turn_payload("completed", transcript, request_payload, "")
+        payload = build_turn_payload("completed", tx_result.text, request_payload, "")
         payload["tts_status"] = tts_status
         return payload
     except RuntimeVoiceExit as exc:
@@ -854,6 +878,8 @@ def handle_ptt_stop(runtime_file: Path, state_file: Path, capture_dir: Path) -> 
             last_error=exc.message,
             last_transcript="",
             last_request_id="",
+            stt_backend="",
+            stt_fallback_reason="",
         )
         raise
     except RuntimeVoiceError as exc:
@@ -865,6 +891,8 @@ def handle_ptt_stop(runtime_file: Path, state_file: Path, capture_dir: Path) -> 
             last_error=str(exc),
             last_transcript="",
             last_request_id="",
+            stt_backend="",
+            stt_fallback_reason="",
         )
         raise
     finally:
@@ -885,6 +913,8 @@ def finalize_voice_state(
     last_error: str,
     last_transcript: str,
     last_request_id: str,
+    stt_backend: str = "",
+    stt_fallback_reason: str = "",
 ) -> None:
     with locked_state_file(runtime_file):
         current_state = load_or_create_state(state_file, refresh_timestamp=False)
@@ -899,6 +929,8 @@ def finalize_voice_state(
                 "last_error": last_error,
                 "last_transcript": last_transcript,
                 "last_request_id": last_request_id,
+                "stt_backend": stt_backend,
+                "stt_fallback_reason": stt_fallback_reason,
                 "last_updated": iso_now(),
                 "status": status,
             }
@@ -1140,20 +1172,26 @@ def stop_recorder(record_pid: int | None) -> None:
         raise_with_state("voice recorder did not stop cleanly", PTT_STOP_CAPTURE_FAILED)
 
 
-def transcribe_capture(backend: VoiceBackend, capture_path: Path) -> str:
+def transcribe_capture(backend: VoiceBackend, capture_path: Path) -> TranscriptionResult:
     if backend.stt_engine == "whisper":
-        transcript = transcribe_with_whisper(backend.stt_bin, capture_path)
+        result = transcribe_with_whisper(backend.stt_bin, capture_path)
     elif backend.stt_engine == "vosk":
-        transcript = transcribe_with_vosk(backend.stt_bin, capture_path)
+        text = transcribe_with_vosk(backend.stt_bin, capture_path)
+        result = TranscriptionResult(text=text)
     else:
         raise_with_state("voice stt unavailable", PTT_STOP_TRANSCRIBE_FAILED)
-    normalized = normalize_transcript(transcript)
+    normalized = normalize_transcript(result.text)
     if normalized.lower() in {"[blank_audio]", "[inaudible]", "[silence]", "[no_speech]", "[no speech]"}:
-        return ""
-    return normalized
+        return TranscriptionResult(text="", backend=result.backend, fallback_used=result.fallback_used, fallback_reason=result.fallback_reason)
+    return TranscriptionResult(text=normalized, backend=result.backend, fallback_used=result.fallback_used, fallback_reason=result.fallback_reason)
 
 
-def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> str:
+def _is_gpu_error(stderr_text: str) -> bool:
+    lower = stderr_text.lower()
+    return any(keyword in lower for keyword in _GPU_ERROR_KEYWORDS)
+
+
+def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionResult:
     root = resolve_root()
     model = clean_text(os.environ.get("LUCY_VOICE_WHISPER_MODEL"))
     if not model:
@@ -1174,13 +1212,10 @@ def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> str:
     prefix_path = Path(prefix.name)
     prefix.close()
     prefix_base = prefix_path.with_suffix("")
-    try:
-        command = [stt_bin, "-m", str(model_path), "-f", str(capture_path), "-otxt", "-of", str(prefix_base)]
-        lang = clean_text(os.environ.get("LUCY_VOICE_STT_LANG"))
-        if lang and lang.lower() != "auto":
-            command[1:1] = ["-l", lang]
-        completed = subprocess.run(
-            command,
+
+    def _run_command(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            cmd,
             check=False,
             capture_output=True,
             text=True,
@@ -1188,17 +1223,59 @@ def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> str:
             shell=False,
             env=whisper_command_env(stt_bin),
         )
-        if completed.returncode != 0:
-            error_text = first_nonempty_line(completed.stderr) or first_nonempty_line(completed.stdout)
-            if not error_text:
-                error_text = f"whisper exited with status {completed.returncode}"
-            raise_with_state(error_text, PTT_STOP_TRANSCRIBE_FAILED)
+
+    def _extract_text(completed: subprocess.CompletedProcess[str]) -> str:
         txt_path = prefix_base.with_suffix(".txt")
         if txt_path.exists():
             return txt_path.read_text(encoding="utf-8")
         if completed.stdout:
             return completed.stdout
         return ""
+
+    try:
+        command = [stt_bin, "-m", str(model_path), "-f", str(capture_path), "-otxt", "-of", str(prefix_base), "--no-timestamps"]
+        lang = clean_text(os.environ.get("LUCY_VOICE_STT_LANG"))
+        if lang and lang.lower() != "auto":
+            command[1:1] = ["-l", lang]
+
+        # Fast decode for voice assistant (tunable via env)
+        beam_size = clean_text(os.environ.get("LUCY_VOICE_WHISPER_BEAM_SIZE"))
+        if beam_size:
+            try:
+                command += ["--beam-size", str(int(beam_size))]
+            except ValueError:
+                command += ["--beam-size", "1", "--best-of", "1"]
+        else:
+            command += ["--beam-size", "1", "--best-of", "1"]
+
+        # First attempt: GPU (default whisper behavior)
+        completed = _run_command(command)
+        if completed.returncode == 0:
+            return TranscriptionResult(text=_extract_text(completed), backend="gpu")
+
+        # GPU failed — check if it's a GPU-specific error
+        error_text = first_nonempty_line(completed.stderr) or first_nonempty_line(completed.stdout)
+        if not error_text:
+            error_text = f"whisper exited with status {completed.returncode}"
+
+        if not _is_gpu_error(error_text):
+            raise_with_state(error_text, PTT_STOP_TRANSCRIBE_FAILED)
+
+        # Retry with CPU fallback (--no-gpu)
+        command_cpu = command + ["--no-gpu"]
+        completed_cpu = _run_command(command_cpu)
+        if completed_cpu.returncode == 0:
+            return TranscriptionResult(
+                text=_extract_text(completed_cpu),
+                backend="cpu",
+                fallback_used=True,
+                fallback_reason=error_text,
+            )
+
+        # CPU fallback also failed
+        cpu_error = first_nonempty_line(completed_cpu.stderr) or first_nonempty_line(completed_cpu.stdout) or error_text
+        raise_with_state(cpu_error, PTT_STOP_TRANSCRIBE_FAILED)
+
     except subprocess.TimeoutExpired as exc:
         raise_with_state(f"voice transcription timed out: {exc}", PTT_STOP_TRANSCRIBE_FAILED)
     except OSError as exc:
@@ -1236,6 +1313,8 @@ def transcribe_with_vosk(stt_bin: str, capture_path: Path) -> str:
 
 def normalize_transcript(text: str) -> str:
     normalized = clean_text(text.replace("\r", " ").replace("\n", " "))
+    # Strip whisper timestamp lines that may leak through
+    normalized = re.sub(r"\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]", "", normalized)
     normalized = re.sub(r"\s+", " ", normalized)
     return normalized.strip()
 
@@ -1988,6 +2067,8 @@ def handle_ptt_stop_python(
                 "processing": False,
                 "status": "no_transcript",
                 "last_error": "No audio recorded",
+                "stt_backend": "",
+                "stt_fallback_reason": "",
                 "last_updated": iso_now(),
             }
             write_voice_runtime(runtime_file, error_state)
@@ -2105,6 +2186,8 @@ def handle_ptt_stop_python(
                 "processing": False,
                 "status": "error",
                 "last_error": str(exc),
+                "stt_backend": "",
+                "stt_fallback_reason": "",
                 "last_updated": iso_now(),
             }
             write_voice_runtime(runtime_file, error_state)
@@ -2120,6 +2203,8 @@ def handle_ptt_stop_python(
                 "processing": False,
                 "status": "completed",
                 "last_error": "",
+                "stt_backend": "",
+                "stt_fallback_reason": "",
                 "last_updated": iso_now(),
                 "last_transcript": transcript,
                 "last_request_id": "",
@@ -2217,6 +2302,8 @@ def handle_ptt_stop_python(
                 "processing": False,
                 "status": "idle",
                 "last_error": "No speech detected",
+                "stt_backend": "",
+                "stt_fallback_reason": "",
                 "last_updated": iso_now(),
                 "tts": "none",
             }
@@ -2236,6 +2323,8 @@ def handle_ptt_stop_python(
                 "processing": False,
                 "status": "error",
                 "last_error": error or "Voice interaction failed",
+                "stt_backend": "",
+                "stt_fallback_reason": "",
                 "last_updated": iso_now(),
                 "tts": "none",
             }

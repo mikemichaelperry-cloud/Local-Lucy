@@ -61,7 +61,12 @@ export LUCY_RUNTIME_NAMESPACE_ROOT="${LUCY_RUNTIME_NAMESPACE_ROOT:-${ROOT}}"
 export LUCY_RUNTIME_REQUEST_HISTORY_FILE="${LUCY_RUNTIME_REQUEST_HISTORY_FILE:-${ROOT}/state/request_history.jsonl}"
 export LUCY_VOICE_RUNTIME_FILE="${LUCY_VOICE_RUNTIME_FILE:-${ROOT}/state/voice_runtime.json}"
 export LUCY_VOICE_CAPTURE_DIR="${LUCY_VOICE_CAPTURE_DIR:-${ROOT}/voice/ui_ptt}"
-export LUCY_VOICE_PYTHON_BIN="${LUCY_VOICE_PYTHON_BIN:-/usr/bin/python3}"
+V8_PYTHON="${UI_ROOT}/.venv/bin/python3"
+if [[ -x "${V8_PYTHON}" ]]; then
+  export LUCY_VOICE_PYTHON_BIN="${V8_PYTHON}"
+elif [[ -n "${LUCY_VOICE_PYTHON_BIN:-}" ]]; then
+  export LUCY_VOICE_PYTHON_BIN
+fi
 export PYTHONPATH="${UI_ROOT}/app:${WORKSPACE_HOME}/.local/lib/python3.10/site-packages:${PYTHONPATH:-}"
 export LUCY_RUNTIME_CONTRACT_REQUIRED=1
 export LUCY_LAUNCHER_LABEL="opt-experimental-v8-dev"

@@ -102,6 +102,18 @@ class PlaybackError(VoicePipelineError):
 # =============================================================================
 
 
+# Keywords that indicate a GPU/CUDA failure requiring CPU fallback
+_GPU_ERROR_KEYWORDS = ("cuda", "cublas", "gpu", "out of memory", "oom")
+
+
+@dataclass(frozen=True)
+class TranscriptionResult:
+    text: str
+    backend: str = ""
+    fallback_used: bool = False
+    fallback_reason: str = ""
+
+
 @dataclass
 class AudioBuffer:
     """Container for raw PCM audio data with metadata.
@@ -257,7 +269,8 @@ class VoicePipeline(BaseToolWrapper):
         
         # Or use individual stages
         audio = await pipeline.record_audio(duration=5.0)
-        transcript = await pipeline.transcribe(audio)
+        tx_result = await pipeline.transcribe(audio)
+        transcript = tx_result.text
     """
     
     # Explicitly declare that this class implements the abstract method
@@ -584,7 +597,7 @@ class VoicePipeline(BaseToolWrapper):
         audio: AudioBuffer,
         model: Optional[str] = None,
         language: Optional[str] = None,
-    ) -> str:
+    ) -> TranscriptionResult:
         """Transcribe audio using Whisper or Vosk.
         
         Args:
@@ -593,7 +606,7 @@ class VoicePipeline(BaseToolWrapper):
             language: Language code (None for auto-detect)
         
         Returns:
-            Transcribed text
+            TranscriptionResult with text, backend, fallback info
         
         Raises:
             TranscriptionError: If transcription fails
@@ -615,19 +628,30 @@ class VoicePipeline(BaseToolWrapper):
             self._check_cancelled()
             
             if stt_engine == "whisper":
-                transcript = await self._transcribe_whisper(stt_bin, tmp_path, model, language)
+                result = await self._transcribe_whisper(stt_bin, tmp_path, model, language)
             elif stt_engine == "vosk":
-                transcript = await self._transcribe_vosk(stt_bin, tmp_path)
+                text = await self._transcribe_vosk(stt_bin, tmp_path)
+                result = TranscriptionResult(text=text)
             else:
                 raise TranscriptionError(f"Unknown STT engine: {stt_engine}")
             
             # Normalize transcript
-            transcript = self._normalize_transcript(transcript)
+            normalized = self._normalize_transcript(result.text)
+            result = TranscriptionResult(
+                text=normalized,
+                backend=result.backend,
+                fallback_used=result.fallback_used,
+                fallback_reason=result.fallback_reason,
+            )
             
             elapsed_ms = int((time.time() - start_time) * 1000)
-            self._logger.info(f"Transcription completed in {elapsed_ms}ms: '{transcript[:50]}...'")
+            backend_label = result.backend or "unknown"
+            fb_flag = " (CPU fallback)" if result.fallback_used else ""
+            self._logger.info(
+                f"Transcription completed in {elapsed_ms}ms [{backend_label}{fb_flag}]: '{result.text[:50]}...'"
+            )
             
-            return transcript
+            return result
             
         finally:
             try:
@@ -641,39 +665,77 @@ class VoicePipeline(BaseToolWrapper):
         wav_path: Path,
         model: Optional[str],
         language: Optional[str],
-    ) -> str:
+    ) -> TranscriptionResult:
         """Transcribe using Whisper."""
         # Resolve model path
         model_path = self._resolve_whisper_model(model)
         
         # Build command
-        cmd = [stt_bin, "-m", str(model_path), "-f", str(wav_path), "-otxt", "-of", "-"]
-        
+        cmd = [stt_bin, "-m", str(model_path), "-f", str(wav_path), "-otxt", "-of", "-", "--no-timestamps"]
+
         if language and language.lower() != "auto":
             cmd[1:1] = ["-l", language]
-        
+
+        # Fast decode for voice assistant (tunable via env)
+        beam_size = os.environ.get("LUCY_VOICE_WHISPER_BEAM_SIZE", "").strip()
+        if beam_size:
+            try:
+                cmd += ["--beam-size", str(int(beam_size))]
+            except ValueError:
+                cmd += ["--beam-size", "1", "--best-of", "1"]
+        else:
+            cmd += ["--beam-size", "1", "--best-of", "1"]
+
         # Set up environment for bundled whisper
         env = self._whisper_env(stt_bin)
         
-        try:
+        async def _run(cmd_list: list[str]) -> tuple[int, bytes, bytes]:
             proc = await asyncio.create_subprocess_exec(
-                *cmd,
+                *cmd_list,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(),
                 timeout=45.0
             )
+            return proc.returncode, stdout, stderr
+        
+        def _is_gpu_error(stderr_text: str) -> bool:
+            lower = stderr_text.lower()
+            return any(keyword in lower for keyword in _GPU_ERROR_KEYWORDS)
+        
+        try:
+            # First attempt: GPU (default whisper behavior)
+            returncode, stdout, stderr = await _run(cmd)
+            if returncode == 0:
+                text = stdout.decode("utf-8", errors="replace").strip()
+                return TranscriptionResult(text=text, backend="gpu")
             
-            if proc.returncode != 0:
-                error = stderr.decode("utf-8", errors="replace").strip() or \
-                       stdout.decode("utf-8", errors="replace").strip()
-                raise TranscriptionError(f"Whisper failed: {error}")
+            # GPU failed — check if it's a GPU-specific error
+            error_text = stderr.decode("utf-8", errors="replace").strip() or \
+                        stdout.decode("utf-8", errors="replace").strip()
+            if not error_text:
+                error_text = f"whisper exited with status {returncode}"
             
-            return stdout.decode("utf-8", errors="replace").strip()
+            if not _is_gpu_error(error_text):
+                raise TranscriptionError(f"Whisper failed: {error_text}")
+            
+            # Retry with CPU fallback (--no-gpu)
+            returncode_cpu, stdout_cpu, stderr_cpu = await _run(cmd + ["--no-gpu"])
+            if returncode_cpu == 0:
+                text = stdout_cpu.decode("utf-8", errors="replace").strip()
+                return TranscriptionResult(
+                    text=text,
+                    backend="cpu",
+                    fallback_used=True,
+                    fallback_reason=error_text,
+                )
+            
+            # CPU fallback also failed
+            cpu_error = stderr_cpu.decode("utf-8", errors="replace").strip() or error_text
+            raise TranscriptionError(f"Whisper failed: {cpu_error}")
             
         except asyncio.TimeoutError:
             raise TranscriptionError("Whisper transcription timed out")
@@ -1479,10 +1541,13 @@ async def test_transcribe(audio: Optional[AudioBuffer] = None):
             audio = await pipeline.record_audio(duration=3.0)
     
     print(f"Transcribing {audio.duration_ms}ms of audio...")
-    transcript = await pipeline.transcribe(audio)
+    tx_result = await pipeline.transcribe(audio)
     
-    print(f"Transcript: '{transcript}'")
-    return transcript
+    print(f"Transcript: '{tx_result.text}'")
+    print(f"Backend: {tx_result.backend or 'unknown'}")
+    if tx_result.fallback_used:
+        print(f"Fallback reason: {tx_result.fallback_reason}")
+    return tx_result.text
 
 
 async def test_synthesize():

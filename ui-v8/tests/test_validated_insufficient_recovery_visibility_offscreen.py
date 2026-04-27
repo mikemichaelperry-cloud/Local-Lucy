@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
-REPO_TOOLS_ROOT = Path("/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools")
+REPO_TOOLS_ROOT = Path("/home/mike/lucy-v8/tools")
 
 
 def main() -> int:
@@ -121,8 +121,8 @@ class Sandbox:
     def __init__(self, root: Path) -> None:
         self.root = root
         self.home = root / "home"
-        self.tools_dir = self.home / "lucy" / "snapshots" / "opt-experimental-v7-dev" / "tools"
-        self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v7" / "state"
+        self.tools_dir = self.home / "lucy" / "snapshots" / "lucy-v8" / "tools"
+        self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v8" / "state"
         self.current_state_path = self.state_dir / "current_state.json"
         self.runtime_lifecycle_path = self.state_dir / "runtime_lifecycle.json"
         self.tools_dir.mkdir(parents=True, exist_ok=True)
@@ -134,7 +134,7 @@ class Sandbox:
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(self.state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(self.home / "lucy" / "snapshots" / "opt-experimental-v7-dev")
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(self.home / "lucy" / "snapshots" / "lucy-v8")
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
@@ -168,7 +168,7 @@ class Sandbox:
                     "augmentation_policy": "direct_allowed",
                     "augmented_provider": "openai",
                     "model": "local-lucy",
-                    "profile": "opt-experimental-v7-dev",
+                    "profile": "lucy-v8",
                 },
                 "error": "",
                 "outcome": {
@@ -222,7 +222,7 @@ class Sandbox:
                 "status": "completed"
             }
 
-            state_dir = Path(os.path.expanduser("~/.codex-api-home/lucy/runtime-v7/state"))
+            state_dir = Path(os.path.expanduser("~/.codex-api-home/lucy/runtime-v8/state"))
             state_dir.mkdir(parents=True, exist_ok=True)
             (state_dir / "last_request_result.json").write_text(json.dumps(payload) + "\\n", encoding="utf-8")
             with open(state_dir / "request_history.jsonl", "a", encoding="utf-8") as handle:
@@ -236,7 +236,7 @@ class Sandbox:
             self.current_state_path,
             {
                 "schema_version": 1,
-                "profile": "opt-experimental-v7-dev",
+                "profile": "lucy-v8",
                 "mode": "auto",
                 "conversation": "on",
                 "memory": "on",

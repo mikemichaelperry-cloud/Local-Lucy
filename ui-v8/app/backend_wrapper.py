@@ -3,7 +3,7 @@ Backend Wrapper - Consolidated Single Source of Truth
 
 Re-exports backend functionality from the unified backend.
 All implementation is in:
-  snapshots/opt-experimental-v8-dev/tools/router_py/
+  /home/mike/lucy-v8/tools/router_py/
 
 This ensures both text and voice paths use IDENTICAL code.
 """

@@ -2,8 +2,8 @@
 Local Lucy v8 - Consolidated Backend (Single Source of Truth)
 
 This module provides a unified interface to the backend by importing
-from the authoritative snapshot location:
-  snapshots/opt-experimental-v8-dev/tools/router_py/
+from the authoritative local v8 location:
+  /home/mike/lucy-v8/tools/router_py/
 
 This ensures both text and voice paths use the exact same code.
 
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 # -----------------------------------------------------------------------------
-# CRITICAL: Set up path to import from authoritative snapshot location
+# CRITICAL: Set up path to import from authoritative local v8 location
 # -----------------------------------------------------------------------------
 
 # V8 ISOLATION: Use environment variable or authority root, not hardcoded home path
@@ -26,8 +26,8 @@ AUTHORITY_ROOT = os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", "").strip()
 if AUTHORITY_ROOT:
     SNAPSHOT_ROOT = Path(AUTHORITY_ROOT).expanduser()
 else:
-    # Fallback: derive from current file location or home
-    SNAPSHOT_ROOT = Path(__file__).resolve().parents[3] / "snapshots" / "opt-experimental-v8-dev"
+    # Fallback: derive local lucy-v8 root from ui-v8/app/backend/__init__.py.
+    SNAPSHOT_ROOT = Path(__file__).resolve().parents[3]
 TOOLS_PATH = SNAPSHOT_ROOT / "tools"
 ROUTER_PY_PATH = TOOLS_PATH / "router_py"
 
@@ -97,7 +97,7 @@ try:
     BACKEND_AVAILABLE = True
     
 except ImportError as e:
-    print(f"[Backend] CRITICAL ERROR: Failed to import from snapshot: {e}", file=sys.stderr)
+    print(f"[Backend] CRITICAL ERROR: Failed to import from local v8 backend: {e}", file=sys.stderr)
     print(f"[Backend] Path attempted: {ROUTER_PY_PATH}", file=sys.stderr)
     BACKEND_AVAILABLE = False
     raise

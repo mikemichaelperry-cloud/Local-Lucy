@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${LUCY_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)}"
 WORKSPACE_ROOT="$(dirname -- "$(dirname -- "${ROOT}")")"
-UI_ROOT="${LUCY_UI_ROOT:-${WORKSPACE_ROOT}/ui-v7}"
+UI_ROOT="${LUCY_UI_ROOT:-${WORKSPACE_ROOT}/lucy-v8/ui-v8}"
 UI_VENV_PY="${UI_ROOT}/.venv/bin/python3"
 TTS_ADAPTER="${ROOT}/tools/voice/tts_adapter.py"
 
@@ -74,13 +74,13 @@ else
 fi
 
 if [[ ! -x "${UI_VENV_PY}" ]]; then
-  die "ui-v7 python missing (${UI_VENV_PY})"
+  die "ui-v8 python missing (${UI_VENV_PY})"
 fi
 
 if ! "${UI_VENV_PY}" -c 'import kokoro, soundfile' >/dev/null 2>&1; then
-  die "ui-v7 kokoro stack missing (expected modules: kokoro, soundfile)"
+  die "ui-v8 kokoro stack missing (expected modules: kokoro, soundfile)"
 fi
-ok "ui-v7 kokoro modules present"
+ok "ui-v8 kokoro modules present"
 
 if [[ ! -f "${TTS_ADAPTER}" ]]; then
   die "tts adapter missing (${TTS_ADAPTER})"
@@ -91,4 +91,4 @@ fi
 if [[ "${payload}" != *'"ok": true'* ]] || [[ "${payload}" != *'"engine": "kokoro"'* ]]; then
   die "kokoro probe failed (${payload})"
 fi
-ok "kokoro probe (ui-v7) passes"
+ok "kokoro probe (ui-v8) passes"

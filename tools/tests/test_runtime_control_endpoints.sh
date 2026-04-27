@@ -105,7 +105,7 @@ import sys
 from pathlib import Path
 
 state = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-assert state["profile"] == "opt-experimental-v7-dev"
+assert state["profile"] == "lucy-v8"
 assert state["mode"] == "auto"
 PY
 
@@ -118,7 +118,7 @@ from pathlib import Path
 state_path = Path(sys.argv[1]) / "state" / "current_state.json"
 state = json.loads(state_path.read_text(encoding="utf-8"))
 assert state_path.exists()
-assert state["profile"] == "opt-experimental-v7-dev"
+assert state["profile"] == "lucy-v8"
 assert state["mode"] == "auto"
 PY
 

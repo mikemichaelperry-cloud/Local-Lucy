@@ -101,7 +101,7 @@ echo ""
 
 # Check PyTorch CUDA (if venv available)
 echo "=== PYTORCH CUDA ==="
-VENV_PYTHON="/home/mike/lucy/ui-v7/.venv/bin/python"
+VENV_PYTHON="/home/mike/lucy-v8/ui-v8/.venv/bin/python"
 if [ -x "$VENV_PYTHON" ]; then
     CUDA_CHECK=$($VENV_PYTHON -c "import torch; print(torch.cuda.is_available())" 2>/dev/null || echo "False")
     if [ "$CUDA_CHECK" = "True" ]; then
