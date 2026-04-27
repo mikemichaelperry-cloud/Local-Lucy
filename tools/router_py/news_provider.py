@@ -329,11 +329,15 @@ class RSSNewsProvider:
             title = _clean_html(title_elem.text) if title_elem is not None else ""
             
             # Extract description/summary
-            desc_elem = item.find("description") or item.find("summary")
+            # NOTE: ElementTree Elements with CDATA are falsy — do NOT use 'or'
+            desc_elem = item.find("description")
+            if desc_elem is None:
+                desc_elem = item.find("summary")
             if desc_elem is None:
                 # Try Atom content
-                desc_elem = item.find("{http://www.w3.org/2005/Atom}summary") or \
-                           item.find("{http://www.w3.org/2005/Atom}content")
+                desc_elem = item.find("{http://www.w3.org/2005/Atom}summary")
+            if desc_elem is None:
+                desc_elem = item.find("{http://www.w3.org/2005/Atom}content")
             description = _clean_html(desc_elem.text) if desc_elem is not None else ""
             
             # Extract link
