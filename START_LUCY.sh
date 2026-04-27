@@ -42,9 +42,14 @@ export LUCY_SESSION_MEMORY=1
 # Voice STT (Whisper) library path
 export LD_LIBRARY_PATH="${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src:${LD_LIBRARY_PATH:-}"
 
-# Voice Python (use system python3 since venv not present)
-export LUCY_VOICE_PYTHON_BIN="/usr/bin/python3"
+V8_PYTHON="${SCRIPT_DIR}/ui-v8/.venv/bin/python3"
+if [ -x "$V8_PYTHON" ]; then
+    export LUCY_VOICE_PYTHON_BIN="$V8_PYTHON"
+    APP_PYTHON="$V8_PYTHON"
+else
+    APP_PYTHON="/usr/bin/python3"
+fi
 
 # Launch HMI
 cd ui-v8
-exec /usr/bin/python3 -m app.main "$@"
+exec "$APP_PYTHON" -m app.main "$@"

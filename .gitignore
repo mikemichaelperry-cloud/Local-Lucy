@@ -1,9 +1,8 @@
 # Local Lucy v8 - Git Ignore
-# Only ui-v8/ is active code for GitHub
+# Local /home/mike/lucy-v8 is the definitive alpha source.
 
-# Legacy tools (kept locally, not on GitHub)
+# Legacy shell tools (kept locally, not on GitHub)
 /tools/router/
-/tools/router_py/
 
 # Snapshots (large archives, kept locally)
 /snapshots/

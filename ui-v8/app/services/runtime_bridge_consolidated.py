@@ -26,16 +26,9 @@ except ImportError as e:
     print(f"[ConsolidatedBridge] Backend import failed: {e}", file=sys.stderr)
     BACKEND_AVAILABLE = False
 
-# Import voice components
-try:
-    sys.path.insert(0, str(APP_DIR / "backend"))
-    sys.path.insert(0, str(APP_DIR / "backend" / "voice"))
-    from voice_tool import VoicePipeline, VoiceResult
-    from voice import tts_adapter
-    VOICE_AVAILABLE = True
-except ImportError as e:
-    print(f"[ConsolidatedBridge] Voice import failed: {e}", file=sys.stderr)
-    VOICE_AVAILABLE = False
+# Voice is handled through the tracked v8 runtime_voice.py endpoint. Do not
+# import alternate voice pipelines here; that creates multiple active versions.
+VOICE_AVAILABLE = True
 
 
 @dataclass(frozen=True)
@@ -54,6 +47,15 @@ class ConsolidatedRuntimeBridge:
         if not BACKEND_AVAILABLE:
             raise RuntimeError("Backend not available")
         self.available = True
+        # Timeout configuration MUST be set before discovering capabilities
+        self.control_timeout_seconds = 5
+        self.profile_timeout_seconds = 5
+        self.lifecycle_timeout_seconds = 15
+        self.request_timeout_seconds = 125
+        self.voice_status_timeout_seconds = 5
+        self.voice_start_timeout_seconds = 5
+        self.voice_stop_timeout_seconds = 300
+        
         self._setup_environment()
         
         # Voice state
@@ -65,7 +67,7 @@ class ConsolidatedRuntimeBridge:
         
         # Tool paths (for lifecycle, voice, etc.) - MUST be set before discovering capabilities
         authority_root = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", 
-            str(Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev")))
+            str(Path(__file__).resolve().parents[3])))
         self.lifecycle_tool_path = authority_root / "tools" / "runtime_lifecycle.py"
         
         # Initialize capabilities for API compatibility with legacy bridge
@@ -74,15 +76,6 @@ class ConsolidatedRuntimeBridge:
         self.lifecycle_capability = self._discover_lifecycle_capability()
         self.request_capability = self._discover_request_capability()
         self.voice_capability = self._discover_voice_capability()
-        
-        # Timeout configuration (mirror legacy bridge)
-        self.control_timeout_seconds = 5
-        self.profile_timeout_seconds = 5
-        self.lifecycle_timeout_seconds = 15
-        self.request_timeout_seconds = 125
-        self.voice_status_timeout_seconds = 5
-        self.voice_start_timeout_seconds = 5
-        self.voice_stop_timeout_seconds = 300
     
     def _setup_environment(self):
         """Set required environment variables."""
@@ -164,31 +157,24 @@ class ConsolidatedRuntimeBridge:
     
     def _discover_voice_capability(self) -> ActionCapability:
         """Discover voice capability."""
-        if not VOICE_AVAILABLE:
-            return ActionCapability(
-                name="voice",
-                available=False,
-                allowed_values=(),
-                reason="Voice components not available (import failed)"
-            )
-        
-        # Check if voice backend is functional
         try:
-            pipeline = VoicePipeline()
-            backend_info = pipeline._detect_backend()
-            if backend_info.available:
+            payload = self._get_voice_status()
+            if payload.get("available"):
                 return ActionCapability(
                     name="voice",
                     available=True,
                     allowed_values=(),
-                    reason=f"Voice ready ({backend_info.recorder_engine} recorder, {backend_info.stt_engine} STT)"
+                    reason=(
+                        f"Voice ready ({payload.get('recorder', 'unknown')} recorder, "
+                        f"{payload.get('stt', 'unknown')} STT, {payload.get('tts', 'none')} TTS)"
+                    )
                 )
             else:
                 return ActionCapability(
                     name="voice",
                     available=False,
                     allowed_values=(),
-                    reason=f"Voice backend unavailable: {backend_info.reason}"
+                    reason=f"Voice backend unavailable: {payload.get('last_error') or payload.get('reason') or 'status unavailable'}"
                 )
         except Exception as e:
             return ActionCapability(
@@ -263,30 +249,46 @@ class ConsolidatedRuntimeBridge:
             }
     
     def _get_voice_status(self) -> dict[str, Any]:
-        """Get current voice runtime status."""
-        if not VOICE_AVAILABLE:
+        """Get current voice runtime status from the tracked v8 runtime endpoint."""
+        import subprocess
+
+        runtime_voice_path = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT",
+            str(Path(__file__).resolve().parents[3]))) / "tools" / "runtime_voice.py"
+
+        if not runtime_voice_path.exists():
             return {
                 "available": False,
                 "status": "unavailable",
                 "listening": False,
                 "processing": False,
-                "reason": "Voice components not available"
+                "reason": f"runtime_voice.py not found at {runtime_voice_path}",
             }
-        
+
         try:
-            pipeline = VoicePipeline()
-            backend = pipeline._detect_backend()
-            
-            return {
-                "available": backend.available,
-                "status": "listening" if self._voice_listening else "processing" if self._voice_processing else "idle",
-                "listening": self._voice_listening,
-                "processing": self._voice_processing,
-                "recorder": backend.recorder_engine,
-                "stt": backend.stt_engine,
-                "tts": backend.tts_engine,
-                "tts_device": backend.tts_device,
-                "last_error": ""
+            result = subprocess.run(
+                [sys.executable, str(runtime_voice_path), "status"],
+                capture_output=True,
+                text=True,
+                timeout=self.voice_status_timeout_seconds,
+                env=os.environ.copy()
+            )
+            if result.returncode != 0:
+                return {
+                    "available": False,
+                    "status": "fault",
+                    "listening": False,
+                    "processing": False,
+                    "reason": result.stderr.strip() or f"voice status exited {result.returncode}",
+                    "last_error": result.stderr.strip(),
+                }
+            payload = json.loads(result.stdout)
+            return payload if isinstance(payload, dict) else {
+                "available": False,
+                "status": "fault",
+                "listening": False,
+                "processing": False,
+                "reason": "invalid voice status payload",
+                "last_error": "invalid voice status payload",
             }
         except Exception as e:
             return {
@@ -303,14 +305,14 @@ class ConsolidatedRuntimeBridge:
         import subprocess
         
         runtime_voice_path = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", 
-            str(Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev"))) / "tools" / "runtime_voice.py"
+            str(Path(__file__).resolve().parents[3]))) / "tools" / "runtime_voice.py"
         
         if not runtime_voice_path.exists():
             return {"status": "failed", "error": f"runtime_voice.py not found at {runtime_voice_path}"}
         
         try:
             result = subprocess.run(
-                ["python3", str(runtime_voice_path), "ptt-start"],
+                [sys.executable, str(runtime_voice_path), "ptt-start"],
                 capture_output=True,
                 text=True,
                 timeout=self.voice_start_timeout_seconds,
@@ -337,14 +339,14 @@ class ConsolidatedRuntimeBridge:
         import subprocess
         
         runtime_voice_path = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", 
-            str(Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev"))) / "tools" / "runtime_voice.py"
+            str(Path(__file__).resolve().parents[3]))) / "tools" / "runtime_voice.py"
         
         if not runtime_voice_path.exists():
             return {"status": "failed", "error": f"runtime_voice.py not found at {runtime_voice_path}"}
         
         try:
             result = subprocess.run(
-                ["python3", str(runtime_voice_path), "ptt-stop"],
+                [sys.executable, str(runtime_voice_path), "ptt-stop"],
                 capture_output=True,
                 text=True,
                 timeout=self.voice_stop_timeout_seconds,
@@ -372,14 +374,14 @@ class ConsolidatedRuntimeBridge:
         import subprocess
         
         runtime_voice_path = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", 
-            str(Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev"))) / "tools" / "runtime_voice.py"
+            str(Path(__file__).resolve().parents[3]))) / "tools" / "runtime_voice.py"
         
         if not runtime_voice_path.exists():
             return {"ok": False, "engine": "none", "prewarmed": False}
         
         try:
             result = subprocess.run(
-                ["python3", str(runtime_voice_path), "internal-prewarm-tts"],
+                [sys.executable, str(runtime_voice_path), "internal-prewarm-tts"],
                 capture_output=True,
                 text=True,
                 timeout=10,

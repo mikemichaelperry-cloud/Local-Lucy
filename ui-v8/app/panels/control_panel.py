@@ -427,11 +427,7 @@ class ControlPanel(QFrame):
         if self._audio_level_timer is not None:
             return
         
-        # Initialize audio levels file path
-        if self._audio_levels_file is None:
-            default_runtime_dir = Path(__file__).resolve().parents[3]
-            runtime_dir = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(default_runtime_dir)))
-            self._audio_levels_file = runtime_dir / "state" / "voice_audio_levels.json"
+        self._resolve_audio_levels_file()
         
         self._audio_level_timer = QTimer(self)
         self._audio_level_timer.timeout.connect(self._update_audio_levels_from_file)
@@ -443,32 +439,40 @@ class ControlPanel(QFrame):
             self._audio_level_timer.stop()
             self._audio_level_timer = None
 
+    def _resolve_audio_levels_file(self) -> Path:
+        """Resolve the v8 runtime audio-level file used by STT/TTS VU meters."""
+        if self._audio_levels_file is None:
+            default_runtime_dir = Path(__file__).resolve().parents[3]
+            runtime_dir = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(default_runtime_dir))).expanduser()
+            self._audio_levels_file = runtime_dir / "state" / "voice_audio_levels.json"
+        return self._audio_levels_file
+
     def _check_is_speaking_from_levels(self) -> bool:
         """Check if TTS is playing by reading voice_audio_levels.json.
         
         Returns True if playing=True and output_level > 0.
         """
-        if self._audio_levels_file is None:
-            return False
+        levels_file = self._resolve_audio_levels_file()
         try:
-            if self._audio_levels_file.exists():
-                with open(self._audio_levels_file) as f:
+            if levels_file.exists():
+                with open(levels_file, encoding="utf-8") as f:
                     data = json.load(f)
                 playing = bool(data.get("playing", False))
                 output_level = int(data.get("output_level", 0))
-                return playing and output_level > 0
+                return playing or output_level > 0
         except Exception:
             pass
         return False
 
     def _update_audio_levels_from_file(self) -> None:
         """Read audio levels from separate file and update VU meter."""
-        if self._voice_vu_meter is None or self._audio_levels_file is None:
+        if self._voice_vu_meter is None:
             return
+        levels_file = self._resolve_audio_levels_file()
         
         try:
-            if self._audio_levels_file.exists():
-                with open(self._audio_levels_file) as f:
+            if levels_file.exists():
+                with open(levels_file, encoding="utf-8") as f:
                     data = json.load(f)
                 
                 input_level = int(data.get("input_level", 0))
@@ -692,7 +696,7 @@ class ControlPanel(QFrame):
         # Start/stop audio level timer based on recording/playback state
         # Also check voice_audio_levels.json for "speaking" state (playing=True with output_level > 0)
         is_speaking = self._check_is_speaking_from_levels()
-        if stage in ("recording", "speaking") or is_speaking:
+        if stage in ("recording", "processing", "speaking") or is_speaking:
             self._start_audio_level_timer()
         else:
             self._stop_audio_level_timer()
