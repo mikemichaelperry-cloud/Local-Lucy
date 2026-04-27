@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive Local Lucy v7 Benchmark Suite
+Comprehensive Local Lucy v8 Benchmark Suite
 Runs all automated benchmarks and generates unified report
 """
 import json
@@ -12,9 +12,9 @@ from datetime import datetime
 from pathlib import Path
 
 # Configuration
-SNAPSHOT_ROOT = Path("/home/mike/lucy/snapshots/opt-experimental-v7-dev")
-UI_ROOT = Path("/home/mike/lucy/ui-v7")
-RUNTIME_NS = Path("/home/mike/.codex-api-home/lucy/runtime-v7")
+SNAPSHOT_ROOT = Path("/home/mike/lucy-v8")
+UI_ROOT = Path("/home/mike/lucy-v8/ui-v8")
+RUNTIME_NS = Path("/home/mike/.codex-api-home/lucy/runtime-v8")
 
 # Environment setup
 os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(SNAPSHOT_ROOT)
@@ -22,7 +22,7 @@ os.environ["LUCY_UI_ROOT"] = str(UI_ROOT)
 os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_NS)
 os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
 
-REPORT_FILE = Path.home() / "Desktop" / "lucy_v7_benchmark_report.json"
+REPORT_FILE = Path.home() / "Desktop" / "lucy_v8_benchmark_report.json"
 
 
 def run_command(cmd, timeout=300, env=None):
@@ -248,7 +248,7 @@ def main():
     print("\n" + "=" * 60)
     print("NEXT STEPS FOR MANUAL TESTING:")
     print("=" * 60)
-    print("  1. Launch HMI: cd /home/mike/lucy/ui-v7 && source .venv/bin/activate && python app/main.py")
+    print("  1. Launch HMI: cd /home/mike/lucy-v8/ui-v8 && source .venv/bin/activate && python app/main.py")
     print("  2. Enable voice mode")
     print("  3. Run 10 voice turns, watch for:")
     print("     - Clipped first words")

@@ -20,10 +20,26 @@ from typing import Optional
 
 try:
     # When imported as part of voice package
-    from voice.playback import detect_audio_player, player_command, PlaybackError
+    from voice.playback import (
+        PlaybackError,
+        create_prepadded_copy,
+        create_silence_copy,
+        detect_audio_player,
+        play_wav_file,
+        player_command,
+        run_player_command,
+    )
 except ImportError:
     # When imported directly
-    from playback import detect_audio_player, player_command, PlaybackError
+    from playback import (
+        PlaybackError,
+        create_prepadded_copy,
+        create_silence_copy,
+        detect_audio_player,
+        play_wav_file,
+        player_command,
+        run_player_command,
+    )
 
 
 def _write_output_level(level: list[int], levels_file: Path, running: list[bool]) -> None:
@@ -40,31 +56,31 @@ def _write_output_level(level: list[int], levels_file: Path, running: list[bool]
     logger = logging.getLogger("playback_with_levels")
     logger.info(f"Level writer thread started: {levels_file}")
     
-    def _read_existing_input_level() -> int:
-        """Read existing input_level from file if it exists."""
+    def _read_existing_levels() -> dict[str, object]:
+        """Read existing levels so playback does not clobber recording state."""
         try:
             if levels_file.exists():
-                with open(levels_file, 'r') as f:
+                with open(levels_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    return int(data.get("input_level", 0))
+                    return data if isinstance(data, dict) else {}
         except Exception:
             pass
-        return 0
+        return {}
     
     while running[0]:
         try:
-            # Preserve input_level from existing file
-            input_level = _read_existing_input_level()
+            existing = _read_existing_levels()
             
             data = {
-                "input_level": input_level,
+                "input_level": int(existing.get("input_level", 0)),
                 "output_level": level[0],
+                "recording": bool(existing.get("recording", False)),
                 "timestamp": time.time(),
                 "playing": True,
             }
             # Atomic write
             tmp_file = levels_file.with_suffix('.tmp')
-            with open(tmp_file, 'w') as f:
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f)
             tmp_file.rename(levels_file)
         except Exception as e:
@@ -76,14 +92,15 @@ def _write_output_level(level: list[int], levels_file: Path, running: list[bool]
     logger.info("Level writer thread stopping")
     # Write final zero level (preserve input_level)
     try:
-        input_level = _read_existing_input_level()
+        existing = _read_existing_levels()
         data = {
-            "input_level": input_level,
+            "input_level": int(existing.get("input_level", 0)),
             "output_level": 0,
+            "recording": bool(existing.get("recording", False)),
             "timestamp": time.time(),
             "playing": False,
         }
-        with open(levels_file, 'w') as f:
+        with open(levels_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
         logger.info("Final zero level written")
     except Exception as e:
@@ -155,6 +172,8 @@ def play_wav_file_with_levels(
     levels_file: Path,
     *,
     player: Optional[str] = None,
+    prepad_ms: int = 0,
+    prime_ms: int = 0,
     timeout_seconds: int = 120,
 ) -> None:
     """
@@ -164,6 +183,8 @@ def play_wav_file_with_levels(
         wav_path: Path to WAV file to play
         levels_file: Path to write audio levels (voice_audio_levels.json)
         player: Optional player override (aplay/paplay)
+        prepad_ms: Optional leading silence to prepend before playback
+        prime_ms: Optional silent priming playback before real playback
         timeout_seconds: Playback timeout
         
     Raises:
@@ -186,18 +207,60 @@ def play_wav_file_with_levels(
     if not selected_player:
         raise PlaybackError("no audio player available")
     
-    # Pre-analyze WAV levels
-    levels = _analyze_wav_levels(wav_path)
+    playback_path = wav_path
+    temp_path: Path | None = None
+    try:
+        if prepad_ms > 0:
+            temp_path = create_prepadded_copy(wav_path, prepad_ms)
+            playback_path = temp_path
+
+        if prime_ms > 0:
+            prime_path = create_silence_copy(playback_path, prime_ms)
+            try:
+                try:
+                    run_player_command(
+                        player_command(selected_player, prime_path),
+                        timeout_seconds=max(5, min(timeout_seconds, 15)),
+                    )
+                except PlaybackError:
+                    pass
+            finally:
+                try:
+                    prime_path.unlink()
+                except OSError:
+                    pass
+
+        # Pre-analyze WAV levels
+        levels = _analyze_wav_levels(playback_path)
+    except Exception:
+        if temp_path is not None:
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
+        raise
     logger.info(f"Analyzed {len(levels)} level chunks from WAV")
     
     if not levels:
         # No levels analyzed, fall back to standard playback
-        from playback import play_wav_file
-        play_wav_file(wav_path, player=player, timeout_seconds=timeout_seconds)
+        try:
+            play_wav_file(
+                wav_path,
+                player=player,
+                prepad_ms=prepad_ms,
+                prime_ms=prime_ms,
+                timeout_seconds=timeout_seconds,
+            )
+        finally:
+            if temp_path is not None:
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
         return
     
     # Start player subprocess
-    cmd = player_command(selected_player, wav_path)
+    cmd = player_command(selected_player, playback_path)
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
@@ -245,7 +308,9 @@ def play_wav_file_with_levels(
     
     try:
         # Wait for playback to complete
-        proc.wait(timeout=timeout_seconds)
+        returncode = proc.wait(timeout=timeout_seconds)
+        if returncode != 0:
+            raise PlaybackError("audio playback failed")
     except subprocess.TimeoutExpired:
         proc.terminate()
         try:
@@ -258,6 +323,11 @@ def play_wav_file_with_levels(
         running[0] = False
         writer_thread.join(timeout=0.5)
         updater_thread.join(timeout=0.5)
+        if temp_path is not None:
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

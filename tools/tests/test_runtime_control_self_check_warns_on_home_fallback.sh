@@ -27,7 +27,7 @@ from pathlib import Path
 
 payload = json.loads(sys.argv[1])
 home_value = Path(sys.argv[2])
-expected_root = home_value / ".codex-api-home" / "lucy" / "runtime-v7"
+expected_root = home_value / ".codex-api-home" / "lucy" / "runtime-v8"
 
 assert payload["status"] == "warning"
 assert payload["resolution_source"] == "home_fallback"

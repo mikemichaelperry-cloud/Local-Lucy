@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 TOOLS_DIR="${ROOT}/tools"
-UI_ROOT="/home/mike/lucy/ui-v7"
+UI_ROOT="/home/mike/lucy-v8/ui-v8"
 
 ok(){ echo "OK: $*"; }
 die(){ echo "FAIL: $*" >&2; exit 1; }
@@ -67,7 +67,7 @@ assert Path(authority["runtime_namespace_root"]) == expected_root
 assert Path(state_store.RUNTIME_NAMESPACE_ROOT) == expected_root
 assert Path(state_store.STATE_DIRECTORY) == expected_root / "state"
 workspace_home = home_value.parent if home_value.name in {".codex-api-home", ".codex-plus-home"} else home_value
-assert Path(state_store.LEGACY_RUNTIME_NAMESPACE_ROOT) == workspace_home / "lucy" / "runtime-v7"
+assert Path(state_store.LEGACY_RUNTIME_NAMESPACE_ROOT) == workspace_home / "lucy" / "runtime-v8"
 PY
 }
 
@@ -111,11 +111,11 @@ assert Path(state_store.STATE_DIRECTORY) == namespace_root / "state"
 PY
 }
 
-EXPECTED_ROOT="${USER_HOME}/.codex-api-home/lucy/runtime-v7"
+EXPECTED_ROOT="${USER_HOME}/.codex-api-home/lucy/runtime-v8"
 check_resolution "${USER_HOME}" "${EXPECTED_ROOT}"
 check_resolution "${SANDBOX_HOME}" "${EXPECTED_ROOT}"
 check_resolution "${PLUS_HOME}" "${EXPECTED_ROOT}"
-check_namespace_override "/home/mike/.codex-plus-home" "/home/mike/.codex-api-home/lucy/runtime-v7"
+check_namespace_override "/home/mike/.codex-plus-home" "/home/mike/.codex-api-home/lucy/runtime-v8"
 
 ok "default runtime namespace resolution stays stable for normal and Codex sandbox HOME values"
 echo "PASS: test_runtime_namespace_default_resolution"

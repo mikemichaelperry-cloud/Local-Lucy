@@ -99,7 +99,7 @@ class RuntimeBridge:
         self._prime_voice_state()
 
     def _workspace_root(self) -> Path:
-        return self.snapshot_root.parent.parent
+        return self.snapshot_root if self.snapshot_root.name == "lucy-v8" else self.snapshot_root.parent.parent
 
     def _contract_required(self) -> bool:
         raw = (os.environ.get(self.contract_required_env) or "").strip().lower()
@@ -127,10 +127,10 @@ class RuntimeBridge:
         ui_root = Path(ui_root_raw).expanduser().resolve()
         runtime_ns_root = Path(runtime_ns_raw).expanduser().resolve()
         bridge_file = Path(__file__).resolve()
-        if ui_root.name not in ("ui-v7", "ui-v8") or not ui_root.exists() or not ui_root.is_dir():
+        if ui_root.name != "ui-v8" or not ui_root.exists() or not ui_root.is_dir():
             raise RuntimeError(f"invalid UI root in authority contract: {ui_root}")
-        # V8 ISOLATION: Only accept v8 authority root
-        if authority_root.name != "opt-experimental-v8-dev":
+        # V8 ISOLATION: Only accept local v8 or the legacy v8 snapshot name.
+        if authority_root.name not in {"lucy-v8", "opt-experimental-v8-dev"}:
             raise RuntimeError(f"invalid authority root in authority contract: {authority_root}")
         if not runtime_ns_root.is_absolute():
             raise RuntimeError(f"invalid runtime namespace root in authority contract: {runtime_ns_root}")
@@ -149,7 +149,6 @@ class RuntimeBridge:
         adapter_tool = self.snapshot_root / "tools" / "voice" / "tts_adapter.py"
         candidates = [
             self._workspace_root() / "ui-v8" / ".venv" / "bin" / "python3",
-            self._workspace_root() / "ui-v7" / ".venv" / "bin" / "python3",
         ]
         for candidate in candidates:
             if not candidate.exists() or not candidate.is_file():
@@ -202,7 +201,7 @@ class RuntimeBridge:
         # Always fail loudly - no silent fallbacks allowed
         raise RuntimeError(
             f"missing required {self.authority_root_env}. "
-            f"Set it explicitly to the snapshot root (e.g., /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev)"
+            f"Set it explicitly to the local v8 root (e.g., /home/mike/lucy-v8)"
         )
 
     def _discover_capabilities(self) -> dict[str, ActionCapability]:

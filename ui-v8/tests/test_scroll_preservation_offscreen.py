@@ -14,7 +14,7 @@ REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="scroll_preservation_ui_") as tmp_dir:
         home = Path(tmp_dir) / "home"
-        state_dir = home / ".codex-api-home" / "lucy" / "runtime-v7" / "state"
+        state_dir = home / ".codex-api-home" / "lucy" / "runtime-v8" / "state"
         state_dir.mkdir(parents=True, exist_ok=True)
 
         write_json(
@@ -50,8 +50,8 @@ def main() -> int:
         os.environ["HOME"] = str(home)
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
         # Set required runtime namespace root
-        os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(home / ".codex-api-home" / "lucy" / "runtime-v7")
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = "/home/mike/lucy/snapshots/opt-experimental-v7-dev"
+        os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(home / ".codex-api-home" / "lucy" / "runtime-v8")
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = "/home/mike/lucy-v8"
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))

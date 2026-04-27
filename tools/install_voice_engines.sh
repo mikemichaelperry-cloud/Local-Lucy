@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${LUCY_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)}"
 WORKSPACE_ROOT="$(dirname -- "$(dirname -- "${ROOT}")")"
-UI_ROOT="${LUCY_UI_ROOT:-${WORKSPACE_ROOT}/ui-v7}"
+UI_ROOT="${LUCY_UI_ROOT:-${WORKSPACE_ROOT}/lucy-v8/ui-v8}"
 UI_VENV_PY="${UI_ROOT}/.venv/bin/python3"
 UI_TTS_REQUIREMENTS_FILE="${LUCY_UI_VOICE_TTS_REQUIREMENTS_FILE:-${UI_ROOT}/tools/voice_tts_requirements.txt}"
 
@@ -310,22 +310,22 @@ install_piper(){
   esac
 }
 
-install_ui_v7_kokoro(){
+install_ui_v8_kokoro(){
   if [[ ! -x "${UI_VENV_PY}" ]]; then
-    warn "ui-v7 python not found at ${UI_VENV_PY}; skipping kokoro install"
+    warn "ui-v8 python not found at ${UI_VENV_PY}; skipping kokoro install"
     return 1
   fi
   if [[ ! -f "${UI_TTS_REQUIREMENTS_FILE}" ]]; then
-    warn "ui-v7 TTS requirements file missing: ${UI_TTS_REQUIREMENTS_FILE}"
+    warn "ui-v8 TTS requirements file missing: ${UI_TTS_REQUIREMENTS_FILE}"
     return 1
   fi
 
-  say "INFO: installing ui-v7 Kokoro/TTS requirements from ${UI_TTS_REQUIREMENTS_FILE}"
+  say "INFO: installing ui-v8 Kokoro/TTS requirements from ${UI_TTS_REQUIREMENTS_FILE}"
   if ! "${UI_VENV_PY}" -m pip install --upgrade -r "${UI_TTS_REQUIREMENTS_FILE}"; then
-    warn "ui-v7 Kokoro/TTS install failed"
+    warn "ui-v8 Kokoro/TTS install failed"
     return 1
   fi
-  say "OK: ui-v7 Kokoro/TTS requirements installed"
+  say "OK: ui-v8 Kokoro/TTS requirements installed"
   return 0
 }
 
@@ -363,7 +363,7 @@ main(){
   else
     warn "no piper runtime detected; voice mode will run without TTS"
   fi
-  install_ui_v7_kokoro || warn "ui-v7 Kokoro/TTS not installed; active v7 may fall back from kokoro"
+  install_ui_v8_kokoro || warn "ui-v8 Kokoro/TTS not installed; active v8 may fall back from kokoro"
 
   [[ -x "${BIN_DIR}/whisper" ]] || die "fatal: whisper binary missing after install"
   [[ -s "${WHISPER_MODEL_PATH}" ]] || die "fatal: whisper model missing after install"

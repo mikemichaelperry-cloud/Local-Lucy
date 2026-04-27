@@ -223,9 +223,9 @@ def main() -> int:
     print()
     
     # Set up required environment for tests that need it
-    os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v7"))
-    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy/snapshots/opt-experimental-v7-dev")
-    os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy/ui-v7")
+    os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v8"))
+    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v8")
+    os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v8/ui-v8")
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
     
     print("Test 1: Staleness indicators")

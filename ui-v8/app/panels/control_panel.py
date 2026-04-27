@@ -66,6 +66,7 @@ class ControlPanel(QFrame):
         self._voice_stage_label: QLabel | None = None
         self._voice_mode_label: QLabel | None = None
         self._voice_tts_label: QLabel | None = None
+        self._voice_stt_label: QLabel | None = None
         self._voice_progress: QProgressBar | None = None
         self._voice_cancel_btn: QPushButton | None = None
         self._voice_transcription_preview: QLabel | None = None
@@ -277,6 +278,15 @@ class ControlPanel(QFrame):
         tts_row.addWidget(self._voice_tts_label)
         tts_row.addStretch(1)
         layout.addLayout(tts_row)
+
+        # STT Backend indicator (GPU vs CPU fallback)
+        stt_row = QHBoxLayout()
+        self._voice_stt_label = QLabel("🧠 STT: —")
+        self._voice_stt_label.setObjectName("voiceSttLabel")
+        self._voice_stt_label.setStyleSheet("color: #7f8d97; font-size: 11px;")
+        stt_row.addWidget(self._voice_stt_label)
+        stt_row.addStretch(1)
+        layout.addLayout(stt_row)
 
         # Progress bar for pipeline stages
         self._voice_progress = QProgressBar()
@@ -717,6 +727,27 @@ class ControlPanel(QFrame):
             else:
                 self._voice_tts_label.setText(f"🔊 TTS: {tts_engine}")
                 self._voice_tts_label.setStyleSheet("color: #7f8d97; font-size: 11px;")
+        
+        # Update STT backend indicator
+        if self._voice_stt_label is not None:
+            stt_backend = str(self._voice_runtime.get("stt_backend", "")).strip()
+            stt_fallback = str(self._voice_runtime.get("stt_fallback_reason", "")).strip()
+            if stt_backend == "gpu":
+                self._voice_stt_label.setText("🧠 STT: GPU")
+                self._voice_stt_label.setStyleSheet("color: #2ecc71; font-size: 11px; font-weight: bold;")
+                self._voice_stt_label.setToolTip("Using GPU acceleration")
+            elif stt_backend == "cpu" and stt_fallback:
+                self._voice_stt_label.setText("🧠 STT: GPU → CPU")
+                self._voice_stt_label.setStyleSheet("color: #f1c40f; font-size: 11px; font-weight: bold;")
+                self._voice_stt_label.setToolTip(f"CPU fallback: {stt_fallback}")
+            elif stt_backend == "cpu":
+                self._voice_stt_label.setText("🧠 STT: CPU")
+                self._voice_stt_label.setStyleSheet("color: #f1c40f; font-size: 11px;")
+                self._voice_stt_label.setToolTip("Using CPU")
+            else:
+                self._voice_stt_label.setText("🧠 STT: —")
+                self._voice_stt_label.setStyleSheet("color: #7f8d97; font-size: 11px;")
+                self._voice_stt_label.setToolTip("")
 
     def _set_selector_value(self, selector: QComboBox, value: str) -> None:
         selector.blockSignals(True)

@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
-REPO_TOOLS_ROOT = Path("/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools")
+REPO_TOOLS_ROOT = Path("/home/mike/lucy-v8/tools")
 
 
 def main() -> int:
@@ -307,9 +307,9 @@ class Sandbox:
     def __init__(self, root: Path) -> None:
         self.root = root
         self.home = root / "home"
-        self.tools_dir = self.home / "lucy" / "snapshots" / "opt-experimental-v7-dev" / "tools"
-        self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v7" / "state"
-        self.logs_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v7" / "logs"
+        self.tools_dir = self.home / "lucy" / "snapshots" / "lucy-v8" / "tools"
+        self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v8" / "state"
+        self.logs_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v8" / "logs"
         self.current_state_path = self.state_dir / "current_state.json"
         self.runtime_lifecycle_path = self.state_dir / "runtime_lifecycle.json"
         self.last_request_result_path = self.state_dir / "last_request_result.json"
@@ -324,7 +324,7 @@ class Sandbox:
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(self.state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(self.home / "lucy" / "snapshots" / "opt-experimental-v7-dev")
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(self.home / "lucy" / "snapshots" / "lucy-v8")
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
@@ -349,7 +349,7 @@ class Sandbox:
                 raise SystemExit(2)
 
             request_text = args[2]
-            state_dir = Path(os.path.expanduser("~/.codex-api-home/lucy/runtime-v7/state"))
+            state_dir = Path(os.path.expanduser("~/.codex-api-home/lucy/runtime-v8/state"))
             state_path = state_dir / "current_state.json"
             state = {}
             if state_path.exists():

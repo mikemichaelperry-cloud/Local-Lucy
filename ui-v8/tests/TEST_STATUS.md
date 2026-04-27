@@ -43,18 +43,18 @@ All 5 quarantined tests had the same root cause: **Path mismatch in sandbox setu
 ### Issue
 The `tools_dir` was set to:
 ```python
-self.tools_dir = self.home / ".codex-api-home" / "lucy" / "snapshots" / "opt-experimental-v7-dev" / "tools"
+self.tools_dir = self.home / ".codex-api-home" / "lucy" / "snapshots" / "lucy-v8" / "tools"
 ```
 
 But the authority root was:
 ```python
-os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(self.home / "lucy" / "snapshots" / "opt-experimental-v7-dev")
+os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(self.home / "lucy" / "snapshots" / "lucy-v8")
 ```
 
 ### Fix
 Changed `tools_dir` to match authority root:
 ```python
-self.tools_dir = self.home / "lucy" / "snapshots" / "opt-experimental-v7-dev" / "tools"
+self.tools_dir = self.home / "lucy" / "snapshots" / "lucy-v8" / "tools"
 ```
 
 ### Additional Fix (test_voice_ptt_pause_removed_offscreen.py)
@@ -66,7 +66,7 @@ Added missing `sys.path.insert(0, str(REPO_UI_ROOT))` before importing app modul
 
 ### Run All Tests
 ```bash
-cd /home/mike/lucy/ui-v7
+cd /home/mike/lucy-v8/ui-v8
 source .venv/bin/activate
 for test in tests/test_*_offscreen.py tests/test_state_store_last_request_provider_truth.py tests/test_changes_verification.py; do
   echo "=== $(basename $test) ==="

@@ -73,7 +73,7 @@ sys.path.insert(0, str(Path(path).resolve().parents[1]))
 spec = importlib.util.spec_from_file_location("contextual_policy", path)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-out = mod.resolve_contextual_followup("And what about Lebanon?", "/home/mike/lucy/snapshots/opt-experimental-v7-dev")
+out = mod.resolve_contextual_followup("And what about Lebanon?", "/home/mike/lucy-v8")
 print("" if out is None else out.get("contextual_followup_kind", ""))
 PY
 )"

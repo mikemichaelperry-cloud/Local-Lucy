@@ -463,7 +463,8 @@ class StreamingVoicePipeline:
     async def _transcribe_async(self, audio) -> str:
         from voice_tool import VoicePipeline
         pipeline = VoicePipeline()
-        return await pipeline.transcribe(audio)
+        result = await pipeline.transcribe(audio)
+        return result.text
     
     async def _get_full_response(self, query: str) -> dict:
         """Get response from Lucy using Python-native router."""

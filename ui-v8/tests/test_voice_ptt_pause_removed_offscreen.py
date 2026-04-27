@@ -21,7 +21,7 @@ def main() -> int:
     home = Path.home()
     os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(home / "lucy" / "runtime")
     # Set required authority contract variables
-    os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(home / "lucy" / "snapshots" / "opt-experimental-v7-dev")
+    os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(home / "lucy" / "snapshots" / "lucy-v8")
     os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
     os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
     sys.path.insert(0, str(REPO_UI_ROOT))
