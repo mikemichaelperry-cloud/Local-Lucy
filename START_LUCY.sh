@@ -34,6 +34,7 @@ export PYTHONPATH="${SCRIPT_DIR}/ui-v8/app:${WORKSPACE_HOME}/.local/lib/python3.
 
 # Runtime configuration
 export LUCY_ROUTER_PY=1
+export LUCY_EXEC_PY=1
 export LUCY_LOCAL_MODEL=local-lucy
 export LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
 export LUCY_ENABLE_INTERNET=1
