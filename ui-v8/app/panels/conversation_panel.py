@@ -495,6 +495,15 @@ class ConversationPanel(QFrame):
         
         has_failure = self._entry_has_operator_failure(entry)
         result_title = "Latest Result" if has_failure else "Latest Answer"
+        
+        # For non-failure responses, preserve original HTML (news links, etc.)
+        raw_response = self._entry_text(entry, "response_text") or ""
+        if not has_failure and self._is_html_content(raw_response):
+            return self._build_html_response(
+                f"Latest Request<br>{request_text_html}",
+                f"<b>{result_title}</b><br>{raw_response}"
+            )
+        
         result_text = self._operator_failure_text(entry) if has_failure else self._operator_response_text(entry)
         
         # Check if result_text is HTML or plain text
