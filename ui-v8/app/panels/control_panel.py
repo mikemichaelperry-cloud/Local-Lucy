@@ -441,7 +441,7 @@ class ControlPanel(QFrame):
         
         self._audio_level_timer = QTimer(self)
         self._audio_level_timer.timeout.connect(self._update_audio_levels_from_file)
-        self._audio_level_timer.start(30)  # 30ms = ~33fps
+        self._audio_level_timer.start(60)  # 60ms = ~17fps (halves disk reads)
 
     def _stop_audio_level_timer(self) -> None:
         """Stop the audio level update timer."""

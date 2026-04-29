@@ -659,7 +659,7 @@ class LocalAnswer:
         """Build the prompt for Ollama."""
         memory_block = ""
         if session_memory.strip():
-            memory_block = f"Session memory (recent turns; use only if relevant):\n{session_memory}\n\n"
+            memory_block = f"{session_memory}\n\n---\n\n"
         
         conversation_block = ""
         if conversation_mode_active and conversation_system_block:
@@ -672,7 +672,7 @@ class LocalAnswer:
         else:
             context_block = ""
             if session_memory.strip():
-                instruction = "You are Local Lucy. You have access to the session memory of recent conversation turns above. Use this memory to answer followup questions and maintain context. Be concise and accurate."
+                instruction = "You are Local Lucy. Be concise and accurate."
             else:
                 instruction = "You are Local Lucy running OFFLINE. Answer using stable general knowledge only. If the user asks for latest/current info, say: 'This requires evidence mode.' and stop."
         

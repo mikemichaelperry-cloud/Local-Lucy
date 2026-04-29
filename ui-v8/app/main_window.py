@@ -42,7 +42,7 @@ from app.ui_levels import SIMPLE, POWER, ENGINEERING, LEVELS, display_level, lev
 
 # Version and Build Info
 LUCY_VERSION = "8"
-LUCY_SNAPSHOT = "opt-experimental-v8-dev"
+LUCY_SNAPSHOT = "v8"
 LUCY_BUILD_DATE = "2026-04-22"
 
 APP_STYLESHEET = """
@@ -219,7 +219,7 @@ class OperatorConsoleWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self._debug_log("OperatorConsoleWindow initializing")
-        self.setWindowTitle(f"Local Lucy v{LUCY_VERSION} - {LUCY_SNAPSHOT}")
+        self.setWindowTitle(f"Local Lucy v{LUCY_VERSION}")
         self.resize(1460, 900)
         # Allow reduced-height operation so per-panel scrolling can engage on smaller displays.
         self.setMinimumSize(960, 620)
@@ -975,13 +975,12 @@ class OperatorConsoleWindow(QMainWindow):
         return payload
 
     def _debug_log(self, msg: str) -> None:
-        """Write debug log to file."""
-        import os
-        from pathlib import Path
+        """Write debug log to file (gated by LUCY_UI_DEBUG_LOG=1)."""
+        if os.environ.get("LUCY_UI_DEBUG_LOG") != "1":
+            return
         log_path = Path.home() / "lucy-v8" / "ui_debug.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a") as f:
-            from datetime import datetime
             f.write(f"{datetime.now().isoformat()} MAIN {msg}\n")
 
     def _reload_request_history(self) -> None:

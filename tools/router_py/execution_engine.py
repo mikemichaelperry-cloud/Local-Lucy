@@ -92,12 +92,17 @@ DEFAULT_POLICY_CONFIDENCE_THRESHOLD = 0.60
 DEFAULT_CHAT_MEMORY_FILE = "~/.codex-api-home/lucy/runtime-v8/state/chat_session_memory.txt"
 
 
-def _load_session_memory_context() -> str:
+def _load_session_memory_context(query: str = "", depth: str = "auto", mode: str = "local") -> str:
     """
     Load session memory context from the chat memory file.
     
     This function reads the conversation history from the memory file
     and returns it as a formatted string for inclusion in prompts.
+    
+    Args:
+        query: Current user query for semantic recall (optional).
+        depth: "auto", "shallow", or "deep". Auto detects based on query content.
+        mode: "local" or "augmented". Local never injects cross-session context.
     
     Returns:
         String containing the session memory context (last 16 lines, max 500 chars)
@@ -106,6 +111,15 @@ def _load_session_memory_context() -> str:
     # Check if memory is enabled
     if os.environ.get("LUCY_SESSION_MEMORY", "0") != "1":
         return ""
+    
+    # SQLite-first read attempt (summary-aware context assembly)
+    try:
+        from memory.memory_service import assemble_context
+        context = assemble_context(max_chars=500, query=query, depth=depth, mode=mode)
+        if context:
+            return context
+    except Exception:
+        pass  # Fall through to legacy text-file logic
     
     # Get memory file path (check both runtime and standard env vars)
     mem_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
@@ -1228,7 +1242,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         })
         
         # Add session memory context if enabled
-        session_memory = _load_session_memory_context()
+        session_memory = _load_session_memory_context(question)
         if session_memory:
             env["LUCY_SESSION_MEMORY_CONTEXT"] = session_memory
             self._logger.debug(f"Added session memory context ({len(session_memory)} chars)")
@@ -2339,7 +2353,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         answer = LocalAnswer(config)
         
         # Load session memory if enabled (same as other execution paths)
-        session_memory = _load_session_memory_context()
+        session_memory = _load_session_memory_context(prompt)
         if session_memory:
             self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
         
@@ -2896,7 +2910,8 @@ them according to the route type (bypass, provisional, or full). It handles:
             })
             
             # Add session memory context if enabled
-            session_memory = _load_session_memory_context()
+            # Augmented mode gets deep context since the model handles mixed sources well
+            session_memory = _load_session_memory_context(question, depth="deep", mode="augmented")
             if session_memory:
                 env["LUCY_SESSION_MEMORY_CONTEXT"] = session_memory
                 self._logger.debug(f"Added session memory context ({len(session_memory)} chars)")

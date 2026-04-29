@@ -50,15 +50,15 @@ def test_staleness_indicators():
     print("  ✓ Staleness indicators: RuntimeSnapshot has timestamp field")
 
 
-def test_ptt_timeout_reduction():
-    """Test that PTT stop timeout is 30s not 180s."""
+def test_ptt_timeout_value():
+    """Test that PTT stop timeout accommodates transcription + LLM + TTS + news digest overhead."""
     from app.services.runtime_bridge import RuntimeBridge
     
     bridge = RuntimeBridge()
     
-    assert_ok(bridge.voice_stop_timeout_seconds == 150, 
-              f"voice_stop_timeout should be 150s, got {bridge.voice_stop_timeout_seconds}s")
-    print("  ✓ PTT timeout: voice_stop_timeout_seconds is 150s (accommodates transcription + request + TTS)")
+    assert_ok(bridge.voice_stop_timeout_seconds == 300, 
+              f"voice_stop_timeout should be 300s, got {bridge.voice_stop_timeout_seconds}s")
+    print("  ✓ PTT timeout: voice_stop_timeout_seconds is 300s (accommodates transcription + request + TTS + long news digests)")
 
 def test_fail_loud_no_env_vars():
     """Test that missing env vars cause RuntimeError."""
@@ -231,8 +231,8 @@ def main() -> int:
     print("Test 1: Staleness indicators")
     test_staleness_indicators()
     
-    print("Test 2: PTT timeout reduction")
-    test_ptt_timeout_reduction()
+    print("Test 2: PTT timeout value")
+    test_ptt_timeout_value()
     
     print("Test 3: Fail-loud behavior (no env vars)")
     test_fail_loud_no_env_vars()

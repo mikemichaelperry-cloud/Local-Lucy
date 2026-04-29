@@ -34,6 +34,17 @@ try:
 except ImportError:
     play_wav_file_with_levels = None
 
+try:
+    from voice.whisper_worker import (
+        ensure_whisper_worker,
+        transcribe_with_worker,
+        WhisperWorkerError,
+    )
+except ImportError:
+    ensure_whisper_worker = None  # type: ignore[assignment]
+    transcribe_with_worker = None  # type: ignore[assignment]
+    WhisperWorkerError = RuntimeError  # type: ignore[misc,assignment]
+
 # Python Voice Tool integration (V8)
 # Import voice_tool for optional Python-native voice pipeline
 _VOICE_TOOL_AVAILABLE = False
@@ -773,6 +784,17 @@ def handle_ptt_start(runtime_file: Path, state_file: Path, capture_dir: Path) ->
         tts_engine, _, _, _ = detect_tts()
         if tts_engine == "kokoro":
             prewarm_kokoro_worker()
+
+    # Pre-warm whisper worker for fast STT (GPU stays loaded)
+    if ensure_whisper_worker is not None:
+        try:
+            backend = detect_backend()
+            if backend.stt_engine == "whisper" and backend.available:
+                model_path = resolve_whisper_model_path()
+                ensure_whisper_worker(model_path, use_gpu=True)
+        except Exception:
+            pass  # Non-fatal: fallback to whisper-cli remains available
+
     return normalize_voice_runtime(result_state or {})
 
 
@@ -1054,6 +1076,7 @@ def run_internal_recorder(output_path: Path, runtime_file: Path) -> int:
             wav_file.setnchannels(1)
             wav_file.setsampwidth(2)
             wav_file.setframerate(16000)
+            chunk_counter = 0
             while not _INTERNAL_RECORD_STOP:
                 chunk = process.stdout.read(2048)
                 if not chunk:
@@ -1062,7 +1085,9 @@ def run_internal_recorder(output_path: Path, runtime_file: Path) -> int:
                     time.sleep(0.01)
                     continue
                 wav_file.writeframesraw(chunk)
-                write_audio_levels(levels_file, input_level=pcm_level(chunk), recording=True)
+                chunk_counter += 1
+                if chunk_counter % 5 == 0:
+                    write_audio_levels(levels_file, input_level=pcm_level(chunk), recording=True)
 
         os.replace(tmp_path, output_path)
         return 0
@@ -1191,7 +1216,39 @@ def _is_gpu_error(stderr_text: str) -> bool:
     return any(keyword in lower for keyword in _GPU_ERROR_KEYWORDS)
 
 
+def resolve_whisper_model_path() -> Path:
+    """Resolve the whisper model file path from env or defaults."""
+    root = resolve_root()
+    model = clean_text(os.environ.get("LUCY_VOICE_WHISPER_MODEL"))
+    if not model:
+        model = str(root / "runtime" / "voice" / "models" / f"ggml-{os.environ.get('LUCY_VOICE_MODEL', 'small.en')}.bin")
+    model_path = Path(model).expanduser()
+    if not model_path.exists():
+        fallback = root / "models" / "ggml-base.bin"
+        if fallback.exists():
+            model_path = fallback
+    return model_path
+
+
 def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionResult:
+    # Fast-path: persistent whisper-server worker (GPU already warm)
+    if ensure_whisper_worker is not None:
+        try:
+            model_path = resolve_whisper_model_path()
+            port = ensure_whisper_worker(model_path, use_gpu=True)
+            if port:
+                result = transcribe_with_worker(capture_path, port, timeout=30.0)
+                return TranscriptionResult(
+                    text=result["text"],
+                    backend=result["backend"],
+                    fallback_used=result["fallback_used"],
+                    fallback_reason=result["fallback_reason"],
+                )
+        except WhisperWorkerError:
+            pass  # Fall through to whisper-cli subprocess path
+        except Exception:
+            pass  # Defensive: any unexpected error falls through
+
     root = resolve_root()
     model = clean_text(os.environ.get("LUCY_VOICE_WHISPER_MODEL"))
     if not model:
