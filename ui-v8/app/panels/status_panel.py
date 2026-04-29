@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -75,6 +76,8 @@ class StatusPanel(QFrame):
         layout.addWidget(self._legacy_warning_label)
 
         self._snapshot_timestamp: datetime | None = None
+        self._gpu_cache_data: dict[str, Any] | None = None
+        self._gpu_cache_time: float = 0.0
         self._runtime_summary_labels: dict[str, QLabel] = {}
         self._runtime_summary_cards: dict[str, QFrame] = {}
         self._runtime_detail_labels: dict[str, QLabel] = {}
@@ -264,7 +267,7 @@ class StatusPanel(QFrame):
         
         # Update Build Information from snapshot
         self._build_info_labels.get("Version", QLabel()).setText("v8")
-        self._build_info_labels.get("Snapshot", QLabel()).setText("opt-experimental-v8-dev")
+        self._build_info_labels.get("Snapshot", QLabel()).setText("v8")
         self._build_info_labels.get("Build Date", QLabel()).setText("2026-04-22")
         
         # Get paths from file_paths
@@ -331,12 +334,18 @@ class StatusPanel(QFrame):
             self._legacy_warning_label.hide()
 
     def _update_gpu_status(self, snapshot) -> None:
-        """Update GPU acceleration status in Runtime Details."""
+        """Update GPU acceleration status in Runtime Details (10-second TTL cache)."""
+        now = time.time()
         gpu_info = getattr(snapshot, 'gpu_info', {})
         if not gpu_info:
-            # Try to get from direct detection if snapshot doesn't have it
-            from app.services.state_store import _detect_gpu_status
-            gpu_info = _detect_gpu_status()
+            # Use cached detection if fresh (< 10 s)
+            if self._gpu_cache_data is not None and (now - self._gpu_cache_time) < 10.0:
+                gpu_info = self._gpu_cache_data
+            else:
+                from app.services.state_store import _detect_gpu_status
+                gpu_info = _detect_gpu_status()
+                self._gpu_cache_data = gpu_info
+                self._gpu_cache_time = now
             if not gpu_info:
                 return
         
@@ -724,6 +733,8 @@ class StatusPanel(QFrame):
             return "Stopped"
         if "status=failed" in normalized:
             return "Failed"
+        if normalized in {"file missing", "unavailable"}:
+            return "Not monitored"
         return value
 
     def _answer_path_text(self, payload: dict[str, object] | None) -> str:

@@ -600,6 +600,15 @@ def _delegate_execution_to_python(
         # Persist chat memory turn if memory is enabled
         if os.environ.get("LUCY_SESSION_MEMORY") == "1" and result.response_text:
             try:
+                # Dual-write: SQLite first (best effort)
+                from memory.memory_service import store_turn, maybe_summarize_session
+                store_turn("user", question)
+                store_turn("assistant", result.response_text)
+                maybe_summarize_session()
+            except Exception:
+                pass  # Text-file write below still happens
+            
+            try:
                 # Check both runtime and standard env vars for memory file path
                 mem_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
                 if not mem_file:

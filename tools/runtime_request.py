@@ -255,6 +255,15 @@ def should_use_chat_memory(root: Path, state: dict[str, Any], request_text: str)
 
 
 def append_chat_memory_turn(memory_file: Path, request_text: str, response_text: str, *, max_turns: int = 6) -> None:
+    # Dual-write: persist to SQLite first (best effort)
+    try:
+        from memory.memory_service import store_turn, maybe_summarize_session
+        store_turn("user", request_text)
+        store_turn("assistant", response_text)
+        maybe_summarize_session()
+    except Exception:
+        pass  # Text-file write below still happens
+
     memory_file.parent.mkdir(parents=True, exist_ok=True)
     assistant_text = (
         response_text.replace("BEGIN_VALIDATED", " ")
