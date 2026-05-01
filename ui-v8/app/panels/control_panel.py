@@ -55,7 +55,6 @@ class ControlPanel(QFrame):
         self._voice_ptt_status_label: QLabel | None = None
         self._voice_status_group: QGroupBox | None = None
         self._voice_stage_label: QLabel | None = None
-        self._voice_mode_label: QLabel | None = None
         self._voice_tts_label: QLabel | None = None
         self._voice_progress: QProgressBar | None = None
         self._voice_transcription_preview: QLabel | None = None
@@ -244,18 +243,6 @@ class ControlPanel(QFrame):
         stage_row.addWidget(self._voice_stage_label)
         stage_row.addStretch(1)
         layout.addLayout(stage_row)
-
-        # Voice mode indicator (Python vs Shell)
-        mode_row = QHBoxLayout()
-        voice_py = os.environ.get("LUCY_VOICE_PY", "0")
-        voice_mode_text = "🐍 Python Voice" if voice_py == "1" else "🐚 Shell Voice"
-        voice_mode_color = "#2ecc71" if voice_py == "1" else "#7f8d97"
-        self._voice_mode_label = QLabel(voice_mode_text)
-        self._voice_mode_label.setObjectName("voiceModeLabel")
-        self._voice_mode_label.setStyleSheet(f"color: {voice_mode_color}; font-size: 11px; font-weight: bold;")
-        mode_row.addWidget(self._voice_mode_label)
-        mode_row.addStretch(1)
-        layout.addLayout(mode_row)
 
         # TTS Engine indicator (Kokoro vs Piper)
         tts_row = QHBoxLayout()
