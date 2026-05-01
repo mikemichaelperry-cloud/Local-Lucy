@@ -53,13 +53,7 @@ class StatusPanel(QFrame):
         title = QLabel("Runtime / Status")
         title.setObjectName("sectionTitle")
         layout.addWidget(title)
-        counter_note = QLabel(
-            "Session augmented counters are GUI-session scoped, reset when this GUI restarts, "
-            "derived conservatively from backend outcome metadata, and separate from terminal launcher counters."
-        )
-        counter_note.setObjectName("cardLabel")
-        counter_note.setWordWrap(True)
-        layout.addWidget(counter_note)
+        # Session counters are updated live; no static explanation needed
 
         # Freshness indicator - shows when status was last updated and warns if stale
         self._freshness_label = QLabel("Status: waiting for first update...")
@@ -478,16 +472,12 @@ class StatusPanel(QFrame):
             active_entries_line = f"{active_entries_line} (invalid lines: {invalid_count})"
 
         summary_lines = [
-            "Advanced visibility only. No destructive actions are live in this phase.",
-            "",
             f"Active request history: {request_history_path}",
             active_entries_line,
             f"Retention cap (active): {retention_cap}",
             f"Archive files: {archive_count}",
             f"Latest archive: {latest_archive}",
             f"Latest request result: {last_result_path}",
-            "Archive browsing: not exposed in the UI yet.",
-            "Retention controls: backend-managed only.",
         ]
         self._set_preserving_scroll(self._history_maintenance_view, "\n".join(summary_lines))
 
