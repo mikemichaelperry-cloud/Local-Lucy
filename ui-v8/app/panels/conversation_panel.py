@@ -23,7 +23,6 @@ class ConversationPanel(QFrame):
     submit_requested = Signal(str)
     history_selection_changed = Signal(str)
     decision_trace_toggled = Signal(bool)
-    voice_cancel_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__()
