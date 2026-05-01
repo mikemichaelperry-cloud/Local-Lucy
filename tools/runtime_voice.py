@@ -163,6 +163,11 @@ def main() -> int:
             else:
                 print(json.dumps({"ok": False, "engine": backend.tts_engine or "none", "prewarmed": False}, sort_keys=True))
             return 0
+        if args.command == "speak":
+            backend = detect_backend()
+            tts_status = speak_response(backend, args.text)
+            print(json.dumps({"ok": tts_status == "completed", "tts_status": tts_status}, sort_keys=True))
+            return 0
         raise RuntimeVoiceError(f"unsupported command: {args.command}")
     except RuntimeVoiceExit as exc:
         print(f"ERROR: {exc.message}", file=sys.stderr)
@@ -198,6 +203,8 @@ def build_parser() -> argparse.ArgumentParser:
     internal_record.add_argument("--runtime-file", required=True)
     internal_prewarm = subparsers.add_parser("internal-prewarm-tts")
     internal_prewarm.help = "Internal: prewarm TTS worker to reduce latency (auto-called by HMI)"
+    speak_parser = subparsers.add_parser("speak")
+    speak_parser.add_argument("--text", required=True, help="Text to synthesize and speak")
     return parser
 
 
@@ -854,29 +861,9 @@ def handle_ptt_stop(runtime_file: Path, state_file: Path, capture_dir: Path) -> 
             )
             return build_turn_payload("no_transcript", "", None, "no transcript")
 
-        request_payload = submit_transcript(tx_result.text)
-        tts_status = "skipped"
-        if request_payload.get("status") == "completed":
-            response_text = clean_text(request_payload.get("response_text"))
-            if response_text:
-                tts_status = speak_response(backend, response_text)
-
-        request_status = clean_text(request_payload.get("status")) or "failed"
-        if request_status != "completed":
-            error_text = clean_text(request_payload.get("error")) or "voice submit failed"
-            finalize_voice_state(
-                runtime_file,
-                state_file,
-                backend,
-                status="fault",
-                last_error=error_text,
-                last_transcript=tx_result.text,
-                last_request_id=clean_text(request_payload.get("request_id")),
-                stt_backend=tx_result.backend,
-                stt_fallback_reason=tx_result.fallback_reason,
-            )
-            raise_with_state(error_text, PTT_STOP_REQUEST_FAILED)
-
+        # Voice is an input modality only. Return transcript to UI;
+        # UI submits through normal text pipeline (memory, routing, evidence,
+        # augmented, telemetry all preserved).
         finalize_voice_state(
             runtime_file,
             state_file,
@@ -884,13 +871,11 @@ def handle_ptt_stop(runtime_file: Path, state_file: Path, capture_dir: Path) -> 
             status="idle",
             last_error="",
             last_transcript=tx_result.text,
-            last_request_id=clean_text(request_payload.get("request_id")),
+            last_request_id="",
             stt_backend=tx_result.backend,
             stt_fallback_reason=tx_result.fallback_reason,
         )
-        payload = build_turn_payload("completed", tx_result.text, request_payload, "")
-        payload["tts_status"] = tts_status
-        return payload
+        return build_turn_payload("completed", tx_result.text, None, "")
     except RuntimeVoiceExit as exc:
         finalize_voice_state(
             runtime_file,
@@ -1041,7 +1026,11 @@ def _handle_internal_record_signal(signum: int, frame: Any) -> None:
     _INTERNAL_RECORD_STOP = True
 
 
-def run_internal_recorder(output_path: Path, runtime_file: Path) -> int:
+def run_internal_recorder(output_path: Path, runtime_file: Path, max_duration_seconds: int | None = None) -> int:
+    if max_duration_seconds is None:
+        max_duration_seconds = int(os.environ.get("LUCY_VOICE_PTT_MAX_SECONDS", "60"))
+        if max_duration_seconds <= 0:
+            max_duration_seconds = 60
     """Record microphone audio while writing input VU levels for the HMI."""
     global _INTERNAL_RECORD_STOP
     _INTERNAL_RECORD_STOP = False
@@ -1077,7 +1066,11 @@ def run_internal_recorder(output_path: Path, runtime_file: Path) -> int:
             wav_file.setsampwidth(2)
             wav_file.setframerate(16000)
             chunk_counter = 0
+            recording_start_time = time.monotonic()
             while not _INTERNAL_RECORD_STOP:
+                if time.monotonic() - recording_start_time >= max_duration_seconds:
+                    print(f"internal recorder stopped after reaching max duration ({max_duration_seconds}s)", file=sys.stderr)
+                    break
                 chunk = process.stdout.read(2048)
                 if not chunk:
                     if process.poll() is not None:
@@ -1373,7 +1366,11 @@ def normalize_transcript(text: str) -> str:
     # Strip whisper timestamp lines that may leak through
     normalized = re.sub(r"\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]", "", normalized)
     normalized = re.sub(r"\s+", " ", normalized)
-    return normalized.strip()
+    normalized = normalized.strip()
+    # Filter known silence hallucinations from small.en
+    if normalized.lower() in {"you", "i", "a", "the", "um", "uh", "hm", "mm", "mhm", "uh huh", "hmm"}:
+        return ""
+    return normalized
 
 
 def _resolve_history_file() -> Path:
@@ -2154,87 +2151,18 @@ def handle_ptt_stop_python(
         runtime_state["last_updated"] = iso_now()
         write_voice_runtime(runtime_file, runtime_state)
     
-    async def run_streaming() -> tuple[bool, str, dict, str, str]:
-        """Returns (success, transcript, response_text, response_data, error, request_id)"""
-        pipeline = StreamingVoicePipeline()
-        
-        transcript_chunks = []
-        response_chunks = []
-        # Generate request_id early so we can use it for both processing and completed entries
-        request_id = f"voice_{int(time.time() * 1000)}"
-        transcript_for_history = ""  # Store transcript for use in callbacks
-        
-        def on_transcript(text: str):
-            nonlocal transcript_for_history
-            transcript_chunks.append(text)
-            transcript_for_history = text
-            # Write a "processing" entry immediately so the user sees their question in HMI
-            if text.strip():
-                processing_id = f"{request_id}_processing"
-                _debug_log(f"Transcription complete, writing processing entry: {processing_id}")
-                try:
-                    _write_history_entry(
-                        _resolve_history_file(),
-                        request_id=processing_id,
-                        request_text=text,
-                        response_text="Processing...",
-                        status="processing",
-                        route={"mode": "online"},
-                        outcome={"outcome_code": "processing"},
-                        error="",
-                    )
-                    _debug_log(f"Processing entry written: {processing_id}")
-                except Exception as hist_exc:
-                    _debug_log(f"Warning: failed to write processing history entry: {hist_exc}")
-        
-        # Store the full original response_text for history (not the TTS-cleaned chunks)
-        full_response_text = ""
-        
-        def on_response(chunk: str):
-            # This receives TTS-cleaned cumulative chunks - we ignore for history
-            # as we want the original full response
-            pass
-        
-        def on_response_ready(response_text: str, response_data: dict):
-            """Called when full response is ready, before TTS starts."""
-            nonlocal full_response_text
-            full_response_text = response_text  # Store original for final entry
-            _debug_log(f"Response ready, writing responding entry before TTS: {request_id}")
-            try:
-                responding_id = f"{request_id}_responding"
-                _write_history_entry(
-                    _resolve_history_file(),
-                    request_id=responding_id,
-                    request_text=transcript_for_history,
-                    response_text=response_text,
-                    status="responding",
-                    route=response_data.get("route", {}),
-                    outcome={"outcome_code": "responding"},
-                    error="",
-                )
-                _debug_log(f"Responding entry written: {responding_id}")
-            except Exception as hist_exc:
-                _debug_log(f"Warning: failed to write responding history entry: {hist_exc}")
-        
-        result = await pipeline.stream_voice_interaction(
-            capture_path,
-            on_transcription=on_transcript,
-            on_response_chunk=on_response,
-            on_response_ready=on_response_ready,
-        )
-        
-        transcript = "".join(transcript_chunks)
-        # Use the original full response, not TTS-cleaned chunks
-        response_text = full_response_text if full_response_text else result.get("response_text", "")
-        response_data = result.get("response_data", {})
-        error = result.get("error", "")
-        
-        return result["success"], transcript, response_text, response_data, error, request_id
-    
+    # Voice is an input modality only. Transcribe and return transcript to UI;
+    # UI submits through normal text pipeline (memory, routing, evidence,
+    # augmented, telemetry all preserved).
     try:
-        success, transcript, response_text, response_data, error, request_id = asyncio.run(run_streaming())
+        _sys.path.insert(0, str(Path(__file__).parent / "router_py"))
+        from voice_tool import AudioBuffer, VoicePipeline
+
+        audio = AudioBuffer.from_file(capture_path)
+        pipeline = VoicePipeline()
+        transcript = asyncio.run(pipeline.transcribe(audio))
+        transcript = normalize_transcript(transcript)
     except Exception as exc:
-        # Clear state on error
         with locked_state_file(runtime_file):
             error_state = {
                 "schema_version": 1,
@@ -2248,145 +2176,51 @@ def handle_ptt_stop_python(
                 "last_updated": iso_now(),
             }
             write_voice_runtime(runtime_file, error_state)
-        raise_with_state(f"Python voice pipeline error: {exc}", PTT_STOP_REQUEST_FAILED)
-    
-    # Build response and update runtime file
-    with locked_state_file(runtime_file):
-        if success:
-            runtime_state = {
-                "schema_version": 1,
-                "available": True,
-                "listening": False,
-                "processing": False,
-                "status": "completed",
-                "last_error": "",
-                "stt_backend": "",
-                "stt_fallback_reason": "",
-                "last_updated": iso_now(),
-                "last_transcript": transcript,
-                "last_request_id": "",
-                "tts": "kokoro",
-            }
-            write_voice_runtime(runtime_file, runtime_state)
-            # Use full response_data from Lucy for HMI compatibility
-            # Update with our transcript and TTS status
-            request_payload = response_data if isinstance(response_data, dict) else {}
-            request_payload.update({
-                "status": "completed",
-                "transcript": transcript,
-                "response_text": response_text,
-            })
-            
-            # Write the final completed entry (we already wrote a processing entry during transcription)
-            try:
-                _write_history_entry(
-                    _resolve_history_file(),
-                    request_id=request_id,
-                    request_text=transcript,
-                    response_text=response_text,
-                    status="completed",
-                    route=request_payload.get("route", {}),
-                    outcome=request_payload.get("outcome", {}),
-                    error="",
-                )
-            except Exception as hist_exc:
-                print(f"Warning: failed to write history entry: {hist_exc}", file=sys.stderr)
-            
-            # Write to chat memory file for session memory
-            if os.environ.get("LUCY_SESSION_MEMORY") == "1" and transcript and response_text:
-                try:
-                    mem_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
-                    if not mem_file:
-                        mem_file = os.environ.get("LUCY_CHAT_MEMORY_FILE", "").strip()
-                    if not mem_file:
-                        home = Path.home()
-                        if home.name in {".codex-api-home", ".codex-plus-home"}:
-                            workspace_home = home.parent
-                        else:
-                            workspace_home = home
-                        mem_file = workspace_home / ".codex-api-home" / "lucy" / "runtime-v8" / "state" / "chat_session_memory.txt"
-                    else:
-                        mem_file = Path(mem_file)
-                    
-                    mem_path = Path(mem_file)
-                    mem_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    # Format assistant text
-                    assistant_text = (
-                        response_text.replace("BEGIN_VALIDATED", " ")
-                        .replace("END_VALIDATED", " ")
-                        .replace("\r", " ")
-                        .replace("\n", " ")
-                    )
-                    assistant_text = re.sub(r"\s+", " ", assistant_text).strip()
-                    if len(assistant_text) > 500:
-                        assistant_text = assistant_text[:500]
-                    
-                    # Read existing content
-                    existing = ""
-                    try:
-                        existing = mem_path.read_text(encoding="utf-8")
-                    except FileNotFoundError:
-                        pass
-                    
-                    # Build new block and append
-                    block = f"User: {transcript.strip()}\nAssistant: {assistant_text}\n\n"
-                    blocks = [item.strip() for item in re.split(r"\n\s*\n", existing) if item.strip()]
-                    blocks.append(block.strip())
-                    
-                    # Keep only last 6 turns
-                    max_turns = 6
-                    trimmed = "\n\n".join(blocks[-max_turns:]).strip()
-                    if trimmed:
-                        trimmed += "\n\n"
-                    
-                    mem_path.write_text(trimmed, encoding="utf-8")
-                except Exception:
-                    pass
-            
-            return {
-                "status": "completed",
-                "transcript": transcript,
-                "error": "",
-                "tts_status": "streamed",
-                "request": request_payload,
-            }
-        elif not transcript:
-            runtime_state = {
+        raise_with_state(f"Python voice transcription failed: {exc}", PTT_STOP_TRANSCRIBE_FAILED)
+
+    if not transcript:
+        with locked_state_file(runtime_file):
+            no_transcript_state = {
                 "schema_version": 1,
                 "available": True,
                 "listening": False,
                 "processing": False,
                 "status": "idle",
-                "last_error": "No speech detected",
+                "last_error": "",
+                "last_transcript": "",
+                "last_request_id": "",
                 "stt_backend": "",
                 "stt_fallback_reason": "",
                 "last_updated": iso_now(),
-                "tts": "none",
             }
-            write_voice_runtime(runtime_file, runtime_state)
-            return {
-                "status": "no_transcript",
-                "transcript": "",
-                "error": "No speech detected",
-                "tts_status": "none",
-            }
-        else:
-            # Error case
-            runtime_state = {
-                "schema_version": 1,
-                "available": True,
-                "listening": False,
-                "processing": False,
-                "status": "error",
-                "last_error": error or "Voice interaction failed",
-                "stt_backend": "",
-                "stt_fallback_reason": "",
-                "last_updated": iso_now(),
-                "tts": "none",
-            }
-            write_voice_runtime(runtime_file, runtime_state)
-            raise_with_state(error or "Voice interaction failed", PTT_STOP_REQUEST_FAILED)
+            write_voice_runtime(runtime_file, no_transcript_state)
+        return {
+            "status": "no_transcript",
+            "transcript": "",
+            "error": "no transcript",
+        }
+
+    with locked_state_file(runtime_file):
+        runtime_state = {
+            "schema_version": 1,
+            "available": True,
+            "listening": False,
+            "processing": False,
+            "status": "idle",
+            "last_error": "",
+            "last_transcript": transcript,
+            "last_request_id": "",
+            "stt_backend": "",
+            "stt_fallback_reason": "",
+            "last_updated": iso_now(),
+        }
+        write_voice_runtime(runtime_file, runtime_state)
+
+    return {
+        "status": "completed",
+        "transcript": transcript,
+        "error": "",
+    }
 
 
 # =============================================================================

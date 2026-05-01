@@ -20,7 +20,7 @@ export QT_QPA_PLATFORM_PLUGIN_PATH="/usr/lib/x86_64-linux-gnu/qt6/plugins"
 export LUCY_ROOT="$SCRIPT_DIR"
 export LUCY_UI_ROOT="${SCRIPT_DIR}/ui-v8"
 export LUCY_RUNTIME_NAMESPACE_ROOT="$SCRIPT_DIR"
-export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
+export LUCY_RUNTIME_AUTHORITY_ROOT="${SCRIPT_DIR}/snapshots/opt-experimental-v8-dev"
 export LUCY_RUNTIME_REQUEST_HISTORY_FILE="$SCRIPT_DIR/state/request_history.jsonl"
 
 # Voice runtime requirements

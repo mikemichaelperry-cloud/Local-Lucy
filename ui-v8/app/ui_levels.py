@@ -27,6 +27,7 @@ LEGACY_LEVEL_ALIASES = {
     # Old names mapped to new
     "operator": SIMPLE,
     "advanced": ENGINEERING,
+    "service": ENGINEERING,
     # Alternative names
     "basic": SIMPLE,
     "standard": POWER,

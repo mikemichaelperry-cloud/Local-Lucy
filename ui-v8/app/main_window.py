@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -26,8 +25,7 @@ from app.panels.conversation_panel import ConversationPanel
 from app.panels.event_log_panel import EventLogPanel
 from app.panels.status_panel import StatusPanel
 from app.services.log_watcher import LogWatcher
-from app.services import RuntimeBridge
-from app.services.runtime_bridge import CommandResult, RuntimeActionTask
+from app.services.runtime_bridge import CommandResult, RuntimeActionTask, RuntimeBridge
 from app.services.state_store import (
     build_request_details,
     get_state_directory,
@@ -36,14 +34,8 @@ from app.services.state_store import (
     resolve_last_request_paid,
     resolve_last_request_provider,
 )
-from app.ui_levels import SIMPLE, POWER, ENGINEERING, LEVELS, display_level, level_at_least, normalize_level, is_simple
+from app.ui_levels import ENGINEERING, LEVELS, SIMPLE, display_level, level_at_least, normalize_level
 
-
-
-# Version and Build Info
-LUCY_VERSION = "8"
-LUCY_SNAPSHOT = "v8"
-LUCY_BUILD_DATE = "2026-04-22"
 
 APP_STYLESHEET = """
 QMainWindow {
@@ -126,15 +118,6 @@ QPushButton#traceSummaryButton:hover {
 QPushButton#traceSummaryButton:checked {
     background: #253743;
     border-color: #627481;
-}
-QPushButton#shutdownButton {
-    background: #5c3a3a;
-    border: 1px solid #8b4545;
-    color: #f0d0d0;
-}
-QPushButton#shutdownButton:hover {
-    background: #7a4a4a;
-    border-color: #a55555;
 }
 QPushButton#pttButton {
     min-height: 46px;
@@ -219,7 +202,7 @@ class OperatorConsoleWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self._debug_log("OperatorConsoleWindow initializing")
-        self.setWindowTitle(f"Local Lucy v{LUCY_VERSION}")
+        self.setWindowTitle("Local Lucy Operator Console")
         self.resize(1460, 900)
         # Allow reduced-height operation so per-panel scrolling can engage on smaller displays.
         self.setMinimumSize(960, 620)
@@ -251,6 +234,11 @@ class OperatorConsoleWindow(QMainWindow):
         self._pending_action_label = ""
         self._pending_voice_action_label = ""
         self._voice_release_pending = False
+        self._voice_ptt_active = False
+        self._voice_elapsed_time = 0
+        self._voice_action_timer = QTimer(self)
+        self._voice_action_timer.setInterval(250)
+        self._voice_action_timer.timeout.connect(self._on_voice_timer_tick)
         self._history_signature: tuple[str, ...] = ()
         self._history_render_level = ""
         self._history_entries: list[dict[str, object]] = []
@@ -259,6 +247,7 @@ class OperatorConsoleWindow(QMainWindow):
         self._latest_request_details: dict[str, object] | None = None
         self._latest_decision_trace_details: dict[str, object] | None = None
         self._ui_event_lines: list[str] = []
+        self._last_model_switch_time: float = 0.0
         self._pending_submit_force_augmented_once = False
         # GUI-session counters only; they reset on GUI restart and are separate from launcher session counters.
         self._session_augmented_calls_total = 0
@@ -267,11 +256,9 @@ class OperatorConsoleWindow(QMainWindow):
         self._session_augmented_calls_kimi = 0
         self._session_augmented_calls_wikipedia = 0
         self._latest_state_snapshot = load_runtime_snapshot()
+        self._sanitize_voice_runtime_on_startup()
         self._latest_log_snapshot = self._log_watcher.poll()
         self._initial_draft_focus_pending = True
-        
-        # Sync environment variables from loaded state (critical for memory toggle)
-        self._sync_env_from_state(self._latest_state_snapshot.current_state)
         self._level_buttons: dict[str, QPushButton] = {}
         self._level_button_group: QButtonGroup | None = None
 
@@ -429,10 +416,12 @@ class OperatorConsoleWindow(QMainWindow):
         self.control_panel.augmented_provider_change_requested.connect(
             lambda value: self._execute_backend_action("augmented_provider", value, "augmented provider change")
         )
+        self.control_panel.model_change_requested.connect(
+            lambda value: self._execute_backend_action("model_selection", value, "model change")
+        )
         self.control_panel.ptt_pressed_requested.connect(self._handle_voice_ptt_pressed)
         self.control_panel.ptt_released_requested.connect(self._handle_voice_ptt_released)
         self.control_panel.reload_profile_requested.connect(self._handle_reload_profile_requested)
-        self.control_panel.shutdown_requested.connect(self._handle_shutdown_requested)
         self.conversation_panel.clear_draft_requested.connect(self._clear_conversation_draft)
         self.conversation_panel.submit_requested.connect(self._handle_submit_requested)
         self.conversation_panel.history_selection_changed.connect(self._handle_history_selection_changed)
@@ -450,18 +439,13 @@ class OperatorConsoleWindow(QMainWindow):
                 button.blockSignals(True)
                 button.setChecked(level == self._interface_level)
                 button.blockSignals(False)
-        # Reset history selection when switching to Simple for clean experience
-        if is_simple(self._interface_level):
+        if self._interface_level == SIMPLE:
             self._history_selection_pinned = False
             self._selected_request_id = None
-        
-        # Apply level to all panels
         self.control_panel.set_interface_level(self._interface_level)
         self.conversation_panel.set_interface_level(self._interface_level)
         self.status_panel.set_interface_level(self._interface_level)
         self._apply_top_status_visibility()
-        
-        # Event log only in Engineering level
         self.event_log_panel.setVisible(self._interface_level == ENGINEERING)
         if persist:
             self._settings.setValue("interface_level", self._interface_level)
@@ -500,8 +484,11 @@ class OperatorConsoleWindow(QMainWindow):
             return
 
         self._voice_release_pending = False
+        self._voice_ptt_active = True
+        self._voice_elapsed_time = 0
+        self._voice_action_timer.start()
         self._append_ui_event("[info] voice ptt start requested")
-        self.statusBar().showMessage("Starting voice capture...", 0)
+        self.statusBar().showMessage("Recording... 0.0s", 0)
         self._execute_voice_action("voice_ptt_start", "start", "voice ptt start")
 
     def _handle_voice_ptt_released(self) -> None:
@@ -511,12 +498,22 @@ class OperatorConsoleWindow(QMainWindow):
             return
         if self._voice_action_in_flight:
             return
-        if not bool(self._latest_state_snapshot.voice_runtime.get("listening", False)):
+        if not self._voice_ptt_active:
             return
 
+        self._voice_ptt_active = False
+        self._voice_action_timer.stop()
         self._append_ui_event("[info] voice stop requested")
         self.statusBar().showMessage("Stopping voice capture...", 0)
         self._execute_voice_action("voice_ptt_stop", "stop", "voice ptt stop")
+
+    def _on_voice_timer_tick(self) -> None:
+        if not self._voice_ptt_active:
+            self._voice_action_timer.stop()
+            return
+        self._voice_elapsed_time += 250
+        elapsed_s = self._voice_elapsed_time / 1000.0
+        self.statusBar().showMessage(f"Recording... {elapsed_s:.1f}s", 0)
 
     def _execute_voice_action(self, action: str, requested_value: str, action_label: str) -> None:
         if self._voice_action_in_flight:
@@ -540,6 +537,16 @@ class OperatorConsoleWindow(QMainWindow):
             self.statusBar().showMessage("Backend action already in flight.", 3000)
             self.refresh_runtime_state()
             return
+
+        # Model switch cooldown: prevent Ollama unload/load race
+        if action == "model_selection":
+            cooldown_remaining = 5.0 - (time.time() - self._last_model_switch_time)
+            if cooldown_remaining > 0:
+                self._append_ui_event(f"[warning] model switch cooldown {cooldown_remaining:.1f}s remaining")
+                self.statusBar().showMessage(f"Model switch cooldown: {cooldown_remaining:.1f}s remaining.", 3000)
+                self.refresh_runtime_state()
+                return
+            self._last_model_switch_time = time.time()
 
         self.control_panel.update_control_state(
             self._latest_state_snapshot.top_status,
@@ -572,28 +579,6 @@ class OperatorConsoleWindow(QMainWindow):
         self._action_task = RuntimeActionTask(self._runtime_bridge, "reload_profile", "")
         self._action_task.signals.finished.connect(self._handle_backend_action_complete)
         self._thread_pool.start(self._action_task)
-
-    def _handle_shutdown_requested(self) -> None:
-        """Gracefully shutdown Local Lucy."""
-        self._append_ui_event("[info] shutdown requested")
-        self.statusBar().showMessage("Shutting down Local Lucy...", 2000)
-        
-        # Stop timers
-        if self._state_refresh_timer.isActive():
-            self._state_refresh_timer.stop()
-        
-        # Stop log watcher
-        if self._log_watcher:
-            self._log_watcher.stop()
-        
-        # Cancel any pending actions
-        if self._action_task:
-            self._action_task.cancel()
-        if self._voice_action_task:
-            self._voice_action_task.cancel()
-        
-        # Close the window
-        QTimer.singleShot(500, self.close)
 
     @Slot(object)
     def _handle_backend_action_complete(self, result: CommandResult) -> None:
@@ -633,7 +618,6 @@ class OperatorConsoleWindow(QMainWindow):
     def _handle_voice_action_complete(self, result: CommandResult) -> None:
         action_label = self._pending_voice_action_label or result.action
         if result.action == "voice_ptt_stop" and isinstance(result.payload, dict):
-            self._update_session_augmented_counters_from_payload(result.payload)
             # Clear transcription preview after successful voice turn
             self.conversation_panel.clear_voice_transcription_preview()
         self.refresh_runtime_state()
@@ -647,6 +631,8 @@ class OperatorConsoleWindow(QMainWindow):
             if result.status == "ok" and bool(self._latest_state_snapshot.voice_runtime.get("listening", False)):
                 if self._voice_release_pending:
                     self._voice_release_pending = False
+                    self._voice_ptt_active = False
+                    self._voice_action_timer.stop()
                     self._append_ui_event("[info] voice stop requested")
                     self.statusBar().showMessage("Stopping voice capture...", 0)
                     self._execute_voice_action("voice_ptt_stop", "stop", "voice ptt stop")
@@ -655,6 +641,8 @@ class OperatorConsoleWindow(QMainWindow):
                 return
 
             self._voice_release_pending = False
+            self._voice_ptt_active = False
+            self._voice_action_timer.stop()
             if result.status == "timeout":
                 timeout_detail = self._voice_failure_detail(result) or "timeout"
                 if self._should_emit_local_voice_failure_event(timeout_detail):
@@ -670,15 +658,21 @@ class OperatorConsoleWindow(QMainWindow):
 
         if result.action == "voice_ptt_stop":
             self._voice_release_pending = False
+            self._voice_ptt_active = False
+            self._voice_action_timer.stop()
             if result.status == "ok":
                 payload = result.payload if isinstance(result.payload, dict) else {}
                 payload_status = self._payload_text(payload, "status") or "completed"
+                transcript = self._payload_text(payload, "transcript")
                 # Clear transcription preview
                 self.conversation_panel.clear_voice_transcription_preview()
-                if payload_status == "no_transcript":
+                if payload_status == "no_transcript" or not transcript:
                     self.statusBar().showMessage("Voice turn ended with no transcript.", 3000)
                 else:
-                    self.statusBar().showMessage("Voice turn complete.", 3000)
+                    preview = transcript if len(transcript) <= 48 else f"{transcript[:45]}..."
+                    self.statusBar().showMessage(f"Voice: '{preview}'", 3000)
+                    self._append_ui_event(f"[info] voice transcript -> submit")
+                    self._execute_backend_action("submit_request", transcript, "voice submit")
                 return
             if result.status == "timeout":
                 timeout_detail = self._voice_failure_detail(result) or "timeout"
@@ -714,8 +708,8 @@ class OperatorConsoleWindow(QMainWindow):
 
         if self._is_self_review_request(request_text):
             if not level_at_least(self._interface_level, ENGINEERING):
-                self._append_ui_event("[warning] self-review trigger blocked outside engineering view")
-                self.statusBar().showMessage("Self-review is available only in Engineering level.", 4000)
+                self._append_ui_event("[warning] self-review trigger blocked outside advanced views")
+                self.statusBar().showMessage("Read-only self-review is available only in Advanced or Coding views.", 4000)
                 return
             if self._current_mode() != "auto":
                 self._append_ui_event("[warning] self-review trigger blocked outside auto mode")
@@ -777,6 +771,10 @@ class OperatorConsoleWindow(QMainWindow):
                 self.statusBar().showMessage("Request completed. State refresh complete.", 3000)
             self._append_request_metadata_events(payload)
             self._append_ui_event("[info] post-request refresh complete")
+            # Trigger TTS for voice-enabled sessions
+            response_text = self._payload_text(payload, "response_text") or result.stdout
+            if response_text:
+                self._speak_response_text(response_text)
             return
 
         if request_status == "timeout":
@@ -793,6 +791,19 @@ class OperatorConsoleWindow(QMainWindow):
             f"Request {request_status or 'failed'}: {failure_detail}",
             4000,
         )
+
+    def _speak_response_text(self, text: str) -> None:
+        """Fire TTS in background if voice is enabled."""
+        voice_on = self._payload_text(self._latest_state_snapshot.top_status, "Voice").lower() == "on"
+        if not voice_on:
+            return
+        task = RuntimeActionTask(self._runtime_bridge, "speak", text)
+        task.signals.finished.connect(self._handle_speak_complete)
+        self._thread_pool.start(task)
+
+    def _handle_speak_complete(self, result: CommandResult) -> None:
+        if result.status != "ok":
+            self._append_ui_event(f"[warning] TTS failed -> {result.stderr or 'unknown'}")
 
     def _is_self_review_request(self, request_text: str) -> bool:
         return bool(SELF_REVIEW_TRIGGER_RE.search(request_text or ""))
@@ -852,30 +863,35 @@ class OperatorConsoleWindow(QMainWindow):
             normalized = normalized[6:].strip()
         return normalized or "unknown failure"
 
-    def _sync_env_from_state(self, state: dict[str, Any]) -> None:
-        """Sync environment variables from loaded state at startup.
-        
-        This ensures toggles like memory are properly reflected in env vars
-        that the backend checks (e.g., LUCY_SESSION_MEMORY).
-        """
-        if not isinstance(state, dict):
+    @staticmethod
+    def _is_pid_alive(pid: int | None) -> bool:
+        if pid is None:
+            return False
+        try:
+            os.kill(pid, 0)
+        except (OSError, ProcessLookupError):
+            return False
+        return True
+
+    def _sanitize_voice_runtime_on_startup(self) -> None:
+        """Reset stale voice runtime state if recorder crashed while listening."""
+        voice_runtime = getattr(self._latest_state_snapshot, "voice_runtime", {})
+        if not isinstance(voice_runtime, dict):
             return
-        
-        # Map state fields to environment variables
-        env_mappings = {
-            "memory": ("LUCY_SESSION_MEMORY", lambda v: "1" if str(v).lower() in ("on", "true", "1") else "0"),
-            "conversation": ("LUCY_CONVERSATION_MODE_FORCE", lambda v: "1" if str(v).lower() in ("on", "true", "1") else "0"),
-            "evidence": ("LUCY_EVIDENCE_ENABLED", lambda v: "1" if str(v).lower() in ("on", "true", "1") else "0"),
-            "voice": ("LUCY_VOICE_ENABLED", lambda v: "1" if str(v).lower() in ("on", "true", "1") else "0"),
-            "augmentation_policy": ("LUCY_AUGMENTATION_POLICY", lambda v: str(v)),
-            "augmented_provider": ("LUCY_AUGMENTED_PROVIDER", lambda v: str(v)),
-            "mode": ("LUCY_MODE", lambda v: str(v)),
-        }
-        
-        for state_key, (env_var, transform) in env_mappings.items():
-            value = state.get(state_key)
-            if value is not None:
-                os.environ[env_var] = transform(value)
+        if not bool(voice_runtime.get("listening", False)):
+            return
+        record_pid = voice_runtime.get("record_pid")
+        if self._is_pid_alive(record_pid):
+            return
+        # Recorder PID is dead but state says listening — sanitize
+        voice_runtime["listening"] = False
+        voice_runtime["processing"] = False
+        voice_runtime["status"] = "idle"
+        voice_runtime["record_pid"] = None
+        voice_runtime["processing_pid"] = None
+        voice_runtime["capture_path"] = ""
+        voice_runtime["last_error"] = voice_runtime.get("last_error", "") or "recovered from stale state"
+        self._append_ui_event("[info] voice state sanitized: recovered from stale listening state")
 
     def _emit_voice_runtime_events(
         self,
@@ -975,12 +991,13 @@ class OperatorConsoleWindow(QMainWindow):
         return payload
 
     def _debug_log(self, msg: str) -> None:
-        """Write debug log to file (gated by LUCY_UI_DEBUG_LOG=1)."""
-        if os.environ.get("LUCY_UI_DEBUG_LOG") != "1":
-            return
+        """Write debug log to file."""
+        import os
+        from pathlib import Path
         log_path = Path.home() / "lucy-v8" / "ui_debug.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a") as f:
+            from datetime import datetime
             f.write(f"{datetime.now().isoformat()} MAIN {msg}\n")
 
     def _reload_request_history(self) -> None:
@@ -997,8 +1014,7 @@ class OperatorConsoleWindow(QMainWindow):
         ]
         latest_id = available_ids[-1] if available_ids else None
 
-        if is_simple(self._interface_level):
-            # In Simple mode, always show latest and don't pin
+        if self._interface_level == SIMPLE:
             selected_id = latest_id
             self._history_selection_pinned = False
         elif self._history_selection_pinned and self._selected_request_id in available_ids:
@@ -1095,6 +1111,7 @@ class OperatorConsoleWindow(QMainWindow):
 
     def _runtime_status_with_session_counters(self) -> dict[str, str]:
         values = dict(self._latest_state_snapshot.runtime_status)
+        values["Model"] = self._latest_state_snapshot.top_status.get("Model", "unknown")
         values["Last Request Provider"] = self._latest_request_provider_used_text()
         values["Last Request Paid"] = self._latest_request_paid_text()
         values["Session Augmented Calls"] = str(self._session_augmented_calls_total)
@@ -1158,34 +1175,26 @@ class OperatorConsoleWindow(QMainWindow):
             self._session_augmented_calls_wikipedia += 1
 
     def _apply_top_status_visibility(self) -> None:
-        """Apply visibility rules for top status bar based on HMI level."""
         if self._top_status_grid is None:
             return
 
-        # Define visibility for each HMI level
         if self._interface_level == ENGINEERING:
-            # Engineering: show all status chips
             visible_labels = list(self._top_status_order)
-        elif self._interface_level == POWER:
-            # Power: show essential operational status
-            visible_labels = ["Version", "Profile", "Router", "Model", "Status"]
+        elif level_at_least(self._interface_level, ENGINEERING):
+            visible_labels = ["Profile", "Router", "Model", "Approval Required", "Overall Status"]
         else:
-            # Simple (default): minimal essential info
-            visible_labels = ["Version", "Status"]
+            visible_labels = ["Profile", "Router", "Model", "Overall Status"]
 
-        # Hide all chips first
         while self._top_status_grid.count():
             item = self._top_status_grid.takeAt(0)
             widget = item.widget()
             if widget is not None:
                 widget.hide()
 
-        # Show only visible chips
         for index, label in enumerate(visible_labels):
-            if label in self._top_status_cards:
-                chip = self._top_status_cards[label]
-                chip.show()
-                self._top_status_grid.addWidget(chip, index // 4, index % 4)
+            chip = self._top_status_cards[label]
+            chip.show()
+            self._top_status_grid.addWidget(chip, index // 4, index % 4)
 
     def _build_decision_trace_panel(self) -> QFrame:
         panel = QFrame()
@@ -1281,6 +1290,7 @@ class OperatorConsoleWindow(QMainWindow):
             "recovery_used": self._trace_value(payload, ("outcome", "recovery_used")),
             "action_hint": self._trace_value(payload, ("outcome", "action_hint")),
             "reason": self._trace_value(payload, ("route", "reason"), ("outcome", "fallback_reason")),
+            "route_confidence": self._trace_value(payload, ("route", "confidence")),
             "forced_augmented": self._trace_value(payload, ("outcome", "augmented_direct_request")),
         }
 
@@ -1310,6 +1320,9 @@ class OperatorConsoleWindow(QMainWindow):
         provider_status_note = self._augmented_provider_status_note(payload)
         if provider_status_note:
             summary = f"{summary} | {provider_status_note}"
+        route_confidence = trace.get("route_confidence")
+        if route_confidence:
+            summary = f"{summary} | confidence={route_confidence}"
         if trust_class:
             summary = f"{summary} | trust={trust_class}"
         elif outcome_code:
@@ -1340,6 +1353,7 @@ class OperatorConsoleWindow(QMainWindow):
             ("Context Title", trace["context_title"]),
             ("Context URL", trace["context_url"]),
             ("Answer Class", trace["answer_class"]),
+            ("Route Confidence", trace["route_confidence"]),
             ("Operator Trust", self._display_operator_trust(payload)),
             ("Operator Answer Path", self._display_operator_answer_path(payload)),
             ("Operator Note", self._display_operator_note(payload)),
@@ -1424,6 +1438,8 @@ class OperatorConsoleWindow(QMainWindow):
             return "A narrower question was required."
         if final_mode == "LOCAL":
             return "Answer stayed on the local path."
+        if final_mode == "SELF_REVIEW":
+            return "Answer stayed on the self-review path."
         return ""
 
     def _operator_trace_note(self, payload: dict[str, object] | None) -> str:
@@ -1575,7 +1591,6 @@ class OperatorConsoleWindow(QMainWindow):
         self._top_status_grid = layout
 
         fields = [
-            ("Version", f"v{LUCY_VERSION}"),
             ("Profile", "loading"),
             ("Mode", "loading"),
             ("Router", "loading"),
@@ -1583,7 +1598,8 @@ class OperatorConsoleWindow(QMainWindow):
             ("Memory", "loading"),
             ("Evidence", "loading"),
             ("Voice", "loading"),
-            ("Status", "loading"),
+            ("Approval Required", "loading"),
+            ("Overall Status", "loading"),
         ]
 
         self._top_status_order = [label for label, _ in fields]

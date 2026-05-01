@@ -42,7 +42,7 @@ def main() -> int:
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(home / "lucy" / "snapshots" / "lucy-v8")
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(home / "lucy" / "snapshots" / "opt-experimental-v7-dev")
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
@@ -57,6 +57,7 @@ def main() -> int:
 
         labels = window.status_panel._runtime_summary_labels
         assert_ok(labels["Augmented Policy"].text() == "disabled", "augmented policy should reflect runtime truth")
+        assert_ok(labels["Model"].text() == "local-lucy", "model should reflect runtime truth")
         assert_ok(labels["Configured Provider"].text() == "wikipedia", "configured provider should reflect runtime truth")
         assert_ok(labels["Configured Provider Paid"].text() == "no", "configured provider paid flag should reflect provider class")
         assert_ok(labels["Last Request Provider"].text() == "unknown", "last request provider should be unknown before any request")
@@ -64,7 +65,7 @@ def main() -> int:
         assert_ok(labels["Session Augmented Calls"].text() == "0", "initial total counter should be 0")
         assert_ok(labels["Session Paid Augmented Calls"].text() == "0", "initial paid counter should be 0")
         assert_ok(
-            labels["Session Provider Counts"].text() == "openai=0 grok=0 wikipedia=0",
+            labels["Session Provider Counts"].text() == "openai=0 kimi=0 wikipedia=0",
             "initial provider counters should be zeroed",
         )
 
@@ -108,7 +109,7 @@ def main() -> int:
         assert_ok(labels["Session Augmented Calls"].text() == "2", "total counter should include only valid augmented usage")
         assert_ok(labels["Session Paid Augmented Calls"].text() == "1", "paid counter should increment only on explicit paid flag")
         assert_ok(
-            labels["Session Provider Counts"].text() == "openai=1 grok=0 wikipedia=1",
+            labels["Session Provider Counts"].text() == "openai=1 kimi=0 wikipedia=1",
             "provider counters should reflect counted usage",
         )
 

@@ -46,11 +46,6 @@ class RuntimeActionTask(QRunnable):
         self._action = action
         self._requested_value = requested_value
         self.signals = RuntimeActionTaskSignals()
-        self._cancelled = False
-
-    def cancel(self) -> None:
-        """Mark task as cancelled. Actual cancellation depends on action implementation."""
-        self._cancelled = True
 
     @Slot()
     def run(self) -> None:
@@ -99,7 +94,7 @@ class RuntimeBridge:
         self._prime_voice_state()
 
     def _workspace_root(self) -> Path:
-        return self.snapshot_root if self.snapshot_root.name == "lucy-v8" else self.snapshot_root.parent.parent
+        return self.snapshot_root.parent.parent
 
     def _contract_required(self) -> bool:
         raw = (os.environ.get(self.contract_required_env) or "").strip().lower()
@@ -127,10 +122,9 @@ class RuntimeBridge:
         ui_root = Path(ui_root_raw).expanduser().resolve()
         runtime_ns_root = Path(runtime_ns_raw).expanduser().resolve()
         bridge_file = Path(__file__).resolve()
-        if ui_root.name != "ui-v8" or not ui_root.exists() or not ui_root.is_dir():
+        if ui_root.name not in ("ui-v7", "ui-v8") or not ui_root.exists() or not ui_root.is_dir():
             raise RuntimeError(f"invalid UI root in authority contract: {ui_root}")
-        # V8 ISOLATION: Only accept local v8 or the legacy v8 snapshot name.
-        if authority_root.name not in {"lucy-v8", "opt-experimental-v8-dev"}:
+        if authority_root.name not in ("opt-experimental-v7-dev", "opt-experimental-v8-dev", "lucy-v8"):
             raise RuntimeError(f"invalid authority root in authority contract: {authority_root}")
         if not runtime_ns_root.is_absolute():
             raise RuntimeError(f"invalid runtime namespace root in authority contract: {runtime_ns_root}")
@@ -149,6 +143,7 @@ class RuntimeBridge:
         adapter_tool = self.snapshot_root / "tools" / "voice" / "tts_adapter.py"
         candidates = [
             self._workspace_root() / "ui-v8" / ".venv" / "bin" / "python3",
+            self._workspace_root() / "ui-v7" / ".venv" / "bin" / "python3",
         ]
         for candidate in candidates:
             if not candidate.exists() or not candidate.is_file():
@@ -201,7 +196,7 @@ class RuntimeBridge:
         # Always fail loudly - no silent fallbacks allowed
         raise RuntimeError(
             f"missing required {self.authority_root_env}. "
-            f"Set it explicitly to the local v8 root (e.g., /home/mike/lucy-v8)"
+            f"Set it explicitly to the snapshot root (e.g., /home/mike/lucy/snapshots/opt-experimental-v7-dev)"
         )
 
     def _discover_capabilities(self) -> dict[str, ActionCapability]:
@@ -253,6 +248,12 @@ class RuntimeBridge:
                 name="augmented_provider",
                 available=available,
                 allowed_values=("wikipedia", "openai", "kimi"),
+                reason=reason,
+            ),
+            "model_selection": ActionCapability(
+                name="model_selection",
+                available=available,
+                allowed_values=("local-lucy", "local-lucy-qwen3"),
                 reason=reason,
             ),
         }
@@ -354,6 +355,8 @@ class RuntimeBridge:
             return self._run_lifecycle_action(action, requested_value)
         if action in {"voice_ptt_start", "voice_ptt_stop", "voice_status"}:
             return self._run_voice_action(action, requested_value)
+        if action == "speak":
+            return self._run_speak_action(requested_value)
 
         capability = self.capabilities.get(action)
         if capability is None:
@@ -522,6 +525,7 @@ class RuntimeBridge:
             "voice_toggle": ["python3", str(self.control_tool_path), "set-voice", "--value", requested_value],
             "augmentation_policy": ["python3", str(self.control_tool_path), "set-augmentation", "--value", requested_value],
             "augmented_provider": ["python3", str(self.control_tool_path), "set-augmented-provider", "--value", requested_value],
+            "model_selection": ["python3", str(self.control_tool_path), "set-model", "--value", requested_value],
         }
         return command_map.get(action)
 
@@ -542,19 +546,6 @@ class RuntimeBridge:
         Previous: runtime_bridge → runtime_request.py → lucy_chat.sh → hybrid_wrapper.sh → main.py
         Current:  runtime_bridge → ExecutionEngine (direct Python call)
         """
-        # Note: Self-review not yet implemented in direct path
-        if self_review:
-            return CommandResult(
-                action=action,
-                requested_value=requested_value,
-                status="unavailable",
-                returncode=None,
-                stdout="",
-                stderr="Self-review not implemented in direct execution path",
-                timed_out=False,
-                payload=None,
-            )
-        
         return self._run_submit_request_direct(
             requested_value,
             action=action,
@@ -660,6 +651,7 @@ class RuntimeBridge:
             engine = ExecutionEngine(config={
                 "timeout": self.request_timeout_seconds,
                 "use_sqlite_state": True,
+                "model": self._resolve_current_model(),
             })
             
             result = engine.execute(
@@ -786,30 +778,14 @@ class RuntimeBridge:
             "is_medical": route_data.get("metadata", {}).get("is_medical_query", False),
         }
         
-        # Determine trust class based on route and provider
-        if result.route == "TIME":
-            trust_class = "time_api"
-        elif result.route == "NEWS":
-            trust_class = "news_api"
-        elif result.metadata and result.metadata.get("trust_class"):
-            trust_class = result.metadata.get("trust_class")
-        else:
-            trust_class = "local"
-        
         # Build outcome payload
         outcome_payload = {
             "outcome_code": result.outcome_code if result.outcome_code else "completed",
             "fallback_used": "false" if result.status == "completed" else "true",
             "fallback_reason": result.error_message or "none",
-            "trust_class": trust_class,
-            "final_mode": result.route if result.route else "LOCAL",
+            "trust_class": result.metadata.get("trust_class", "local") if result.metadata else "local",
             "error_message": result.error_message or "",
             "execution_time_ms": execution_time_ms,
-            # Augmented provider fields for UI display
-            "augmented_provider_used": result.provider if result.provider else "none",
-            "augmented_provider": result.provider if result.provider else "none",
-            "augmented_provider_status": "used" if result.route in ("AUGMENTED", "TIME", "NEWS") else "not_used",
-            "augmented_provider_call_reason": "direct" if result.route in ("AUGMENTED", "TIME", "NEWS") else "not_needed",
         }
         
         return {
@@ -860,86 +836,18 @@ class RuntimeBridge:
         with open(history_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, sort_keys=True))
             f.write("\n")
-        
-        # Also write route snapshot for UI status display
-        self._write_route_snapshot(payload)
-    
-    def _write_route_snapshot(self, payload: dict[str, Any]) -> None:
-        """Write route snapshot to last_route.json for UI status display."""
-        route = payload.get("route") if isinstance(payload.get("route"), dict) else {}
-        outcome = payload.get("outcome") if isinstance(payload.get("outcome"), dict) else {}
-        authority = payload.get("authority", {})
-        
-        current_route = route.get("mode") or route.get("final_mode") or route.get("requested_mode") or "unknown"
-        provider_used = (
-            outcome.get("augmented_provider_used")
-            or outcome.get("augmented_provider")
-            or "none"
-        )
-        trust_class = outcome.get("trust_class", "local")
-        
-        # Determine source type based on route and provider
-        source_type = self._determine_source_type(current_route, provider_used, trust_class)
-        
-        snapshot = {
-            "current_route": current_route,
-            "final_mode": route.get("final_mode", current_route),
-            "intent_family": route.get("intent_family", "unknown"),
-            "mode": route.get("mode", current_route),
-            "outcome_code": outcome.get("outcome_code", "unknown"),
-            "provider_used": provider_used or "none",
-            "request_id": payload.get("request_id", ""),
-            "route": current_route,
-            "route_reason": route.get("route_reason", "direct_execution"),
-            "selected_route": route.get("selected_route", current_route),
-            "source": source_type,
-            "source_type": source_type,
-            "status": payload.get("status", "unknown"),
-            "answer_class": outcome.get("answer_class", ""),
-            "operator_trust_label": outcome.get("operator_trust_label") or trust_class,
-            "trust_class": trust_class,
-            "authority": authority,
-            "timestamp": self._iso_now(),
-        }
-        
-        # Write to last_route.json
-        route_file = self._resolve_route_file()
-        route_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(route_file, "w", encoding="utf-8") as f:
-            json.dump(snapshot, f, indent=2, sort_keys=True)
-            f.write("\n")
-    
-    def _determine_source_type(self, current_route: str, provider_used: str, trust_class: str) -> str:
-        """Determine source type based on route and provider."""
-        current_route_upper = str(current_route).upper()
-        provider_lower = str(provider_used).lower()
-        
-        if current_route_upper == "TIME":
-            return "time_api"
-        elif current_route_upper == "NEWS":
-            return "news_api"
-        elif current_route_upper == "AUGMENTED":
-            if provider_lower in ("openai", "kimi"):
-                return "paid_provider"
-            elif provider_lower == "wikipedia":
-                return "free_provider"
-            return "augmented"
-        elif current_route_upper == "EVIDENCE":
-            return "evidence_backed"
-        elif current_route_upper == "LOCAL":
-            return "local_model"
-        return "unknown"
-    
-    def _resolve_route_file(self) -> Path:
-        """Resolve the last_route.json file path."""
-        raw = os.environ.get("LUCY_RUNTIME_REQUEST_HISTORY_FILE")
-        if raw:
-            # Use same directory as history file
-            return Path(raw).expanduser().parent / "last_route.json"
-        # Default path
-        home = Path.home()
-        workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v8" / "state" / "last_route.json"
+
+    def _resolve_current_model(self) -> str:
+        """Read the active model from runtime state file."""
+        namespace_root = Path(os.environ.get(self.runtime_namespace_env, "")).expanduser()
+        if not namespace_root:
+            return "local-lucy"
+        state_file = namespace_root / "state" / "current_state.json"
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            return state.get("model") or state.get("active_model") or "local-lucy"
+        except (OSError, json.JSONDecodeError):
+            return "local-lucy"
 
     def _resolve_history_file(self) -> Path:
         """Resolve the history file path (same logic as runtime_request.py)."""
@@ -1073,6 +981,52 @@ class RuntimeBridge:
         return CommandResult(
             action=action,
             requested_value=requested_value,
+            status=status,
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            timed_out=False,
+            payload=self._extract_payload(completed.stdout),
+        )
+
+    def _run_speak_action(self, text: str) -> CommandResult:
+        """Run TTS speak action via voice tool."""
+        if not self.voice_capability.available:
+            return CommandResult(
+                action="speak",
+                requested_value=text,
+                status="unavailable",
+                returncode=None,
+                stdout="",
+                stderr=self.voice_capability.reason,
+                timed_out=False,
+                payload=None,
+            )
+        try:
+            completed = subprocess.run(
+                ["python3", str(self.voice_tool_path), "speak", "--text", text],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                shell=False,
+                env=self._command_env(include_voice_python=True),
+            )
+        except subprocess.TimeoutExpired as exc:
+            return CommandResult(
+                action="speak",
+                requested_value=text,
+                status="timeout",
+                returncode=None,
+                stdout=exc.stdout or "",
+                stderr=exc.stderr or "",
+                timed_out=True,
+                payload=self._extract_payload(exc.stdout),
+            )
+        status = "ok" if completed.returncode == 0 else "failed"
+        return CommandResult(
+            action="speak",
+            requested_value=text,
             status=status,
             returncode=completed.returncode,
             stdout=completed.stdout,
