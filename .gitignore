@@ -38,3 +38,8 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+state/evidence_session_*.json
+
+# Runtime state files (generated during execution)
+state/voice_runtime.json
+ui_debug.log

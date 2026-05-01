@@ -36,6 +36,11 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Global lock to serialize Ollama API calls and prevent model unload/load races.
+# Threading lock (not asyncio) because _call_ollama may run in different event loops.
+import threading
+_ollama_call_lock = threading.Lock()
+
 
 # Fixed policy responses
 FIXED_POLICY_RESPONSES: Dict[str, str] = {
@@ -89,7 +94,7 @@ class LocalAnswerConfig:
     num_predict_default: int = 96
     num_predict_chat: int = 192
     num_predict_conversation: int = 96
-    num_predict_brief: int = 48
+    num_predict_brief: int = 128
     num_predict_detail: int = 768
     num_predict_clarify: int = 48
     num_predict_augmented_default: int = 128
@@ -100,8 +105,8 @@ class LocalAnswerConfig:
     prompt_guard_tokens: int = 700
     cache_enabled: bool = True
     cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "lucy" / "local_repeat")
-    cache_ttl_seconds: int = 300
-    cache_max_entries: int = 100
+    cache_ttl_seconds: int = 60
+    cache_max_entries: int = 5
     root_path: Path = field(default_factory=lambda: Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev")
     conversation_mode_active: bool = False
     conversation_mode_force: bool = False
@@ -131,14 +136,14 @@ class LocalAnswerConfig:
             num_predict_default=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_DEFAULT", "128")),
             num_predict_chat=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CHAT", "256")),
             num_predict_conversation=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CONVERSATION", "128")),
-            num_predict_brief=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_BRIEF", "64")),
+            num_predict_brief=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_BRIEF", "128")),
             num_predict_detail=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_DETAIL", "768")),
             num_predict_clarify=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CLARIFY", "64")),
             prompt_guard_tokens=int(os.environ.get("LUCY_LOCAL_PROMPT_GUARD_TOKENS", "700")),
             cache_enabled=os.environ.get("LUCY_LOCAL_REPEAT_CACHE", "1").lower() in ("1", "true", "yes", "on"),
             cache_dir=Path(cache_dir) if cache_dir else (root / "cache" / "local_repeat"),
-            cache_ttl_seconds=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_TTL_S", "300")),
-            cache_max_entries=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_ENTRIES", "100")),
+            cache_ttl_seconds=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_TTL_S", "60")),
+            cache_max_entries=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_ENTRIES", "5")),
             root_path=root,
             conversation_mode_active=os.environ.get("LUCY_CONVERSATION_MODE_ACTIVE", "").lower() in ("1", "true", "yes", "on"),
             conversation_mode_force=os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "").lower() in ("1", "true", "yes", "on"),
@@ -659,7 +664,7 @@ class LocalAnswer:
         """Build the prompt for Ollama."""
         memory_block = ""
         if session_memory.strip():
-            memory_block = f"{session_memory}\n\n---\n\n"
+            memory_block = f"Session memory (recent turns; use only if relevant):\n{session_memory}\n\n"
         
         conversation_block = ""
         if conversation_mode_active and conversation_system_block:
@@ -672,7 +677,7 @@ class LocalAnswer:
         else:
             context_block = ""
             if session_memory.strip():
-                instruction = "You are Local Lucy. Be concise and accurate."
+                instruction = "You are Local Lucy. You have access to the session memory of recent conversation turns above. Use this memory to answer followup questions and maintain context. Be concise and accurate."
             else:
                 instruction = "You are Local Lucy running OFFLINE. Answer using stable general knowledge only. If the user asks for latest/current info, say: 'This requires evidence mode.' and stop."
         
@@ -718,7 +723,7 @@ class LocalAnswer:
         return "Which person or company do you mean?"
 
     async def _call_ollama(self, prompt: str, num_predict: int) -> Tuple[str, int]:
-        """Call Ollama API."""
+        """Call Ollama API with retry for model-load transitions."""
         start_time = time.time()
         payload = {
             "model": self.config.model,
@@ -738,18 +743,40 @@ class LocalAnswer:
                 ]
             }
         }
-        try:
-            session = await self._get_session()
-            async with session.post(self.config.ollama_url, json=payload) as response:
-                response.raise_for_status()
-                data = await response.json()
-                text = data.get("response", "")
+        # Retry with exponential backoff for model-load transitions.
+        # Ollama can take 5-10s to load a large model (e.g., qwen3 14B @ 9.3GB).
+        max_attempts = 5
+        base_delay = 2.0
+        for attempt in range(max_attempts):
+            try:
+                session = await self._get_session()
+                with _ollama_call_lock:
+                    async with session.post(self.config.ollama_url, json=payload) as response:
+                        response.raise_for_status()
+                        data = await response.json()
+                        text = data.get("response", "")
+                        # Qwen3 and similar thinking models may emit reasoning in
+                        # 'thinking' while leaving 'response' empty when token budget
+                        # is consumed by the thinking phase.
+                        if not text and data.get("thinking"):
+                            text = data["thinking"].strip()
+                            if text:
+                                logger.warning(f"Ollama response empty but thinking present for {self.config.model}; using thinking as fallback")
+                        duration_ms = int((time.time() - start_time) * 1000)
+                        if text:
+                            return text, duration_ms
+                        if attempt == max_attempts - 1:
+                            logger.error(f"Ollama returned empty response for {self.config.model} after {max_attempts} attempts")
+                            return "", duration_ms
+                        # Empty response: Ollama likely mid-load/unload.
+                        delay = base_delay * (2 ** attempt)
+                        logger.warning(f"Ollama returned empty response for {self.config.model}, retrying in {delay}s... (attempt {attempt + 1}/{max_attempts})")
+                        await asyncio.sleep(delay)
+            except Exception as e:
                 duration_ms = int((time.time() - start_time) * 1000)
-                return text, duration_ms
-        except Exception as e:
-            duration_ms = int((time.time() - start_time) * 1000)
-            logger.error(f"Ollama API call failed: {e}")
-            raise
+                logger.error(f"Ollama API call failed: {e}")
+                raise
+        return "", int((time.time() - start_time) * 1000)
 
     async def generate_answer(
         self,

@@ -166,8 +166,9 @@ def main() -> int:
         if args.command == "speak":
             backend = detect_backend()
             tts_status = speak_response(backend, args.text)
-            print(json.dumps({"ok": tts_status == "completed", "tts_status": tts_status}, sort_keys=True))
-            return 0
+            ok = tts_status == "completed"
+            print(json.dumps({"ok": ok, "tts_status": tts_status}, sort_keys=True))
+            return 0 if ok else 1
         raise RuntimeVoiceError(f"unsupported command: {args.command}")
     except RuntimeVoiceExit as exc:
         print(f"ERROR: {exc.message}", file=sys.stderr)
