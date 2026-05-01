@@ -570,6 +570,87 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
         return dot / (norm_a * norm_b)
 
 
+def find_relevant_sessions_with_diagnostics(
+    query: str,
+    top_k: int | None = None,
+    similarity_threshold: float | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """
+    Find past sessions whose summaries are semantically similar to the query.
+
+    Returns both the filtered results and diagnostic telemetry about the
+    semantic search (top score, gap, whether gap blocked, etc.).
+
+    Uses environment-configured thresholds if parameters are not provided.
+    """
+    diagnostics: dict[str, Any] = {
+        "threshold_applied": 0.0,
+        "gap_applied": None,
+        "embedding_count": 0,
+        "candidates_above_threshold": 0,
+        "top_score": None,
+        "second_score": None,
+        "top_gap": None,
+        "gap_blocked": False,
+    }
+
+    if not query.strip():
+        return [], diagnostics
+
+    threshold = similarity_threshold if similarity_threshold is not None else _similarity_threshold()
+    limit = top_k if top_k is not None else _max_injected_sessions()
+    gap = _top_gap_threshold()
+
+    diagnostics["threshold_applied"] = threshold
+    diagnostics["gap_applied"] = gap
+
+    query_vector = _get_embedding(query)
+    if query_vector is None:
+        return [], diagnostics
+
+    embeddings = _load_all_summary_embeddings()
+    diagnostics["embedding_count"] = len(embeddings)
+    if not embeddings:
+        return [], diagnostics
+
+    # Fetch summary texts
+    conn = _get_connection()
+    session_ids = [sid for sid, _ in embeddings]
+    if not session_ids:
+        return [], diagnostics
+
+    placeholders = ",".join("?" * len(session_ids))
+    cursor = conn.execute(
+        f"SELECT session_id, summary_text FROM session_summaries WHERE session_id IN ({placeholders})",
+        session_ids,
+    )
+    summary_map = {row[0]: row[1] for row in cursor.fetchall()}
+
+    scored = []
+    for session_id, vector in embeddings:
+        sim = _cosine_similarity(query_vector, vector)
+        if sim >= threshold and session_id in summary_map:
+            scored.append({
+                "session_id": session_id,
+                "summary_text": summary_map[session_id],
+                "similarity": sim,
+            })
+
+    scored.sort(key=lambda x: x["similarity"], reverse=True)
+    diagnostics["candidates_above_threshold"] = len(scored)
+
+    if scored:
+        diagnostics["top_score"] = scored[0]["similarity"]
+        if len(scored) >= 2:
+            diagnostics["second_score"] = scored[1]["similarity"]
+            diagnostics["top_gap"] = scored[0]["similarity"] - scored[1]["similarity"]
+            if gap is not None and diagnostics["top_gap"] < gap:
+                diagnostics["gap_blocked"] = True
+                return [], diagnostics
+
+    return scored[:limit], diagnostics
+
+
 def find_relevant_sessions(
     query: str,
     top_k: int | None = None,
@@ -592,52 +673,8 @@ def find_relevant_sessions(
         List of dicts: [{"session_id": "...", "summary_text": "...", "similarity": 0.87}, ...]
         Sorted by similarity descending.
     """
-    if not query.strip():
-        return []
-
-    threshold = similarity_threshold if similarity_threshold is not None else _similarity_threshold()
-    limit = top_k if top_k is not None else _max_injected_sessions()
-    gap = _top_gap_threshold()
-
-    query_vector = _get_embedding(query)
-    if query_vector is None:
-        return []
-
-    embeddings = _load_all_summary_embeddings()
-    if not embeddings:
-        return []
-
-    # Fetch summary texts
-    conn = _get_connection()
-    session_ids = [sid for sid, _ in embeddings]
-    if not session_ids:
-        return []
-
-    placeholders = ",".join("?" * len(session_ids))
-    cursor = conn.execute(
-        f"SELECT session_id, summary_text FROM session_summaries WHERE session_id IN ({placeholders})",
-        session_ids,
-    )
-    summary_map = {row[0]: row[1] for row in cursor.fetchall()}
-
-    scored = []
-    for session_id, vector in embeddings:
-        sim = _cosine_similarity(query_vector, vector)
-        if sim >= threshold and session_id in summary_map:
-            scored.append({
-                "session_id": session_id,
-                "summary_text": summary_map[session_id],
-                "similarity": sim,
-            })
-
-    scored.sort(key=lambda x: x["similarity"], reverse=True)
-
-    # Apply top-gap filter: the #1 match must beat #2 by at least the gap margin.
-    if gap is not None and len(scored) >= 2:
-        if (scored[0]["similarity"] - scored[1]["similarity"]) < gap:
-            return []
-
-    return scored[:limit]
+    results, _ = find_relevant_sessions_with_diagnostics(query, top_k, similarity_threshold)
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -723,6 +760,141 @@ def _top_gap_threshold() -> float | None:
 # Context assembly
 # ---------------------------------------------------------------------------
 
+def assemble_context_with_telemetry(
+    current_session_id: str = "default",
+    max_chars: int = 500,
+    recent_turn_limit: int = 4,
+    other_summary_limit: int = 2,
+    query: str = "",
+    depth: str = "auto",
+    mode: str = "local",
+) -> tuple[str, dict[str, str]]:
+    """
+    Assemble the session memory context string with telemetry.
+
+    LOCAL mode (default):
+        - Shallow: recent turns only
+        - Deep: current session summary + recent turns
+        - NEVER injects other sessions (no cross-session recall)
+
+    AUGMENTED mode:
+        - Deep: semantic recall + current summary + recent turns + other sessions
+        - Cross-session recall permitted with strict thresholds
+
+    Returns:
+        Tuple of (context_string, telemetry_dict).
+        telemetry_dict contains:
+            memory_context_used: "true" or "false"
+            memory_mode_used: "local", "augmented", or "none"
+            memory_depth_used: "shallow", "deep", or "none"
+            memory_top_score: similarity of top match or "none"
+            memory_session_injected: session_id of top injected match or "none"
+            memory_top_gap: gap between top 1 and top 2 or "none"
+    """
+    telemetry: dict[str, str] = {
+        "memory_context_used": "false",
+        "memory_mode_used": "none",
+        "memory_depth_used": "none",
+        "memory_top_score": "none",
+        "memory_session_injected": "none",
+        "memory_top_gap": "none",
+    }
+
+    if depth == "auto":
+        depth = _detect_context_depth(query)
+
+    parts: list[str] = []
+
+    # SHALLOW (both modes): recent turns only. Fast, low risk.
+    if depth == "shallow":
+        recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
+        if recent_turns:
+            context = format_turns_for_prompt(recent_turns)[:max_chars]
+            telemetry["memory_context_used"] = "true"
+            telemetry["memory_mode_used"] = mode
+            telemetry["memory_depth_used"] = "shallow"
+            return context, telemetry
+        return "", telemetry
+
+    # DEEP — LOCAL: current session only. No cross-session recall.
+    if mode == "local":
+        current_summary = get_session_summary(current_session_id)
+        if current_summary:
+            parts.append(f"Session summary: {current_summary}")
+        recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
+        if recent_turns:
+            parts.append(format_turns_for_prompt(recent_turns))
+        if not parts:
+            return "", telemetry
+        context = "\n\n".join(parts)
+        if len(context) > max_chars:
+            context = context[-max_chars:]
+        telemetry["memory_context_used"] = "true"
+        telemetry["memory_mode_used"] = "local"
+        telemetry["memory_depth_used"] = "deep"
+        return context, telemetry
+
+    # DEEP — AUGMENTED: full context assembly with cross-session recall
+    included_session_ids: set[str] = set()
+    top_session: str | None = None
+
+    # 1. Semantic recall (uses env-configured thresholds)
+    if query.strip():
+        try:
+            relevant, diag = find_relevant_sessions_with_diagnostics(query)
+            if diag.get("top_score") is not None:
+                telemetry["memory_top_score"] = f"{diag['top_score']:.3f}"
+            if diag.get("top_gap") is not None:
+                telemetry["memory_top_gap"] = f"{diag['top_gap']:.3f}"
+            for item in relevant:
+                text = item["summary_text"]
+                if len(text) > 150:
+                    text = text[:150].rsplit(" ", 1)[0] + "..."
+                parts.append(f"Related session: {text}")
+                included_session_ids.add(item["session_id"])
+                if top_session is None:
+                    top_session = item["session_id"]
+        except Exception:
+            pass
+
+    # 2. Chronological fallback — only when no query (semantic already handled it)
+    if not query.strip() and len(parts) < other_summary_limit:
+        other_summaries = get_other_session_summaries(current_session_id, limit=other_summary_limit)
+        for summary in other_summaries:
+            if summary["session_id"] in included_session_ids:
+                continue
+            text = summary["summary_text"]
+            if len(text) > 150:
+                text = text[:150].rsplit(" ", 1)[0] + "..."
+            parts.append(f"Previous session: {text}")
+            if len(parts) >= other_summary_limit:
+                break
+
+    # 3. Current session summary
+    current_summary = get_session_summary(current_session_id)
+    if current_summary:
+        parts.append(f"Session summary: {current_summary}")
+
+    # 4. Recent turns
+    recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
+    if recent_turns:
+        parts.append(format_turns_for_prompt(recent_turns))
+
+    if not parts:
+        return "", telemetry
+
+    context = "\n\n".join(parts)
+    if len(context) > max_chars:
+        context = context[-max_chars:]
+
+    telemetry["memory_context_used"] = "true"
+    telemetry["memory_mode_used"] = "augmented"
+    telemetry["memory_depth_used"] = "deep"
+    if top_session:
+        telemetry["memory_session_injected"] = top_session
+    return context, telemetry
+
+
 def assemble_context(
     current_session_id: str = "default",
     max_chars: int = 500,
@@ -756,76 +928,13 @@ def assemble_context(
     Returns:
         Formatted context string, or empty string if nothing available.
     """
-    if depth == "auto":
-        depth = _detect_context_depth(query)
-
-    parts: list[str] = []
-
-    # SHALLOW (both modes): recent turns only. Fast, low risk.
-    if depth == "shallow":
-        recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
-        if recent_turns:
-            return format_turns_for_prompt(recent_turns)[:max_chars]
-        return ""
-
-    # DEEP — LOCAL: current session only. No cross-session recall.
-    if mode == "local":
-        current_summary = get_session_summary(current_session_id)
-        if current_summary:
-            parts.append(f"Session summary: {current_summary}")
-        recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
-        if recent_turns:
-            parts.append(format_turns_for_prompt(recent_turns))
-        if not parts:
-            return ""
-        context = "\n\n".join(parts)
-        if len(context) > max_chars:
-            context = context[-max_chars:]
-        return context
-
-    # DEEP — AUGMENTED: full context assembly with cross-session recall
-    included_session_ids: set[str] = set()
-
-    # 1. Semantic recall (uses env-configured thresholds)
-    if query.strip():
-        try:
-            relevant = find_relevant_sessions(query)
-            for item in relevant:
-                text = item["summary_text"]
-                if len(text) > 150:
-                    text = text[:150].rsplit(" ", 1)[0] + "..."
-                parts.append(f"Related session: {text}")
-                included_session_ids.add(item["session_id"])
-        except Exception:
-            pass
-
-    # 2. Chronological fallback — only when no query (semantic already handled it)
-    if not query.strip() and len(parts) < other_summary_limit:
-        other_summaries = get_other_session_summaries(current_session_id, limit=other_summary_limit)
-        for summary in other_summaries:
-            if summary["session_id"] in included_session_ids:
-                continue
-            text = summary["summary_text"]
-            if len(text) > 150:
-                text = text[:150].rsplit(" ", 1)[0] + "..."
-            parts.append(f"Previous session: {text}")
-            if len(parts) >= other_summary_limit:
-                break
-
-    # 3. Current session summary
-    current_summary = get_session_summary(current_session_id)
-    if current_summary:
-        parts.append(f"Session summary: {current_summary}")
-
-    # 4. Recent turns
-    recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
-    if recent_turns:
-        parts.append(format_turns_for_prompt(recent_turns))
-
-    if not parts:
-        return ""
-
-    context = "\n\n".join(parts)
-    if len(context) > max_chars:
-        context = context[-max_chars:]
+    context, _ = assemble_context_with_telemetry(
+        current_session_id=current_session_id,
+        max_chars=max_chars,
+        recent_turn_limit=recent_turn_limit,
+        other_summary_limit=other_summary_limit,
+        query=query,
+        depth=depth,
+        mode=mode,
+    )
     return context

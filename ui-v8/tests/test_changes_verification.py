@@ -61,12 +61,13 @@ def test_ptt_timeout_value():
     print("  ✓ PTT timeout: voice_stop_timeout_seconds is 300s (accommodates transcription + request + TTS + long news digests)")
 
 def test_fail_loud_no_env_vars():
-    """Test that missing env vars cause RuntimeError."""
+    """Test that state_store gracefully falls back to defaults when env vars are missing."""
     import subprocess
     
-    # Test that state_store fails without LUCY_RUNTIME_NAMESPACE_ROOT
+    # Test that state_store loads successfully without LUCY_RUNTIME_NAMESPACE_ROOT
+    # (it now has sensible fallback defaults)
     result = subprocess.run(
-        ["python3", "-c", "from app.services import state_store"],
+        ["python3", "-c", "from app.services import state_store; print('RUNTIME_NAMESPACE_ROOT=', state_store.RUNTIME_NAMESPACE_ROOT)"],
         cwd=str(REPO_UI_ROOT),
         capture_output=True,
         text=True,
@@ -75,10 +76,10 @@ def test_fail_loud_no_env_vars():
         ]},
     )
     
-    assert_ok(result.returncode != 0, "state_store should fail without env vars")
-    assert_ok("missing required" in result.stderr.lower(), 
-              f"error should mention 'missing required', got: {result.stderr}")
-    print("  ✓ Fail-loud: state_store raises RuntimeError without LUCY_RUNTIME_NAMESPACE_ROOT")
+    assert_ok(result.returncode == 0, f"state_store should load without env vars, got: {result.stderr}")
+    assert_ok("RUNTIME_NAMESPACE_ROOT=" in result.stdout, 
+              f"state_store should set a default root, got: {result.stdout}")
+    print("  ✓ Fail-soft: state_store loads with default paths when env vars are missing")
 
 
 def test_legacy_namespace_detection():
@@ -218,6 +219,34 @@ def test_status_panel_freshness_indicator():
     print("  ✓ StatusPanel: has freshness, legacy warning, and GPU status UI elements")
 
 
+def test_strict_contract_boundary_violation():
+    """Test that strict contract mode raises RuntimeError when paths escape namespace."""
+    import subprocess
+    
+    # With LUCY_RUNTIME_CONTRACT_REQUIRED=1, a state dir outside the namespace
+    # must raise RuntimeError to prevent cross-tree contamination.
+    test_env = {
+        "LUCY_RUNTIME_CONTRACT_REQUIRED": "1",
+        "LUCY_RUNTIME_NAMESPACE_ROOT": "/tmp/fake_runtime_root",
+        "LUCY_UI_STATE_DIR": "/tmp/outside_namespace",
+        "LUCY_RUNTIME_AUTHORITY_ROOT": "/home/mike/lucy-v8",
+        "LUCY_UI_ROOT": "/home/mike/lucy-v8/ui-v8",
+    }
+    
+    result = subprocess.run(
+        ["python3", "-c", "from app.services import state_store"],
+        cwd=str(REPO_UI_ROOT),
+        capture_output=True,
+        text=True,
+        env=test_env,
+    )
+    
+    assert_ok(result.returncode != 0, "strict contract should fail when state_dir escapes namespace")
+    assert_ok("strict mode" in result.stderr.lower() or "runtimeerror" in result.stderr.lower(),
+              f"error should mention strict mode or RuntimeError, got: {result.stderr}")
+    print("  ✓ Strict contract: RuntimeError raised when state_dir escapes namespace boundary")
+
+
 def main() -> int:
     print("Running verification tests for code review changes...")
     print()
@@ -251,6 +280,9 @@ def main() -> int:
 
     print("Test 8: StatusPanel freshness indicator")
     test_status_panel_freshness_indicator()
+    
+    print("Test 9: Strict contract boundary violation")
+    test_strict_contract_boundary_violation()
     
     print()
     print("=" * 50)

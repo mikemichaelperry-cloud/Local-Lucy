@@ -36,6 +36,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Global lock to serialize Ollama API calls and prevent model unload/load races
+_ollama_call_lock = asyncio.Lock()
+
 
 # Fixed policy responses
 FIXED_POLICY_RESPONSES: Dict[str, str] = {
@@ -100,8 +103,8 @@ class LocalAnswerConfig:
     prompt_guard_tokens: int = 700
     cache_enabled: bool = True
     cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "lucy" / "local_repeat")
-    cache_ttl_seconds: int = 300
-    cache_max_entries: int = 100
+    cache_ttl_seconds: int = 60
+    cache_max_entries: int = 5
     root_path: Path = field(default_factory=lambda: Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev")
     conversation_mode_active: bool = False
     conversation_mode_force: bool = False
@@ -137,8 +140,8 @@ class LocalAnswerConfig:
             prompt_guard_tokens=int(os.environ.get("LUCY_LOCAL_PROMPT_GUARD_TOKENS", "700")),
             cache_enabled=os.environ.get("LUCY_LOCAL_REPEAT_CACHE", "1").lower() in ("1", "true", "yes", "on"),
             cache_dir=Path(cache_dir) if cache_dir else (root / "cache" / "local_repeat"),
-            cache_ttl_seconds=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_TTL_S", "300")),
-            cache_max_entries=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_ENTRIES", "100")),
+            cache_ttl_seconds=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_TTL_S", "60")),
+            cache_max_entries=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_ENTRIES", "5")),
             root_path=root,
             conversation_mode_active=os.environ.get("LUCY_CONVERSATION_MODE_ACTIVE", "").lower() in ("1", "true", "yes", "on"),
             conversation_mode_force=os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "").lower() in ("1", "true", "yes", "on"),
@@ -659,7 +662,7 @@ class LocalAnswer:
         """Build the prompt for Ollama."""
         memory_block = ""
         if session_memory.strip():
-            memory_block = f"{session_memory}\n\n---\n\n"
+            memory_block = f"Session memory (recent turns; use only if relevant):\n{session_memory}\n\n"
         
         conversation_block = ""
         if conversation_mode_active and conversation_system_block:
@@ -672,7 +675,7 @@ class LocalAnswer:
         else:
             context_block = ""
             if session_memory.strip():
-                instruction = "You are Local Lucy. Be concise and accurate."
+                instruction = "You are Local Lucy. You have access to the session memory of recent conversation turns above. Use this memory to answer followup questions and maintain context. Be concise and accurate."
             else:
                 instruction = "You are Local Lucy running OFFLINE. Answer using stable general knowledge only. If the user asks for latest/current info, say: 'This requires evidence mode.' and stop."
         
@@ -740,12 +743,13 @@ class LocalAnswer:
         }
         try:
             session = await self._get_session()
-            async with session.post(self.config.ollama_url, json=payload) as response:
-                response.raise_for_status()
-                data = await response.json()
-                text = data.get("response", "")
-                duration_ms = int((time.time() - start_time) * 1000)
-                return text, duration_ms
+            async with _ollama_call_lock:
+                async with session.post(self.config.ollama_url, json=payload) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    text = data.get("response", "")
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    return text, duration_ms
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
             logger.error(f"Ollama API call failed: {e}")

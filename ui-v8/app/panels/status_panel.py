@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QGroupBox, QLabel, QLayout, QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget
 
-from app.ui_levels import SIMPLE, POWER, ENGINEERING, level_at_least, is_engineering
+from app.ui_levels import ENGINEERING, level_at_least
 
 DEFAULT_HISTORY_RETENTION_MAX_ENTRIES = 200
 
@@ -21,7 +20,7 @@ class StatusPanel(QFrame):
         self.setMinimumWidth(320)
         self._scroll_area: QScrollArea | None = None
         self._content_widget: QWidget | None = None
-        self._current_level = SIMPLE
+        self._current_level = "operator"
         self._latest_runtime_snapshot: dict[str, dict[str, str]] = {
             "top_status": {},
             "runtime_status": {},
@@ -76,8 +75,6 @@ class StatusPanel(QFrame):
         layout.addWidget(self._legacy_warning_label)
 
         self._snapshot_timestamp: datetime | None = None
-        self._gpu_cache_data: dict[str, Any] | None = None
-        self._gpu_cache_time: float = 0.0
         self._runtime_summary_labels: dict[str, QLabel] = {}
         self._runtime_summary_cards: dict[str, QFrame] = {}
         self._runtime_detail_labels: dict[str, QLabel] = {}
@@ -86,8 +83,6 @@ class StatusPanel(QFrame):
         self._request_summary_cards: dict[str, QFrame] = {}
         self._request_detail_labels: dict[str, QLabel] = {}
         self._request_detail_cards: dict[str, QFrame] = {}
-        self._build_info_labels: dict[str, QLabel] = {}
-        self._build_info_cards: dict[str, QFrame] = {}
 
         self._runtime_summary_group = self._build_group(
             "Runtime Summary",
@@ -97,6 +92,7 @@ class StatusPanel(QFrame):
                 ("Conversation", "unknown"),
                 ("Voice State", "unknown"),
                 ("Health", "unknown"),
+                ("Model", "unknown"),
                 ("Augmented Policy", "unknown"),
                 ("Configured Provider", "unknown"),
                 ("Configured Provider Paid", "unknown"),
@@ -114,32 +110,18 @@ class StatusPanel(QFrame):
         self._runtime_detail_group = self._build_group(
             "Runtime Details",
             [
-                ("Voice Backend", "unknown"),
-                ("Voice Error", "none"),
-                ("GPU Acceleration", "checking..."),
                 ("Preprocess Active", "unknown"),
                 ("Reduced Scope", "unknown"),
                 ("Patch Surface Summary", "unknown"),
                 ("Uncertainty / Underspecified", "unknown"),
+                ("Voice Backend", "unknown"),
+                ("Voice Error", "none"),
+                ("GPU Acceleration", "checking..."),
             ],
             self._runtime_detail_labels,
             self._runtime_detail_cards,
         )
         layout.addWidget(self._runtime_detail_group)
-        self._build_info_group = self._build_group(
-            "Build Information",
-            [
-                ("Version", "v8"),
-                ("Snapshot", "opt-experimental-v8-dev"),
-                ("Build Date", "2026-04-22"),
-                ("Authority", "loading..."),
-                ("State Path", "loading..."),
-            ],
-            self._build_info_labels,
-            self._build_info_cards,
-        )
-        layout.addWidget(self._build_info_group)
-
 
         self._request_summary_group = self._build_group(
             "Request Diagnostics",
@@ -164,6 +146,7 @@ class StatusPanel(QFrame):
                 ("Request Text", "unknown"),
                 ("Error", "none"),
                 ("Route Reason", "unknown"),
+                ("Route Confidence", "unknown"),
                 ("Operator Note", "none"),
                 ("Action Hint", "none"),
                 ("Verification Status", "unknown"),
@@ -219,9 +202,6 @@ class StatusPanel(QFrame):
         for label_text, label_widget in self._runtime_summary_labels.items():
             label_widget.setText(self._format_runtime_value(label_text, values.get(label_text, "unknown")))
         for label_text, label_widget in self._runtime_detail_labels.items():
-            # Skip GPU Acceleration - it's updated separately by _update_gpu_status
-            if label_text == "GPU Acceleration":
-                continue
             label_widget.setText(values.get(label_text, "unknown"))
         self._latest_runtime_snapshot["runtime_status"] = dict(values)
 
@@ -240,6 +220,7 @@ class StatusPanel(QFrame):
             "Request Text": self._payload_text(payload, "request_text") or "unknown",
             "Error": self._payload_text(payload, "error") or "none",
             "Route Reason": self._nested_text(payload, "route", "reason") or "unknown",
+            "Route Confidence": self._nested_text(payload, "route", "confidence") or "unknown",
             "Operator Note": self._operator_note_text(payload),
             "Action Hint": self._nested_text(payload, "outcome", "action_hint") or "none",
             "Verification Status": self._answer_contract_verification_text(payload),
@@ -264,23 +245,6 @@ class StatusPanel(QFrame):
             "runtime_status": dict(snapshot.runtime_status),
             "file_paths": dict(snapshot.file_paths),
         }
-        
-        # Update Build Information from snapshot
-        self._build_info_labels.get("Version", QLabel()).setText("v8")
-        self._build_info_labels.get("Snapshot", QLabel()).setText("v8")
-        self._build_info_labels.get("Build Date", QLabel()).setText("2026-04-22")
-        
-        # Get paths from file_paths
-        file_paths = dict(snapshot.file_paths)
-        authority = file_paths.get("runtime_namespace_root", "unknown")
-        if len(authority) > 40:
-            authority = "..." + authority[-37:]
-        self._build_info_labels.get("Authority", QLabel()).setText(authority)
-        
-        state_path = file_paths.get("current_state", "unknown")
-        if len(state_path) > 40:
-            state_path = "..." + state_path[-37:]
-        self._build_info_labels.get("State Path", QLabel()).setText(state_path)
         # Parse and store timestamp, then update freshness indicator
         try:
             self._snapshot_timestamp = datetime.fromisoformat(snapshot.snapshot_timestamp)
@@ -334,26 +298,15 @@ class StatusPanel(QFrame):
             self._legacy_warning_label.hide()
 
     def _update_gpu_status(self, snapshot) -> None:
-        """Update GPU acceleration status in Runtime Details (10-second TTL cache)."""
-        now = time.time()
+        """Update GPU acceleration status in Runtime Details."""
         gpu_info = getattr(snapshot, 'gpu_info', {})
         if not gpu_info:
-            # Use cached detection if fresh (< 10 s)
-            if self._gpu_cache_data is not None and (now - self._gpu_cache_time) < 10.0:
-                gpu_info = self._gpu_cache_data
-            else:
-                from app.services.state_store import _detect_gpu_status
-                gpu_info = _detect_gpu_status()
-                self._gpu_cache_data = gpu_info
-                self._gpu_cache_time = now
-            if not gpu_info:
-                return
+            return
         
         gpu_available = gpu_info.get('available', False)
         gpu_type = gpu_info.get('type', 'none')
         gpu_model = gpu_info.get('model', '')
         ollama_on_gpu = gpu_info.get('ollama_on_gpu', False)
-        model_loaded = gpu_info.get('model_loaded', False)
         vram_used = gpu_info.get('vram_used_mb', 0)
         vram_total = gpu_info.get('vram_total_mb', 0)
         
@@ -363,16 +316,10 @@ class StatusPanel(QFrame):
                 status_text += f" ({vram_used}/{vram_total}MB)"
             tooltip = "GPU acceleration active - optimal performance"
             style = "color: #2ecc71;"  # Green
-        elif gpu_available and model_loaded and not ollama_on_gpu:
-            # Model is loaded but NOT using GPU - this is a real problem
+        elif gpu_available and not ollama_on_gpu:
             status_text = f"⚠️ {gpu_type.upper()}: {gpu_model} (CPU mode)"
             tooltip = "GPU detected but Ollama using CPU - check CUDA/ROCm installation"
             style = "color: #f1c40f;"  # Yellow
-        elif gpu_available and not model_loaded:
-            # No model loaded - this is normal idle state
-            status_text = f"ℹ️ {gpu_type.upper()}: {gpu_model} (idle)"
-            tooltip = "GPU ready - model will load on GPU when needed"
-            style = "color: #3498db;"  # Blue
         else:
             status_text = "❌ CPU only"
             tooltip = "No GPU detected - performance will be slower"
@@ -389,85 +336,61 @@ class StatusPanel(QFrame):
         self._refresh_service_view()
 
     def set_interface_level(self, level: str) -> None:
-        """Apply HMI level visibility to status panel elements.
-        
-        SIMPLE:     Build info only (minimal status)
-        POWER:      Build info + operational status (route, provider, health)
-        ENGINEERING: Everything including detailed diagnostics
-        """
         self._current_level = level
-        is_eng = is_engineering(level)
-        is_pwr = level_at_least(level, POWER)
-        
-        # Runtime Summary visibility
-        if is_eng:
+        advanced_or_deeper = level_at_least(level, ENGINEERING)
+
+        if advanced_or_deeper:
             self._runtime_summary_group.setTitle("Runtime Summary")
-            self._runtime_summary_group.setVisible(True)
-            self._set_card_visibility(
-                self._runtime_summary_cards,
-                {
-                    "Current Route", "Source Type", "Voice State", "Health",
-                    "Augmented Policy", "Configured Provider", "Configured Provider Paid",
-                    "Last Request Provider", "Last Request Paid",
-                    "Session Augmented Calls", "Session Paid Augmented Calls", "Session Provider Counts",
-                },
-            )
-        elif is_pwr:
-            self._runtime_summary_group.setTitle("Runtime Status")
-            self._runtime_summary_group.setVisible(True)
-            self._set_card_visibility(
-                self._runtime_summary_cards,
-                {
-                    "Current Route", "Source Type", "Voice State", "Health",
-                    "Augmented Policy", "Configured Provider",
-                },
-            )
-        else:
-            # Simple: hide runtime summary completely
-            self._runtime_summary_group.setVisible(False)
-        
-        # Runtime Detail visibility
-        if is_eng:
-            self._runtime_detail_group.setVisible(True)
-            self._set_card_visibility(
-                self._runtime_detail_cards,
-                {
-                    "Voice Backend", "Voice Error", "GPU Acceleration",
-                    "Preprocess Active", "Reduced Scope", "Patch Surface Summary",
-                    "Uncertainty / Underspecified",
-                },
-            )
-        elif is_pwr:
-            self._runtime_detail_group.setVisible(True)
-            self._set_card_visibility(
-                self._runtime_detail_cards,
-                {"Voice Backend", "GPU Acceleration"},
-            )
-        else:
-            self._runtime_detail_group.setVisible(False)
-        
-        # Request Summary visibility
-        if is_eng:
             self._request_summary_group.setTitle("Request Diagnostics")
-            self._request_summary_group.setVisible(True)
+            self._set_card_visibility(
+                self._runtime_summary_cards,
+                {
+                    "Current Route",
+                    "Source Type",
+                    "Voice State",
+                    "Health",
+                    "Augmented Policy",
+                    "Configured Provider",
+                    "Configured Provider Paid",
+                    "Last Request Provider",
+                    "Last Request Paid",
+                    "Session Augmented Calls",
+                    "Session Paid Augmented Calls",
+                    "Session Provider Counts",
+                },
+            )
             self._set_card_visibility(
                 self._request_summary_cards,
                 {"Status", "Completed At", "Answer Path", "Trust", "Augmented", "Route Mode", "Outcome Code"},
             )
-        elif is_pwr:
+        else:
+            self._runtime_summary_group.setTitle("Runtime Status")
             self._request_summary_group.setTitle("Latest Request")
-            self._request_summary_group.setVisible(True)
+            self._set_card_visibility(
+                self._runtime_summary_cards,
+                {
+                    "Health",
+                    "Augmented Policy",
+                    "Configured Provider",
+                    "Configured Provider Paid",
+                    "Last Request Provider",
+                    "Last Request Paid",
+                    "Session Augmented Calls",
+                    "Session Paid Augmented Calls",
+                    "Session Provider Counts",
+                },
+            )
             self._set_card_visibility(
                 self._request_summary_cards,
-                {"Status", "Trust", "Augmented"},
+                {"Status", "Completed At", "Answer Path", "Trust", "Augmented"},
             )
-        else:
-            self._request_summary_group.setVisible(False)
-        
-        # Engineering-only groups
-        self._request_detail_group.setVisible(is_eng)
-        self._advanced_metadata_group.setVisible(is_eng)
-        self._history_maintenance_group.setVisible(is_eng)
+
+        self._runtime_summary_group.setVisible(True)
+        self._runtime_detail_group.setVisible(advanced_or_deeper)
+        self._request_summary_group.setVisible(True)
+        self._request_detail_group.setVisible(advanced_or_deeper)
+        self._advanced_metadata_group.setVisible(advanced_or_deeper)
+        self._history_maintenance_group.setVisible(advanced_or_deeper)
 
     def _build_group(
         self,
@@ -723,7 +646,7 @@ class StatusPanel(QFrame):
     def _format_runtime_value(self, label_text: str, value: str) -> str:
         if label_text != "Health":
             return value
-        if is_engineering(self._current_level):
+        if level_at_least(self._current_level, ENGINEERING):
             return value
 
         normalized = str(value or "").strip().lower()
@@ -733,8 +656,6 @@ class StatusPanel(QFrame):
             return "Stopped"
         if "status=failed" in normalized:
             return "Failed"
-        if normalized in {"file missing", "unavailable"}:
-            return "Not monitored"
         return value
 
     def _answer_path_text(self, payload: dict[str, object] | None) -> str:

@@ -44,6 +44,11 @@ CHANNELS = 1
 SAMPLE_WIDTH = 2  # 16-bit
 CHUNK_SIZE = 1024
 
+# Safety cap to prevent runaway recording (configurable via env var)
+_MAX_RECORDING_DURATION_SECONDS = int(os.environ.get("LUCY_VOICE_PTT_MAX_SECONDS", "60"))
+if _MAX_RECORDING_DURATION_SECONDS <= 0:
+    _MAX_RECORDING_DURATION_SECONDS = 60  # Fallback for invalid values
+
 # Global state for signal handling
 _recording = True
 _stop_requested = False
@@ -287,7 +292,7 @@ def signal_handler(signum, frame):
     _stop_requested = True
     _recording = False
 
-def record_audio(output_path: Path, runtime_file: Optional[Path] = None, stop_file: Optional[Path] = None) -> bool:
+def record_audio(output_path: Path, runtime_file: Optional[Path] = None, stop_file: Optional[Path] = None, max_duration_seconds: Optional[int] = None) -> bool:
     """Record audio until signaled to stop.
     
     CRITICAL: Start audio capture IMMEDIATELY to avoid truncating first word.
@@ -297,6 +302,7 @@ def record_audio(output_path: Path, runtime_file: Optional[Path] = None, stop_fi
         output_path: Path to save the recorded WAV file
         runtime_file: Optional path to runtime file for state tracking
         stop_file: Optional path to stop file (created by parent to signal stop)
+        max_duration_seconds: Optional maximum recording duration (defaults to MAX_RECORDING_DURATION_SECONDS)
         
     Returns:
         True if recording succeeded, False otherwise
@@ -352,9 +358,14 @@ def record_audio(output_path: Path, runtime_file: Optional[Path] = None, stop_fi
                 wav_file.setsampwidth(SAMPLE_WIDTH)
                 wav_file.setframerate(SAMPLE_RATE)
                 
-                # Read audio data until stopped
+                # Read audio data until stopped or max duration reached
                 import select
+                max_dur = max_duration_seconds if max_duration_seconds is not None else _MAX_RECORDING_DURATION_SECONDS
+                recording_start_time = time.monotonic()
                 while _recording and not check_stop_signal(stop_file):
+                    if time.monotonic() - recording_start_time >= max_dur:
+                        logger.warning(f"Recording stopped after reaching max duration ({max_dur}s)")
+                        break
                     try:
                         # Use select to check if data is available with timeout
                         ready, _, _ = select.select([proc.stdout], [], [], 0.1)

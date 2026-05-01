@@ -1,5 +1,4 @@
-from PySide6.QtCore import QTimer, Qt, Signal, QUrl
-from PySide6.QtGui import QDesktopServices, QKeyEvent
+from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -11,13 +10,12 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QScrollArea,
     QSizePolicy,
-    QTextBrowser,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
-from app.ui_levels import SIMPLE, POWER, ENGINEERING, normalize_level, level_at_least, is_simple, is_engineering
+from app.ui_levels import ENGINEERING, normalize_level, level_at_least
 
 
 class ConversationPanel(QFrame):
@@ -32,7 +30,7 @@ class ConversationPanel(QFrame):
         self.setObjectName("shellCard")
         self._entry_map: dict[str, dict[str, object]] = {}
         self._selection_blocked = False
-        self._current_level = SIMPLE
+        self._current_level = "operator"
         self._scroll_area: QScrollArea | None = None
         self._content_widget: QWidget | None = None
         self._input_label: QLabel | None = None
@@ -104,16 +102,13 @@ class ConversationPanel(QFrame):
         trace_row.addWidget(self._decision_trace_summary_button, stretch=1)
         layout.addLayout(trace_row)
 
-        self._history = QTextBrowser()
-        self._history.setOpenExternalLinks(False)  # We handle links manually to ensure they open in browser
-        self._history.setOpenLinks(False)  # Prevent internal navigation to avoid "No document" warnings
+        self._history = QTextEdit()
+        self._history.setReadOnly(True)
         self._history.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._history.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._history.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self._history.setPlainText(self._default_history_text())
         self._history.document().documentLayout().documentSizeChanged.connect(lambda _size: self._schedule_output_height_sync())
-        # Enable clickable links - connect anchorClicked to open URLs in browser
-        self._history.anchorClicked.connect(self._on_link_clicked)
         layout.addWidget(self._history, stretch=1)
 
         input_label = QLabel("Operator Input")
@@ -170,19 +165,6 @@ class ConversationPanel(QFrame):
         super().resizeEvent(event)
         self._schedule_output_height_sync()
 
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        """Handle Enter key to submit when draft has focus."""
-        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
-            # Only submit if draft has focus and submit is enabled
-            if self._draft.hasFocus() and self._operator_submit_enabled:
-                # Check if Shift is pressed - if so, insert newline
-                if event.modifiers() & Qt.ShiftModifier:
-                    super().keyPressEvent(event)
-                    return
-                self._emit_submit_requested()
-                return
-        super().keyPressEvent(event)
-
     def clear_draft(self) -> None:
         self._draft.clear()
 
@@ -197,8 +179,7 @@ class ConversationPanel(QFrame):
 
     def set_submit_enabled(self, enabled: bool) -> None:
         self._operator_submit_enabled = enabled
-        # Force augmented only available in Engineering level
-        checkbox_enabled = enabled and is_engineering(self._current_level)
+        checkbox_enabled = enabled and level_at_least(self._current_level, ENGINEERING)
         self._force_augmented_once_checkbox.setEnabled(checkbox_enabled)
         self._sync_submit_state()
 
@@ -221,8 +202,7 @@ class ConversationPanel(QFrame):
         button.blockSignals(False)
 
     def consume_force_augmented_once(self) -> bool:
-        # Force augmented only available in Engineering level
-        if not is_engineering(self._current_level):
+        if not level_at_least(self._current_level, ENGINEERING):
             return False
         if not self._force_augmented_once_checkbox.isChecked():
             return False
@@ -230,42 +210,24 @@ class ConversationPanel(QFrame):
         return True
 
     def set_interface_level(self, level: str) -> None:
-        """Apply HMI level to conversation panel.
-        
-        SIMPLE: Clean conversation view, minimal controls
-        POWER: + History list access
-        ENGINEERING: Full controls including force augmented
-        """
         self._current_level = normalize_level(level)
-        is_eng = is_engineering(self._current_level)
-        is_pwr = level_at_least(self._current_level, POWER)
-        
-        # Labels change based on level
-        self._history_label.setText("Request History" if is_pwr else "Recent Activity")
-        self._output_label.setText("Response" if is_simple(self._current_level) else "Answer")
-        
-        # History view: summary for Simple, list for Power/Engineering
-        self._recent_history_summary.setVisible(not is_pwr)
-        self._history_list.setVisible(is_pwr)
-        
-        # Decision trace button always visible but may show different detail
+        advanced_or_deeper = level_at_least(self._current_level, ENGINEERING)
+        self._history_label.setText("Persisted Request History" if advanced_or_deeper else "Recent History")
+        self._output_label.setText("Selected Request Output" if advanced_or_deeper else "Latest Answer")
+        self._recent_history_summary.setVisible(not advanced_or_deeper)
+        self._history_list.setVisible(advanced_or_deeper)
         self._decision_trace_summary_button.setVisible(True)
-        
-        # Core conversation elements always visible
         self._history.setVisible(True)
         if self._input_label is not None:
             self._input_label.setVisible(True)
         self._draft.setVisible(True)
-        self._submit_button.setVisible(True)
+        self._force_augmented_once_checkbox.setVisible(advanced_or_deeper)
+        self._force_augmented_once_checkbox.setEnabled(advanced_or_deeper and self._submit_button.isEnabled())
+        if not advanced_or_deeper:
+            self._force_augmented_once_checkbox.setChecked(False)
         if self._clear_button is not None:
             self._clear_button.setVisible(True)
-        
-        # Force augmented checkbox only in Engineering
-        self._force_augmented_once_checkbox.setVisible(is_eng)
-        self._force_augmented_once_checkbox.setEnabled(is_eng and self._submit_button.isEnabled())
-        if not is_eng:
-            self._force_augmented_once_checkbox.setChecked(False)
-        
+        self._submit_button.setVisible(True)
         self._sync_submit_state()
         self._schedule_output_height_sync()
 
@@ -355,21 +317,20 @@ class ConversationPanel(QFrame):
         self._submit_button.setEnabled(self._operator_submit_enabled)
 
     def _default_history_text(self) -> str:
-        # Engineering gets technical message, Simple/Power get user-friendly
-        if is_engineering(self._current_level):
+        if level_at_least(self._current_level, ENGINEERING):
             return (
                 "[system] Backend submit path is authoritative and non-interactive.\n"
                 "[system] No persisted request history is available yet."
             )
         return (
-            "No requests yet.\n"
-            "Type a message and press Send to start."
+            "No latest request is available yet.\n"
+            "Submit a prompt to see the latest answer here."
         )
 
     def _default_recent_history_text(self) -> str:
         return (
-            "No history available yet.\n"
-            "Your conversation will appear here."
+            "No persisted request history is available yet.\n"
+            "Operator view follows the latest authoritative result."
         )
 
     def _handle_current_item_changed(
@@ -449,100 +410,49 @@ class ConversationPanel(QFrame):
         return self._entry_text(entry, "request_id")
 
     def _format_history_entry(self, entry: dict[str, object]) -> str:
-        # Engineering gets diagnostic format, Simple/Power get clean format
-        if is_engineering(self._current_level):
+        if level_at_least(self._current_level, ENGINEERING):
             return self._format_diagnostic_entry(entry)
         return self._format_operator_entry(entry)
 
     def _format_operator_entry(self, entry: dict[str, object]) -> str:
-        import html as html_module
-        
         request_text = self._entry_text(entry, "request_text") or "Unknown request."
         status = self._entry_text(entry, "status") or "unknown"
         
-        # Escape request text for HTML
-        request_text_html = html_module.escape(request_text)
-        
         # Handle processing status specially
         if status == "processing":
-            return self._build_html_response(
-                f"Latest Request<br>{request_text_html}",
-                "Processing...<br>⏳ Lucy is thinking..."
+            return "\n\n".join(
+                [
+                    f"Latest Request\n{request_text}",
+                    "Processing...\n⏳ Lucy is thinking...",
+                ]
             )
         
         # Handle responding status - show full answer while TTS is speaking
         if status == "responding":
             response_text = self._entry_text(entry, "response_text")
             if response_text:
-                # Check if response is HTML or plain text
-                if self._is_html_content(response_text):
-                    # Already HTML, embed directly
-                    return self._build_html_response(
-                        f"Latest Request<br>{request_text_html}",
-                        f"<b>Latest Answer (speaking...)</b><br>{response_text}"
-                    )
-                else:
-                    # Plain text, escape it
-                    response_html = html_module.escape(response_text).replace('\n', '<br>')
-                    return self._build_html_response(
-                        f"Latest Request<br>{request_text_html}",
-                        f"<b>Latest Answer (speaking...)</b><br>{response_html}"
-                    )
-            return self._build_html_response(
-                f"Latest Request<br>{request_text_html}",
-                "Responding...<br>🗣️ Speaking..."
+                return "\n\n".join(
+                    [
+                        f"Latest Request\n{request_text}",
+                        f"Latest Answer (speaking...)\n{response_text}",
+                    ]
+                )
+            return "\n\n".join(
+                [
+                    f"Latest Request\n{request_text}",
+                    "Responding...\n🗣️ Speaking...",
+                ]
             )
         
         has_failure = self._entry_has_operator_failure(entry)
         result_title = "Latest Result" if has_failure else "Latest Answer"
-        
-        # For non-failure responses, preserve original HTML (news links, etc.)
-        raw_response = self._entry_text(entry, "response_text") or ""
-        if not has_failure and self._is_html_content(raw_response):
-            return self._build_html_response(
-                f"Latest Request<br>{request_text_html}",
-                f"<b>{result_title}</b><br>{raw_response}"
-            )
-        
         result_text = self._operator_failure_text(entry) if has_failure else self._operator_response_text(entry)
-        
-        # Check if result_text is HTML or plain text
-        if self._is_html_content(result_text):
-            # Already HTML, embed directly
-            return self._build_html_response(
-                f"Latest Request<br>{request_text_html}",
-                f"<b>{result_title}</b><br>{result_text}"
-            )
-        else:
-            # Plain text, escape it
-            result_html = html_module.escape(result_text).replace('\n', '<br>')
-            return self._build_html_response(
-                f"Latest Request<br>{request_text_html}",
-                f"<b>{result_title}</b><br>{result_html}"
-            )
-    
-    def _build_html_response(self, request_section: str, response_section: str) -> str:
-        """Build a complete HTML document for the response."""
-        return f'''<!DOCTYPE html>
-<html>
-<head>
-<style>
-body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.5; }}
-b {{ font-weight: 600; }}
-a {{ color: #0066cc; text-decoration: underline; }}
-a:hover {{ color: #0052a3; }}
-</style>
-</head>
-<body>
-<div style="margin-bottom: 16px;">
-<b>Latest Request</b><br>
-{request_section}
-</div>
-<div>
-{response_section}
-</div>
-</body>
-</html>'''
+        return "\n\n".join(
+            [
+                f"Latest Request\n{request_text}",
+                f"{result_title}\n{result_text}",
+            ]
+        )
 
     def _format_diagnostic_entry(self, entry: dict[str, object]) -> str:
         lines = [
@@ -564,10 +474,12 @@ a:hover {{ color: #0052a3; }}
         if isinstance(route, dict):
             route_mode = self._entry_text(route, "mode")
             route_reason = self._entry_text(route, "reason")
-            if route_mode or route_reason:
+            route_confidence = self._entry_text(route, "confidence")
+            if route_mode or route_reason or route_confidence:
                 lines.append(
                     f"[route] mode={route_mode or 'unknown'}"
                     f" reason={route_reason or 'unknown'}"
+                    f" confidence={route_confidence or 'unknown'}"
                 )
 
         outcome = entry.get("outcome")
@@ -697,6 +609,8 @@ a:hover {{ color: #0052a3; }}
             return "Clarification requested"
         if final_mode_upper == "LOCAL":
             return "Local answer"
+        if final_mode_upper == "SELF_REVIEW":
+            return "Self-review answer"
         return ""
 
     def _nested_entry_text(self, payload: object, key: str) -> str:
@@ -728,6 +642,14 @@ a:hover {{ color: #0052a3; }}
         else:
             source_basis_text = str(source_basis or "").strip()
 
+        # Route confidence from classifier (distinct from augmented answer contract confidence)
+        route = entry.get("route")
+        route_confidence = ""
+        if isinstance(route, dict):
+            rc = route.get("confidence")
+            if rc not in {None, ""}:
+                route_confidence = str(rc)
+
         parts: list[str] = []
         if verification:
             parts.append(f"Verification: {verification}")
@@ -740,114 +662,24 @@ a:hover {{ color: #0052a3; }}
             else:
                 rendered_confidence = f"{rendered_confidence} estimated"
             parts.append(f"Confidence: {rendered_confidence}")
+        if route_confidence:
+            parts.append(f"Route confidence: {route_confidence}")
         if source_basis_text:
             parts.append(f"Source basis: {source_basis_text}")
         return " | ".join(parts)
 
-    def _on_link_clicked(self, url: QUrl) -> None:
-        """Open clicked links in default browser.
-        
-        Note: Must prevent default navigation to avoid clearing the widget content.
-        """
-        # Store current content before opening link (in case navigation clears it)
-        current_html = self._history.toHtml()
-        
-        # Open in external browser
-        QDesktopServices.openUrl(url)
-        
-        # Restore content after a short delay (QTextBrowser may clear on navigation)
-        QTimer.singleShot(50, lambda: self._restore_history_content(current_html))
-    
-    def _restore_history_content(self, html_content: str) -> None:
-        """Restore history content if it was cleared by link navigation."""
-        # Only restore if content was cleared (significantly shorter than expected)
-        if len(self._history.toPlainText()) < 10 and len(html_content) > 100:
-            self._history.setHtml(html_content)
-            self._debug_log("Restored history content after link click")
-
-    def _set_plain_text(self, widget: QPlainTextEdit | QTextEdit | QTextBrowser, text: str, *, reset_scroll: bool) -> None:
+    def _set_plain_text(self, widget: QPlainTextEdit | QTextEdit, text: str, *, reset_scroll: bool) -> None:
         widget_name = "_history" if widget is self._history else "other"
         self._debug_log(f"_set_plain_text: {widget_name}, text length: {len(text)}")
         if widget.toPlainText() == text:
             self._debug_log("text unchanged, skipping")
             return
-        
-        # Check if text is already a complete HTML document
-        if text.strip().startswith('<!DOCTYPE html>') or text.strip().startswith('<html>'):
-            # Already a complete HTML document, use as-is
-            widget.setHtml(text)
-            self._debug_log(f"Complete HTML document set, new length: {len(widget.toPlainText())}")
-        elif self._is_html_content(text):
-            # Has HTML tags but not a complete document, wrap it
-            html_content = self._wrap_mixed_content_as_html(text)
-            widget.setHtml(html_content)
-            self._debug_log(f"Wrapped HTML content set, new length: {len(widget.toPlainText())}")
-        else:
-            widget.setPlainText(text)
-            self._debug_log(f"plain text set, new length: {len(widget.toPlainText())}")
-        
+        widget.setPlainText(text)
+        self._debug_log(f"text set, new length: {len(widget.toPlainText())}")
         if reset_scroll:
             widget.verticalScrollBar().setValue(0)
         if widget is self._history:
             self._schedule_output_height_sync()
-    
-    def _is_html_content(self, text: str) -> bool:
-        """Check if text contains HTML markup."""
-        if not text:
-            return False
-        # Simple heuristic: check for common HTML tags
-        html_indicators = ['<p>', '<a ', '<b>', '<i>', '<br>', '<div>', '<span>', '&lt;', '&gt;', '&amp;']
-        text_lower = text.lower()
-        return any(indicator in text_lower for indicator in html_indicators)
-    
-    def _wrap_mixed_content_as_html(self, text: str) -> str:
-        """Wrap mixed plain text and HTML content in proper HTML structure."""
-        import html as html_module
-        
-        lines = text.split('\n')
-        html_parts = ['<!DOCTYPE html><html><body style="font-family: sans-serif; font-size: 14px;">']
-        
-        in_html_block = False
-        
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                html_parts.append('<br>')
-                continue
-            
-            # Check if line is HTML or plain text
-            if stripped.startswith('<') and ('>' in stripped or stripped.startswith('<a ')):
-                # It's HTML, add as-is
-                html_parts.append(line)
-                in_html_block = True
-            else:
-                # It's plain text, escape and wrap
-                if in_html_block and html_parts[-1].endswith('</p>'):
-                    html_parts.append('<br>')
-                escaped = html_module.escape(line)
-                # Convert URLs in plain text to links
-                escaped = self._make_urls_clickable(escaped)
-                html_parts.append(f'<div>{escaped}</div>')
-                in_html_block = False
-        
-        html_parts.append('</body></html>')
-        return '\n'.join(html_parts)
-    
-    def _make_urls_clickable(self, text: str) -> str:
-        """Convert http/https URLs in text to HTML links."""
-        import re
-        import html
-        
-        # URL pattern
-        url_pattern = r'(https?://[^\s<>"]+)'
-        
-        def replace_url(match):
-            url = match.group(1)
-            # Don't double-escape if already escaped
-            safe_url = html.escape(url) if '&' not in url or ';' not in url else url
-            return f'<a href="{safe_url}" style="color: #0066cc;">{safe_url}</a>'
-        
-        return re.sub(url_pattern, replace_url, text)
 
     def _schedule_output_height_sync(self) -> None:
         QTimer.singleShot(0, self._sync_output_height)
