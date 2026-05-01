@@ -60,6 +60,13 @@ try:
 except ImportError:
     HAS_LOCAL_ANSWER_PY = False
 
+# Import news provider for live news fetching
+try:
+    from router_py.news_provider import NewsProvider, NewsResult
+    HAS_NEWS_PROVIDER = True
+except ImportError:
+    HAS_NEWS_PROVIDER = False
+
 
 # TODO: Migrate from execute_plan.sh - State file paths
 STATE_DIR = ROOT_DIR / "state" / "namespaces" / "default"
@@ -93,6 +100,13 @@ def _load_session_memory_context_with_telemetry(
 
     Returns:
         Tuple of (context_string, telemetry_dict).
+        telemetry_dict contains:
+            memory_context_used: "true" or "false"
+            memory_mode_used: "local", "augmented", or "none"
+            memory_depth_used: "shallow", "deep", or "none"
+            memory_top_score: similarity of top match or "none"
+            memory_session_injected: session_id of top injected match or "none"
+            memory_top_gap: gap between top 1 and top 2 or "none"
     """
     telemetry: dict[str, str] = {
         "memory_context_used": "false",
@@ -149,12 +163,15 @@ def _load_session_memory_context_with_telemetry(
         telemetry["memory_context_used"] = "true"
         telemetry["memory_mode_used"] = mode
         telemetry["memory_depth_used"] = depth
-
     return context, telemetry
 
 
 def _load_session_memory_context(query: str = "", depth: str = "auto", mode: str = "local") -> str:
-    """Load session memory context (compatibility wrapper)."""
+    """
+    Load session memory context from the chat memory file.
+
+    Backward-compatible wrapper that returns only the context string.
+    """
     context, _ = _load_session_memory_context_with_telemetry(query, depth, mode)
     return context
 
@@ -755,29 +772,6 @@ them according to the route type (bypass, provisional, or full). It handles:
         9. Clean up namespace directory
         10. Return structured result
         """
-        # Use Python-native path by default for all routes (shell-free)
-        # Following burn-in certification (2,221+ queries, 100% success)
-        if use_python_path and route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "LOCAL"):
-            self._logger.info("Using Python-native execution path (shell-free)")
-            # Run the async version in a new event loop
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # We're already in an async context, create a new loop
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(
-                            self._run_async_execute, intent, route, context
-                        )
-                        return future.result()
-                else:
-                    return loop.run_until_complete(
-                        self.execute_async(intent, route, context)
-                    )
-            except RuntimeError:
-                # No event loop, create one
-                return asyncio.run(self.execute_async(intent, route, context))
-        
         start_time = time.time()
         context = context or {}
         question = context.get("question", "")
@@ -798,6 +792,29 @@ them according to the route type (bypass, provisional, or full). It handles:
             )
             self._write_state_files(route, result, context)
             return result
+        
+        # Use Python-native path by default for all routes (shell-free)
+        # Following burn-in certification (2,221+ queries, 100% success)
+        if use_python_path and route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "LOCAL", "TIME"):
+            self._logger.info("Using Python-native execution path (shell-free)")
+            # Run the async version in a new event loop
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're already in an async context, create a new loop
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(
+                            self._run_async_execute, intent, route, context
+                        )
+                        return future.result()
+                else:
+                    return loop.run_until_complete(
+                        self.execute_async(intent, route, context)
+                    )
+            except RuntimeError:
+                # No event loop, create one
+                return asyncio.run(self.execute_async(intent, route, context))
         
         # Check for medical context and configure safety constraints
         requires_evidence, evidence_reason = requires_evidence_mode(question, context)
@@ -1114,6 +1131,9 @@ them according to the route type (bypass, provisional, or full). It handles:
         if normalized_policy == "disabled":
             return "bypass"
         elif normalized_policy == "fallback_only":
+            # TIME route goes directly to full (no local attempt)
+            if route.route == "TIME":
+                return "full"
             return "provisional"
         else:  # direct_allowed
             return "full"
@@ -1263,6 +1283,12 @@ them according to the route type (bypass, provisional, or full). It handles:
             "LUCY_LOCAL_GEN_OUTPUT_MODE": context.get("output_mode", "CHAT"),
         })
         
+        # Add session memory context if enabled
+        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(question)
+        if session_memory:
+            env["LUCY_SESSION_MEMORY_CONTEXT"] = session_memory
+            self._logger.debug(f"Added session memory context ({len(session_memory)} chars)")
+        
         local_direct_used = True
         local_direct_fallback = False
         local_direct_path = "local_answer"
@@ -1320,6 +1346,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             "guard_trigger": guard_trigger,
             "fallback_kind": fallback_kind,
             "trust_class": "local",
+            **memory_telemetry,
         }
         
         return ExecutionResult(
@@ -1723,7 +1750,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         # Reject empty or whitespace-only queries at the engine boundary
         if not question or not question.strip():
             execution_time = int((time.time() - start_time) * 1000)
-            result = ExecutionResult(
+            return ExecutionResult(
                 status="failed",
                 outcome_code="empty_query",
                 route="LOCAL",
@@ -1734,8 +1761,6 @@ them according to the route type (bypass, provisional, or full). It handles:
                 execution_time_ms=execution_time,
                 metadata={"reason": "empty_query_rejected"},
             )
-            self._write_state_files(route, result, context)
-            return result
         
         # Check for medical context and configure safety constraints
         requires_evidence, evidence_reason = requires_evidence_mode(question, context)
@@ -1763,7 +1788,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             route_type = self._determine_route_type(route, intent, context)
             
             # Use Python-native execution based on route type
-            if route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED"):
+            if route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "TIME"):
                 result = await self._execute_full_route_python(intent, route, context)
             elif route_type == "provisional":
                 # Provisional: local first with fallback to augmentation
@@ -1877,22 +1902,86 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         # Step 1: Fetch evidence if needed
         evidence = None
-        if route.route in ("EVIDENCE", "NEWS", "FULL", "AUGMENTED"):
-            evidence = await self._fetch_evidence(question, route)
+        if route.route in ("EVIDENCE", "NEWS", "FULL", "AUGMENTED", "TIME"):
+            # Check if this is a voice query for voice-optimized content
+            for_voice = context.get("surface") == "voice" if context else False
+            evidence = await self._fetch_evidence(question, route, for_voice=for_voice)
+        
+        # Special handling for TIME route: return current time directly
+        if route.route == "TIME":
+            if evidence and evidence.get("ok"):
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="answered",
+                    route="TIME",
+                    provider="timeapi",
+                    provider_usage_class="free",
+                    response_text=evidence["formatted"],
+                    error_message="",
+                    metadata={
+                        "route_type": "time_lookup",
+                        "timezone": evidence.get("timezone"),
+                        "datetime": evidence.get("datetime"),
+                        "dst_active": evidence.get("dst"),
+                        "real_route_preserved": True,
+                    },
+                )
+            else:
+                # Time lookup failed - return helpful error
+                error_msg = evidence.get("error", "Unknown location") if evidence else "Could not determine timezone"
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="error",
+                    route="TIME",
+                    provider="timeapi",
+                    provider_usage_class="free",
+                    response_text=f"Sorry, I couldn't find the time for that location. Please try specifying a major city (e.g., 'London', 'New York', 'Tokyo'). Error: {error_msg}",
+                    error_message=error_msg,
+                    metadata={
+                        "route_type": "time_lookup_failed",
+                        "real_route_preserved": True,
+                    },
+                )
+        
+        # Special handling for NEWS route: return news directly
+        if route.route == "NEWS" and evidence and evidence.get("context"):
+            return ExecutionResult(
+                status="completed",
+                outcome_code="answered",
+                route="NEWS",
+                provider="news",
+                provider_usage_class="free",
+                response_text=evidence["context"],
+                error_message="",
+                metadata={
+                    "route_type": "news_live",
+                    "evidence_fetched": True,
+                    "evidence_title": "Latest News",
+                    "evidence_url": "",
+                    "trust_class": "unverified",
+                    "real_route_preserved": True,
+                    "news_source": evidence.get("provider", "unknown"),
+                },
+            )
         
         # Step 2: Build augmented prompt with evidence
         prompt = self._build_augmented_prompt(question, evidence, route)
         
+        # Load session memory with telemetry before calling provider
+        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(prompt)
+        if session_memory:
+            self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
+        
         # Step 3: Call appropriate provider
         if route.provider == "local":
-            response = await self._call_local_model_async(prompt, context)
+            response = await self._call_local_model_async(prompt, context, session_memory)
         elif route.provider in ("openai", "kimi"):
             response = await self._call_api_provider_async(route.provider, prompt, context)
         elif route.provider == "wikipedia":
             response = await self._call_wikipedia_provider_async(prompt, evidence, context)
         else:
             # Default to local model
-            response = await self._call_local_model_async(prompt, context)
+            response = await self._call_local_model_async(prompt, context, session_memory)
         
         # Step 4: Validate response
         validated = self._validate_response(response, route)
@@ -1913,6 +2002,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                 "evidence_url": evidence.get("url", "") if evidence else "",
                 "trust_class": "unverified" if evidence else "local",
                 "real_route_preserved": True,  # Marker for testing
+                **memory_telemetry,
             },
         )
 
@@ -1925,6 +2015,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         self,
         question: str,
         route: RoutingDecision,
+        for_voice: bool = False,
     ) -> dict[str, Any] | None:
         """
         Fetch evidence from appropriate sources based on route.
@@ -1935,11 +2026,20 @@ them according to the route type (bypass, provisional, or full). It handles:
         Args:
             question: The user question
             route: The routing decision
+            for_voice: If True, fetch voice-optimized content (e.g., condensed news)
         
         Returns:
             Evidence dictionary with context, title, url, etc., or None if failed
         """
-        self._logger.info(f"Fetching evidence for route={route.route}, provider={route.provider}")
+        self._logger.info(f"Fetching evidence for route={route.route}, provider={route.provider}, for_voice={for_voice}")
+        
+        # For TIME route, fetch current time from time API
+        if route.route == "TIME":
+            return await self._fetch_time_evidence(question)
+        
+        # For NEWS route, fetch live news from RSS sources
+        if route.route == "NEWS":
+            return await self._fetch_news_evidence(question, for_voice=for_voice)
         
         provider = route.provider
         if provider == "none" or not provider:
@@ -1948,8 +2048,8 @@ them according to the route type (bypass, provisional, or full). It handles:
         try:
             if provider == "wikipedia":
                 return await self._fetch_wikipedia_evidence(question)
-            elif provider == "grok":
-                return await self._fetch_api_evidence(question, "grok")
+            elif provider == "kimi":
+                return await self._fetch_api_evidence(question, "kimi")
             elif provider == "openai":
                 return await self._fetch_api_evidence(question, "openai")
             else:
@@ -1998,19 +2098,168 @@ them according to the route type (bypass, provisional, or full). It handles:
             self._logger.warning(f"Wikipedia evidence fetch failed: {e}")
             return None
     
+    async def _fetch_news_evidence(self, question: str, for_voice: bool = False) -> dict[str, Any] | None:
+        """
+        Fetch live news from RSS feeds.
+        
+        Uses the news_provider module to fetch fresh news from RSS sources.
+        
+        Args:
+            question: The user question (may contain search terms)
+            for_voice: If True, return condensed format optimized for TTS
+            
+        Returns:
+            Evidence dictionary with news articles or None if failed
+        """
+        if not HAS_NEWS_PROVIDER:
+            self._logger.warning("News provider not available")
+            return None
+        
+        try:
+            
+            # Run news fetch in thread pool to not block event loop
+            loop = asyncio.get_event_loop()
+            # Use functools.partial to pass for_voice parameter
+            import functools
+            result = await loop.run_in_executor(
+                None, functools.partial(NewsProvider.fetch_news, question, for_voice=for_voice)
+            )
+            
+            if result.ok:
+                return {
+                    "context": result.text,
+                    "title": "Latest News",
+                    "url": "",
+                    "provider": result.source,
+                    "class": "news_live",
+                    "articles": result.articles,
+                }
+            else:
+                self._logger.warning(f"News fetch failed: {result.error}")
+                return None
+        except Exception as e:
+            self._logger.warning(f"News evidence fetch failed: {e}")
+            return None
+    
+    async def _fetch_time_evidence(self, question: str) -> dict[str, Any] | None:
+        """
+        Fetch current time from TimeAPI.io.
+        
+        Extracts location from question and fetches real-time data.
+        
+        Args:
+            question: The user question (e.g., "What time is it in Tokyo?")
+            
+        Returns:
+            Evidence dictionary with time data or None if failed
+        """
+        import re
+        
+        # Extract location from question
+        location = None
+        patterns = [
+            r"(?:what['']?s?|what is|current)\s+time\s+(?:is it\s+)?(?:in|at)\s+([^?]+)",
+            r"time\s+(?:in|at)\s+([^?]+)",
+            r"([^?]+)\s+time",
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, question, re.IGNORECASE)
+            if match:
+                location = match.group(1).strip()
+                break
+        
+        # Default to UTC if no location found
+        if not location:
+            location = "UTC"
+        
+        self._logger.info(f"Fetching time for location: {location}")
+        
+        try:
+            # Call time tool using subprocess directly (not in executor to avoid async issues)
+            tool_path = ROOT_DIR / "tools" / "current_time_tool.py"
+            if not tool_path.exists():
+                self._logger.warning("Time tool not found")
+                return None
+            
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, str(tool_path), location,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(ROOT_DIR),
+            )
+            
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
+            except asyncio.TimeoutError:
+                proc.kill()
+                self._logger.warning("Time tool timed out")
+                return None
+            
+            if proc.returncode == 0:
+                data = json.loads(stdout.decode('utf-8'))
+                if data.get("ok"):
+                    formatted = self._format_time_response(data)
+                    return {
+                        "ok": True,
+                        "timezone": data.get("timezone"),
+                        "datetime": data.get("datetime"),
+                        "dst": data.get("dst"),
+                        "formatted": formatted,
+                    }
+                else:
+                    self._logger.warning(f"Time API error: {data.get('error')}")
+                    return None
+            else:
+                self._logger.warning(f"Time tool failed: {stderr.decode()}")
+                return None
+        except Exception as e:
+            self._logger.warning(f"Time evidence fetch failed: {e}")
+            return None
+    
+    def _format_time_response(self, data: dict) -> str:
+        """Format time API response into human-readable text."""
+        try:
+            time_str = data.get("time", "?")
+            date_str = data.get("date", "?")
+            timezone = data.get("timezone", "Unknown")
+            day = data.get("day_of_week", "")
+            dst = data.get("dst", False)
+            
+            # Format time nicely
+            hour = int(data.get("hour", 0))
+            minute = int(data.get("minute", 0))
+            ampm = "AM" if hour < 12 else "PM"
+            hour_12 = hour if hour <= 12 else hour - 12
+            if hour_12 == 0:
+                hour_12 = 12
+            time_formatted = f"{hour_12}:{minute:02d} {ampm}"
+            
+            lines = [
+                f"The current time in {timezone} is {time_formatted}.",
+                f"Date: {day}, {date_str}",
+            ]
+            
+            if dst:
+                lines.append("Daylight Saving Time is currently active.")
+            
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Current time: {data.get('time', 'unknown')}"
+    
     async def _fetch_api_evidence(
         self,
         question: str,
         provider: str,
     ) -> dict[str, Any] | None:
         """
-        Fetch evidence from API provider (Grok or OpenAI).
+        Fetch evidence from API provider (Kimi or OpenAI).
         
-        Uses unverified_context_grok.py or unverified_context_openai.py.
+        Uses unverified_context_kimi.py or unverified_context_openai.py.
         
         Args:
             question: The user question
-            provider: "grok" or "openai"
+            provider: "kimi" or "openai"
         
         Returns:
             Evidence dictionary or None if failed
@@ -2020,14 +2269,8 @@ them according to the route type (bypass, provisional, or full). It handles:
         try:
             sys.path.insert(0, str(ROOT_DIR / "tools"))
             
-            if provider == "grok":
-                import unverified_context_grok as grok_provider
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    None, self._call_grok_subprocess, question
-                )
-                return result
-            elif provider == "kimi":
+            if provider == "kimi":
+                import unverified_context_kimi as kimi_provider
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
                     None, self._call_kimi_subprocess, question
@@ -2044,35 +2287,6 @@ them according to the route type (bypass, provisional, or full). It handles:
         except Exception as e:
             self._logger.warning(f"{provider} evidence fetch failed: {e}")
             return None
-    
-    def _call_grok_subprocess(self, question: str) -> dict[str, Any] | None:
-        """Call Grok provider via subprocess (sync version for thread pool)."""
-        tool = ROOT_DIR / "tools" / "unverified_context_grok.py"
-        if not tool.exists():
-            return None
-        
-        try:
-            result = subprocess.run(
-                [sys.executable, str(tool), question],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=self._prepare_subprocess_env(),
-                cwd=str(ROOT_DIR),
-            )
-            if result.returncode == 0:
-                payload = json.loads(result.stdout)
-                if payload.get("ok"):
-                    return {
-                        "context": payload.get("text", payload.get("context", "")),
-                        "title": payload.get("title", ""),
-                        "url": payload.get("url", ""),
-                        "provider": "grok",
-                        "class": payload.get("class", "grok_general"),
-                    }
-        except Exception as e:
-            self._logger.debug(f"Grok subprocess failed: {e}")
-        return None
     
     def _call_kimi_subprocess(self, question: str) -> dict[str, Any] | None:
         """Call Kimi provider via subprocess (sync version for thread pool)."""
@@ -2180,6 +2394,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         self,
         prompt: str,
         context: dict[str, Any],
+        session_memory: str = "",
     ) -> str:
         """
         Call local model asynchronously using Python-native path.
@@ -2190,6 +2405,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         Args:
             prompt: The augmented prompt
             context: Execution context
+            session_memory: Pre-loaded session memory context (optional)
         
         Returns:
             Model response text
@@ -2199,15 +2415,17 @@ them according to the route type (bypass, provisional, or full). It handles:
         # Use Python-native local_answer
         from router_py.local_answer import LocalAnswer, LocalAnswerConfig
         
-        config = LocalAnswerConfig(
-            timeout=self.timeout,
-        )
-        if self.config.get("model"):
-            config.model = self.config["model"]
+        config = LocalAnswerConfig.from_env()
         answer = LocalAnswer(config)
         
+        if session_memory:
+            self._logger.debug(f"Using provided session memory ({len(session_memory)} chars)")
+        
         try:
-            result = await answer.generate_answer(query=prompt)
+            result = await answer.generate_answer(
+                query=prompt,
+                session_memory=session_memory,
+            )
             return self._render_chat_fast_from_raw(result.text)
         except Exception as e:
             self._logger.warning(f"Local model failed: {e}")
@@ -2226,7 +2444,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         with urllib/subprocess.
         
         Args:
-            provider: "openai" or "grok"
+            provider: "openai" or "kimi"
             prompt: The augmented prompt
             context: Execution context
         
@@ -2273,29 +2491,6 @@ them according to the route type (bypass, provisional, or full). It handles:
             return f"Error: {result.stderr}"
         except Exception as e:
             return f"Error calling OpenAI: {e}"
-    
-    def _call_grok_for_response(self, prompt: str) -> str:
-        """Call Grok for direct response (sync version)."""
-        tool = ROOT_DIR / "tools" / "unverified_context_grok.py"
-        if not tool.exists():
-            return "Error: Grok tool not found"
-        
-        try:
-            result = subprocess.run(
-                [sys.executable, str(tool), prompt],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=self._prepare_subprocess_env(),
-                cwd=str(ROOT_DIR),
-            )
-            if result.returncode == 0:
-                payload = json.loads(result.stdout)
-                if payload.get("ok"):
-                    return payload.get("text", payload.get("context", "No response"))
-            return f"Error: {result.stderr}"
-        except Exception as e:
-            return f"Error calling Grok: {e}"
     
     def _call_kimi_for_response(self, prompt: str) -> str:
         """Call Kimi for direct response (sync version)."""
@@ -2421,10 +2616,8 @@ them according to the route type (bypass, provisional, or full). It handles:
             # Create config from environment
             config = LocalAnswerConfig.from_env()
             
-            # Override with engine config or passed env vars
-            if self.config.get("model"):
-                config.model = self.config["model"]
-            elif env.get("LUCY_LOCAL_MODEL"):
+            # Override with passed env vars
+            if env.get("LUCY_LOCAL_MODEL"):
                 config.model = env["LUCY_LOCAL_MODEL"]
             if env.get("LUCY_SESSION_MEMORY_CONTEXT"):
                 session_memory = env["LUCY_SESSION_MEMORY_CONTEXT"]
@@ -2572,7 +2765,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         """
         Call unverified context provider for augmentation with fallback chain.
         
-        Provider chain: trusted -> wikipedia -> openai -> grok
+        Provider chain: trusted -> wikipedia -> openai -> kimi
         If one fails, automatically tries the next.
         
         For news/medical/finance queries, tries trusted sources first.
@@ -2660,7 +2853,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         Call a single augmented provider.
         
         Args:
-            provider: Provider name (wikipedia, openai, grok)
+            provider: Provider name (wikipedia, openai, kimi)
             question: The user question
             intent: The classified intent
             route: The routing decision
@@ -2685,6 +2878,16 @@ them according to the route type (bypass, provisional, or full). It handles:
         if allow_domains_file:
             env["LUCY_FETCH_ALLOWLIST_FILTER_FILE"] = allow_domains_file
             env["LUCY_SEARCH_ALLOWLIST_FILTER_FILE"] = allow_domains_file
+
+        # Initialize memory telemetry defaults (updated later if memory is loaded)
+        memory_telemetry: dict[str, str] = {
+            "memory_context_used": "false",
+            "memory_mode_used": "none",
+            "memory_depth_used": "none",
+            "memory_top_score": "none",
+            "memory_session_injected": "none",
+            "memory_top_gap": "none",
+        }
         
         try:
             # Call unverified_context_provider_dispatch.py
@@ -2703,14 +2906,25 @@ them according to the route type (bypass, provisional, or full). It handles:
             )
             
             if result.returncode != 0:
+                # Dispatch tool writes structured errors to stdout; try to extract reason
+                dispatch_error = result.stderr or ""
+                if not dispatch_error and result.stdout:
+                    try:
+                        parsed = json.loads(result.stdout)
+                        if isinstance(parsed, dict) and not parsed.get("ok"):
+                            dispatch_error = parsed.get("reason", "Provider dispatch failed")
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+                if not dispatch_error:
+                    dispatch_error = "Provider dispatch failed"
                 return ExecutionResult(
                     status="failed",
                     outcome_code="augmentation_failed",
                     route="AUGMENTED",
                     provider=provider,
                     provider_usage_class=self._provider_usage_class_for(provider),
-                    error_message=result.stderr or "Provider dispatch failed",
-                    metadata={"provider": provider, "raw_output": result.stdout},
+                    error_message=dispatch_error,
+                    metadata={"provider": provider, "raw_output": result.stdout, **memory_telemetry},
                 )
             
             # Parse JSON response
@@ -2735,7 +2949,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                     provider=provider,
                     provider_usage_class=self._provider_usage_class_for(provider),
                     error_message=payload.get("reason", "Unknown provider error"),
-                    metadata={"provider": provider, "payload": payload},
+                    metadata={"provider": provider, "payload": payload, **memory_telemetry},
                 )
             
             # Extract context from payload
@@ -2764,6 +2978,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                         "category": category,
                         "sources": sources,
                         "trust_class": "trusted",
+                        **memory_telemetry,
                     },
                 )
             
@@ -2780,6 +2995,15 @@ them according to the route type (bypass, provisional, or full). It handles:
                 "LUCY_LOCAL_AUGMENTED_CONTEXT_URL": context_url,
             })
             
+            # Add session memory context if enabled
+            # Augmented mode gets deep context since the model handles mixed sources well
+            session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(
+                question, depth="deep", mode="augmented"
+            )
+            if session_memory:
+                env["LUCY_SESSION_MEMORY_CONTEXT"] = session_memory
+                self._logger.debug(f"Added session memory context ({len(session_memory)} chars)")
+            
             local_result = self._call_local_worker(question, env)
             
             if local_result.returncode != 0:
@@ -2790,7 +3014,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                     provider=provider,
                     provider_usage_class=self._provider_usage_class_for(provider),
                     error_message=local_result.stderr,
-                    metadata={"provider": provider},
+                    metadata={"provider": provider, **memory_telemetry},
                 )
             
             # Success - format and return
@@ -2808,6 +3032,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                     "context_title": context_title,
                     "context_url": context_url,
                     "trust_class": "unverified",
+                    **memory_telemetry,
                 },
             )
             
@@ -2819,6 +3044,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                 provider=provider,
                 provider_usage_class=self._provider_usage_class_for(provider),
                 error_message=f"Augmentation timeout after {self.timeout}s",
+                metadata={**memory_telemetry},
             )
         except Exception as e:
             return ExecutionResult(
@@ -2828,7 +3054,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                 provider=provider,
                 provider_usage_class=self._provider_usage_class_for(provider),
                 error_message=str(e),
-                metadata={"exception_type": type(e).__name__},
+                metadata={"exception_type": type(e).__name__, **memory_telemetry},
             )
     
     def _is_local_response_sufficient(self, response_text: str) -> bool:
@@ -2888,7 +3114,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         - local: Local response generation
         - wikipedia: Wikipedia search and fetch
         - openai: OpenAI API calls
-        - grok: Grok API calls
+        - kimi: Kimi API calls
         """
         # TODO: Implement tool dispatch from execute_plan.sh
         # - Map tool_name to tool path
@@ -3019,16 +3245,24 @@ them according to the route type (bypass, provisional, or full). It handles:
                 }
             })
             
+            # Build outcome metadata for SQLite
+            outcome_meta: dict[str, Any] = {
+                "route": result.route,
+                "provider": result.provider,
+                "outcome_code": result.outcome_code,
+                "trust_class": result.metadata.get("trust_class", "local"),
+            }
+            # Include memory telemetry if present
+            for key in ("memory_context_used", "memory_mode_used", "memory_top_score",
+                        "memory_session_injected", "memory_top_gap"):
+                if key in result.metadata:
+                    outcome_meta[key] = result.metadata[key]
+            
             # Write outcome record
             self.state_manager.write_outcome({
                 "success": result.status == "completed",
                 "duration_ms": result.execution_time_ms,
-                "result": {
-                    "route": result.route,
-                    "provider": result.provider,
-                    "outcome_code": result.outcome_code,
-                    "trust_class": result.metadata.get("trust_class", "local"),
-                },
+                "result": outcome_meta,
                 "error_message": result.error_message or ""
             })
             
@@ -3089,6 +3323,20 @@ them according to the route type (bypass, provisional, or full). It handles:
             ("EXECUTION_TIME_MS", str(result.execution_time_ms)),
             ("ROUTING_SIGNAL_MEDICAL_CONTEXT", "true" if context.get("is_medical_query") else "false"),
         ]
+        
+        # Memory telemetry (added if present in metadata)
+        if "memory_context_used" in result.metadata:
+            outcome_fields.append(("MEMORY_CONTEXT_USED", result.metadata["memory_context_used"]))
+        if "memory_mode_used" in result.metadata:
+            outcome_fields.append(("MEMORY_MODE_USED", result.metadata["memory_mode_used"]))
+        if "memory_depth_used" in result.metadata:
+            outcome_fields.append(("MEMORY_DEPTH_USED", result.metadata["memory_depth_used"]))
+        if "memory_top_score" in result.metadata:
+            outcome_fields.append(("MEMORY_TOP_SCORE", result.metadata["memory_top_score"]))
+        if "memory_session_injected" in result.metadata:
+            outcome_fields.append(("MEMORY_SESSION_INJECTED", result.metadata["memory_session_injected"]))
+        if "memory_top_gap" in result.metadata:
+            outcome_fields.append(("MEMORY_TOP_GAP", result.metadata["memory_top_gap"]))
         
         # Write last_route.env with locking
         try:
@@ -3577,7 +3825,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         Map provider name to usage class (ported from provider_usage_class_for, line 327).
         
         Args:
-            provider: Provider name (e.g., "openai", "grok", "wikipedia", "local")
+            provider: Provider name (e.g., "openai", "kimi", "wikipedia", "local")
             
         Returns:
             Usage class: "paid", "free", "local", or "none"
@@ -3585,7 +3833,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         Examples:
             >>> ExecutionEngine._provider_usage_class_for("openai")
             'paid'
-            >>> ExecutionEngine._provider_usage_class_for("grok")
+            >>> ExecutionEngine._provider_usage_class_for("kimi")
             'paid'
             >>> ExecutionEngine._provider_usage_class_for("wikipedia")
             'free'
@@ -3599,7 +3847,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         if not provider:
             return "none"
         match provider.lower():
-            case "openai" | "grok":
+            case "openai" | "kimi":
                 return "paid"
             case "wikipedia":
                 return "free"
