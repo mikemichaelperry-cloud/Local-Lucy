@@ -1,8 +1,0 @@
-# Archives excluded from git (large binaries + old snapshots)
-retired-snapshot-set-*/
-*.bin
-*.onnx
-*.pt
-*.pth
-*.ckpt
-*.safetensors

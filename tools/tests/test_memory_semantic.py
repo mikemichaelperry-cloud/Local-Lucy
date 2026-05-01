@@ -198,6 +198,106 @@ class TestMemorySemantic(unittest.TestCase):
         self.assertIn("User: Hello", ctx)
         self.assertNotIn("Related session", ctx)
 
+    # ------------------------------------------------------------------
+    # find_relevant_sessions_with_diagnostics
+    # ------------------------------------------------------------------
+
+    def test_diagnostics_returns_top_score_and_gap(self):
+        for session_id, summary, vector in [
+            ("tubes", "Tube amp project discussion.", [1.0, 0.0, 0.0]),
+            ("python", "Python refactoring session.", [0.0, 1.0, 0.0]),
+        ]:
+            conn = ms._get_connection()
+            conn.execute(
+                "INSERT INTO session_summaries (session_id, summary_text, summarized_turn_count) VALUES (?, ?, ?)",
+                (session_id, summary, 10),
+            )
+            conn.execute(
+                "INSERT INTO summary_embeddings (session_id, embedding) VALUES (?, ?)",
+                (session_id, str(vector).encode()),
+            )
+            conn.commit()
+
+        with patch.object(ms, "_get_embedding", return_value=[0.9, 0.1, 0.0]):
+            results, diag = ms.find_relevant_sessions_with_diagnostics("tube amplifiers", top_k=2)
+
+        self.assertEqual(len(results), 2)
+        self.assertAlmostEqual(diag["top_score"], results[0]["similarity"], places=5)
+        self.assertIsNotNone(diag["top_gap"])
+        self.assertFalse(diag["gap_blocked"])
+
+    def test_diagnostics_gap_blocked(self):
+        os.environ["LUCY_MEMORY_REQUIRE_TOP_GAP"] = "0.5"
+        for session_id, summary, vector in [
+            ("a", "Summary A.", [1.0, 0.0, 0.0]),
+            ("b", "Summary B.", [0.95, 0.05, 0.0]),
+        ]:
+            conn = ms._get_connection()
+            conn.execute(
+                "INSERT INTO session_summaries (session_id, summary_text, summarized_turn_count) VALUES (?, ?, ?)",
+                (session_id, summary, 10),
+            )
+            conn.execute(
+                "INSERT INTO summary_embeddings (session_id, embedding) VALUES (?, ?)",
+                (session_id, str(vector).encode()),
+            )
+            conn.commit()
+
+        with patch.object(ms, "_get_embedding", return_value=[0.95, 0.05, 0.0]):
+            results, diag = ms.find_relevant_sessions_with_diagnostics("test", top_k=2)
+
+        self.assertEqual(results, [])
+        self.assertTrue(diag["gap_blocked"])
+        self.assertIsNotNone(diag["top_gap"])
+
+    # ------------------------------------------------------------------
+    # assemble_context_with_telemetry
+    # ------------------------------------------------------------------
+
+    def test_telemetry_local_shallow(self):
+        ms.store_turn("user", "Q1")
+        ctx, telem = ms.assemble_context_with_telemetry(depth="shallow", mode="local")
+        self.assertIn("User: Q1", ctx)
+        self.assertEqual(telem["memory_context_used"], "true")
+        self.assertEqual(telem["memory_mode_used"], "local")
+        self.assertEqual(telem["memory_depth_used"], "shallow")
+        self.assertEqual(telem["memory_top_score"], "none")
+
+    def test_telemetry_local_deep_no_summary(self):
+        ctx, telem = ms.assemble_context_with_telemetry(depth="deep", mode="local")
+        self.assertEqual(ctx, "")
+        self.assertEqual(telem["memory_context_used"], "false")
+        self.assertEqual(telem["memory_mode_used"], "none")
+
+    def test_telemetry_augmented_with_semantic_recall(self):
+        conn = ms._get_connection()
+        conn.execute(
+            "INSERT INTO session_summaries (session_id, summary_text, summarized_turn_count) VALUES (?, ?, ?)",
+            ("tubes", "Tube amplifier design decisions.", 10),
+        )
+        conn.execute(
+            "INSERT INTO summary_embeddings (session_id, embedding) VALUES (?, ?)",
+            ("tubes", str([1.0, 0.0, 0.0]).encode()),
+        )
+        conn.commit()
+        ms.store_turn("user", "What transformer?", session_id="current")
+
+        with patch.object(ms, "_get_embedding", return_value=[0.95, 0.05, 0.0]):
+            ctx, telem = ms.assemble_context_with_telemetry(
+                current_session_id="current",
+                query="tube amp transformer",
+                max_chars=500,
+                depth="deep",
+                mode="augmented",
+            )
+
+        self.assertIn("Related session: Tube amplifier design decisions.", ctx)
+        self.assertEqual(telem["memory_context_used"], "true")
+        self.assertEqual(telem["memory_mode_used"], "augmented")
+        self.assertEqual(telem["memory_depth_used"], "deep")
+        self.assertEqual(telem["memory_session_injected"], "tubes")
+        self.assertNotEqual(telem["memory_top_score"], "none")
+
 
 if __name__ == "__main__":
     unittest.main()

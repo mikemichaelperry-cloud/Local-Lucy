@@ -799,6 +799,23 @@ them according to the route type (bypass, provisional, or full). It handles:
         context = context or {}
         question = context.get("question", "")
         
+        # Reject empty or whitespace-only queries at the engine boundary
+        if not question or not question.strip():
+            execution_time = int((time.time() - start_time) * 1000)
+            result = ExecutionResult(
+                status="failed",
+                outcome_code="empty_query",
+                route="LOCAL",
+                provider="local",
+                provider_usage_class="local",
+                response_text="",
+                error_message="Query is empty or contains only whitespace.",
+                execution_time_ms=execution_time,
+                metadata={"reason": "empty_query_rejected"},
+            )
+            self._write_state_files(route, result, context)
+            return result
+        
         # Check for medical context and configure safety constraints
         requires_evidence, evidence_reason = requires_evidence_mode(question, context)
         

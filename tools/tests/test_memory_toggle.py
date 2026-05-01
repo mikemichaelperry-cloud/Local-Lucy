@@ -19,7 +19,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "router_py"))
 RUNTIME_V8 = Path.home() / ".codex-api-home" / "lucy" / "runtime-v8"
 STATE_FILE = RUNTIME_V8 / "state" / "current_state.json"
 MEMORY_FILE = RUNTIME_V8 / "state" / "chat_session_memory.txt"
-LUCY_V8 = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev"
+# Try snapshot path first, fall back to repo root
+LUCY_V8_SNAPSHOT = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev"
+LUCY_V8_REPO = Path.home() / "lucy-v8"
+if (LUCY_V8_SNAPSHOT / "tools" / "runtime_control.py").exists():
+    LUCY_V8 = LUCY_V8_SNAPSHOT
+else:
+    LUCY_V8 = LUCY_V8_REPO
 RUNTIME_CONTROL = LUCY_V8 / "tools" / "runtime_control.py"
 
 
@@ -86,6 +92,7 @@ def test_memory_toggle_basic():
     with open(STATE_FILE, "w") as f:
         json.dump(original, f, indent=2)
     print("\n✓ TEST 1 PASSED")
+    return True
 
 
 def test_memory_env_var():
@@ -202,7 +209,7 @@ def test_memory_context_in_prompt():
         conversation_system_block=False
     )
     
-    if "Session memory" in prompt and "Oscar" in prompt:
+    if "Oscar" in prompt and "---" in prompt:
         print("✓ Memory context included in prompt when enabled")
     else:
         print("✗ Memory context NOT included in prompt")
@@ -222,7 +229,7 @@ def test_memory_context_in_prompt():
         conversation_system_block=False
     )
     
-    if "Session memory" not in prompt_no_memory:
+    if "Oscar" not in prompt_no_memory:
         print("✓ Memory context NOT included when disabled")
     else:
         print("✗ Memory context included when disabled")
