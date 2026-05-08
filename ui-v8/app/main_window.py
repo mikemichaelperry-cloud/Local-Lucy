@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QSettings, QThreadPool, QTimer, Qt, QUrl, Slot
-from PySide6.QtGui import QDesktopServices, QGuiApplication, QShowEvent
+from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QShowEvent
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -36,7 +36,7 @@ from app.services.state_store import (
     resolve_last_request_paid,
     resolve_last_request_provider,
 )
-from app.ui_levels import ENGINEERING, LEVELS, SIMPLE, display_level, level_at_least, normalize_level
+from app.ui_levels import ENGINEERING, LEVELS, POWER, SIMPLE, display_level, level_at_least, normalize_level
 
 
 APP_STYLESHEET = """
@@ -120,6 +120,15 @@ QPushButton#traceSummaryButton:hover {
 QPushButton#traceSummaryButton:checked {
     background: #253743;
     border-color: #627481;
+}
+QPushButton#shutdownButton {
+    background: #5c3a3a;
+    border: 1px solid #8b4545;
+    color: #f0d0d0;
+}
+QPushButton#shutdownButton:hover {
+    background: #7a4a4a;
+    border-color: #a55555;
 }
 QPushButton#pttButton {
     min-height: 46px;
@@ -248,6 +257,7 @@ class OperatorConsoleWindow(QMainWindow):
         self._history_selection_pinned = False
         self._latest_request_details: dict[str, object] | None = None
         self._latest_decision_trace_details: dict[str, object] | None = None
+        self._latest_live_entry: dict[str, object] | None = None
         self._ui_event_lines: list[str] = []
         self._last_model_switch_time: float = 0.0
         self._pending_submit_force_augmented_once = False
@@ -326,6 +336,34 @@ class OperatorConsoleWindow(QMainWindow):
             return
         self._initial_draft_focus_pending = False
         QTimer.singleShot(0, self.conversation_panel.focus_draft)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Clean up voice workers on HMI close to prevent orphaned GPU processes."""
+        self._append_ui_event("[info] shutdown: cleaning up voice workers")
+        # Gracefully quit kokoro worker
+        try:
+            from pathlib import Path
+            socket_path = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev" / "tmp" / "run" / "kokoro_tts_worker.sock"
+            if socket_path.exists():
+                import socket, json
+                client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                client.settimeout(1.0)
+                client.connect(str(socket_path))
+                client.sendall((json.dumps({"cmd": "quit"}, sort_keys=True) + "\n").encode("utf-8"))
+                client.close()
+        except Exception:
+            pass
+        # Kill whisper-server
+        try:
+            from pathlib import Path
+            import os, signal
+            whisper_pid_file = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev" / "tmp" / "run" / "whisper_worker.pid"
+            if whisper_pid_file.exists():
+                whisper_pid = int(whisper_pid_file.read_text().strip())
+                os.kill(whisper_pid, signal.SIGTERM)
+        except Exception:
+            pass
+        event.accept()
 
     def refresh_runtime_state(self) -> None:
         self._debug_log("refresh_runtime_state called")
@@ -421,9 +459,11 @@ class OperatorConsoleWindow(QMainWindow):
         self.control_panel.model_change_requested.connect(
             lambda value: self._execute_backend_action("model_selection", value, "model change")
         )
+
         self.control_panel.ptt_pressed_requested.connect(self._handle_voice_ptt_pressed)
         self.control_panel.ptt_released_requested.connect(self._handle_voice_ptt_released)
         self.control_panel.reload_profile_requested.connect(self._handle_reload_profile_requested)
+        self.control_panel.shutdown_requested.connect(self._handle_shutdown_requested)
         self.conversation_panel.clear_draft_requested.connect(self._clear_conversation_draft)
         self.conversation_panel.submit_requested.connect(self._handle_submit_requested)
         self.conversation_panel.history_selection_changed.connect(self._handle_history_selection_changed)
@@ -527,7 +567,7 @@ class OperatorConsoleWindow(QMainWindow):
         self._voice_action_task.signals.finished.connect(self._handle_backend_action_complete)
         self._thread_pool.start(self._voice_action_task)
 
-    def _execute_backend_action(self, action: str, requested_value: str, action_label: str) -> None:
+    def _execute_backend_action(self, action: str, requested_value: str, action_label: str, *, context: dict[str, Any] | None = None) -> None:
         if not self._backend_controls_available:
             self._append_ui_event(f"[warning] {action_label} unavailable")
             self.statusBar().showMessage("Backend controls unavailable.", 3000)
@@ -558,7 +598,7 @@ class OperatorConsoleWindow(QMainWindow):
         self._pending_action_label = action_label
         self._append_ui_event(f"[info] {action_label} requested -> {requested_value}")
         self.statusBar().showMessage(f"Applying {action_label}: {requested_value}", 0)
-        self._action_task = RuntimeActionTask(self._runtime_bridge, action, requested_value)
+        self._action_task = RuntimeActionTask(self._runtime_bridge, action, requested_value, context=context)
         self._action_task.signals.finished.connect(self._handle_backend_action_complete)
         self._thread_pool.start(self._action_task)
 
@@ -573,14 +613,33 @@ class OperatorConsoleWindow(QMainWindow):
             self.statusBar().showMessage("Backend action already in flight.", 3000)
             self.refresh_runtime_state()
             return
-
-        self._set_backend_busy(True)
-        self._pending_action_label = "profile reset"
         self._append_ui_event("[info] profile reset requested")
         self.statusBar().showMessage("Resetting profile/model to authoritative defaults...", 0)
         self._action_task = RuntimeActionTask(self._runtime_bridge, "reload_profile", "")
         self._action_task.signals.finished.connect(self._handle_backend_action_complete)
         self._thread_pool.start(self._action_task)
+
+    def _handle_shutdown_requested(self) -> None:
+        """Gracefully shutdown Local Lucy."""
+        self._append_ui_event("[info] shutdown requested")
+        self.statusBar().showMessage("Shutting down Local Lucy...", 2000)
+
+        # Stop timers
+        if self._state_refresh_timer.isActive():
+            self._state_refresh_timer.stop()
+
+        # Stop log watcher
+        if self._log_watcher:
+            self._log_watcher.stop()
+
+        # Cancel any pending actions
+        if self._action_task:
+            self._action_task.cancel()
+        if self._voice_action_task:
+            self._voice_action_task.cancel()
+
+        # Close the window
+        QTimer.singleShot(500, self.close)
 
     @Slot(object)
     def _handle_backend_action_complete(self, result: CommandResult) -> None:
@@ -674,7 +733,7 @@ class OperatorConsoleWindow(QMainWindow):
                     preview = transcript if len(transcript) <= 48 else f"{transcript[:45]}..."
                     self.statusBar().showMessage(f"Voice: '{preview}'", 3000)
                     self._append_ui_event(f"[info] voice transcript -> submit")
-                    self._execute_backend_action("submit_request", transcript, "voice submit")
+                    self._execute_backend_action("submit_request", transcript, "voice submit", context={"surface": "voice"})
                 return
             if result.status == "timeout":
                 timeout_detail = self._voice_failure_detail(result) or "timeout"
@@ -776,7 +835,22 @@ class OperatorConsoleWindow(QMainWindow):
             # Trigger TTS for voice-enabled sessions
             response_text = self._payload_text(payload, "response_text") or result.stdout
             if response_text:
-                self._speak_response_text(response_text)
+                # Use voice-optimized text (e.g., condensed news headlines) if available
+                voice_text = ""
+                if isinstance(payload, dict):
+                    metadata = payload.get("metadata")
+                    if isinstance(metadata, dict):
+                        voice_text = str(metadata.get("voice_text", "")).strip()
+                self._speak_response_text(voice_text or response_text)
+            # Cache live (non-persisted) entries such as NEWS so they display in the HMI.
+            # Clear any previous live entry for non-NEWS routes so they don't linger.
+            route_mode = self._payload_route_mode(payload)
+            if route_mode == "NEWS":
+                self._latest_live_entry = self._build_live_entry_from_payload(payload, result)
+                # Force immediate UI update so the news shows right away
+                self._reload_request_history()
+            else:
+                self._latest_live_entry = None
             return
 
         if request_status == "timeout":
@@ -788,6 +862,11 @@ class OperatorConsoleWindow(QMainWindow):
         failure_detail = self._payload_text(payload, "error") or self._result_detail(result)
         self._append_ui_event(f"[alarm] request {request_status or 'failed'} -> {failure_detail}")
         self._append_request_metadata_events(payload)
+        if self._payload_route_mode(payload) == "NEWS":
+            self._latest_live_entry = self._build_live_entry_from_payload(payload, result)
+            self._reload_request_history()
+        else:
+            self._latest_live_entry = None
         self._append_ui_event("[info] post-request refresh complete")
         self.statusBar().showMessage(
             f"Request {request_status or 'failed'}: {failure_detail}",
@@ -796,6 +875,8 @@ class OperatorConsoleWindow(QMainWindow):
 
     def _speak_response_text(self, text: str) -> None:
         """Fire TTS in background if voice is enabled."""
+        if not text:
+            return
         voice_on = self._payload_text(self._latest_state_snapshot.top_status, "Voice").lower() == "on"
         if not voice_on:
             return
@@ -1002,6 +1083,26 @@ class OperatorConsoleWindow(QMainWindow):
             from datetime import datetime
             f.write(f"{datetime.now().isoformat()} MAIN {msg}\n")
 
+    def _build_live_entry_from_payload(self, payload: dict[str, object], result: CommandResult) -> dict[str, object]:
+        """Build a synthetic history entry for non-persisted results (e.g. NEWS)."""
+        from datetime import datetime, timezone
+        route_mode = self._payload_route_mode(payload)
+        return {
+            "request_id": f"live-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}",
+            "status": self._payload_text(payload, "status") or result.status or "completed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "error": self._payload_text(payload, "error") or result.stderr or "",
+            "request_text": self._payload_text(payload, "request_text") or result.requested_value or "",
+            "response_text": self._payload_text(payload, "response_text") or result.stdout or "",
+            "route": {"mode": route_mode, "confidence": 0},
+            "outcome": {
+                "outcome_code": self._payload_text(payload.get("outcome"), "outcome_code")
+                if isinstance(payload.get("outcome"), dict)
+                else "answered"
+            },
+            "metadata": payload.get("metadata") if isinstance(payload, dict) else None,
+        }
+
     def _reload_request_history(self) -> None:
         self._debug_log(f"_reload_request_history called")
         from app.services.state_store import REQUEST_HISTORY_FILE
@@ -1009,6 +1110,9 @@ class OperatorConsoleWindow(QMainWindow):
         history_result = load_recent_request_history()
         self._debug_log(f"history_result: {history_result.status}, entries: {len(history_result.entries)}")
         self._history_entries = history_result.entries
+        # Prepend live (non-persisted) entry if present so it appears in Latest Answer
+        if self._latest_live_entry is not None:
+            self._history_entries = self._history_entries + [self._latest_live_entry]
         available_ids = [
             self._payload_text(entry, "request_id")
             for entry in self._history_entries
@@ -1040,7 +1144,7 @@ class OperatorConsoleWindow(QMainWindow):
 
         self._selected_request_id = selected_id
         self._latest_request_details = build_request_details(self._selected_history_entry())
-        self._latest_decision_trace_details = build_request_details(self._latest_history_entry())
+        self._latest_decision_trace_details = build_request_details(self._selected_history_entry())
 
         if same_signature and same_selection and same_level:
             self._debug_log("skipping update (same signature, selection, level)")
@@ -1056,7 +1160,7 @@ class OperatorConsoleWindow(QMainWindow):
         self._debug_log(f"set_history_entries returned: {applied_selection}")
         self._selected_request_id = applied_selection
         self._latest_request_details = build_request_details(self._selected_history_entry())
-        self._latest_decision_trace_details = build_request_details(self._latest_history_entry())
+        self._latest_decision_trace_details = build_request_details(self._selected_history_entry())
 
     def _selected_history_entry(self) -> dict[str, object] | None:
         selected_id = (self._selected_request_id or "").strip()
@@ -1078,9 +1182,11 @@ class OperatorConsoleWindow(QMainWindow):
         self._selected_request_id = request_id.strip() or None
         self._history_selection_pinned = bool(self._selected_request_id and self._selected_request_id != latest_id)
         self._latest_request_details = build_request_details(self._selected_history_entry())
-        self._latest_decision_trace_details = build_request_details(self._latest_history_entry())
+        self._latest_decision_trace_details = build_request_details(self._selected_history_entry())
         self.status_panel.update_request_details(self._latest_request_details)
         self._refresh_decision_trace()
+        # Re-render the center panel so the selected entry's content is shown
+        self.conversation_panel._render_selected_entry(request_id)
 
     def _append_request_metadata_events(self, payload: dict[str, object]) -> None:
         route = payload.get("route")
@@ -1110,6 +1216,12 @@ class OperatorConsoleWindow(QMainWindow):
         if value is None:
             return ""
         return str(value).strip()
+
+    def _payload_route_mode(self, payload: dict[str, object] | None) -> str:
+        route_payload = payload.get("route") if isinstance(payload, dict) else {}
+        if isinstance(route_payload, dict):
+            return self._payload_text(route_payload, "mode")
+        return str(route_payload or "").strip()
 
     def _runtime_status_with_session_counters(self) -> dict[str, str]:
         values = dict(self._latest_state_snapshot.runtime_status)
@@ -1182,7 +1294,7 @@ class OperatorConsoleWindow(QMainWindow):
 
         if self._interface_level == ENGINEERING:
             visible_labels = list(self._top_status_order)
-        elif level_at_least(self._interface_level, ENGINEERING):
+        elif level_at_least(self._interface_level, POWER):
             visible_labels = ["Profile", "Router", "Model", "Approval Required", "Overall Status"]
         else:
             visible_labels = ["Profile", "Router", "Model", "Overall Status"]
@@ -1593,15 +1705,15 @@ class OperatorConsoleWindow(QMainWindow):
         self._top_status_grid = layout
 
         fields = [
-            ("Profile", "loading"),
-            ("Mode", "loading"),
-            ("Router", "loading"),
-            ("Model", "loading"),
-            ("Memory", "loading"),
-            ("Evidence", "loading"),
-            ("Voice", "loading"),
-            ("Approval Required", "loading"),
-            ("Overall Status", "loading"),
+            ("Profile", "—"),
+            ("Mode", "—"),
+            ("Router", "—"),
+            ("Model", "—"),
+            ("Memory", "—"),
+            ("Evidence", "—"),
+            ("Voice", "—"),
+            ("Approval Required", "—"),
+            ("Overall Status", "—"),
         ]
 
         self._top_status_order = [label for label, _ in fields]

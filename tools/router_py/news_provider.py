@@ -5,19 +5,35 @@ News Provider - Fetches latest world news from RSS feeds and news APIs.
 This module provides real-time news fetching for queries like "what's the latest world news".
 It uses RSS feeds from reputable news sources (no API key required) and optionally
 NewsAPI if an API key is available.
+
+v2 changes (2026-05-02):
+- Parallel RSS fetching via aiohttp
+- No caching — news is always fetched fresh
+- Cleaner display format: headline, 1-2 sentence info, source/timestamp, "Read more" link
+- Natural voice_text for Kokoro TTS
+- Graceful partial-failure handling
 """
 
 from __future__ import annotations
 
+import asyncio
+import html
 import json
+import logging
 import os
 import re
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
+
+import aiohttp
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -28,16 +44,23 @@ class NewsResult:
     source: str
     error: str = ""
     articles: list[dict[str, Any]] | None = None
+    partial: bool = False
+    errors: list[str] | None = None
+    html_text: str = ""
 
 
 def _clean_html(text: str) -> str:
-    """Remove HTML tags and entities."""
+    """Remove HTML tags and decode common entities."""
+    if not text:
+        return ""
     # Remove HTML tags
     text = re.sub(r'<[^>]+>', '', text)
     # Decode common HTML entities
     text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
     text = text.replace('&quot;', '"').replace('&#39;', "'")
-    text = text.replace('&nbsp;', ' ')
+    text = text.replace('&nbsp;', ' ').replace('&#160;', ' ')
+    # Use html.unescape for any remaining entities
+    text = html.unescape(text)
     # Normalize whitespace
     text = re.sub(r'\s+', ' ', text).strip()
     return text
@@ -46,14 +69,12 @@ def _clean_html(text: str) -> str:
 def _format_time_ago(published: str) -> str:
     """Format publish time as 'X minutes/hours ago'."""
     try:
-        # Normalize the published string - replace GMT with +0000
         normalized = published.strip()
         if normalized.endswith(" GMT"):
             normalized = normalized[:-4] + " +0000"
         elif normalized.endswith(" UTC"):
             normalized = normalized[:-4] + " +0000"
-        
-        # Try various date formats
+
         pub_time = None
         for fmt in [
             "%a, %d %b %Y %H:%M:%S %z",
@@ -66,21 +87,19 @@ def _format_time_ago(published: str) -> str:
                 break
             except ValueError:
                 continue
-        
+
         if pub_time is None:
             return "recently"
-        
-        # Make timezone-aware comparison
+
         if pub_time.tzinfo:
             now = datetime.now(pub_time.tzinfo)
         else:
-            # Assume UTC if no timezone
             from datetime import timezone
             pub_time = pub_time.replace(tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
-        
+
         diff = now - pub_time
-        
+
         if diff < timedelta(minutes=1):
             return "just now"
         elif diff < timedelta(hours=1):
@@ -98,7 +117,7 @@ def _format_time_ago(published: str) -> str:
 
 class RSSNewsProvider:
     """Fetch news from RSS feeds (no API key required)."""
-    
+
     # Reputable world news RSS feeds (verified working with fresh content)
     RSS_FEEDS = {
         "bbc_world": {
@@ -166,358 +185,407 @@ class RSSNewsProvider:
             "name": "The Age",
             "region": "australia",
         },
-
         "crikey": {
             "url": "https://www.crikey.com.au/feed/",
             "name": "Crikey",
             "region": "australia",
         },
     }
-    
+
     TIMEOUT = 10.0
     MAX_ARTICLES_PER_SOURCE = 3
     MAX_TOTAL_ARTICLES = 10
-    
     # Region keywords to detect in queries
     REGION_KEYWORDS = {
-        "middle_east": ["israel", "israeli", "israel's", "jerusalem", "tel aviv", "haifa", 
-                        "palestine", "palestinian", "palestinians", "gaza", "gazan", "hamas", 
+        "middle_east": ["israel", "israeli", "israel's", "jerusalem", "tel aviv", "haifa",
+                        "palestine", "palestinian", "palestinians", "gaza", "gazan", "hamas",
                         "west bank", "lebanon", "lebanese", "hezbollah", "beirut",
                         "netanyahu", "idf", "iron dome", "middle east", "mideast",
-                        "iran", "iranian", "tehran", "syria", "damascus", "yemen", 
+                        "iran", "iranian", "tehran", "syria", "damascus", "yemen",
                         "saudi", "saudi arabia", "qatar", "doha", "uae", "dubai", "abudhabi",
-                        "baghdad", "iraq", "jordan", "amman", "egypt", "cairo", "sinai", 
+                        "baghdad", "iraq", "jordan", "amman", "egypt", "cairo", "sinai",
                         "ceasefire", "two-state solution", "settlement", "zionist", "zionism",
                         "knesset", "al-aqsa", "dome of the rock", "golan heights"],
         "australia": ["australia", "australian", "aussie", "auspol",
-                      "sydney", "melbourne", "canberra", "perth", "brisbane", "adelaide", 
+                      "sydney", "melbourne", "canberra", "perth", "brisbane", "adelaide",
                       "tasmania", "hobart", "darwin", "gold coast", "newcastle", "wollongong",
                       "anzac", "anzus", "scott morrison", "anthony albanese", "albo",
                       "liberal party", "labor party", "coles", "woolworths", "qantas"],
     }
-    
+
     @classmethod
-    def fetch_world_news(cls, query: str = "", for_voice: bool = False) -> NewsResult:
-        """
-        Fetch latest world news from multiple RSS sources.
-        
-        Args:
-            query: Optional search query to filter articles
-            for_voice: If True, return condensed format optimized for TTS
-            
-        Returns:
-            NewsResult with formatted news text
-        """
-        all_articles = []
-        errors = []
-        
-        # Detect region from query
+    def _detect_region(cls, query: str) -> set[str]:
+        """Detect regions from query keywords."""
         query_lower = query.lower()
-        detected_regions = set()
+        detected = set()
         for region, keywords in cls.REGION_KEYWORDS.items():
             if any(kw in query_lower for kw in keywords):
-                detected_regions.add(region)
-        
-        # Prioritize feeds based on detected regions
+                detected.add(region)
+        return detected
+
+    @classmethod
+    def _get_feeds_for_query(cls, query: str) -> list[tuple[str, dict[str, str]]]:
+        """Return ordered list of (feed_id, feed_info) tuples for a query."""
+        detected_regions = cls._detect_region(query)
         regional_feeds = []
         world_feeds = []
-        
+
         for source_id, source_info in cls.RSS_FEEDS.items():
             feed_region = source_info.get("region", "world")
             if feed_region in detected_regions:
-                # Regional feeds get priority
                 regional_feeds.append((source_id, source_info))
             elif feed_region == "world":
-                # World feeds are secondary
                 world_feeds.append((source_id, source_info))
-        
-        # If we have detected regions, prioritize regional feeds
-        # Fetch regional feeds first with higher article limits
+
         if detected_regions:
-            # Fetch more articles from regional sources
-            for source_id, source_info in regional_feeds:
-                try:
-                    articles = cls._fetch_rss_feed(
-                        source_info["url"], 
-                        source_info["name"],
-                        query
-                    )
-                    # Allow more articles per regional source
-                    all_articles.extend(articles[:cls.MAX_ARTICLES_PER_SOURCE + 2])
-                except Exception as e:
-                    errors.append(f"{source_info['name']}: {e}")
-            
-            # Fetch fewer articles from world sources when region is specified
-            for source_id, source_info in world_feeds:
-                try:
-                    articles = cls._fetch_rss_feed(
-                        source_info["url"], 
-                        source_info["name"],
-                        query
-                    )
-                    # Limit world articles when we have regional focus
-                    all_articles.extend(articles[:1])  # Only 1 per world source
-                except Exception as e:
-                    errors.append(f"{source_info['name']}: {e}")
-        else:
-            # No region detected, use all world feeds normally
-            for source_id, source_info in world_feeds:
-                try:
-                    articles = cls._fetch_rss_feed(
-                        source_info["url"], 
-                        source_info["name"],
-                        query
-                    )
-                    all_articles.extend(articles[:cls.MAX_ARTICLES_PER_SOURCE])
-                except Exception as e:
-                    errors.append(f"{source_info['name']}: {e}")
-        
-        if not all_articles:
-            return NewsResult(
-                ok=False,
-                text="",
-                source="rss",
-                error=f"Failed to fetch news from all sources: {'; '.join(errors)}"
-            )
-        
-        # Sort by time (most recent first) and limit
-        all_articles.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-        all_articles = all_articles[:cls.MAX_TOTAL_ARTICLES]
-        
-        # Format response with HTML for clickable links
-        formatted = cls._format_news_response(all_articles, query, use_html=True, for_voice=for_voice)
-        
-        return NewsResult(
-            ok=True,
-            text=formatted,
-            source="rss",
-            articles=all_articles
-        )
-    
+            return regional_feeds + world_feeds
+        return world_feeds
+
     @classmethod
-    def _fetch_rss_feed(cls, url: str, source_name: str, query: str = "") -> list[dict[str, Any]]:
-        """Fetch and parse an RSS feed."""
+    async def _fetch_rss_feed_async(
+        cls,
+        session: aiohttp.ClientSession,
+        source_id: str,
+        source_info: dict[str, str],
+        query: str = "",
+    ) -> list[dict[str, Any]]:
+        """Fetch and parse a single RSS feed asynchronously."""
+        url = source_info["url"]
+        source_name = source_info["name"]
         articles = []
-        
-        request = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Local Lucy News Fetcher)",
-                "Accept": "application/rss+xml,application/xml,text/xml,*/*",
-            },
-            method="GET",
-        )
-        
-        with urllib.request.urlopen(request, timeout=cls.TIMEOUT) as response:
-            data = response.read().decode("utf-8", errors="replace")
-        
-        # Parse XML
-        root = ET.fromstring(data)
-        
+
+        try:
+            async with session.get(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Local Lucy News Fetcher)",
+                    "Accept": "application/rss+xml,application/xml,text/xml,*/*",
+                    "Cache-Control": "no-cache",
+                    "Pragma": "no-cache",
+                },
+                timeout=aiohttp.ClientTimeout(total=cls.TIMEOUT),
+            ) as response:
+                data = await response.read()
+        except Exception:
+            # Let the caller decide how to handle
+            raise
+
+        # Hardened XML parsing: cap size
+        text = data.decode("utf-8", errors="replace")
+        if len(text) > 2_000_000:
+            raise ValueError("Feed response too large (>2MB)")
+
+        root = ET.fromstring(text)
+
         # Find items (handle both RSS 2.0 and Atom)
         channel = root.find("channel")
         if channel is not None:
             items = channel.findall("item")
         else:
-            # Atom format
             ns = {"atom": "http://www.w3.org/2005/Atom"}
             items = root.findall("atom:entry", ns)
-        
+
         for item in items:
-            # Extract title
             title_elem = item.find("title")
             title = _clean_html(title_elem.text) if title_elem is not None else ""
-            
-            # Extract description/summary
-            # NOTE: ElementTree Elements with CDATA are falsy — do NOT use 'or'
+
             desc_elem = item.find("description")
             if desc_elem is None:
                 desc_elem = item.find("summary")
             if desc_elem is None:
-                # Try Atom content
                 desc_elem = item.find("{http://www.w3.org/2005/Atom}summary")
             if desc_elem is None:
                 desc_elem = item.find("{http://www.w3.org/2005/Atom}content")
             description = _clean_html(desc_elem.text) if desc_elem is not None else ""
-            
-            # Extract link
+
             link_elem = item.find("link")
             if link_elem is not None:
                 link = link_elem.text or link_elem.get("href", "")
             else:
                 link = ""
-            
-            # Extract publish date
-            # Note: Don't use 'or' with ElementTree - empty elements are falsy!
+
             pub_date_elem = item.find("pubDate")
             if pub_date_elem is None:
                 pub_date_elem = item.find("published")
             if pub_date_elem is None:
                 pub_date_elem = item.find("{http://www.w3.org/2005/Atom}published")
             pub_date = pub_date_elem.text if pub_date_elem is not None else ""
-            
-            # Normalize date for consistent parsing
+
             if pub_date:
                 pub_date = pub_date.strip()
                 if pub_date.endswith(" GMT"):
                     pub_date = pub_date[:-4] + " +0000"
                 elif pub_date.endswith(" UTC"):
                     pub_date = pub_date[:-4] + " +0000"
-            
+
             # Filter by query if provided (only for specific search terms)
-            # Skip filtering for generic news queries
-            generic_terms = ['latest', 'world news', 'news today', 'current news', 'breaking news']
+            generic_terms = ['latest', 'world news', 'news today', 'current news', 'breaking news', 'news']
             if query and not any(term in query.lower() for term in generic_terms):
                 query_lower = query.lower()
                 search_text = f"{title} {description}".lower()
-                if query_lower not in search_text:
+                keywords = [w for w in query_lower.split() if len(w) > 3 and w not in {'what', 'when', 'where', 'which', 'latest', 'current', 'about'}]
+                if keywords and not any(kw in search_text for kw in keywords):
                     continue
-            
+
+            # Truncate description to 1-2 sentences (~200 chars) for clean display
+            clean_desc = description.strip()
+            if len(clean_desc) > 220:
+                # Try to break at sentence boundary
+                sentence_end = clean_desc.find('. ', 100, 220)
+                if sentence_end == -1:
+                    sentence_end = clean_desc.rfind(' ', 180, 220)
+                if sentence_end == -1:
+                    sentence_end = 200
+                clean_desc = clean_desc[:sentence_end].rstrip() + "."
+
             articles.append({
                 "title": title,
-                "description": description[:300] + "..." if len(description) > 300 else description,
+                "description": clean_desc,
                 "url": link,
                 "source": source_name,
                 "published": pub_date,
                 "time_ago": _format_time_ago(pub_date),
                 "timestamp": pub_date,
             })
-        
+
         return articles
-    
+
+    @classmethod
+    async def fetch_world_news_async(cls, query: str = "", for_voice: bool = False) -> NewsResult:
+        """
+        Fetch latest world news from multiple RSS sources asynchronously.
+
+        Uses parallel aiohttp fetching and always fetches fresh results.
+        Returns partial results if some feeds fail.
+        """
+        # NOTE: News is always fetched fresh — no caching.
+        # Queries like "latest news" explicitly request current content.
+        # Parallel aiohttp fetching makes this fast enough (~2-6s) that
+        # cache hits are not worth stale headlines.
+
+        feeds = cls._get_feeds_for_query(query)
+        if not feeds:
+            return NewsResult(
+                ok=False,
+                text="",
+                source="rss",
+                error="No RSS feeds configured for this query.",
+            )
+
+        all_articles: list[dict[str, Any]] = []
+        errors: list[str] = []
+
+        connector = aiohttp.TCPConnector(limit=20, limit_per_host=4, ttl_dns_cache=300)
+        fetch_start = time.time()
+        async with aiohttp.ClientSession(connector=connector) as session:
+            tasks = []
+            for source_id, source_info in feeds:
+                tasks.append(
+                    cls._fetch_rss_feed_async(session, source_id, source_info, query)
+                )
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info(f"NEWS fetch completed in {(time.time() - fetch_start):.2f}s for query: {query!r}")
+
+        for (source_id, source_info), result in zip(feeds, results):
+            if isinstance(result, Exception):
+                errors.append(f"{source_info['name']}: {type(result).__name__}")
+                continue
+            # Apply per-source limits based on region priority
+            feed_region = source_info.get("region", "world")
+            detected = cls._detect_region(query)
+            if detected and feed_region in detected:
+                all_articles.extend(result[:cls.MAX_ARTICLES_PER_SOURCE + 2])
+            elif detected and feed_region == "world":
+                all_articles.extend(result[:1])
+            else:
+                all_articles.extend(result[:cls.MAX_ARTICLES_PER_SOURCE])
+
+        if not all_articles:
+            return NewsResult(
+                ok=False,
+                text="",
+                source="rss",
+                error=f"Failed to fetch news from all sources. Errors: {'; '.join(errors)}",
+            )
+
+        # Deduplicate by normalized title
+        seen_titles: set[str] = set()
+        deduped: list[dict[str, Any]] = []
+        for article in all_articles:
+            norm = article.get("title", "").strip().lower().rstrip(".…!?:;")
+            if norm and norm not in seen_titles:
+                seen_titles.add(norm)
+                deduped.append(article)
+        all_articles = deduped
+
+        # Sort by time (most recent first) and limit
+        all_articles.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        all_articles = all_articles[:cls.MAX_TOTAL_ARTICLES]
+
+        # Format response
+        formatted = cls._format_news_response(all_articles, query, for_voice=for_voice)
+        html_formatted = cls._format_news_response(all_articles, query, use_html=True, for_voice=for_voice)
+
+        return NewsResult(
+            ok=True,
+            text=formatted,
+            source="rss",
+            articles=all_articles,
+            partial=bool(errors),
+            errors=errors if errors else None,
+            html_text=html_formatted,
+        )
+
+    @classmethod
+    def fetch_world_news(cls, query: str = "", for_voice: bool = False) -> NewsResult:
+        """
+        Synchronous wrapper around async fetch.
+
+        For use from non-async contexts. Prefer fetch_world_news_async in async code.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're inside an async context but being called sync — schedule it
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(
+                        asyncio.run, cls.fetch_world_news_async(query, for_voice=for_voice)
+                    )
+                    return future.result(timeout=60)
+            else:
+                return loop.run_until_complete(
+                    cls.fetch_world_news_async(query, for_voice=for_voice)
+                )
+        except RuntimeError:
+            # No event loop
+            return asyncio.run(cls.fetch_world_news_async(query, for_voice=for_voice))
+
     @classmethod
     def _format_news_response(cls, articles: list[dict[str, Any]], query: str = "", use_html: bool = False, for_voice: bool = False) -> str:
-        """Format articles into readable text.
-        
+        """Format articles into readable text or HTML.
+
         Args:
             articles: List of article dictionaries
             query: Optional search query
-            use_html: If True, return HTML formatted text
-            for_voice: If True, return condensed format for TTS (headlines + sources only)
+            use_html: If True, return HTML formatted text with clickable links
+            for_voice: If True, return condensed natural format for TTS
         """
-        from datetime import datetime
-        
+        # HTML and voice are independent display formats.
+        # Check HTML first so callers can request both formats in one call.
         if use_html:
-            return cls._format_news_response_html(articles, query, for_voice=for_voice)
-        
+            return cls._format_news_response_html(articles, query)
         if for_voice:
             return cls._format_news_response_voice(articles, query)
-        
+        # Default: return plain text (URLs will be auto-linked by conversation panel)
+        return cls._format_news_response_plain(articles, query)
+
+    @classmethod
+    def _format_news_response_plain(cls, articles: list[dict[str, Any]], query: str = "") -> str:
+        """Plain text format: numbered headlines, short info, source/timestamp, Read more URL."""
         lines = []
-        
-        # Add fetch timestamp for verification
         fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
         if query:
             lines.append(f"Latest news about '{query}':")
         else:
             lines.append("Latest World News:")
-        
         lines.append(f"(Fetched: {fetch_time})\n")
-        
+
         for i, article in enumerate(articles, 1):
             lines.append(f"{i}. {article['title']}")
-            lines.append(f"   Source: {article['source']} • {article['time_ago']}")
-            if article['description']:
+            if article.get("description"):
                 lines.append(f"   {article['description']}")
-            if article['url']:
+            lines.append(f"   {article['source']} • {article['time_ago']}")
+            if article.get("url"):
                 lines.append(f"   Read more: {article['url']}")
             lines.append("")
-        
+
         return "\n".join(lines)
-    
+
     @classmethod
     def _format_news_response_voice(cls, articles: list[dict[str, Any]], query: str = "") -> str:
-        """Format articles into condensed text optimized for voice/TTS.
-        
-        Returns only headlines and sources for quick audio playback.
-        Full descriptions, timestamps, and metadata are omitted.
+        """Natural, concise voice format for Kokoro TTS.
+
+        Reads as: "Headline, from Source. Brief info. Next: Headline, from Source."
         """
-        lines = []
-        
-        # Just say the headlines with minimal attribution - no intro, no timestamps
-        for article in articles:
-            # Format: "Headline, from Source" - concise for voice
-            lines.append(f"{article['title']}, from {article['source']}.")
-        
-        return " ".join(lines)
-    
+        if not articles:
+            return "No news available at the moment."
+
+        parts = []
+        # Optional brief intro for voice (omitted to keep it snappy)
+        for i, article in enumerate(articles):
+            title = article.get("title", "")
+            source = article.get("source", "")
+            desc = article.get("description", "")
+
+            line = f"{title}, from {source}."
+            if desc and len(desc) > 20:
+                # Append brief description if meaningful
+                line += f" {desc}"
+            parts.append(line)
+
+        return " ".join(parts)
+
     @classmethod
-    def _format_news_response_html(cls, articles: list[dict[str, Any]], query: str = "", for_voice: bool = False) -> str:
-        """Format articles into HTML with clickable links.
-        
-        Args:
-            articles: List of article dictionaries
-            query: Optional search query
-            for_voice: If True, returns condensed format (headlines + sources only)
-        """
-        from datetime import datetime
-        import html
-        
-        lines = []
-        
-        if for_voice:
-            # Ultra-minimal for voice - just headlines and sources, no HTML wrappers
-            # This will be stripped of HTML anyway, so keep it simple
-            for article in articles:
-                title = html.escape(article['title'])
-                source = html.escape(article['source'])
-                lines.append(f"{title}, from {source}.")
-            return " ".join(lines)
-        
-        # Add fetch timestamp for verification (display only)
+    def _format_news_response_html(cls, articles: list[dict[str, Any]], query: str = "") -> str:
+        """HTML format with clickable Read more links for PySide6 QTextBrowser."""
         fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        if query:
-            lines.append(f"<p><b>Latest news about '{html.escape(query)}':</b></p>")
-        else:
-            lines.append("<p><b>Latest World News:</b></p>")
-        
-        lines.append(f'<p style="color: #666; font-size: 0.9em;">(Fetched: {fetch_time})</p>')
-        lines.append("")
-        
+        parts: list[str] = []
+
+        header = f"Latest news about '{html.escape(query)}':" if query else "Latest World News:"
+        parts.append(f'<p style="margin: 4px 0;"><b>{html.escape(header)}</b></p>')
+        parts.append(f'<p style="margin: 4px 0; color: #888; font-size: 0.85em;">(Fetched: {html.escape(fetch_time)})</p>')
+
         for i, article in enumerate(articles, 1):
-            title = html.escape(article['title'])
-            source = html.escape(article['source'])
-            time_ago = html.escape(article['time_ago'])
-            description = html.escape(article['description']) if article['description'] else ""
-            url = article['url']
-            
-            lines.append(f'<p><b>{i}. {title}</b><br>')
-            lines.append(f'   <span style="color: #666;">Source: {source} • {time_ago}</span><br>')
-            
+            title = html.escape(article.get("title", ""))
+            source = html.escape(article.get("source", ""))
+            time_ago = html.escape(article.get("time_ago", ""))
+            description = html.escape(article.get("description", ""))
+            url = article.get("url", "")
+
+            parts.append('<div style="margin: 10px 0; padding: 6px 0; border-bottom: 1px solid #3a4a5a;">')
+            parts.append(f'<p style="margin: 2px 0; font-size: 14px;"><b>{i}. {title}</b></p>')
+            parts.append(f'<p style="margin: 2px 0; color: #888; font-size: 0.85em;">Source: {source} • {time_ago}</p>')
             if description:
-                lines.append(f'   {description}<br>')
-            
+                parts.append(f'<p style="margin: 2px 0; color: #c8d0d6;">{description}</p>')
             if url:
-                # Create clickable link
                 safe_url = html.escape(url)
-                lines.append(f'   <a href="{safe_url}" style="color: #0066cc; text-decoration: underline;">Read more</a>')
-            
-            lines.append('</p>')
-        
-        return "\n".join(lines)
+                parts.append(
+                    f'<p style="margin: 2px 0;">'
+                    f'<a href="{safe_url}" style="color: #66b3ff; text-decoration: underline;">Read more</a>'
+                    f'</p>'
+                )
+            parts.append('</div>')
+
+        body = "\n".join(parts)
+        return (
+            '<html><body style="font-family: sans-serif; font-size: 13px; color: #d8e0e6;">'
+            f'{body}'
+            '</body></html>'
+        )
 
 
 class NewsAPIProvider:
     """Fetch news from NewsAPI (requires API key)."""
-    
+
     DEFAULT_API_BASE = "https://newsapi.org/v2"
     TIMEOUT = 15.0
     MAX_ARTICLES = 10
-    
+
     @classmethod
     def fetch_world_news(cls, query: str = "", api_key: str = "", for_voice: bool = False) -> NewsResult:
         """
         Fetch latest world news from NewsAPI.
-        
+
         Args:
             query: Optional search query
             api_key: NewsAPI key (or from NEWSAPI_API_KEY env var)
             for_voice: If True, return condensed format optimized for TTS
-            
+
         Returns:
-            NewsResult with formatted news text
+            NewsResult with news articles
         """
         api_key = api_key or os.environ.get("NEWSAPI_API_KEY", "").strip()
         if not api_key:
@@ -527,17 +595,16 @@ class NewsAPIProvider:
                 source="newsapi",
                 error="NewsAPI key not configured (set NEWSAPI_API_KEY environment variable)"
             )
-        
-        # Build request URL
+
         if query:
             endpoint = f"{cls.DEFAULT_API_BASE}/everything"
             params = f"?q={urllib.parse.quote(query)}&sortBy=publishedAt&language=en&pageSize={cls.MAX_ARTICLES}"
         else:
             endpoint = f"{cls.DEFAULT_API_BASE}/top-headlines"
             params = f"?category=general&language=en&pageSize={cls.MAX_ARTICLES}"
-        
+
         url = f"{endpoint}{params}&apiKey={api_key}"
-        
+
         request = urllib.request.Request(
             url,
             headers={
@@ -546,7 +613,7 @@ class NewsAPIProvider:
             },
             method="GET",
         )
-        
+
         try:
             with urllib.request.urlopen(request, timeout=cls.TIMEOUT) as response:
                 data = json.loads(response.read().decode("utf-8"))
@@ -564,7 +631,7 @@ class NewsAPIProvider:
                 source="newsapi",
                 error=f"NewsAPI request failed: {e}"
             )
-        
+
         if data.get("status") != "ok":
             return NewsResult(
                 ok=False,
@@ -572,7 +639,7 @@ class NewsAPIProvider:
                 source="newsapi",
                 error=f"NewsAPI error: {data.get('message', 'Unknown error')}"
             )
-        
+
         articles = data.get("articles", [])
         if not articles:
             return NewsResult(
@@ -581,54 +648,64 @@ class NewsAPIProvider:
                 source="newsapi",
                 error="No articles found"
             )
-        
-        # Format articles
+
         formatted_articles = []
         for article in articles:
             pub_date = article.get("publishedAt", "")
+            desc = article.get("description", "") or ""
+            if len(desc) > 220:
+                sentence_end = desc.find('. ', 100, 220)
+                if sentence_end == -1:
+                    sentence_end = desc.rfind(' ', 180, 220)
+                if sentence_end == -1:
+                    sentence_end = 200
+                desc = desc[:sentence_end].rstrip() + "."
+
             formatted_articles.append({
                 "title": article.get("title", ""),
-                "description": article.get("description", ""),
+                "description": desc,
                 "url": article.get("url", ""),
                 "source": article.get("source", {}).get("name", "Unknown"),
                 "published": pub_date,
                 "time_ago": _format_time_ago(pub_date),
                 "timestamp": pub_date,
             })
-        
-        formatted = RSSNewsProvider._format_news_response(formatted_articles, query, use_html=True, for_voice=for_voice)
-        
+
+        formatted = RSSNewsProvider._format_news_response(formatted_articles, query, use_html=False, for_voice=for_voice)
+        html_formatted = RSSNewsProvider._format_news_response(formatted_articles, query, use_html=True, for_voice=for_voice)
+
         return NewsResult(
             ok=True,
             text=formatted,
             source="newsapi",
-            articles=formatted_articles
+            articles=formatted_articles,
+            html_text=html_formatted,
         )
 
 
 class NewsProvider:
     """
     Unified news provider that tries multiple sources.
-    
+
     Usage:
-        result = NewsProvider.fetch_news("latest world news")
+        result = await NewsProvider.fetch_news("latest world news")
         if result.ok:
             print(result.text)
     """
-    
+
     @classmethod
-    def fetch_news(cls, query: str = "", for_voice: bool = False) -> NewsResult:
+    async def fetch_news(cls, query: str = "", for_voice: bool = False) -> NewsResult:
         """
         Fetch news using best available source.
-        
+
         Priority:
         1. NewsAPI (if API key configured)
         2. RSS feeds (no API key needed)
-        
+
         Args:
             query: Search query (e.g., "world news", "technology", "sports")
             for_voice: If True, return condensed format optimized for TTS
-            
+
         Returns:
             NewsResult with news articles
         """
@@ -637,14 +714,13 @@ class NewsProvider:
             result = NewsAPIProvider.fetch_world_news(query, for_voice=for_voice)
             if result.ok:
                 return result
-        
-        # Fallback to RSS feeds
-        return RSSNewsProvider.fetch_world_news(query, for_voice=for_voice)
-    
+
+        # Fallback to RSS feeds (async, parallel, always fresh)
+        return await RSSNewsProvider.fetch_world_news_async(query, for_voice=for_voice)
+
     @classmethod
     def is_available(cls) -> bool:
         """Check if news fetching is available."""
-        # RSS feeds are always available (unless network is down)
         return True
 
 
@@ -652,20 +728,19 @@ class NewsProvider:
 def fetch_latest_news(query: str = "") -> str:
     """
     Fetch latest news and return formatted text.
-    
+
     Args:
         query: Optional search query
-        
+
     Returns:
         Formatted news text or error message
     """
-    result = NewsProvider.fetch_news(query)
+    result = asyncio.run(NewsProvider.fetch_news(query))
     if result.ok:
         return result.text
     return f"Sorry, I couldn't fetch the news right now. {result.error}"
 
 
 if __name__ == "__main__":
-    # Test the news provider
     print("Fetching latest world news...\n")
     print(fetch_latest_news())

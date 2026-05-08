@@ -31,9 +31,12 @@ RUNTIME_CONTROL = LUCY_V8 / "tools" / "runtime_control.py"
 
 def set_memory_toggle(value: str):
     """Set memory toggle via runtime_control."""
+    env = os.environ.copy()
+    env["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "0"
+    env["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_V8)
     result = subprocess.run(
         [sys.executable, str(RUNTIME_CONTROL), "set-memory", "--value", value],
-        capture_output=True, text=True
+        capture_output=True, text=True, env=env,
     )
     return result.returncode == 0
 

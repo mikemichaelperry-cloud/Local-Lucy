@@ -40,6 +40,15 @@ export LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
 export LUCY_ENABLE_INTERNET=1
 export LUCY_SESSION_MEMORY=1
 
+# GPU memory optimization: enable Flash Attention for Ollama
+# Reduces VRAM usage for transformer attention without accuracy loss
+export OLLAMA_FLASH_ATTENTION=1
+
+# Force TTS (Kokoro) to CPU to free GPU memory for LLM inference
+# On RTX 3060 12GB, this prevents OOM when qwen3 14B is loaded alongside STT
+# NOTE: local-lucy now uses qwen3:14b (rebuilt from llama3.1:8b on 2026-05-06)
+export LUCY_VOICE_KOKORO_DEVICE=cpu
+
 # Voice STT (Whisper) library path
 export LD_LIBRARY_PATH="${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src:${LD_LIBRARY_PATH:-}"
 
@@ -51,6 +60,57 @@ else
     APP_PYTHON="/usr/bin/python3"
 fi
 
-# Launch HMI
+# =============================================================================
+# STALE STATE SANITIZATION
+# Cached state files can hold values from previous runs (e.g., tts_device,
+# stt_backend) that conflict with current env vars. Clearing them on startup
+# guarantees ground-truth detection on first use.
+# =============================================================================
+
+# Clear stale voice runtime cache (contains tts_device, stt_device, etc.)
+for _vr_candidate in \
+    "${LUCY_VOICE_RUNTIME_FILE}" \
+    "${LUCY_RUNTIME_NAMESPACE_ROOT}/state/voice_runtime.json" \
+    "${LUCY_RUNTIME_AUTHORITY_ROOT}/state/voice_runtime.json"
+do
+    if [ -f "${_vr_candidate}" ]; then
+        rm -f "${_vr_candidate}"
+    fi
+done
+
+# Clear stale semantic interpreter backend cache
+for _si_candidate in \
+    "${SCRIPT_DIR}/state/semantic_interpreter_backend.json" \
+    "${LUCY_RUNTIME_NAMESPACE_ROOT}/state/semantic_interpreter_backend.json" \
+    "${LUCY_RUNTIME_AUTHORITY_ROOT}/state/semantic_interpreter_backend.json"
+do
+    if [ -f "${_si_candidate}" ]; then
+        rm -f "${_si_candidate}"
+    fi
+done
+
+# Clear stale worker PID / socket files
+rm -f "${LUCY_RUNTIME_AUTHORITY_ROOT}/tmp/run/whisper_worker.pid"
+rm -f "${LUCY_RUNTIME_AUTHORITY_ROOT}/tmp/run/kokoro_tts_worker.sock"
+
+# =============================================================================
+# STARTUP VALIDATION
+# =============================================================================
+
+# Warn if current_state.json model conflicts with LUCY_LOCAL_MODEL env var.
+# This is a common silent misconfiguration: the env says one thing, the
+# persistent state file says another, and the state file wins at runtime.
+_state_file="${LUCY_RUNTIME_NAMESPACE_ROOT}/state/current_state.json"
+if [ -f "${_state_file}" ]; then
+    _state_model=$(python3 -c "import sys,json; print(json.load(open('${_state_file}')).get('model',''))" 2>/dev/null || true)
+    if [ -n "${_state_model}" ] && [ "${_state_model}" != "${LUCY_LOCAL_MODEL}" ]; then
+        echo "[START_LUCY] WARNING: current_state.json model='${_state_model}' differs from LUCY_LOCAL_MODEL='${LUCY_LOCAL_MODEL}'"
+        echo "[START_LUCY] The state file value will be used. Run: python3 tools/runtime_control.py set-model --value ${LUCY_LOCAL_MODEL}"
+    fi
+fi
+
+# =============================================================================
+# LAUNCH HMI
+# =============================================================================
 cd ui-v8
 exec "$APP_PYTHON" -m app.main "$@"

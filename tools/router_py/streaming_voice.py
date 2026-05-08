@@ -489,7 +489,7 @@ class StreamingVoicePipeline:
             policy = normalize_augmentation_policy(
                 os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
             )
-            decision = select_route(classification, policy=policy)
+            decision = select_route(classification, policy=policy, query=query)
             
             # Map mode setting to forced_mode for execution engine
             mode = os.environ.get("LUCY_MODE", "auto").lower()
@@ -819,6 +819,9 @@ class StreamingVoicePipeline:
             print(f"[TTS Debug] Worker socket not found, skipping synthesis")
             return b""
         
+        tmp_path: str | None = None
+        wav_path: str | None = None
+        sock: socket.socket | None = None
         try:
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
                 tmp_path = tmp.name
@@ -839,7 +842,6 @@ class StreamingVoicePipeline:
             
             sock.send(json.dumps(request).encode() + b'\n')
             response_data = sock.recv(4096).decode()
-            sock.close()
             
             response = json.loads(response_data)
             
@@ -856,11 +858,6 @@ class StreamingVoicePipeline:
             with wave.open(wav_path, 'rb') as wav:
                 source_rate = wav.getframerate()
                 pcm_data = wav.readframes(wav.getnframes())
-            
-            try:
-                Path(wav_path).unlink()
-            except:
-                pass
             
             # Resample if needed (Kokoro outputs 24kHz, aplay expects 22050 Hz)
             if source_rate != self.sample_rate:
@@ -889,6 +886,22 @@ class StreamingVoicePipeline:
         except Exception as e:
             print(f"[TTS Debug] Worker error: {e}")
             return b""
+        finally:
+            if sock is not None:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+            if wav_path is not None:
+                try:
+                    Path(wav_path).unlink()
+                except Exception:
+                    pass
+            if tmp_path is not None:
+                try:
+                    Path(tmp_path).unlink()
+                except Exception:
+                    pass
     
     async def _synthesize_subprocess_to_pcm(self, text: str) -> bytes:
         """Fallback subprocess synthesis."""

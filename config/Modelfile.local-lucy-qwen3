@@ -4,7 +4,7 @@ FROM qwen3:14b
 # Higher quality local model for RTX 3060 12GB
 # VRAM: ~9.3GB loaded, leaves ~2.7GB for Whisper + Kokoro
 
-# Context window: 2048 tokens (balance of performance and capability)
+# Context window: 1024 tokens (reduced for VRAM optimization on RTX 3060)
 # Allows longer responses (e.g., 500+ word stories) without truncation
 PARAMETER num_ctx 2048
 

@@ -600,47 +600,68 @@ class ConsolidatedRuntimeBridge:
         
         Mirrors functionality of runtime_control.py's update_state_field.
         Updates both state file AND environment variables that backend uses.
+        Uses file locking and atomic writes to prevent corruption under concurrency.
         """
         from app.services.runtime_bridge import CommandResult
         from pathlib import Path
         from datetime import datetime, timezone
         import json
+        import fcntl
+        import tempfile
+        import os as _os
         
         # Resolve state file path
         state_file = self._resolve_state_file()
+        lock_file = state_file.with_suffix(state_file.suffix + ".lock")
         
         try:
-            # Read current state
-            if state_file.exists():
-                with open(state_file, "r", encoding="utf-8") as f:
-                    state = json.load(f)
-            else:
-                state = {}
-            
-            # Update the field
-            state[field] = value
-            state["last_updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            
-            # Update environment variables that the backend ACTUALLY uses
-            # These must match what ensure_control_env() and execution engine expect
-            env_var_map = {
-                "evidence": ("LUCY_EVIDENCE_ENABLED", lambda v: "1" if v in ("on", "true", "1") else "0"),
-                "augmentation_policy": ("LUCY_AUGMENTATION_POLICY", lambda v: v),
-                "augmented_provider": ("LUCY_AUGMENTED_PROVIDER", lambda v: v),
-                "mode": ("LUCY_MODE", lambda v: v),
-                "conversation": ("LUCY_CONVERSATION_MODE_FORCE", lambda v: "1" if v in ("on", "true", "1") else "0"),
-                "memory": ("LUCY_SESSION_MEMORY", lambda v: "1" if v in ("on", "true", "1") else "0"),
-                "voice": ("LUCY_VOICE_ENABLED", lambda v: "1" if v in ("on", "true", "1") else "0"),
-                "approval_required": ("LUCY_APPROVAL_REQUIRED", lambda v: "1" if v in ("on", "true", "1") else "0"),
-            }
-            if field in env_var_map:
-                env_var, transform = env_var_map[field]
-                os.environ[env_var] = transform(value)
-            
-            # Write state back
-            state_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(state_file, "w", encoding="utf-8") as f:
-                json.dump(state, f, indent=2, sort_keys=True)
+            # Acquire exclusive file lock and perform atomic read-modify-write
+            lock_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(lock_file, "a+", encoding="utf-8") as lock_handle:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+                try:
+                    # Read current state
+                    if state_file.exists():
+                        with open(state_file, "r", encoding="utf-8") as f:
+                            state = json.load(f)
+                    else:
+                        state = {}
+                    
+                    # Update the field
+                    state[field] = value
+                    state["last_updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    
+                    # Update environment variables that the backend ACTUALLY uses
+                    env_var_map = {
+                        "evidence": ("LUCY_EVIDENCE_ENABLED", lambda v: "1" if v in ("on", "true", "1") else "0"),
+                        "augmentation_policy": ("LUCY_AUGMENTATION_POLICY", lambda v: v),
+                        "augmented_provider": ("LUCY_AUGMENTED_PROVIDER", lambda v: v),
+                        "mode": ("LUCY_MODE", lambda v: v),
+                        "conversation": ("LUCY_CONVERSATION_MODE_FORCE", lambda v: "1" if v in ("on", "true", "1") else "0"),
+                        "memory": ("LUCY_SESSION_MEMORY", lambda v: "1" if v in ("on", "true", "1") else "0"),
+                        "voice": ("LUCY_VOICE_ENABLED", lambda v: "1" if v in ("on", "true", "1") else "0"),
+                        "approval_required": ("LUCY_APPROVAL_REQUIRED", lambda v: "1" if v in ("on", "true", "1") else "0"),
+                    }
+                    if field in env_var_map:
+                        env_var, transform = env_var_map[field]
+                        _os.environ[env_var] = transform(value)
+                    
+                    # Write state back atomically
+                    state_file.parent.mkdir(parents=True, exist_ok=True)
+                    with tempfile.NamedTemporaryFile(
+                        "w",
+                        encoding="utf-8",
+                        dir=state_file.parent,
+                        delete=False,
+                        prefix=".current_state.",
+                        suffix=".tmp",
+                    ) as handle:
+                        json.dump(state, handle, indent=2, sort_keys=True)
+                        handle.write("\n")
+                        tmp_path = Path(handle.name)
+                    _os.replace(tmp_path, state_file)
+                finally:
+                    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
             
             return CommandResult(
                 action=f"set_{field}",

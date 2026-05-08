@@ -283,7 +283,8 @@ class TestGenerationProfiles(unittest.TestCase):
             "LOCAL", "CHAT", "what is Python"
         )
         self.assertEqual(name, "chat")
-        self.assertEqual(num_predict, 192)  # Default num_predict_chat
+        # num_predict_chat default raised for qwen3 (was 192)
+        self.assertEqual(num_predict, 256)
     
     def test_brief_profile(self):
         """Test brief request profile."""
@@ -291,7 +292,8 @@ class TestGenerationProfiles(unittest.TestCase):
             "LOCAL", "CHAT", "brief answer please"
         )
         self.assertEqual(name, "brief")
-        self.assertEqual(num_predict, 48)  # Default num_predict_brief
+        # num_predict_brief default raised for qwen3 (was 48)
+        self.assertEqual(num_predict, 128)
     
     def test_detail_profile(self):
         """Test detail request profile."""
@@ -299,7 +301,8 @@ class TestGenerationProfiles(unittest.TestCase):
             "LOCAL", "CHAT", "explain in detail"
         )
         self.assertEqual(name, "detail")
-        self.assertEqual(num_predict, 384)  # Default num_predict_detail
+        # num_predict_detail default raised for qwen3 (was 384)
+        self.assertEqual(num_predict, 768)
     
     def test_augmented_profile(self):
         """Test AUGMENTED route profile."""
@@ -307,7 +310,8 @@ class TestGenerationProfiles(unittest.TestCase):
             "AUGMENTED", "CHAT", "what is Python"
         )
         self.assertEqual(name, "augmented")
-        self.assertEqual(num_predict, 32)  # Default num_predict_augmented_default
+        # num_predict_augmented_default raised for qwen3 (was 32)
+        self.assertEqual(num_predict, 128)
 
 
 class Test807Questions(unittest.TestCase):
@@ -439,24 +443,30 @@ class TestCompletionGuards(unittest.TestCase):
     
     def test_remove_dangling_conjunction(self):
         """Test removal of dangling conjunctions."""
-        text = self.answer._apply_augmented_completion_guard("This is a test and.")
+        text, triggered, reason = self.answer._apply_augmented_completion_guard("This is a test and.")
         self.assertEqual(text, "This is a test.")
+        self.assertTrue(triggered)
+        self.assertEqual(reason, "removed_dangling_conjunction")
         
-        text = self.answer._apply_augmented_completion_guard("This is a test, or.")
+        text, triggered, reason = self.answer._apply_augmented_completion_guard("This is a test, or.")
         self.assertEqual(text, "This is a test.")
     
     def test_close_truncated(self):
         """Test closing truncated sentences."""
-        text = self.answer._apply_augmented_completion_guard("This is incomplete")
+        text, triggered, reason = self.answer._apply_augmented_completion_guard("This is incomplete")
         self.assertTrue(text.endswith("."))
+        self.assertTrue(triggered)
+        self.assertEqual(reason, "closed_truncated_fragment")
     
     def test_trim_to_sentence(self):
         """Test trimming to last complete sentence."""
-        text = self.answer._apply_augmented_completion_guard(
+        text, triggered, reason = self.answer._apply_augmented_completion_guard(
             "First sentence here. Second sentence that is long enough to be kept. Extra incomplete"
         )
         self.assertIn("Second sentence", text)
         self.assertNotIn("Extra incomplete", text)
+        self.assertTrue(triggered)
+        self.assertEqual(reason, "trimmed_to_last_complete_sentence")
 
 
 class TestIntegration(unittest.TestCase):

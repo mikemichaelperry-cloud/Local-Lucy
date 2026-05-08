@@ -417,7 +417,7 @@ def test_full_python_route_appends_medical_sources_for_medical_augmented_answer(
     intent = create_test_classification()
     route = create_test_route_augmented()
 
-    async def fake_fetch(_question, _route):
+    async def fake_fetch(_question, _route, for_voice=False):
         return {"context": "medical context", "title": "Tadalafil", "url": "https://example.test"}
 
     async def fake_call_provider(_provider, _prompt, _context):
@@ -446,7 +446,7 @@ def test_full_python_route_does_not_append_medical_sources_for_non_medical_answe
     intent = create_test_classification()
     route = create_test_route_augmented()
 
-    async def fake_fetch(_question, _route):
+    async def fake_fetch(_question, _route, for_voice=False):
         return {"context": "general context", "title": "Ada Lovelace", "url": "https://example.test"}
 
     async def fake_call_provider(_provider, _prompt, _context):

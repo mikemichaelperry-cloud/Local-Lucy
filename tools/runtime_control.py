@@ -152,7 +152,7 @@ def build_parser() -> argparse.ArgumentParser:
     model_parser.add_argument(
         "--value",
         required=True,
-        choices=("local-lucy", "local-lucy-qwen3"),
+        choices=("local-lucy",),
     )
 
     return parser
@@ -391,7 +391,13 @@ def normalize_state(payload: dict[str, Any] | None) -> dict[str, Any]:
             else:
                 extras[key] = value
 
-    state["schema_version"] = 1
+    # Preserve existing schema_version for forward compatibility; only default to 1
+    # if missing or invalid. This allows newer schemas to coexist with older tools.
+    existing_version = payload.get("schema_version") if isinstance(payload, dict) else None
+    try:
+        state["schema_version"] = int(existing_version) if existing_version is not None else 1
+    except (ValueError, TypeError):
+        state["schema_version"] = 1
     state["profile"] = clean_text(state.get("profile")) or default_state()["profile"]
     state["mode"] = coerce_mode(state.get("mode"))
     state["conversation"] = coerce_toggle(state.get("conversation"))

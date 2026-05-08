@@ -135,7 +135,7 @@ def _is_category_supported(intent_family: str, question: str) -> tuple[str | Non
     
     # Check for news queries
     news_keywords = ['news', 'headline', 'headlines', 'breaking', 'latest news', 'world news']
-    if intent_family == "current_evidence" or any(kw in q_lower for kw in news_keywords):
+    if any(kw in q_lower for kw in news_keywords):
         region = _detect_news_region(question)
         return (region, "news")
     

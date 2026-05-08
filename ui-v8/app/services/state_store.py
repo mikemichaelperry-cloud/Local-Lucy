@@ -210,6 +210,7 @@ STATE_FILES = {
         os.environ.get("LUCY_RUNTIME_LIFECYCLE_FILE", str(STATE_DIRECTORY / "runtime_lifecycle.json"))
     ).expanduser(),
     "voice_runtime": Path(os.environ.get("LUCY_VOICE_RUNTIME_FILE", str(STATE_DIRECTORY / "voice_runtime.json"))).expanduser(),
+    "voice_audio_levels": STATE_DIRECTORY / "voice_audio_levels.json",
 }
 REQUEST_RESULT_FILE = Path(
     os.environ.get("LUCY_RUNTIME_REQUEST_RESULT_FILE", str(STATE_DIRECTORY / "last_request_result.json"))
@@ -232,10 +233,17 @@ def load_runtime_snapshot() -> RuntimeSnapshot:
     health = _load_json(STATE_FILES["health"])
     lifecycle = _load_json(STATE_FILES["runtime_lifecycle"])
     voice_runtime = _load_json(STATE_FILES["voice_runtime"])
+    voice_audio_levels = _load_json(STATE_FILES["voice_audio_levels"])
     lifecycle_status = _resolve_value(lifecycle, (("status",),))
     lifecycle_running = _resolve_lifecycle_running(lifecycle)
     lifecycle_pid = _resolve_lifecycle_pid(lifecycle)
     voice_runtime_data = _normalize_voice_runtime(voice_runtime)
+    # Merge audio levels into voice runtime for HMI VU meter display
+    if voice_audio_levels.status == "ok" and isinstance(voice_audio_levels.data, dict):
+        voice_runtime_data["input_level"] = int(voice_audio_levels.data.get("input_level", 0))
+        voice_runtime_data["output_level"] = int(voice_audio_levels.data.get("output_level", 0))
+        voice_runtime_data["recording"] = bool(voice_audio_levels.data.get("recording", False))
+        voice_runtime_data["playing"] = bool(voice_audio_levels.data.get("playing", False))
 
     top_status = {
         "Profile": _resolve_value(current_state, (("profile",), ("active_profile",))),
@@ -259,7 +267,9 @@ def load_runtime_snapshot() -> RuntimeSnapshot:
             (("status",),),
             fallback_result=health,
             fallback_paths=(("overall_status",), ("status",)),
-        ),
+        )
+        if lifecycle.status == "ok" or health.status == "ok"
+        else _resolve_value(current_state, (("status",),)),
     }
 
     runtime_status = {
@@ -288,7 +298,9 @@ def load_runtime_snapshot() -> RuntimeSnapshot:
             lifecycle_status=lifecycle_status,
             lifecycle_running=lifecycle_running,
             lifecycle_pid=lifecycle_pid,
-            fallback=_resolve_value(health, (("health",), ("status",), ("overall_status",))),
+            fallback=_resolve_value(health, (("health",), ("status",), ("overall_status",)))
+            if health.status == "ok"
+            else _resolve_value(current_state, (("status",),)),
         ),
     }
 
@@ -388,12 +400,18 @@ def build_request_details(entry: dict[str, Any] | None) -> dict[str, Any] | None
 def resolve_last_request_provider(payload: dict[str, Any] | None) -> str:
     if not isinstance(payload, dict):
         return "unknown"
+    # Check outcome first (augmented routes)
     outcome = payload.get("outcome")
-    if not isinstance(outcome, dict):
-        return "unknown"
-    provider = _stringify(outcome.get("augmented_provider_used") or outcome.get("augmented_provider")).lower()
-    if provider in {"openai", "kimi", "wikipedia", "none"}:
-        return provider
+    if isinstance(outcome, dict):
+        provider = _stringify(outcome.get("augmented_provider_used") or outcome.get("augmented_provider")).lower()
+        if provider in {"openai", "kimi", "wikipedia", "none"}:
+            return provider
+    # Fallback to route.provider (local, news, time routes)
+    route = payload.get("route")
+    if isinstance(route, dict):
+        provider = _stringify(route.get("provider")).lower()
+        if provider in {"openai", "kimi", "wikipedia", "news", "local", "none"}:
+            return provider
     return "unknown"
 
 
@@ -445,6 +463,7 @@ def _normalize_voice_runtime(result: FileLoadResult) -> dict[str, Any]:
         "last_updated": _stringify(data.get("last_updated")) if data.get("last_updated") else "",
         "recorder": _stringify(data.get("recorder")) if data.get("recorder") else "unknown",
         "stt": _stringify(data.get("stt")) if data.get("stt") else "unknown",
+        "stt_device": _stringify(data.get("stt_device")) if data.get("stt_device") else "unknown",
         "tts": _stringify(data.get("tts")) if data.get("tts") else "none",
         "tts_device": _stringify(data.get("tts_device")) if data.get("tts_device") else "none",
         "audio_player": _stringify(data.get("audio_player")) if data.get("audio_player") else "none",
@@ -469,6 +488,7 @@ def _resolve_voice_backend(voice_runtime: dict[str, Any], voice_status: str) -> 
             f"available={'yes' if voice_runtime.get('available') else 'no'}",
             f"recorder={voice_runtime.get('recorder', 'unknown')}",
             f"stt={voice_runtime.get('stt', 'unknown')}",
+            f"stt_device={voice_runtime.get('stt_device', 'unknown')}",
             f"tts={voice_runtime.get('tts', 'none')}",
             f"tts_device={voice_runtime.get('tts_device', 'none')}",
         ]
@@ -491,8 +511,8 @@ def _resolve_selected_provider_paid(current_state: FileLoadResult) -> str:
     provider = _stringify(provider_value).lower()
     if provider in {"openai", "kimi"}:
         return "yes"
-    if provider == "wikipedia":
-        return "no"
+    if provider in {"wikipedia", "none"}:
+        return "Free"
     return "unknown"
 
 

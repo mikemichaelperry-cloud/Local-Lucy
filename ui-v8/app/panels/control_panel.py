@@ -18,7 +18,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.ui_levels import ENGINEERING, level_at_least
+from app.ui_levels import ENGINEERING, POWER, level_at_least
+from app.widgets.vu_meter import VoiceVUMeter
 
 
 class ControlPanel(QFrame):
@@ -37,6 +38,12 @@ class ControlPanel(QFrame):
     ptt_pressed_requested = Signal()
     ptt_released_requested = Signal()
     reload_profile_requested = Signal()
+    shutdown_requested = Signal()
+
+    # Model label mapping: backend value → display label
+    _MODEL_LABELS: dict[str, str] = {
+        "local-lucy": "local-lucy (qwen3 14B)",
+    }
 
     def __init__(self) -> None:
         super().__init__()
@@ -55,9 +62,11 @@ class ControlPanel(QFrame):
         self._voice_ptt_status_label: QLabel | None = None
         self._voice_status_group: QGroupBox | None = None
         self._voice_stage_label: QLabel | None = None
+        self._voice_stt_label: QLabel | None = None
         self._voice_tts_label: QLabel | None = None
         self._voice_progress: QProgressBar | None = None
         self._voice_transcription_preview: QLabel | None = None
+        self._voice_vu_meter: VoiceVUMeter | None = None
         self._reload_profile_button: QPushButton | None = None
         self._profile_value_label: QLabel | None = None
         self._copy_button: QPushButton | None = None
@@ -176,7 +185,7 @@ class ControlPanel(QFrame):
         self._augmented_provider_selector.activated.connect(self._handle_augmented_provider_activated)
 
         self._model_selector = QComboBox()
-        self._model_selector.addItems(["local-lucy", "local-lucy-qwen3"])
+        self._model_selector.addItems(list(self._MODEL_LABELS.values()))
         self._model_selector.activated.connect(self._handle_model_activated)
 
         layout.addWidget(self._build_labeled_row("model", self._model_selector))
@@ -186,7 +195,6 @@ class ControlPanel(QFrame):
         layout.addWidget(self._build_labeled_row("voice", self._voice_selector))
         layout.addWidget(self._build_labeled_row("augmented policy", self._augmentation_policy_selector))
         layout.addWidget(self._build_labeled_row("augmented provider", self._augmented_provider_selector))
-
         note = QLabel("Feature toggles unavailable.")
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -244,6 +252,15 @@ class ControlPanel(QFrame):
         stage_row.addStretch(1)
         layout.addLayout(stage_row)
 
+        # STT Engine indicator
+        stt_row = QHBoxLayout()
+        self._voice_stt_label = QLabel("🎤 STT: detecting...")
+        self._voice_stt_label.setObjectName("voiceSttLabel")
+        self._voice_stt_label.setStyleSheet("color: #7f8d97; font-size: 11px;")
+        stt_row.addWidget(self._voice_stt_label)
+        stt_row.addStretch(1)
+        layout.addLayout(stt_row)
+
         # TTS Engine indicator (Kokoro vs Piper)
         tts_row = QHBoxLayout()
         self._voice_tts_label = QLabel("🔊 TTS: detecting...")
@@ -261,6 +278,10 @@ class ControlPanel(QFrame):
         self._voice_progress.setFixedHeight(6)
         layout.addWidget(self._voice_progress)
 
+        # VU meters for input/output audio levels
+        self._voice_vu_meter = VoiceVUMeter()
+        layout.addWidget(self._voice_vu_meter)
+
         # Transcription preview
         self._voice_transcription_preview = QLabel("")
         self._voice_transcription_preview.setObjectName("cardValue")
@@ -273,7 +294,7 @@ class ControlPanel(QFrame):
 
     def update_voice_pipeline_status(self, stage: str, progress: float, transcription: str = "") -> None:
         """Update voice pipeline status display.
-        
+
         Args:
             stage: Pipeline stage (idle, recording, transcribing, processing, speaking, error)
             progress: Progress value 0.0-1.0
@@ -290,7 +311,7 @@ class ControlPanel(QFrame):
             "speaking": "🟢 Speaking...",
             "error": "❌ Error",
         }
-        
+
         stage_colors = {
             "idle": "#7f8d97",
             "recording": "#e74c3c",
@@ -302,7 +323,7 @@ class ControlPanel(QFrame):
 
         display_stage = stage_names.get(stage, f"⚪ {stage}")
         self._voice_stage_label.setText(display_stage)
-        
+
         # Update progress bar
         self._voice_progress.setValue(int(progress * 100))
         color = stage_colors.get(stage, "#7f8d97")
@@ -401,12 +422,18 @@ class ControlPanel(QFrame):
         open_state_button.clicked.connect(self.open_state_requested.emit)
         self._open_state_button = open_state_button
 
+        shutdown_button = QPushButton("Shutdown Local Lucy")
+        shutdown_button.setObjectName("shutdownButton")
+        shutdown_button.clicked.connect(self.shutdown_requested.emit)
+        self._shutdown_button = shutdown_button
+
         layout.addWidget(refresh_button)
         layout.addWidget(copy_button)
         layout.addWidget(open_logs_button)
         layout.addWidget(open_state_button)
+        layout.addWidget(shutdown_button)
 
-        note = QLabel("These actions are UI-local or read-safe only.")
+        note = QLabel("UI-local actions. Shutdown closes the console.")
         note.setWordWrap(True)
         layout.addWidget(note)
         self._safe_actions_note = note
@@ -446,6 +473,7 @@ class ControlPanel(QFrame):
 
     def set_interface_level(self, level: str) -> None:
         show_profile_group = level_at_least(level, ENGINEERING)
+        show_power_widgets = level_at_least(level, POWER)
         for group in (
             self._mode_group,
             self._feature_group,
@@ -465,7 +493,7 @@ class ControlPanel(QFrame):
             self._safe_actions_note,
         ):
             if widget is not None:
-                widget.setVisible(level == ENGINEERING)
+                widget.setVisible(show_power_widgets)
 
     def update_control_state(self, top_status: dict[str, str], current_state: dict[str, Any] | None = None) -> None:
         values = {
@@ -507,18 +535,20 @@ class ControlPanel(QFrame):
         self._voice_status_group.setVisible(voice_enabled)
         if not voice_enabled:
             self._stop_voice_pulse()
+            if self._voice_vu_meter is not None:
+                self._voice_vu_meter.reset()
             return
 
         # Get pipeline state from runtime
         stage = str(self._voice_runtime.get("pipeline_stage", "idle")).lower()
         progress = float(self._voice_runtime.get("pipeline_progress", 0.0))
         transcription = str(self._voice_runtime.get("transcription_preview", ""))
-        
+
         # Derive stage from runtime state if not explicitly set
         status = str(self._voice_runtime.get("status", "unknown")).lower()
         listening = bool(self._voice_runtime.get("listening", False))
         processing = bool(self._voice_runtime.get("processing", False))
-        
+
         if stage == "idle":
             if listening:
                 stage = "recording"
@@ -528,14 +558,41 @@ class ControlPanel(QFrame):
                 progress = max(progress, 0.5)
             elif status in ("fault", "error"):
                 stage = "error"
-        
+
         self.update_voice_pipeline_status(stage, progress, transcription)
-        
+
+        # Update VU meters from audio levels
+        if self._voice_vu_meter is not None:
+            input_level = int(self._voice_runtime.get("input_level", 0))
+            output_level = int(self._voice_runtime.get("output_level", 0))
+            self._voice_vu_meter.set_input_level(input_level)
+            self._voice_vu_meter.set_output_level(output_level)
+
+        # Update STT engine indicator
+        if self._voice_stt_label is not None:
+            stt_engine = str(self._voice_runtime.get("stt", "unknown")).lower()
+            stt_device = str(self._voice_runtime.get("stt_device", "unknown")).lower()
+            if stt_engine == "whisper":
+                device_label = stt_device if stt_device not in {"none", "unknown", ""} else "CPU"
+                self._voice_stt_label.setText(f"🎤 STT: Whisper ({device_label.upper()})")
+                self._voice_stt_label.setStyleSheet("color: #2ecc71; font-size: 11px; font-weight: bold;")
+            elif stt_engine == "vosk":
+                self._voice_stt_label.setText("🎤 STT: Vosk (CPU)")
+                self._voice_stt_label.setStyleSheet("color: #f1c40f; font-size: 11px;")
+            elif stt_engine in {"none", "unavailable", ""}:
+                self._voice_stt_label.setText("🎤 STT: unavailable")
+                self._voice_stt_label.setStyleSheet("color: #e74c3c; font-size: 11px;")
+            else:
+                self._voice_stt_label.setText(f"🎤 STT: {stt_engine}")
+                self._voice_stt_label.setStyleSheet("color: #7f8d97; font-size: 11px;")
+
         # Update TTS engine indicator
         if self._voice_tts_label is not None:
             tts_engine = str(self._voice_runtime.get("tts", "none")).lower()
+            tts_device = str(self._voice_runtime.get("tts_device", "none")).lower()
             if tts_engine == "kokoro":
-                self._voice_tts_label.setText("🔊 TTS: Kokoro (GPU)")
+                device_label = tts_device if tts_device != "none" else "GPU"
+                self._voice_tts_label.setText(f"🔊 TTS: Kokoro ({device_label.upper()})")
                 self._voice_tts_label.setStyleSheet("color: #2ecc71; font-size: 11px; font-weight: bold;")
             elif tts_engine == "piper":
                 self._voice_tts_label.setText("🔊 TTS: Piper (CPU)")
@@ -549,7 +606,11 @@ class ControlPanel(QFrame):
 
     def _set_selector_value(self, selector: QComboBox, value: str) -> None:
         selector.blockSignals(True)
-        index = selector.findText(value)
+        if selector is self._model_selector:
+            label = self._MODEL_LABELS.get(value, value)
+            index = selector.findText(label)
+        else:
+            index = selector.findText(value)
         if index >= 0:
             selector.setCurrentIndex(index)
         else:
@@ -586,9 +647,15 @@ class ControlPanel(QFrame):
         )
 
     def _handle_model_activated(self, index: int) -> None:
+        label = self._model_selector.itemText(index)
+        # Reverse lookup: find backend value from display label
+        model_value = next(
+            (k for k, v in self._MODEL_LABELS.items() if v == label),
+            label,
+        )
         self._emit_if_changed(
             "model",
-            self._model_selector.itemText(index),
+            model_value,
             self.model_change_requested,
         )
 

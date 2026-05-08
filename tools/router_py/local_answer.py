@@ -22,6 +22,7 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -36,10 +37,12 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Global lock to serialize Ollama API calls and prevent model unload/load races.
-# Threading lock (not asyncio) because _call_ollama may run in different event loops.
-import threading
 _ollama_call_lock = threading.Lock()
+
+
+async def _acquire_ollama_call_lock() -> None:
+    """Serialize Ollama calls across worker threads without blocking the event loop."""
+    await asyncio.to_thread(_ollama_call_lock.acquire)
 
 
 # Fixed policy responses
@@ -96,6 +99,7 @@ class LocalAnswerConfig:
     num_predict_conversation: int = 96
     num_predict_brief: int = 128
     num_predict_detail: int = 768
+    num_predict_long: int = 1536
     num_predict_clarify: int = 48
     num_predict_augmented_default: int = 128
     num_predict_augmented_brief: int = 64
@@ -105,8 +109,8 @@ class LocalAnswerConfig:
     prompt_guard_tokens: int = 700
     cache_enabled: bool = True
     cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "lucy" / "local_repeat")
-    cache_ttl_seconds: int = 60
-    cache_max_entries: int = 5
+    cache_ttl_seconds: int = 300
+    cache_max_entries: int = 100
     root_path: Path = field(default_factory=lambda: Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev")
     conversation_mode_active: bool = False
     conversation_mode_force: bool = False
@@ -138,12 +142,13 @@ class LocalAnswerConfig:
             num_predict_conversation=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CONVERSATION", "128")),
             num_predict_brief=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_BRIEF", "128")),
             num_predict_detail=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_DETAIL", "768")),
+            num_predict_long=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_LONG", "1536")),
             num_predict_clarify=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CLARIFY", "64")),
             prompt_guard_tokens=int(os.environ.get("LUCY_LOCAL_PROMPT_GUARD_TOKENS", "700")),
             cache_enabled=os.environ.get("LUCY_LOCAL_REPEAT_CACHE", "1").lower() in ("1", "true", "yes", "on"),
             cache_dir=Path(cache_dir) if cache_dir else (root / "cache" / "local_repeat"),
-            cache_ttl_seconds=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_TTL_S", "60")),
-            cache_max_entries=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_ENTRIES", "5")),
+            cache_ttl_seconds=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_TTL_S", "300")),
+            cache_max_entries=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_ENTRIES", "100")),
             root_path=root,
             conversation_mode_active=os.environ.get("LUCY_CONVERSATION_MODE_ACTIVE", "").lower() in ("1", "true", "yes", "on"),
             conversation_mode_force=os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "").lower() in ("1", "true", "yes", "on"),
@@ -520,7 +525,7 @@ class LocalAnswer:
         asks_michael = "who is michael" in q or "who am i" in q
         asks_racheli = "who is racheli" in q
         asks_relationship = "who are we" in q or "our relationship" in q
-        asks_oscar = "who is oscar" in q or ("oscar" in q.split() and "who" in q)
+        asks_oscar = "who is oscar" in q or "who's oscar" in q
         
         identity_loaded = "yes" if (asks_lucy or asks_michael or asks_racheli or asks_relationship) else "no"
         identity_source = "profile_default"
@@ -602,7 +607,24 @@ class LocalAnswer:
         output = output_mode.upper()
         q = self._normalize_query(query)
         
-        detail_patterns = [r'(in detail|detailed|deep dive|thorough|comprehensive|step by step|step-by-step|walk me through|with examples|give examples|more detail|more details|long answer|full answer|complete answer|full recipe|complete recipe|full guide|complete guide)']
+        # Detect explicit word-count requests (e.g., "500-word story", "1000 words")
+        word_match = re.search(r'(\d+)[\s\-]*(?:word|words)', q)
+        if word_match:
+            requested_words = int(word_match.group(1))
+            # Token estimate: ~1.5 tokens per word for output, but qwen3 uses
+            # "thinking" tokens internally, so we need ~2.5x to avoid truncation.
+            # Cap at num_predict_long to stay within the model's context window.
+            if route == "AUGMENTED":
+                max_tokens = self.config.num_predict_augmented_detail
+            else:
+                max_tokens = self.config.num_predict_long
+            num_predict = min(int(requested_words * 2.5), max_tokens)
+            return ("chat_long", num_predict, f"- Write approximately {requested_words} words.")
+        
+        detail_patterns = [
+            r'(in detail|detailed|deep dive|thorough|comprehensive|step by step|step-by-step|walk me through|with examples|give examples|more detail|more details|long answer|full answer|complete answer|full recipe|complete recipe|full guide|complete guide)',
+            r'\b(novel|story|poem|essay|narrative|tale|write a|compose a|craft a)\b',
+        ]
         requests_detail = any(re.search(p, q) for p in detail_patterns)
         
         brief_patterns = [r'(briefly|brief|concise|short answer|one sentence|single sentence|two sentences|summarize|short paragraph)']
@@ -681,7 +703,13 @@ class LocalAnswer:
             else:
                 instruction = "You are Local Lucy running OFFLINE. Answer using stable general knowledge only. If the user asks for latest/current info, say: 'This requires evidence mode.' and stop."
         
-        return f"{instruction}\n\nTone: Warm, calm, clear. Start with the answer directly. Be concise.\n{budget_instruction}\n\n{conversation_block}{memory_block}{context_block}User: {query}"
+        # Adjust tone instruction based on generation profile
+        if generation_profile in ("chat_long", "detail", "augmented_detail"):
+            tone_instruction = "Tone: Warm, calm, clear. Start with the answer directly. Be thorough and complete."
+        else:
+            tone_instruction = "Tone: Warm, calm, clear. Start with the answer directly. Be concise."
+        
+        return f"{instruction}\n\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{context_block}User: {query}"
     
     def _apply_augmented_behavior_contract(self, user_question: str, background_context: str) -> str:
         """Apply augmented behavior contract and return answer shape."""
@@ -744,13 +772,16 @@ class LocalAnswer:
             }
         }
         # Retry with exponential backoff for model-load transitions.
-        # Ollama can take 5-10s to load a large model (e.g., qwen3 14B @ 9.3GB).
-        max_attempts = 5
-        base_delay = 2.0
+        # Qwen3 benefits from extra headroom; llama3.1 is stable without it.
+        max_attempts = 3
+        base_delay = 0.5
+        needs_lock = "qwen" in self.config.model.lower()
         for attempt in range(max_attempts):
             try:
                 session = await self._get_session()
-                with _ollama_call_lock:
+                if needs_lock:
+                    await _acquire_ollama_call_lock()
+                try:
                     async with session.post(self.config.ollama_url, json=payload) as response:
                         response.raise_for_status()
                         data = await response.json()
@@ -772,6 +803,9 @@ class LocalAnswer:
                         delay = base_delay * (2 ** attempt)
                         logger.warning(f"Ollama returned empty response for {self.config.model}, retrying in {delay}s... (attempt {attempt + 1}/{max_attempts})")
                         await asyncio.sleep(delay)
+                finally:
+                    if needs_lock:
+                        _ollama_call_lock.release()
             except Exception as e:
                 duration_ms = int((time.time() - start_time) * 1000)
                 logger.error(f"Ollama API call failed: {e}")
@@ -844,7 +878,7 @@ class LocalAnswer:
                 duration_ms=int((time.time() - start_time) * 1000)
             )
         
-        if route_mode != "AUGMENTED" and self._is_time_sensitive(q_eval):
+        if route_mode not in {"AUGMENTED", "NEWS"} and self._is_time_sensitive(q_eval):
             return AnswerResult(
                 text=f"This requires evidence mode.\nRun: run online: {q_eval}",
                 generation_profile="time_sensitive_refusal",
