@@ -155,6 +155,16 @@ class HybridRouter:
             "timezone", "what date", "how many days until",
             "time in ", "time now", "local time",
         ]
+        # Ephemeral queries change hour-to-hour and should skip memory
+        self.ephemeral_keywords = [
+            # Weather
+            "weather", "forecast", "temperature", "rain", "snow", "sunny",
+            "cloudy", "windy", "storm", "humidity", "precipitation",
+            # Real-time prices
+            "stock price", "bitcoin price", "crypto price", "current price",
+            "price of", "trading at", "market cap", "market price",
+            "exchange rate", "currency rate", "forex",
+        ]
         # Cooking/recipe queries should always be LOCAL
         self.cooking_keywords = [
             "bake", "cook", "recipe", "pancake", "sourdough",
@@ -285,6 +295,7 @@ class HybridRouter:
         is_news = any(kw in q_lower for kw in self.news_keywords) or has_news_typo or (wat_pattern and has_news_context)
         is_time = any(kw in q_lower for kw in self.time_keywords)
         is_cooking = any(kw in q_lower for kw in self.cooking_keywords)
+        is_ephemeral = any(kw in q_lower for kw in self.ephemeral_keywords)
 
         # Stage 2: Cooking -> always LOCAL
         if is_cooking:
@@ -345,6 +356,8 @@ class HybridRouter:
             guards_fired.append("time_keyword")
         if is_news and not requires_evidence:
             guards_fired.append("news_keyword")
+        if is_ephemeral:
+            guards_fired.append("ephemeral")
 
         # Stage 4: Override with keyword rules + embedding intent
         # Use embedding intent to catch news/time even when keyword lists miss
@@ -371,6 +384,7 @@ class HybridRouter:
             "embedding_intent": best_intent,
             "top_k_neighbours": top_k_neighbours,
             "guards_fired": guards_fired,
+            "ephemeral": is_ephemeral,
         }
 
 
