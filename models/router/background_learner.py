@@ -337,7 +337,7 @@ def run_daemon(log_path: Path | None, interval: int = 60):
         print("\nDaemon stopped.")
 
 
-def maybe_auto_learn(log_path: Path | None = None, min_entries: int = 3) -> bool:
+def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = None) -> bool:
     """Trigger background learning if enough pending feedback exists.
 
     Called from execution_engine after writing auto-feedback.
@@ -350,6 +350,9 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int = 3) -> bool
     Returns:
         True if learning was triggered, False otherwise
     """
+    if min_entries is None:
+        min_entries = int(os.environ.get("LUCY_AUTO_LEARN_THRESHOLD", "5"))
+
     sys.path.insert(0, str(ROUTER_DIR))
     try:
         from auto_feedback import load_auto_feedback
