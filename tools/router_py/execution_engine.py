@@ -132,7 +132,7 @@ def _load_session_memory_context_with_telemetry(
     try:
         from memory.memory_service import assemble_context_with_telemetry
         context, telemetry = assemble_context_with_telemetry(
-            max_chars=500, query=query, depth=depth, mode=mode
+            current_session_id="default", max_chars=500, query=query, depth=depth, mode=mode
         )
         if context:
             return context, telemetry
@@ -913,6 +913,15 @@ them according to the route type (bypass, provisional, or full). It handles:
                         )
                 except Exception:
                     pass  # Auto-feedback must never break execution
+            
+            # Store conversation turn in memory DB (covers HMI + CLI paths)
+            if question and final_result.response_text:
+                try:
+                    from memory.memory_service import store_turn
+                    store_turn("user", question)
+                    store_turn("assistant", final_result.response_text)
+                except Exception:
+                    pass  # Memory storage must never break execution
             
             self._logger.info(
                 f"Execution complete: status={final_result.status}, "
