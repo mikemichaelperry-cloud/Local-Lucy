@@ -3,7 +3,9 @@
 ## Authority
 
 - The authoritative working root is:
-  /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev
+  /home/mike/lucy-v8
+- Snapshot sync target:
+  /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev (mirror, not source)
 
 - Do not modify:
   - launcher structure

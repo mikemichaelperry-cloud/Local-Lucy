@@ -5,7 +5,8 @@
 - UI Venv (has Kokoro): `/home/mike/lucy-v8/ui-v8/.venv/bin/python3`
 
 ## Critical Paths
-- Project Root: `/home/mike/lucy-v8/snapshots/opt-experimental-v8-dev`
+- Project Root: `/home/mike/lucy-v8`
+- Snapshot Mirror: `/home/mike/lucy-v8/snapshots/opt-experimental-v8-dev`
 - Kokoro Socket: `tmp/run/kokoro_tts_worker.sock`
 - Logs: `~/.local/share/lucy/logs/`
 
@@ -57,36 +58,11 @@ The socket worker is started by streaming_voice.py and handles synthesis request
 2. UI-v8 Python provides: Kokoro TTS, other UI-specific packages
 3. Communication via: Subprocess calls (tts_adapter.py CLI interface)
 
-### Voice Tool Cleanup (Priority 3 - IMPLEMENTED)
-**Status:** `lucy_voice_ptt.sh` (1,503 lines) is now DEPRECATED.
-
-**Migration:**
-- Old: `tools/lucy_voice_ptt.sh` (shell script)
-- New: `tools/router_py/voice_runtime.py` (Python)
-
-**Usage:**
-```bash
-# Use new Python voice runtime
-export LUCY_VOICE_PY=1
-./tools/start_local_lucy_opt_experimental_v7_dev.sh
-# Then use /voice command
-
-# Or suppress deprecation warning for old script
-export LUCY_VOICE_PY_SILENCE_DEPRECATION=1
-./tools/lucy_voice_ptt.sh
-```
-
-**Implementation Details:**
-- `voice_runtime.py` provides interactive voice loop using `StreamingVoicePipeline`
-- Uses streaming TTS for minimal latency
+### Voice Tool
+**Current:** `tools/router_py/voice_runtime.py` (Python) via `tools/runtime_voice.py`.
+- Streaming TTS for minimal latency
 - Handles signals (Ctrl+C) gracefully
-- Supports oneshot and continuous modes
 - Respects LUCY_VOICE_ROUTE_MODE, LUCY_VOICE_ONESHOT, LUCY_VOICE_PTT_MODE
-
-**Files Modified:**
-- `tools/lucy_voice_ptt.sh` - Added deprecation warning (v8 only)
-- `tools/router_py/voice_runtime.py` - NEW Python voice runtime
-- `tools/start_v8_hmi_python.sh` - Sets LUCY_VOICE_PY=1
 
 ### First Half Second Missing - FIXED
 **Problem:** When using streaming TTS, the first ~0.5 seconds of audio was being cut off.
