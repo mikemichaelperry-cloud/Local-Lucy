@@ -915,9 +915,8 @@ them according to the route type (bypass, provisional, or full). It handles:
                     pass  # Auto-feedback must never break execution
             
             # Store conversation turn in memory DB (covers HMI + CLI paths).
-            # The router already classified the query; trust its decision.
-            # NEWS and TIME routes are inherently ephemeral — exclude from memory.
-            if question and final_result.response_text and route.route not in ("NEWS", "TIME"):
+            # The router already classified the query; trust its ephemeral flag.
+            if question and final_result.response_text and not getattr(route, "ephemeral", False):
                 try:
                     from memory.memory_service import store_turn
                     store_turn("user", question)

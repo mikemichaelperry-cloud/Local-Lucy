@@ -96,6 +96,9 @@ class RoutingDecision:
     requires_evidence: bool
     policy_reason: str
 
+    # Ephemeral queries (weather, real-time prices) — exclude from memory
+    ephemeral: bool = False
+
 
 def classify_intent(query: str, surface: str = "cli") -> ClassificationResult:
     """
@@ -270,47 +273,48 @@ def _select_route_legacy(
     classification: ClassificationResult,
     policy: str = "fallback_only",
     forced_mode: str | None = None,
+    query: str = "",
 ) -> RoutingDecision:
     """Legacy keyword-based router — preserved for rollback only.
 
     Set LUCY_ROUTER_LEGACY_PRIMARY=1 to use this instead of the embedding router.
     """
     if forced_mode == "FORCED_OFFLINE":
-        return _make_local_decision(classification)
+        return _make_local_decision(classification, query=query)
     if forced_mode == "FORCED_ONLINE":
-        return _make_augmented_decision(classification, prefer_paid=True)
+        return _make_augmented_decision(classification, prefer_paid=True, query=query)
     if classification.force_local:
-        return _make_local_decision(classification)
+        return _make_local_decision(classification, query=query)
     if policy == "disabled":
-        return _make_local_decision(classification)
+        return _make_local_decision(classification, query=query)
     if classification.evidence_mode == "required":
-        return _make_augmented_decision(classification, prefer_paid=True)
+        return _make_augmented_decision(classification, prefer_paid=True, query=query)
     if classification.intent_family == "current_evidence":
         if classification.category in ("news_world", "news_israel", "news_australia"):
             return _make_news_decision(classification)
         if classification.category == "time_query":
             return _make_time_decision(classification)
         if policy == "fallback_only":
-            return _make_local_with_fallback(classification)
+            return _make_local_with_fallback(classification, query=query)
         elif policy == "direct_allowed":
-            return _make_augmented_decision(classification, prefer_paid=False)
-        return _make_local_decision(classification)
+            return _make_augmented_decision(classification, prefer_paid=False, query=query)
+        return _make_local_decision(classification, query=query)
     if classification.needs_web:
         if classification.intent_family in ("background_overview", "synthesis_explanation"):
             if policy == "direct_allowed":
-                return _make_augmented_decision(classification, prefer_paid=False)
-            return _make_local_with_fallback(classification)
+                return _make_augmented_decision(classification, prefer_paid=False, query=query)
+            return _make_local_with_fallback(classification, query=query)
         if policy == "fallback_only":
-            return _make_local_with_fallback(classification)
+            return _make_local_with_fallback(classification, query=query)
         elif policy == "direct_allowed":
-            return _make_augmented_decision(classification, prefer_paid=False)
+            return _make_augmented_decision(classification, prefer_paid=False, query=query)
     if classification.intent_family in ("background_overview", "synthesis_explanation"):
         if policy == "direct_allowed":
-            return _make_augmented_decision(classification, prefer_paid=False)
-        return _make_local_with_fallback(classification)
+            return _make_augmented_decision(classification, prefer_paid=False, query=query)
+        return _make_local_with_fallback(classification, query=query)
     if classification.intent_family == "local_answer":
-        return _make_local_decision(classification)
-    return _make_local_decision(classification)
+        return _make_local_decision(classification, query=query)
+    return _make_local_decision(classification, query=query)
 
 
 def select_route(
@@ -335,7 +339,7 @@ def select_route(
     """
     # Rollback: legacy keyword router (for emergency use only)
     if os.environ.get("LUCY_ROUTER_LEGACY_PRIMARY", "").strip().lower() in ("1", "on", "true", "yes"):
-        decision = _select_route_legacy(classification, policy, forced_mode)
+        decision = _select_route_legacy(classification, policy, forced_mode, query=query)
         _log_decision(
             query or "",
             decision,
@@ -346,29 +350,29 @@ def select_route(
 
     # Hard overrides
     if forced_mode == "FORCED_OFFLINE":
-        return _make_local_decision(classification)
+        return _make_local_decision(classification, query=query)
 
     if forced_mode == "FORCED_ONLINE":
-        return _make_augmented_decision(classification, prefer_paid=True)
+        return _make_augmented_decision(classification, prefer_paid=True, query=query)
 
     if policy == "disabled":
-        return _make_local_decision(classification)
+        return _make_local_decision(classification, query=query)
 
     if classification.force_local:
-        return _make_local_decision(classification)
+        return _make_local_decision(classification, query=query)
 
     # Fallback when no query provided
     if not query:
         if classification.evidence_mode == "required":
-            return _make_augmented_decision(classification, prefer_paid=True)
+            return _make_augmented_decision(classification, prefer_paid=True, query=query)
         if classification.intent_family == "local_answer":
-            return _make_local_decision(classification)
+            return _make_local_decision(classification, query=query)
         if classification.needs_web:
             if policy == "direct_allowed":
-                return _make_augmented_decision(classification, prefer_paid=False)
+                return _make_augmented_decision(classification, prefer_paid=False, query=query)
             else:
-                return _make_local_with_fallback(classification)
-        return _make_local_decision(classification)
+                return _make_local_with_fallback(classification, query=query)
+        return _make_local_decision(classification, query=query)
 
     # Primary path: embedding router
     router = _get_router()
@@ -384,6 +388,7 @@ def select_route(
             embedding_route = result.get("embedding_route", route)
             guards_fired = result.get("guards_fired", [])
             top_k_neighbours = result.get("top_k_neighbours", [])
+            ephemeral = result.get("ephemeral", False)
 
             if route == "LOCAL":
                 decision = RoutingDecision(
@@ -397,6 +402,7 @@ def select_route(
                     evidence_reason=evidence_reason,
                     requires_evidence=requires_evidence,
                     policy_reason="router_local",
+                    ephemeral=ephemeral,
                 )
             elif route == "NEWS":
                 decision = RoutingDecision(
@@ -410,6 +416,7 @@ def select_route(
                     evidence_reason=evidence_reason,
                     requires_evidence=requires_evidence,
                     policy_reason="router_news",
+                    ephemeral=True,
                 )
             elif route == "TIME":
                 decision = RoutingDecision(
@@ -423,6 +430,7 @@ def select_route(
                     evidence_reason=evidence_reason,
                     requires_evidence=requires_evidence,
                     policy_reason="router_time",
+                    ephemeral=True,
                 )
             else:  # AUGMENTED
                 if evidence_reason == "medical_context":
@@ -448,6 +456,7 @@ def select_route(
                     evidence_reason=evidence_reason,
                     requires_evidence=requires_evidence,
                     policy_reason=policy_reason,
+                    ephemeral=ephemeral,
                 )
 
             # Cheap legacy audit — not used for routing, only for diagnostics
@@ -467,7 +476,7 @@ def select_route(
             pass
 
     # Safe fallback
-    decision = _make_local_decision(classification)
+    decision = _make_local_decision(classification, query=query)
     _log_decision(query or "", decision, embedding_route="FALLBACK_LOCAL", guards_fired=["router_failure"])
     return decision
 
@@ -563,7 +572,22 @@ def _map_to_intent_family(intent: str, intent_class: str, category: str) -> str:
     return "local_answer"
 
 
-def _make_local_decision(classification: ClassificationResult) -> RoutingDecision:
+_EPHEMERAL_KEYWORDS = [
+    "weather", "forecast", "temperature", "rain", "snow", "sunny",
+    "cloudy", "windy", "storm", "humidity", "precipitation",
+    "stock price", "bitcoin price", "crypto price", "current price",
+    "price of", "trading at", "market cap", "market price",
+    "exchange rate", "currency rate", "forex",
+]
+
+
+def _is_ephemeral(query: str) -> bool:
+    """Check if a query is ephemeral (changes hour-to-hour)."""
+    q_lower = query.lower()
+    return any(kw in q_lower for kw in _EPHEMERAL_KEYWORDS)
+
+
+def _make_local_decision(classification: ClassificationResult, query: str = "") -> RoutingDecision:
     """Create a local-only routing decision."""
     return RoutingDecision(
         route="LOCAL",
@@ -576,12 +600,14 @@ def _make_local_decision(classification: ClassificationResult) -> RoutingDecisio
         evidence_reason=classification.evidence_reason,
         requires_evidence=bool(classification.evidence_mode),
         policy_reason="local_sufficient",
+        ephemeral=_is_ephemeral(query),
     )
 
 
 def _make_augmented_decision(
     classification: ClassificationResult,
     prefer_paid: bool = False,
+    query: str = "",
 ) -> RoutingDecision:
     """Create an augmented routing decision."""
     # Select provider based on query type and evidence requirements
@@ -621,10 +647,11 @@ def _make_augmented_decision(
         evidence_reason=classification.evidence_reason,
         requires_evidence=bool(classification.evidence_mode),
         policy_reason=policy_reason,
+        ephemeral=_is_ephemeral(query),
     )
 
 
-def _make_local_with_fallback(classification: ClassificationResult) -> RoutingDecision:
+def _make_local_with_fallback(classification: ClassificationResult, query: str = "") -> RoutingDecision:
     """Create a local-first with fallback routing decision."""
     return RoutingDecision(
         route="LOCAL",  # Start local
@@ -637,6 +664,7 @@ def _make_local_with_fallback(classification: ClassificationResult) -> RoutingDe
         evidence_reason=classification.evidence_reason,
         requires_evidence=bool(classification.evidence_mode),
         policy_reason="local_first_fallback_allowed",
+        ephemeral=_is_ephemeral(query),
     )
 
 
@@ -653,6 +681,7 @@ def _make_news_decision(classification: ClassificationResult) -> RoutingDecision
         evidence_reason=classification.evidence_reason,
         requires_evidence=bool(classification.evidence_mode),
         policy_reason="rss_news_provider",
+        ephemeral=True,
     )
 
 
@@ -669,6 +698,7 @@ def _make_time_decision(classification: ClassificationResult) -> RoutingDecision
         evidence_reason=classification.evidence_reason,
         requires_evidence=False,
         policy_reason="time_api_provider",
+        ephemeral=True,
     )
 
 
