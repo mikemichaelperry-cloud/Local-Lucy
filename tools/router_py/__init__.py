@@ -56,10 +56,10 @@ from .classify import (
 # Phase 4: Main Orchestration
 from .main import (
     RouterOutcome,
-    ShadowComparison,
+    OutcomeComparison,
     execute_plan_python,
     execute_plan_shell,
-    execute_plan_shadow,
+    execute_plan_parity,
 )
 
 # Tool Wrappers (Phase 5)
@@ -114,9 +114,11 @@ __all__ = [
     "select_route",
     # Phase 4: Main Orchestration
     "RouterOutcome",
+    "OutcomeComparison",
     "ShadowComparison",
     "execute_plan_python",
     "execute_plan_shell",
+    "execute_plan_parity",
     "execute_plan_shadow",
     # Phase 5: Tool Wrappers
     "ToolConfig",

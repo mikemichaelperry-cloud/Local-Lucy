@@ -9,8 +9,8 @@ Usage:
     # Run all tests and compare outputs
     python test_execution_parity.py
     
-    # Run in shadow mode (log differences without failing)
-    python test_execution_parity.py --shadow-mode
+    # Run in lenient mode (log differences without failing)
+    python test_execution_parity.py --lenient-mode
     
     # Run specific test categories
     python test_execution_parity.py --category local,news
@@ -22,7 +22,7 @@ Usage:
     python test_execution_parity.py -v
 
 Exit Codes:
-    0 = All tests passed (or shadow mode with differences logged)
+    0 = All tests passed (or lenient mode with differences logged)
     1 = One or more tests failed (parity mismatch)
     2 = Configuration or environment error
 """
@@ -147,7 +147,7 @@ class TestReport:
     passed: int
     failed: int
     skipped: int
-    shadow_mode: bool
+    lenient_mode: bool
     results: list[ComparisonResult]
     summary: dict[str, Any] = field(default_factory=dict)
     
@@ -158,7 +158,7 @@ class TestReport:
             "passed": self.passed,
             "failed": self.failed,
             "skipped": self.skipped,
-            "shadow_mode": self.shadow_mode,
+            "lenient_mode": self.lenient_mode,
             "results": [r.to_dict() for r in self.results],
             "summary": self.summary,
         }
@@ -650,12 +650,12 @@ class ParityTestRunner:
         self,
         root_dir: Path,
         categories: list[str] | None = None,
-        shadow_mode: bool = False,
+        lenient_mode: bool = False,
         verbose: bool = False,
     ):
         self.root_dir = root_dir
         self.categories = categories
-        self.shadow_mode = shadow_mode
+        self.lenient_mode = lenient_mode
         self.verbose = verbose
         
         self.engine = ExecutionEngine(root_dir)
@@ -679,7 +679,7 @@ class ParityTestRunner:
         
         print(f"\n{'=' * 70}")
         print(f"Running {total} parity tests")
-        print(f"Shadow mode: {self.shadow_mode}")
+        print(f"Lenient mode: {self.lenient_mode}")
         print(f"Categories: {self.categories or 'all'}")
         print(f"{'=' * 70}\n")
         
@@ -713,7 +713,7 @@ class ParityTestRunner:
             passed=passed,
             failed=failed,
             skipped=skipped,
-            shadow_mode=self.shadow_mode,
+            lenient_mode=self.lenient_mode,
             results=self.results,
             summary=summary,
         )
@@ -782,7 +782,7 @@ def generate_console_report(report: TestReport) -> str:
     lines.append("PARITY TEST REPORT")
     lines.append("=" * 70)
     lines.append(f"Timestamp: {report.timestamp}")
-    lines.append(f"Shadow mode: {report.shadow_mode}")
+    lines.append(f"Lenient mode: {report.lenient_mode}")
     lines.append("")
     lines.append(f"Total tests: {report.total_tests}")
     lines.append(f"Passed: {report.passed} ✅")
@@ -804,8 +804,8 @@ def generate_console_report(report: TestReport) -> str:
     lines.append("")
     lines.append("=" * 70)
     
-    if report.shadow_mode:
-        lines.append("Shadow mode: Differences logged, no failure reported.")
+    if report.lenient_mode:
+        lines.append("Lenient mode: Differences logged, no failure reported.")
     elif report.failed == 0:
         lines.append("All tests passed! ✅")
     else:
@@ -832,9 +832,9 @@ def main() -> int:
         description="Test harness for migration validation (shell vs Python)",
     )
     parser.add_argument(
-        "--shadow-mode",
+        "--lenient-mode",
         action="store_true",
-        help="Run in shadow mode - log differences without failing",
+        help="Run in lenient mode - log differences without failing",
     )
     parser.add_argument(
         "--category",
@@ -880,7 +880,7 @@ def main() -> int:
     runner = ParityTestRunner(
         root_dir=ROOT_DIR,
         categories=categories,
-        shadow_mode=args.shadow_mode,
+        lenient_mode=args.lenient_mode,
         verbose=args.verbose,
     )
     
@@ -898,8 +898,8 @@ def main() -> int:
         print(f"\nJSON report written to: {output_path}")
     
     # Return exit code
-    if args.shadow_mode:
-        return 0  # Always success in shadow mode
+    if args.lenient_mode:
+        return 0  # Always success in lenient mode
     return 0 if report.failed == 0 else 1
 
 

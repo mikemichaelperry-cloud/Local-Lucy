@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from main import (
     RouterOutcome,
-    ShadowComparison,
+    OutcomeComparison,
     _compare_outcomes,
     _classify_difference,
 )
@@ -120,7 +120,7 @@ class TestClassifyDifference(unittest.TestCase):
             confidence=0.9,
         )
         
-        comparison = ShadowComparison(
+        comparison = OutcomeComparison(
             query="test",
             shell_result=shell,
             python_result=python,
@@ -153,7 +153,7 @@ class TestClassifyDifference(unittest.TestCase):
             confidence=0.9,
         )
         
-        comparison = ShadowComparison(
+        comparison = OutcomeComparison(
             query="test",
             shell_result=shell,
             python_result=python,
@@ -187,7 +187,7 @@ class TestClassifyDifference(unittest.TestCase):
             error_message="Something broke",
         )
         
-        comparison = ShadowComparison(
+        comparison = OutcomeComparison(
             query="test",
             shell_result=shell,
             python_result=python,
@@ -220,7 +220,7 @@ class TestClassifyDifference(unittest.TestCase):
             confidence=0.9,
         )
         
-        comparison = ShadowComparison(
+        comparison = OutcomeComparison(
             query="test",
             shell_result=shell,
             python_result=python,
@@ -232,8 +232,8 @@ class TestClassifyDifference(unittest.TestCase):
         self.assertEqual(classification, "suspicious_drift")
 
 
-class TestShadowComparison(unittest.TestCase):
-    """Test shadow mode comparison."""
+class TestOutcomeComparison(unittest.TestCase):
+    """Test shell-vs-Python outcome comparison."""
     
     def test_identical_outcomes(self):
         """Test comparison of identical outcomes."""
@@ -320,8 +320,8 @@ class TestShadowComparison(unittest.TestCase):
         self.assertFalse(comparison.match)
         self.assertIn("status: shell=completed, python=failed", comparison.differences)
     
-    def test_shadow_comparison_to_dict(self):
-        """Test ShadowComparison to_dict."""
+    def test_comparison_to_dict(self):
+        """Test OutcomeComparison to_dict."""
         shell = RouterOutcome(
             status="completed",
             outcome_code="local_answer",
@@ -342,7 +342,7 @@ class TestShadowComparison(unittest.TestCase):
             confidence=0.85,
         )
         
-        comparison = ShadowComparison(
+        comparison = OutcomeComparison(
             query="test query",
             shell_result=shell,
             python_result=python,
@@ -427,7 +427,7 @@ def run_tests():
     
     suite.addTests(loader.loadTestsFromTestCase(TestRouterOutcome))
     suite.addTests(loader.loadTestsFromTestCase(TestClassifyDifference))
-    suite.addTests(loader.loadTestsFromTestCase(TestShadowComparison))
+    suite.addTests(loader.loadTestsFromTestCase(TestOutcomeComparison))
     suite.addTests(loader.loadTestsFromTestCase(TestExecutionModes))
     suite.addTests(loader.loadTestsFromTestCase(TestErrorHandling))
     

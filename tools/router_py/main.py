@@ -6,12 +6,12 @@ This is the Python entry point for the router migration.
 It provides a hybrid execution mode:
 - LUCY_ROUTER_PY=0: Use shell implementation (default, safe)
 - LUCY_ROUTER_PY=1: Use Python implementation (new, tested)
-- LUCY_ROUTER_PY=shadow: Run both, compare, log differences
+- LUCY_ROUTER_PY=parity: Run both, compare, log differences
 
 Execution Engine Toggle (LUCY_EXEC_PY):
 - LUCY_EXEC_PY=0 or unset: Use shell execute_plan.sh (default, safe)
 - LUCY_EXEC_PY=1: Use Python ExecutionEngine (new)
-- LUCY_EXEC_PY=shadow: Run both, compare, log differences to /tmp/exec_shadow_diffs.log
+- LUCY_EXEC_PY=parity: Run both, compare, log differences to /tmp/exec_parity_diffs.log
 
 CRITICAL DESIGN PRINCIPLE:
 The Python router makes routing decisions but DELEGATES execution to the
@@ -45,7 +45,7 @@ from router_py.execution_engine import ExecutionEngine, ExecutionResult, DEFAULT
 
 
 # Configuration
-SHADOW_LOG_DIR = ROOT_DIR / "logs" / "router_py_shadow"
+PARITY_LOG_DIR = ROOT_DIR / "logs" / "router_py_parity"
 SHELL_EXECUTE_PLAN = ROOT_DIR / "tools" / "router" / "execute_plan.sh"
 SHELL_LUCY_CHAT = ROOT_DIR / "lucy_chat.sh"
 DEFAULT_TIMEOUT = 130
@@ -160,8 +160,8 @@ class RouterOutcome:
 
 
 @dataclass
-class ShadowComparison:
-    """Result of shadow mode comparison."""
+class OutcomeComparison:
+    """Result of parity mode comparison."""
     
     query: str
     shell_result: RouterOutcome | None
@@ -402,7 +402,7 @@ def _delegate_execution(
     Controlled by LUCY_EXEC_PY environment variable:
     - LUCY_EXEC_PY=0 or unset: Use shell execute_plan.sh (default, safe)
     - LUCY_EXEC_PY=1: Use Python ExecutionEngine (new)
-    - LUCY_EXEC_PY=shadow: Run both, compare, return shell result, log differences
+    - LUCY_EXEC_PY=parity: Run both, compare, return shell result, log differences
     
     This preserves:
     - Authority chain
@@ -415,9 +415,9 @@ def _delegate_execution(
     if exec_mode == "1":
         # Use Python ExecutionEngine
         return _delegate_execution_to_python(question, decision, timeout, classification)
-    elif exec_mode == "shadow":
+    elif exec_mode == "parity":
         # Shadow mode: run both, compare, return shell result
-        return _delegate_execution_shadow(question, decision, timeout, classification)
+        return _delegate_execution_parity(question, decision, timeout, classification)
     else:
         # Default: use shell execution
         return _delegate_execution_to_shell(question, decision, timeout)
@@ -671,7 +671,7 @@ def _delegate_execution_to_python(
         return _delegate_execution_to_shell(question, decision, timeout)
 
 
-def _delegate_execution_shadow(
+def _delegate_execution_parity(
     question: str,
     decision: RoutingDecision,
     timeout: int,
@@ -689,19 +689,19 @@ def _delegate_execution_shadow(
     python_result = _delegate_execution_to_python(question, decision, timeout, classification)
     
     # Compare and log differences
-    _log_execution_shadow_diff(question, shell_result, python_result)
+    _log_execution_parity_diff(question, shell_result, python_result)
     
     # Return shell result (safety first)
     return shell_result
 
 
-def _log_execution_shadow_diff(
+def _log_execution_parity_diff(
     query: str,
     shell_outcome: RouterOutcome,
     python_outcome: RouterOutcome,
 ) -> None:
-    """Log differences between shell and Python execution to shadow log file."""
-    SHADOW_LOG_FILE = Path("/tmp/exec_shadow_diffs.log")
+    """Log differences between shell and Python execution to parity log file."""
+    SHADOW_LOG_FILE = Path("/tmp/exec_parity_diffs.log")
     
     # Determine if results match
     match = (
@@ -841,14 +841,14 @@ def execute_plan_shell(
         )
 
 
-def execute_plan_shadow(
+def execute_plan_parity(
     question: str,
     policy: str = "fallback_only",
     timeout: int = DEFAULT_TIMEOUT,
 ) -> RouterOutcome:
     """
-    Execute in shadow mode - run both implementations and compare.
-    
+    Execute with parity checking - run both shell and Python implementations and compare.
+
     Returns shell result (trusted) but logs any differences with classification.
     """
     # Run both implementations
@@ -864,17 +864,21 @@ def execute_plan_shadow(
     
     # Log if different
     if not comparison.match:
-        _log_shadow_difference(comparison)
+        _log_parity_difference(comparison)
     
     # Return shell result (safety first)
     return shell_result
+
+
+# Backwards-compatibility alias — deprecated, use execute_plan_parity.
+execute_plan_shadow = execute_plan_parity
 
 
 def _compare_outcomes(
     query: str,
     shell: RouterOutcome,
     python: RouterOutcome,
-) -> ShadowComparison:
+) -> OutcomeComparison:
     """Compare shell and Python outcomes."""
     differences = []
     
@@ -893,7 +897,7 @@ def _compare_outcomes(
     if shell.outcome_code != python.outcome_code:
         differences.append(f"outcome_code: shell={shell.outcome_code}, python={python.outcome_code}")
     
-    return ShadowComparison(
+    return OutcomeComparison(
         query=query,
         shell_result=shell,
         python_result=python,
@@ -903,7 +907,7 @@ def _compare_outcomes(
 
 
 def _classify_difference(
-    comparison: ShadowComparison,
+    comparison: OutcomeComparison,
     shell: RouterOutcome,
     python: RouterOutcome,
 ) -> str:
@@ -947,14 +951,14 @@ def _classify_difference(
     return "suspicious_drift"
 
 
-def _log_shadow_difference(comparison: ShadowComparison) -> None:
-    """Log shadow mode differences to file."""
+def _log_parity_difference(comparison: OutcomeComparison) -> None:
+    """Log parity mode differences to file."""
     try:
-        SHADOW_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        PARITY_LOG_DIR.mkdir(parents=True, exist_ok=True)
         
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         query_hash = sha256_text(comparison.query)[:8]
-        log_file = SHADOW_LOG_DIR / f"shadow_diff_{timestamp}_{query_hash}.json"
+        log_file = PARITY_LOG_DIR / f"parity_diff_{timestamp}_{query_hash}.json"
         
         with open(log_file, "w") as f:
             json.dump(comparison.to_dict(), f, indent=2, default=str)
@@ -973,7 +977,7 @@ def main() -> int:
     parser.add_argument("question", nargs="?", help="User question")
     parser.add_argument("--policy", default="fallback_only", help="Augmentation policy")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="Request timeout")
-    parser.add_argument("--mode", choices=["shell", "python", "shadow", "auto"], 
+    parser.add_argument("--mode", choices=["shell", "python", "parity", "auto"], 
                         default="auto", help="Execution mode")
     parser.add_argument("--json", action="store_true", help="Output JSON")
     args = parser.parse_args()
@@ -993,8 +997,8 @@ def main() -> int:
         env_mode = os.environ.get("LUCY_ROUTER_PY", "0")
         if env_mode == "1":
             mode = "python"
-        elif env_mode == "shadow":
-            mode = "shadow"
+        elif env_mode == "parity":
+            mode = "parity"
         else:
             mode = "shell"
     
@@ -1007,8 +1011,8 @@ def main() -> int:
     # Execute
     if mode == "python":
         result = execute_plan_python(question, policy, args.timeout)
-    elif mode == "shadow":
-        result = execute_plan_shadow(question, policy, args.timeout)
+    elif mode == "parity":
+        result = execute_plan_parity(question, policy, args.timeout)
     else:  # shell
         result = execute_plan_shell(question, policy, args.timeout)
     
