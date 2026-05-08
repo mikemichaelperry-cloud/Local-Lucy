@@ -405,7 +405,7 @@ class TestPromptBuilding(unittest.TestCase):
             False
         )
         self.assertIn("Local Lucy", prompt)
-        self.assertIn("OFFLINE", prompt)
+        self.assertIn("offline", prompt)
         self.assertIn("what is Python", prompt)
     
     def test_build_prompt_with_memory(self):
@@ -418,7 +418,7 @@ class TestPromptBuilding(unittest.TestCase):
             False,
             False
         )
-        self.assertIn("Session memory", prompt)
+        self.assertIn("Memory", prompt)
         self.assertIn("Previously discussed Python", prompt)
     
     def test_build_prompt_conversation_mode(self):
@@ -432,7 +432,7 @@ class TestPromptBuilding(unittest.TestCase):
             True
         )
         self.assertIn("CONVERSATION_MODE", prompt)
-        self.assertIn("calibrated_sharp", prompt)
+        self.assertIn("sharp", prompt)
 
 
 class TestCompletionGuards(unittest.TestCase):

@@ -686,30 +686,30 @@ class LocalAnswer:
         """Build the prompt for Ollama."""
         memory_block = ""
         if session_memory.strip():
-            memory_block = f"Session memory (recent turns; use only if relevant):\n{session_memory}\n\n"
+            memory_block = f"Memory:\n{session_memory}\n\n"
         
         conversation_block = ""
         if conversation_mode_active and conversation_system_block:
-            conversation_block = "[CONVERSATION_MODE: calibrated_sharp]\n\nTone rules: Take a position early. Avoid therapy language. Use no more than one hedge phrase. Include one concrete example. End with a clear takeaway.\n\n"
+            conversation_block = "[CONVERSATION_MODE: sharp]\nTake a position early. One hedge max. One concrete example. Clear takeaway.\n\n"
         
         # If augmented context is provided, use it to answer (evidence mode)
         if augmented_context.strip():
-            context_block = f"Background context (from verified sources):\n{augmented_context}\n\n"
-            instruction = "You are Local Lucy with access to background context above. Answer the user's question using this context. Be concise and accurate."
+            context_block = f"Context:\n{augmented_context}\n\n"
+            instruction = "You are Local Lucy. Use the context above. Be concise."
         else:
             context_block = ""
             if session_memory.strip():
-                instruction = "You are Local Lucy. You have access to the session memory of recent conversation turns above. Use this memory to answer followup questions and maintain context. Be concise and accurate."
+                instruction = "You are Local Lucy. Use session memory above for followups. Be concise."
             else:
-                instruction = "You are Local Lucy running OFFLINE. Answer using stable general knowledge only. If the user asks for latest/current info, say: 'This requires evidence mode.' and stop."
+                instruction = "You are Local Lucy (offline). Use general knowledge. For current info, say 'Requires evidence mode.'"
         
         # Adjust tone instruction based on generation profile
         if generation_profile in ("chat_long", "detail", "augmented_detail"):
-            tone_instruction = "Tone: Warm, calm, clear. Start with the answer directly. Be thorough and complete."
+            tone_instruction = "Tone: warm, direct, thorough."
         else:
-            tone_instruction = "Tone: Warm, calm, clear. Start with the answer directly. Be concise."
+            tone_instruction = "Tone: warm, direct, concise."
         
-        return f"{instruction}\n\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{context_block}User: {query}"
+        return f"{instruction}\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{context_block}User: {query}"
     
     def _apply_augmented_behavior_contract(self, user_question: str, background_context: str) -> str:
         """Apply augmented behavior contract and return answer shape."""
