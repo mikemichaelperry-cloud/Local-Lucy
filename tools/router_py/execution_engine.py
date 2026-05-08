@@ -60,6 +60,14 @@ try:
 except ImportError:
     HAS_AUTO_FEEDBACK = False
 
+# Import response cache for repeated query short-circuit
+try:
+    sys.path.insert(0, str(ROOT_DIR / "models" / "router"))
+    from response_cache import get_cached, set_cached
+    HAS_RESPONSE_CACHE = True
+except ImportError:
+    HAS_RESPONSE_CACHE = False
+
 # Import Python local_answer if available
 try:
     from router_py.local_answer import LocalAnswer, LocalAnswerConfig
@@ -855,6 +863,23 @@ them according to the route type (bypass, provisional, or full). It handles:
             f"intent={intent.intent}, question={question[:100]}..."
         )
         
+        # Response cache short-circuit: skip LLM for repeated LOCAL queries
+        if HAS_RESPONSE_CACHE and route.route == "LOCAL" and question:
+            cached = get_cached(question)
+            if cached:
+                execution_time = int((time.time() - start_time) * 1000)
+                self._logger.info(f"Cache hit: returning cached response ({execution_time}ms)")
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="local_answer",
+                    route="LOCAL",
+                    provider="local",
+                    provider_usage_class="local",
+                    response_text=cached,
+                    execution_time_ms=execution_time,
+                    metadata={"cache_hit": True, "execution_time_ms": execution_time},
+                )
+        
         try:
             # Handle CLARIFY route early
             if route.route == "CLARIFY":
@@ -923,6 +948,13 @@ them according to the route type (bypass, provisional, or full). It handles:
                     store_turn("assistant", final_result.response_text)
                 except Exception:
                     pass  # Memory storage must never break execution
+            
+            # Cache LOCAL responses for repeated queries
+            if HAS_RESPONSE_CACHE and route.route == "LOCAL" and question and final_result.response_text:
+                try:
+                    set_cached(question, final_result.response_text, route="LOCAL")
+                except Exception:
+                    pass  # Cache must never break execution
             
             self._logger.info(
                 f"Execution complete: status={final_result.status}, "
