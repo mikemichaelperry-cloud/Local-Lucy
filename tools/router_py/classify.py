@@ -578,6 +578,11 @@ _EPHEMERAL_KEYWORDS = [
     "stock price", "bitcoin price", "crypto price", "current price",
     "price of", "trading at", "market cap", "market price",
     "exchange rate", "currency rate", "forex",
+    "score", "who won", "game result", "match result", "final score",
+    "live score", "half time", "full time", "overtime",
+    "traffic", "delay", "road closure", "accident on", "congestion",
+    "flight status", "departure", "arrival", "gate", "boarding",
+    "election results", "vote count", "polls closed", "live updates",
 ]
 
 
