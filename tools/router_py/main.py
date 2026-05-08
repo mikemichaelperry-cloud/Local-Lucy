@@ -347,7 +347,7 @@ def execute_plan_python(
         classification = classify_intent(question, surface="cli")
         
         # Step 2: Select route (Phase 3)
-        decision = select_route(classification, policy=policy)
+        decision = select_route(classification, policy=policy, query=question)
         
         # Step 3: DELEGATE execution to governed path
         # This preserves authority semantics and truth metadata

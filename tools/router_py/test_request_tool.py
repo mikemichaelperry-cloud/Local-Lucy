@@ -5,13 +5,41 @@ import asyncio
 import sys
 import os
 
+import pytest
+
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from base_tool_wrapper import ToolConfig, ToolResult
 from request_tool import RequestTool
 
+pytestmark = pytest.mark.asyncio
 
+
+# Skip integration tests when Ollama is not available
+async def _ollama_available() -> bool:
+    import aiohttp
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get("http://127.0.0.1:11434/api/tags", timeout=aiohttp.ClientTimeout(total=2)):
+                return True
+    except Exception:
+        return False
+
+
+OLLAMA_UP = False
+
+def setup_module(module):
+    """Check if Ollama is running before module tests."""
+    global OLLAMA_UP
+    try:
+        import asyncio
+        OLLAMA_UP = asyncio.run(_ollama_available())
+    except Exception:
+        OLLAMA_UP = False
+
+
+@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
 async def test_generate():
     """Test the generate method with a simple prompt."""
     tool = RequestTool(ToolConfig(timeout=30.0))
@@ -25,6 +53,7 @@ async def test_generate():
     print(f"✅ Generate test passed: {result.data[:50]}")
 
 
+@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
 async def test_chat():
     """Test the chat method with messages."""
     tool = RequestTool()
@@ -40,6 +69,7 @@ async def test_chat():
     await tool.close()
 
 
+@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
 async def test_health_check():
     """Test the health check endpoint."""
     tool = RequestTool()
@@ -48,6 +78,7 @@ async def test_health_check():
     await tool.close()
 
 
+@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
 async def test_context_manager():
     """Test async context manager usage."""
     async with RequestTool() as tool:
@@ -56,6 +87,7 @@ async def test_context_manager():
         print(f"✅ Context manager test passed")
 
 
+@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
 async def test_invalid_model():
     """Test error handling for invalid model."""
     tool = RequestTool()

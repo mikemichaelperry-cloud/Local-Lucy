@@ -75,45 +75,194 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     # Normalize for keyword matching
     normalized = query.lower()
     
-    # Medical/health keywords
+    # Creative writing guard — fictional/artistic requests should never trigger evidence
+    # even if they contain medical/financial/legal topic keywords (e.g. "write a horror story about a hospital")
+    creative_verbs = ["write", "compose", "craft", "tell", "create", "make up", "imagine"]
+    creative_nouns = [
+        "story", "poem", "essay", "novel", "fiction", "script", "play", "song",
+        "horror", "fantasy", "sci-fi", "romance", "thriller", "mystery",
+        "character", "plot", "dialogue", "scene", "chapter",
+    ]
+    has_creative_verb = any(v in normalized for v in creative_verbs)
+    has_creative_noun = any(n in normalized for n in creative_nouns)
+    if has_creative_verb and has_creative_noun:
+        return False, "creative_writing"
+    
+    # Medical/health keywords — comprehensive coverage for safety-critical queries
     medical_keywords = [
+        # General health inquiry
         "symptom", "symptoms", "diagnosis", "treatment", "treat", "medication",
         "disease", "condition", "prescription", "drug", "vaccine",
         "vaccination", "pregnancy", "pregnant", "cancer", "diabetes",
         "heart attack", "stroke", "infection", "virus", "bacteria",
         "pain", "headache", "injury", "emergency", "hospital", "doctor", "medicine",
+        # Body parts + symptom combinations (critical for catching novel phrasings)
+        "chest", "breath", "breathing", "shortness of breath",
+        "fever", "temperature", "feel good", "not feeling", "feel well", "feeling bad",
+        "unwell", "sick", "nausea", "nauseous", "vomit", "dizzy", "cough", "sneeze",
+        "aches", "sore", "swelling", "swollen", "rash", "itchy", "burning",
+        "numbness", "tingling", "weakness", "fatigue", "tired", "exhausted",
+        "appetite", "weight loss", "weight gain", "bleeding", "bruising", "wound", "cut",
+        "chills", "shivering", "dehydration", "seizure", "convulsion", "paralysis",
+        "palpitation", "sweating", "hallucination", "delusion", "panic",
+        # Pediatric indicators
+        "baby", "child", "kid", "toddler", "infant", "2-year-old", "3-year-old",
+        "4-year-old", "5-year-old", "year old", "years old", "my son", "my daughter",
         # Medications and interactions
         "tadalafil", "cialis", "viagra", "sildenafil", "interaction", "interact",
         "grapefruit", "side effect", "contraindication", "dosage", "dose",
         "amoxicillin", "aspirin", "metformin", "insulin", "ibuprofen", "warfarin",
-        "atorvastatin", "lipitor", "omeprazole", "pharmacy", "pharmacist"
+        "atorvastatin", "lipitor", "omeprazole", "pharmacy", "pharmacist",
+        "acetaminophen", "paracetamol", "naproxen", "clopidogrel", "lisinopril",
+        "amlodipine", "metoprolol", "atorvastatin", "simvastatin", "levothyroxine",
+        "albuterol", "gabapentin", "prednisone", "fluticasone", "montelukast",
+        # Conditions and diseases
+        "hypertension", "high blood pressure", "cholesterol", "asthma", "copd",
+        "arthritis", "osteoporosis", "depression", "anxiety", "bipolar",
+        "epilepsy", "seizure", "migraine", "allergy", "allergic", "anaphylaxis",
+        "pneumonia", "bronchitis", "tuberculosis", "hepatitis", "meningitis",
+        "appendicitis", "gallstones", "kidney stone", "fracture", "burn",
+        "covid", "coronavirus", "flu", "influenza", "hiv", "aids", "malaria",
+        "measles", "mumps", "rubella", "chickenpox", "shingles", "herpes",
+        # Body systems and anatomy
+        "liver", "kidney", "heart", "lung", "brain", "spine", "nerve",
+        "blood clot", "aneurysm", "arrhythmia", "atrial fibrillation", "afib",
+        # Procedures
+        "surgery", "operation", "transplant", "biopsy", "mri", "ct scan",
+        "x-ray", "ultrasound", "colonoscopy", "endoscopy", "chemotherapy",
+        "radiation", "dialysis", "vaccination", "immunization",
+        # Mental health
+        "suicide", "self-harm", "overdose", "poisoning", "antidepressant",
+        "antipsychotic", "benzodiazepine", "ssri", "snri",
     ]
     
     for keyword in medical_keywords:
         if keyword in normalized:
             return True, "medical_context"
     
-    # Live conflict/geopolitics keywords
+    # Body-part + symptom pattern detection — catches novel phrasings like "my chest feels tight"
+    body_parts = [
+        "chest", "head", "stomach", "back", "throat", "heart", "lungs",
+        "arm", "leg", "knee", "shoulder", "neck", "ear", "eye", "nose",
+        "mouth", "tooth", "teeth", "finger", "toe", "foot", "hand",
+        "wrist", "ankle", "hip", "elbow", "skin", "face", "forehead",
+        "abdomen", "stomach", "gut", "intestine", "bowel", "bladder",
+        "kidney", "liver", "spleen", "pancreas", "gallbladder",
+    ]
+    symptoms = [
+        "hurts", "hurt", "pain", "pains", "tight", "pressure", "aches", "ache",
+        "burns", "burning", "feels funny", "feels weird", "feels strange",
+        "feels wrong", "sore", "stiff", "swollen", "numb", "tingling",
+        "weak", "throbbing", "sharp", "dull", "constant", "intermittent",
+        "cramping", "spasm", "twitch", "pounding", "racing", "flutter",
+    ]
+    for bp in body_parts:
+        if bp in normalized:
+            for sym in symptoms:
+                if sym in normalized:
+                    return True, "medical_body_symptom"
+    
+    # Live conflict/geopolitics keywords — real-time verification needed
     conflict_keywords = [
         "breaking news", "latest news", "latest updates", "current conflict", "war in",
         "ongoing war", "live updates", "just happened", "today in",
-        "current situation", "latest development"
+        "current situation", "latest development",
+        # Geopolitics and sanctions
+        "sanctions", "ceasefire", "peace talks", "evacuation", "hostage",
+        "diplomatic crisis", "embassy", "consulate", "diplomat",
+        # Elections and political events
+        "election results", "vote count", "exit poll", "inauguration",
+        "election night", "primary results", " runoff",
+        # Terrorism and security
+        "terrorist attack", "bombing", "shooting", "hostage crisis",
+        "security alert", "travel advisory", "embassy warning",
+        # Natural disasters (real-time)
+        "earthquake", "tsunami", "hurricane", "typhoon", "tornado",
+        "flood warning", "wildfire", "volcano eruption", "evacuation order",
+        "severe weather alert", "amber alert", "emergency broadcast",
     ]
     
     for keyword in conflict_keywords:
         if keyword in normalized:
             return True, "conflict_live"
     
-    # Source verification requests
+    # Source verification requests — user explicitly wants citations
     source_keywords = [
         "source", "cite", "citation", "reference", "evidence",
         "where did you get", "how do you know", "prove that",
-        "verify", "fact check"
+        "verify", "fact check", "peer-reviewed", "study", "research paper",
+        "clinical trial", "meta-analysis", "systematic review",
+        "according to", "who said", "which expert", "official report",
+    ]
+    
+    # Financial / market data — requires real-time accurate data
+    financial_keywords = [
+        "stock price", "share price", "market cap", "market capitalization",
+        "trading at", "nasdaq", "nyse", "s&p 500", "dow jones", "ftse",
+        "bitcoin price", "crypto price", "ethereum", "exchange rate",
+        "interest rate", "federal reserve", "fed rate", "ecb rate",
+        "inflation rate", "cpi", "gdp", "unemployment rate",
+        "earnings report", "quarterly results", "revenue", "profit margin",
+        # Investment and planning (NEW)
+        "invest", "investing", "investment", "retirement", "401k", "ira", "roth",
+        "bitcoin", "ethereum", "crypto", "cryptocurrency",
+        "economy", "economic", "stock", "stocks", "portfolio",
+        "mutual fund", "etf", "bond", "bonds", "dividend", "yield",
+        "asset", "risk", "return", "roi", "capital", "equity",
+        "debt", "loan", "mortgage", "refinance", "credit", "credit score",
+        "bankruptcy", "savings", "account", "bank", "credit card",
+        "salary", "income", "expense", "budget", "valuation", "worth",
+        "net worth", "wealth", "pension", "insurance", "premium",
+    ]
+    
+    # Legal / regulatory — statutory text changes slowly but case law is live
+    legal_keywords = [
+        "is it legal to", "legality of", "law regarding", "regulation",
+        "court ruling", "supreme court", "recent ruling", "precedent",
+        "statute", "ordinance", "compliance requirement", "penalty for",
+        # Licenses and permits (NEW)
+        "business license", "license", "permit", "zoning",
+        # Immigration and citizenship (NEW)
+        "citizenship", "visa", "immigration", "passport", "work permit",
+        # Employment law (NEW)
+        "discrimination", "harassment", "wrongful termination",
+        "nda", "non-compete", "non-disclosure",
+        # IP and defamation (NEW)
+        "copyright", "trademark", "patent", "plagiarism", "defamation",
+        "libel", "slander",
+        # Litigation and remedies (NEW)
+        "contract", "breach", "liability", "negligence", "class action",
+        "lawsuit", "settlement", "damages", "injunction",
+        "restraining order", "probation", "parole", "bail",
+        "felony", "misdemeanor", "warrant", "subpoena",
+        # Family law (NEW)
+        "power of attorney", "guardianship", "custody", "child support",
+        "alimony", "divorce", "adoption", "wills", "estate", "inheritance",
+        "probate", "trust",
+        # Business structures (NEW)
+        "llc", "incorporation", "partnership", "nonprofit",
+        # Tax and audit (NEW)
+        "tax", "taxes", "audit", "tax attorney",
+        # Courts and appeals (NEW)
+        "expert witness", "appeal", "appellate",
+        "family court", "small claims", "attorney general",
+        "district attorney", "prosecutor", "defense attorney",
+        "legal aid", "habeas corpus",
     ]
     
     for keyword in source_keywords:
         if keyword in normalized:
             return True, "source_request"
+    
+    # Financial / market data — accuracy matters
+    for keyword in financial_keywords:
+        if keyword in normalized:
+            return True, "financial_data"
+    
+    # Legal / regulatory — accuracy matters
+    for keyword in legal_keywords:
+        if keyword in normalized:
+            return True, "legal_context"
     
     # Default: no evidence required
     return False, "default_light"

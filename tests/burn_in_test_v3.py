@@ -129,14 +129,14 @@ class BurnInTestV3:
             classification = classify_intent(question, surface="hmi")
             
             # Step 2: Select route
-            policy = normalize_augmentation_policy("adaptive")
-            decision = select_route(classification, policy=policy)
+            policy = normalize_augmentation_policy("fallback_only")
+            decision = select_route(classification, policy=policy, query=question)
             
             # Step 3: Execute
             result = self.engine.execute(
                 intent=classification,
                 route=decision,
-                context={},
+                context={"question": question},
                 use_python_path=True,
             )
             elapsed = (time.time() - start) * 1000

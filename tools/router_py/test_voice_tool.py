@@ -14,17 +14,19 @@ from pathlib import Path
 
 # Ensure imports work
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pytest
 
+# Simple utilities — always available, independent of heavy deps
+from router_py.voice_tool import clean_text, iso_now
+
 
 try:
-    from voice_tool import (
+    from router_py.voice_tool import (
         VoicePipeline,
         VoicePipelineConfig,
         VoiceResult,
-        clean_text,
-        iso_now,
         use_python_voice,
     )
     VOICE_TOOL_AVAILABLE = True

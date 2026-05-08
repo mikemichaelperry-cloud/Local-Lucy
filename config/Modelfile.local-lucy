@@ -1,7 +1,8 @@
-FROM llama3.1:8b
+FROM qwen3:14b
 
-# Context window: 2048 tokens (balance of performance and capability)
-# Allows longer responses (e.g., 500+ word stories) without truncation
+# Context window: 2048 tokens
+# Supports 500+ word responses with qwen3 thinking mode + conversation history
+# VRAM: ~9.8 GB on RTX 3060 12GB (safe headroom)
 PARAMETER num_ctx 2048
 
 # Use all available CPU threads for generation

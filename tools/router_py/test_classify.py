@@ -185,7 +185,7 @@ class TestRouteSelection(unittest.TestCase):
         self.assertEqual(decision.provider, "openai")  # Paid for forced online
     
     def test_clarify_required(self):
-        """Test clarify required routes to CLARIFY."""
+        """Test clarify_required no longer forces CLARIFY — embedding router decides."""
         classification = ClassificationResult(
             intent="local_answer",
             intent_family="local_answer",
@@ -196,13 +196,16 @@ class TestRouteSelection(unittest.TestCase):
             clarify_required=True,
         )
         
+        # Without query, falls back to local (no embedding router input)
         decision = select_route(classification)
+        self.assertEqual(decision.route, "LOCAL")
         
-        self.assertEqual(decision.route, "CLARIFY")
-        self.assertEqual(decision.policy_reason, "clarification_required")
+        # With a genuine clarify query, embedding router returns LOCAL
+        decision = select_route(classification, query="What do you mean by that?")
+        self.assertEqual(decision.route, "LOCAL")
     
-    def test_evidence_mode_trumps_policy(self):
-        """Test evidence mode overrides policy."""
+    def test_evidence_mode_trumps_fallback_policy(self):
+        """Test evidence mode overrides fallback_only policy (but not disabled)."""
         classification = ClassificationResult(
             intent="background_overview",
             intent_family="background_overview",
@@ -214,7 +217,7 @@ class TestRouteSelection(unittest.TestCase):
             evidence_reason="medical_context",
         )
         
-        decision = select_route(classification, policy="disabled")
+        decision = select_route(classification, policy="fallback_only")
         
         self.assertEqual(decision.route, "AUGMENTED")
         self.assertTrue(decision.requires_evidence)

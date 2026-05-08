@@ -43,3 +43,29 @@ state/evidence_session_*.json
 # Runtime state files (generated during execution)
 state/voice_runtime.json
 ui_debug.log
+
+# Generated router artifacts
+models/router/*.npy
+models/router/*.jsonl
+models/router/*.json
+models/router/*.processed
+models/router/*.log
+models/router/*.json
+models/router/*.log
+models/router/*.processed
+models/router/v2_evaluation.txt
+models/router/.learner_lock
+models/router/checkpoints/
+models/router/data/
+models/router/__pycache__/
+
+# Runtime state
+state/namespaces/
+state/*.jsonl
+state/*.jsonl.lock
+state/state_ARCHIVE_*/
+state/voice_audio_levels.json
+
+# Local reports
+burn_in_report*.json
+thrash_report*.json

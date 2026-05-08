@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QGroupBox, QLabel, QLayout, QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget
 
-from app.ui_levels import ENGINEERING, level_at_least
+from app.ui_levels import ENGINEERING, POWER, level_at_least
 
 DEFAULT_HISTORY_RETENTION_MAX_ENTRIES = 200
 
@@ -92,9 +92,9 @@ class StatusPanel(QFrame):
                 ("Configured Provider Paid", "unknown"),
                 ("Last Request Provider", "unknown"),
                 ("Last Request Paid", "unknown"),
-                ("Session Augmented Calls", "0"),
-                ("Session Paid Augmented Calls", "0"),
-                ("Session Provider Counts", "openai=0 kimi=0 wikipedia=0"),
+                ("Session Augmented Calls", "—"),
+                ("Session Paid Augmented Calls", "—"),
+                ("Session Provider Counts", "—"),
             ],
             self._runtime_summary_labels,
             self._runtime_summary_cards,
@@ -196,7 +196,8 @@ class StatusPanel(QFrame):
         for label_text, label_widget in self._runtime_summary_labels.items():
             label_widget.setText(self._format_runtime_value(label_text, values.get(label_text, "unknown")))
         for label_text, label_widget in self._runtime_detail_labels.items():
-            label_widget.setText(values.get(label_text, "unknown"))
+            if label_text in values:
+                label_widget.setText(values[label_text])
         self._latest_runtime_snapshot["runtime_status"] = dict(values)
 
     def update_request_details(self, payload: dict[str, object] | None) -> None:
@@ -332,6 +333,7 @@ class StatusPanel(QFrame):
     def set_interface_level(self, level: str) -> None:
         self._current_level = level
         advanced_or_deeper = level_at_least(level, ENGINEERING)
+        power_or_deeper = level_at_least(level, POWER)
 
         if advanced_or_deeper:
             self._runtime_summary_group.setTitle("Runtime Summary")
@@ -380,7 +382,7 @@ class StatusPanel(QFrame):
             )
 
         self._runtime_summary_group.setVisible(True)
-        self._runtime_detail_group.setVisible(advanced_or_deeper)
+        self._runtime_detail_group.setVisible(power_or_deeper)
         self._request_summary_group.setVisible(True)
         self._request_detail_group.setVisible(advanced_or_deeper)
         self._advanced_metadata_group.setVisible(advanced_or_deeper)

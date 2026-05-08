@@ -4,10 +4,14 @@ from __future__ import annotations
 # This HMI bridge intentionally lives in the shared UI tree outside any single
 # snapshot. Runtime authority remains pinned to snapshot-local backend tools.
 
+import fcntl
 import json
 import os
 import subprocess
 import sys
+import threading
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -40,17 +44,18 @@ class RuntimeActionTaskSignals(QObject):
 
 
 class RuntimeActionTask(QRunnable):
-    def __init__(self, bridge: "RuntimeBridge", action: str, requested_value: str) -> None:
+    def __init__(self, bridge: "RuntimeBridge", action: str, requested_value: str, *, context: dict[str, Any] | None = None) -> None:
         super().__init__()
         self._bridge = bridge
         self._action = action
         self._requested_value = requested_value
+        self._context = context
         self.signals = RuntimeActionTaskSignals()
 
     @Slot()
     def run(self) -> None:
         try:
-            result = self._bridge.run_action(self._action, self._requested_value)
+            result = self._bridge.run_action(self._action, self._requested_value, context=self._context)
         except Exception as exc:  # pragma: no cover - defensive UI worker guard
             result = CommandResult(
                 action=self._action,
@@ -92,6 +97,7 @@ class RuntimeBridge:
         self.request_capability = self._discover_request_capability()
         self.voice_capability = self._discover_voice_capability()
         self._prime_voice_state()
+        threading.Thread(target=self._background_warmup_ollama, daemon=True).start()
 
     def _workspace_root(self) -> Path:
         return self.snapshot_root.parent.parent
@@ -187,6 +193,9 @@ class RuntimeBridge:
         env.setdefault("LUCY_AUGMENTATION_POLICY", os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only"))
         env.setdefault("LUCY_CONVERSATION_MODE_FORCE", os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0"))
         env.setdefault("LUCY_SESSION_MEMORY", os.environ.get("LUCY_SESSION_MEMORY", "0"))
+        # Router decision logging — default to project logs directory
+        default_log_dir = str(Path(__file__).resolve().parents[3] / "logs" / "router")
+        env.setdefault("LUCY_ROUTER_LOG_DIR", os.environ.get("LUCY_ROUTER_LOG_DIR", default_log_dir))
         return env
 
     def _resolve_snapshot_root(self) -> Path:
@@ -253,7 +262,7 @@ class RuntimeBridge:
             "model_selection": ActionCapability(
                 name="model_selection",
                 available=available,
-                allowed_values=("local-lucy", "local-lucy-qwen3"),
+                allowed_values=("local-lucy",),
                 reason=reason,
             ),
         }
@@ -337,17 +346,18 @@ class RuntimeBridge:
     def voice_available(self) -> bool:
         return self.voice_capability.available
 
-    def run_action(self, action: str, requested_value: str) -> CommandResult:
+    def run_action(self, action: str, requested_value: str, *, context: dict[str, Any] | None = None) -> CommandResult:
         if action == "submit_request":
-            return self._run_submit_request(requested_value, action=action, augmented_direct_once=False)
+            return self._run_submit_request(requested_value, action=action, augmented_direct_once=False, context=context)
         if action == "submit_request_force_augmented_once":
-            return self._run_submit_request(requested_value, action=action, augmented_direct_once=True)
+            return self._run_submit_request(requested_value, action=action, augmented_direct_once=True, context=context)
         if action == "submit_self_review_request":
             return self._run_submit_request(
                 requested_value,
                 action=action,
                 augmented_direct_once=False,
                 self_review=True,
+                context=context,
             )
         if action == "reload_profile":
             return self._run_profile_action(action)
@@ -492,7 +502,7 @@ class RuntimeBridge:
         if not self.voice_capability.available:
             return
         try:
-            # Check voice status
+            # Check voice status (fast, keep synchronous)
             subprocess.run(
                 ["python3", str(self.voice_tool_path), "status"],
                 check=False,
@@ -502,19 +512,64 @@ class RuntimeBridge:
                 shell=False,
                 env=self._command_env(include_voice_python=True),
             )
-            # Prewarm Kokoro TTS worker to reduce latency on first use
-            # This prevents the 2-5s cold-start delay
+        except (OSError, subprocess.TimeoutExpired):
+            return
+        # Background prewarm voice workers so UI startup isn't blocked
+        threading.Thread(target=self._background_prewarm_voice, daemon=True).start()
+
+    def _background_warmup_ollama(self) -> None:
+        """Send a dummy prompt to Ollama to pre-load the model and reduce first-token latency."""
+        model = self._resolve_current_model()
+        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate")
+        keep_alive = os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "10m")
+        body = {
+            "model": model,
+            "prompt": "",
+            "stream": False,
+            "keep_alive": keep_alive,
+            "options": {"num_predict": 0},
+        }
+        try:
+            request = urllib.request.Request(
+                api_url,
+                data=json.dumps(body).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=60.0) as response:
+                response.read()
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+
+    def _background_prewarm_voice(self) -> None:
+        """Prewarm TTS and STT workers in the background to eliminate cold-start latency."""
+        env = self._command_env(include_voice_python=True)
+        # Prewarm Kokoro TTS worker (~2s on cold start)
+        try:
             subprocess.run(
                 ["python3", str(self.voice_tool_path), "internal-prewarm-tts"],
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=10,
+                timeout=30,
                 shell=False,
-                env=self._command_env(include_voice_python=True),
+                env=env,
             )
         except (OSError, subprocess.TimeoutExpired):
-            return
+            pass
+        # Prewarm Whisper STT server (~3-5s on cold start for CPU mode)
+        try:
+            subprocess.run(
+                ["python3", str(self.voice_tool_path), "internal-prewarm-stt"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                shell=False,
+                env=env,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            pass
 
     def _build_command(self, action: str, requested_value: str) -> list[str] | None:
         command_map = {
@@ -536,6 +591,7 @@ class RuntimeBridge:
         action: str,
         augmented_direct_once: bool,
         self_review: bool = False,
+        context: dict[str, Any] | None = None,
     ) -> CommandResult:
         """
         Submit a request to the backend.
@@ -551,6 +607,7 @@ class RuntimeBridge:
             action=action,
             augmented_direct_once=augmented_direct_once,
             self_review=self_review,
+            context=context,
         )
 
     def _extract_payload(self, stdout: str | None) -> dict[str, Any] | None:
@@ -572,6 +629,7 @@ class RuntimeBridge:
         action: str,
         augmented_direct_once: bool,
         self_review: bool = False,
+        context: dict[str, Any] | None = None,
     ) -> CommandResult:
         """
         Direct Python execution path - bypasses subprocess hops.
@@ -627,11 +685,13 @@ class RuntimeBridge:
             )
         
         # Build execution context
-        context = {"question": request_text}
+        exec_context = {"question": request_text}
+        if context:
+            exec_context.update(context)
         if augmented_direct_once:
-            context["augmented_direct_once"] = True
+            exec_context["augmented_direct_once"] = True
         if self_review:
-            context["self_review"] = True
+            exec_context["self_review"] = True
         
         # Get augmentation policy from environment
         policy = normalize_augmentation_policy(
@@ -644,8 +704,8 @@ class RuntimeBridge:
             # Step 1: Classify intent
             classification = classify_intent(request_text, surface="hmi")
             
-            # Step 2: Select route
-            decision = select_route(classification, policy=policy)
+            # Step 2: Select route (with shadow logging if enabled)
+            decision = select_route(classification, policy=policy, query=request_text)
             
             # Step 3: Execute via ExecutionEngine (Python-native path)
             engine = ExecutionEngine(config={
@@ -657,7 +717,7 @@ class RuntimeBridge:
             result = engine.execute(
                 intent=classification,
                 route=decision,
-                context=context,
+                context=exec_context,
                 use_python_path=True,  # KEY: Skip shell entirely
             )
             
@@ -697,11 +757,13 @@ class RuntimeBridge:
             )
             
             # Write to history file for HMI display (same as voice path)
-            try:
-                self._write_history_entry(payload)
-            except Exception as hist_exc:
-                # Log but don't fail the request if history write fails
-                print(f"[runtime_bridge] Warning: failed to write history entry: {hist_exc}", file=sys.stderr)
+            # NEWS is ephemeral — display immediately but do not persist to history.
+            if result.route != "NEWS":
+                try:
+                    self._write_history_entry(payload)
+                except Exception as hist_exc:
+                    # Log but don't fail the request if history write fails
+                    print(f"[runtime_bridge] Warning: failed to write history entry: {hist_exc}", file=sys.stderr)
             
             return CommandResult(
                 action=action,
@@ -798,6 +860,7 @@ class RuntimeBridge:
             "control_state": control_state,
             "error": result.error_message or "",
             "outcome": outcome_payload,
+            "metadata": result.metadata or {},
             "request_id": request_id,
             "request_text": request_text,
             "response_text": result.response_text,
@@ -811,7 +874,11 @@ class RuntimeBridge:
         return datetime.now(timezone.utc).isoformat()
 
     def _write_history_entry(self, payload: dict[str, Any]) -> None:
-        """Write a history entry to the jsonl file for HMI display."""
+        """Write a history entry to the jsonl file for HMI display.
+        
+        Uses fcntl locking to coordinate with runtime_request.py and prevent
+        interleaved writes under concurrency.
+        """
         from datetime import datetime, timezone
         
         # Resolve history file path (same logic as runtime_request.py)
@@ -831,11 +898,18 @@ class RuntimeBridge:
             "status": payload.get("status", "unknown"),
         }
         
-        # Write to file
+        # Write to file under lock to coordinate with runtime_request.py
         history_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(history_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, sort_keys=True))
-            f.write("\n")
+        lock_file = history_file.with_suffix(history_file.suffix + ".lock")
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(lock_file, "a+", encoding="utf-8") as lock_handle:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+            try:
+                with open(history_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(entry, sort_keys=True))
+                    f.write("\n")
+            finally:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
 
     def _resolve_current_model(self) -> str:
         """Read the active model from runtime state file."""
@@ -1003,12 +1077,17 @@ class RuntimeBridge:
                 payload=None,
             )
         try:
+            # Long voice text (e.g., NEWS with 10 articles) can exceed 60s of audio +
+            # synthesis time. Compute a generous timeout from text length (~8 chars/sec
+            # spoken rate + 30s synthesis headroom), capped at 5 minutes.
+            speak_timeout = max(60, len(text) // 8 + 30)
+            speak_timeout = min(speak_timeout, 300)
             completed = subprocess.run(
                 ["python3", str(self.voice_tool_path), "speak", "--text", text],
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=speak_timeout,
                 shell=False,
                 env=self._command_env(include_voice_python=True),
             )

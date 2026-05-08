@@ -76,7 +76,7 @@ def test_policy_disabled_overrides_evidence_required():
         f"but got provider={decision.provider}"
     )
     print("✓ PASS: policy=disabled correctly overrides evidence_mode=required")
-    return True
+    
 
 
 def test_policy_disabled_overrides_news_query():
@@ -97,7 +97,7 @@ def test_policy_disabled_overrides_news_query():
         f"but got route={decision.route}"
     )
     print("✓ PASS: News queries respect policy=disabled")
-    return True
+    
 
 
 def test_policy_fallback_with_evidence_goes_augmented():
@@ -119,7 +119,7 @@ def test_policy_fallback_with_evidence_goes_augmented():
         f"but got route={decision.route}"
     )
     print("✓ PASS: evidence_mode=required correctly overrides fallback_only policy")
-    return True
+    
 
 
 def test_policy_direct_allows_evidence():
@@ -141,7 +141,7 @@ def test_policy_direct_allows_evidence():
         f"but got route={decision.route}"
     )
     print("✓ PASS: policy=direct_allowed correctly routes to AUGMENTED")
-    return True
+    
 
 
 def test_evidence_mode_required_without_policy():
@@ -164,7 +164,7 @@ def test_evidence_mode_required_without_policy():
         f"but got route={decision.route}"
     )
     print("✓ PASS: evidence_mode=required routes correctly with default policy")
-    return True
+    
 
 
 def test_non_evidence_query_with_disabled_policy():
@@ -184,7 +184,7 @@ def test_non_evidence_query_with_disabled_policy():
         f"but got route={decision.route}"
     )
     print("✓ PASS: Non-evidence queries respect policy=disabled")
-    return True
+    
 
 
 def test_all_policy_modes_matrix():
@@ -230,7 +230,7 @@ def test_all_policy_modes_matrix():
     else:
         print("✗ FAIL: Some policy mode combinations failed")
     
-    return all_passed
+    assert all_passed, "Some policy mode combinations failed"
 
 
 def run_all_tests():

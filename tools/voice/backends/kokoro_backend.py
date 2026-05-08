@@ -52,6 +52,7 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
     socket_path = root / "tmp" / "run" / "kokoro_tts_worker.sock"
     if socket_path.exists():
         # Verify socket is responsive
+        sock = None
         try:
             import socket
             import json
@@ -60,7 +61,6 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
             sock.connect(str(socket_path))
             sock.send(json.dumps({"cmd": "prewarm"}).encode() + b"\n")
             response = sock.recv(4096).decode()
-            sock.close()
             result = json.loads(response)
             if result.get("ok"):
                 # Return ui-v8 Python path since that's where Kokoro is installed
@@ -69,6 +69,12 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
                     return ui_v8_python
         except Exception:
             pass
+        finally:
+            if sock is not None:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
     
     return None
 

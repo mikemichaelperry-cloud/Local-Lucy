@@ -47,6 +47,23 @@ VOICE_DIR = Path(__file__).resolve().parents[1] / "voice"
 if str(VOICE_DIR) not in sys.path:
     sys.path.insert(0, str(VOICE_DIR))
 
+# ---------------------------------------------------------------------------
+# Utility functions (also re-exported for test compatibility)
+# ---------------------------------------------------------------------------
+
+def iso_now() -> str:
+    """Return current UTC time as ISO-8601 string with Z suffix."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def clean_text(value: Any) -> str:
+    """Clean and normalize text input."""
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 # Import playback with levels - track import status for debugging
 _playback_with_levels_import_error = None
 
@@ -857,7 +874,7 @@ class VoicePipeline(BaseToolWrapper):
             policy = normalize_augmentation_policy(
                 os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
             )
-            decision = select_route(classification, policy=policy)
+            decision = select_route(classification, policy=policy, query=transcript)
             
             # Map mode setting to forced_mode for execution engine
             mode = os.environ.get("LUCY_MODE", "auto").lower()

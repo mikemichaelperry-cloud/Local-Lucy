@@ -1,3 +1,6 @@
+import html
+import re
+
 from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -10,12 +13,13 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QScrollArea,
     QSizePolicy,
+    QTextBrowser,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
-from app.ui_levels import ENGINEERING, normalize_level, level_at_least
+from app.ui_levels import ENGINEERING, POWER, normalize_level, level_at_least
 
 
 class ConversationPanel(QFrame):
@@ -101,8 +105,9 @@ class ConversationPanel(QFrame):
         trace_row.addWidget(self._decision_trace_summary_button, stretch=1)
         layout.addLayout(trace_row)
 
-        self._history = QTextEdit()
+        self._history = QTextBrowser()
         self._history.setReadOnly(True)
+        self._history.setOpenExternalLinks(True)
         self._history.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._history.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._history.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
@@ -130,7 +135,7 @@ class ConversationPanel(QFrame):
         self._draft.setPlaceholderText(
             "Type an operator prompt here.\n\n"
             "Submit dispatches a single authoritative backend request.\n"
-            "Slash text (for example /status) is sent as request text unless GUI command handling is implemented."
+            "Slash text (for example /status) is sent as request text."
         )
         self._draft.setFixedHeight(120)
         layout.addWidget(self._draft)
@@ -211,10 +216,11 @@ class ConversationPanel(QFrame):
     def set_interface_level(self, level: str) -> None:
         self._current_level = normalize_level(level)
         advanced_or_deeper = level_at_least(self._current_level, ENGINEERING)
-        self._history_label.setText("Persisted Request History" if advanced_or_deeper else "Recent History")
-        self._output_label.setText("Selected Request Output" if advanced_or_deeper else "Latest Answer")
-        self._recent_history_summary.setVisible(not advanced_or_deeper)
-        self._history_list.setVisible(advanced_or_deeper)
+        power_or_deeper = level_at_least(self._current_level, POWER)
+        self._history_label.setText("Persisted Request History" if power_or_deeper else "Recent History")
+        self._output_label.setText("Selected Request Output" if power_or_deeper else "Latest Answer")
+        self._recent_history_summary.setVisible(not power_or_deeper)
+        self._history_list.setVisible(power_or_deeper)
         self._decision_trace_summary_button.setVisible(True)
         self._history.setVisible(True)
         if self._input_label is not None:
@@ -446,6 +452,21 @@ class ConversationPanel(QFrame):
         has_failure = self._entry_has_operator_failure(entry)
         result_title = "Latest Result" if has_failure else "Latest Answer"
         result_text = self._operator_failure_text(entry) if has_failure else self._operator_response_text(entry)
+        if self._looks_like_html(result_text):
+            # Build a proper HTML document with escaped request text and answer body.
+            escaped_request = html.escape(request_text)
+            # Extract inner content from <body>...</body> if present
+            body_match = re.search(r'<body[^>]*>(.*?)</body>', result_text, re.IGNORECASE | re.DOTALL)
+            answer_content = body_match.group(1).strip() if body_match else result_text
+            answer_content = re.sub(r'</?html[^>]*>', '', answer_content, flags=re.IGNORECASE)
+            return (
+                '<html><body style="font-family: sans-serif; font-size: 13px; color: #d8e0e6;">'
+                f'<p style="margin: 4px 0;"><b>Latest Request</b><br>{escaped_request}</p>'
+                '<hr style="border: none; border-top: 1px solid #3a4a5a; margin: 8px 0;">'
+                f'<p style="margin: 4px 0;"><b>{result_title}</b></p>'
+                f'{answer_content}'
+                '</body></html>'
+            )
         return "\n\n".join(
             [
                 f"Latest Request\n{request_text}",
@@ -497,6 +518,8 @@ class ConversationPanel(QFrame):
         response_text = self._entry_text(entry, "response_text")
         if not response_text:
             return "No answer was returned."
+        if self._looks_like_html(response_text):
+            return response_text
 
         contract = self._answer_contract(entry)
         cleaned_lines: list[str] = []
@@ -564,6 +587,9 @@ class ConversationPanel(QFrame):
         )
 
     def _operator_failure_text(self, entry: dict[str, object]) -> str:
+        response_text = self._entry_text(entry, "response_text")
+        if response_text:
+            return response_text
         status = (self._entry_text(entry, "status") or "").lower()
         if status == "timeout":
             return "Lucy timed out before returning a usable answer."
@@ -610,6 +636,10 @@ class ConversationPanel(QFrame):
             return "Local answer"
         if final_mode_upper == "SELF_REVIEW":
             return "Self-review answer"
+        if final_mode_upper == "NEWS":
+            return "News (RSS)"
+        if final_mode_upper == "TIME":
+            return "Time lookup"
         return ""
 
     def _nested_entry_text(self, payload: object, key: str) -> str:
@@ -647,7 +677,11 @@ class ConversationPanel(QFrame):
         if isinstance(route, dict):
             rc = route.get("confidence")
             if rc not in {None, ""}:
-                route_confidence = str(rc)
+                try:
+                    if float(rc) > 0:
+                        route_confidence = str(rc)
+                except (ValueError, TypeError):
+                    pass
 
         parts: list[str] = []
         if verification:
@@ -667,18 +701,59 @@ class ConversationPanel(QFrame):
             parts.append(f"Source basis: {source_basis_text}")
         return " | ".join(parts)
 
-    def _set_plain_text(self, widget: QPlainTextEdit | QTextEdit, text: str, *, reset_scroll: bool) -> None:
+    def _set_plain_text(self, widget: QPlainTextEdit | QTextBrowser, text: str, *, reset_scroll: bool) -> None:
         widget_name = "_history" if widget is self._history else "other"
         self._debug_log(f"_set_plain_text: {widget_name}, text length: {len(text)}")
         if widget.toPlainText() == text:
             self._debug_log("text unchanged, skipping")
             return
-        widget.setPlainText(text)
+        if self._looks_like_html(text):
+            widget.setHtml(text)
+        elif self._contains_url(text):
+            widget.setHtml(self._auto_link_urls(text))
+        else:
+            widget.setPlainText(text)
         self._debug_log(f"text set, new length: {len(widget.toPlainText())}")
         if reset_scroll:
             widget.verticalScrollBar().setValue(0)
         if widget is self._history:
             self._schedule_output_height_sync()
+
+    @staticmethod
+    def _looks_like_html(text: str) -> bool:
+        """Detect if text contains HTML markup."""
+        if "<" not in text or ">" not in text:
+            return False
+        # Detect common HTML tags including document-level (html, body) and inline tags
+        return bool(re.search(r'<(html|body|p|div|span|a|b|i|strong|em|br|h[1-6]|ul|ol|li)[\s>]', text, re.IGNORECASE))
+
+    @staticmethod
+    def _contains_url(text: str) -> bool:
+        return bool(re.search(r'https?://[^\s<>"{}|\\^`\[\]]+', text))
+
+    @staticmethod
+    def _auto_link_urls(text: str) -> str:
+        """Convert plain text URLs to clickable HTML links, preserving line breaks."""
+        escaped = html.escape(text)
+        # Convert URLs to clickable links
+        linked = re.sub(
+            r'(https?://[^\s<>"{}|\\^`\[\]]+)',
+            r'<a href="\1">\1</a>',
+            escaped
+        )
+        # Split into paragraphs (separated by blank lines)
+        paragraphs = linked.split('\n\n')
+        html_paragraphs = []
+        for para in paragraphs:
+            # Within each paragraph, convert single newlines to <br>
+            para = para.replace('\n', '<br>')
+            if para.strip():
+                html_paragraphs.append(f'<p style="margin: 8px 0;">{para}</p>')
+        body_content = '\n'.join(html_paragraphs)
+        return (
+            '<html><body style="font-family: sans-serif; font-size: 13px; color: #d8e0e6;">'
+            f'{body_content}</body></html>'
+        )
 
     def _schedule_output_height_sync(self) -> None:
         QTimer.singleShot(0, self._sync_output_height)
