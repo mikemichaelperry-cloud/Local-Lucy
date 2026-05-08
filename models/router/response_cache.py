@@ -15,18 +15,23 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import re
 import time
 from collections import OrderedDict
 from typing import Any
 
-# Config
-MAX_CACHE_SIZE = 256
-DEFAULT_TTL_SECONDS = 300  # 5 minutes
+# Config (overridable via env vars)
+MAX_CACHE_SIZE = int(os.environ.get("LUCY_CACHE_MAX_SIZE", "256"))
+DEFAULT_TTL_SECONDS = int(os.environ.get("LUCY_CACHE_TTL_SECONDS", "300"))
 
 # Cache: OrderedDict preserves insertion order for LRU eviction
 # Value: (response_text, expiry_timestamp)
 _cache: OrderedDict[str, tuple[str, float]] = OrderedDict()
+
+# Metrics
+_hits = 0
+_misses = 0
 
 
 def _normalize_key(query: str) -> str:
@@ -39,15 +44,19 @@ def _normalize_key(query: str) -> str:
 
 def get_cached(query: str) -> str | None:
     """Return cached response if present and not expired."""
+    global _hits, _misses
     key = _normalize_key(query)
     if key not in _cache:
+        _misses += 1
         return None
     response, expiry = _cache[key]
     if time.time() > expiry:
+        _misses += 1
         del _cache[key]
         return None
     # Move to end (most recently used)
     _cache.move_to_end(key)
+    _hits += 1
     return response
 
 
@@ -84,12 +93,17 @@ def cache_stats() -> dict[str, Any]:
     now = time.time()
     valid = sum(1 for _, expiry in _cache.values() if expiry > now)
     expired = len(_cache) - valid
+    total = _hits + _misses
+    hit_rate = round(_hits / total, 3) if total > 0 else 0.0
     return {
         "size": len(_cache),
         "valid": valid,
         "expired": expired,
         "max_size": MAX_CACHE_SIZE,
         "ttl_seconds": DEFAULT_TTL_SECONDS,
+        "hits": _hits,
+        "misses": _misses,
+        "hit_rate": hit_rate,
     }
 
 
