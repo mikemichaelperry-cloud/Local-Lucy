@@ -915,13 +915,24 @@ them according to the route type (bypass, provisional, or full). It handles:
                     pass  # Auto-feedback must never break execution
             
             # Store conversation turn in memory DB (covers HMI + CLI paths)
+            # Exclude ephemeral/time-sensitive queries that change every hour/day.
             if question and final_result.response_text:
-                try:
-                    from memory.memory_service import store_turn
-                    store_turn("user", question)
-                    store_turn("assistant", final_result.response_text)
-                except Exception:
-                    pass  # Memory storage must never break execution
+                q_lower = question.lower()
+                time_sensitive = route.route in ("NEWS", "TIME") or any(
+                    kw in q_lower for kw in [
+                        "latest", "today", "current", "breaking", "just now",
+                        "right now", "happening now", "live", "this morning",
+                        "tonight", "yesterday", "headlines", "stock price",
+                        "weather", "score", "what time",
+                    ]
+                )
+                if not time_sensitive:
+                    try:
+                        from memory.memory_service import store_turn
+                        store_turn("user", question)
+                        store_turn("assistant", final_result.response_text)
+                    except Exception:
+                        pass  # Memory storage must never break execution
             
             self._logger.info(
                 f"Execution complete: status={final_result.status}, "
