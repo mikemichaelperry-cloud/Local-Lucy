@@ -5,7 +5,7 @@
 2. Labels them with intent_family based on content
 3. Adds supplementary examples for underrepresented categories
 4. Builds embedding index
-5. Runs shadow test against legacy router
+5. Runs embedding evaluation against legacy router
 """
 
 import json

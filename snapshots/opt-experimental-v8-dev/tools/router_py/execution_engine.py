@@ -53,6 +53,13 @@ from router_py.classify import ClassificationResult, RoutingDecision
 from router_py.policy import requires_evidence_mode
 from router_py.state_manager import get_state_manager
 
+# Import auto-feedback for answer quality analysis
+try:
+    from auto_feedback import analyze_answer_quality, log_auto_feedback
+    HAS_AUTO_FEEDBACK = True
+except ImportError:
+    HAS_AUTO_FEEDBACK = False
+
 # Import Python local_answer if available
 try:
     from router_py.local_answer import LocalAnswer, LocalAnswerConfig
@@ -262,6 +269,7 @@ them according to the route type (bypass, provisional, or full). It handles:
     EXTRACTOR_SCRIPT: Path = ROOT_DIR / "tools" / "router" / "extract_validated.py"
     LUCY_CHAT_SCRIPT: Path = ROOT_DIR / "lucy_chat.sh"
     LOCAL_ANSWER_SCRIPT: Path = ROOT_DIR / "tools" / "local_answer.sh"
+    LOCAL_ANSWER_PY_SCRIPT: Path = ROOT_DIR / "tools" / "router_py" / "local_answer.py"
     LOCAL_WORKER_SCRIPT: Path = ROOT_DIR / "tools" / "local_worker.py"
     LOCAL_WORKER_CLIENT_LIB: Path = ROOT_DIR / "tools" / "local_worker_client.sh"
     CONV_SHIM_SCRIPT: Path = ROOT_DIR / "tools" / "conversation" / "conversation_cadence_shim.py"
@@ -630,6 +638,14 @@ them according to the route type (bypass, provisional, or full). It handles:
             # Points subprocesses to the correct state directory
             "LUCY_STATE_DIR": str(self._state_dir),
         })
+        # Propagate the selected model so local_answer uses the right LLM.
+        # HMI model selector updates current_state.json; runtime_bridge passes
+        # it via config["model"]. Without this, START_LUCY.sh's hardcoded
+        # LUCY_LOCAL_MODEL=local-lucy always wins.
+        configured_model = self.config.get("model")
+        if configured_model:
+            env["LUCY_LOCAL_MODEL"] = str(configured_model)
+            self._logger.info(f"[MODEL] Subprocess env set to: {configured_model}")
         return env
     
     @contextmanager
@@ -879,6 +895,25 @@ them according to the route type (bypass, provisional, or full). It handles:
             # Persist execution state
             self._write_state_files(route, final_result, context)
             
+            # Auto-feedback: detect obvious misroutes from answer quality
+            if HAS_AUTO_FEEDBACK and question:
+                try:
+                    suggestion = analyze_answer_quality(
+                        query=question,
+                        route=route.route,
+                        response_text=final_result.response_text or "",
+                        error_message=final_result.error_message or "",
+                    )
+                    if suggestion:
+                        log_auto_feedback(suggestion)
+                        self._logger.info(
+                            f"Auto-feedback: detected {suggestion['reason']} "
+                            f"(suggest {suggestion['suggested_route']}, "
+                            f"confidence={suggestion['confidence']})"
+                        )
+                except Exception:
+                    pass  # Auto-feedback must never break execution
+            
             self._logger.info(
                 f"Execution complete: status={final_result.status}, "
                 f"outcome={final_result.outcome_code}, time={execution_time}ms"
@@ -906,6 +941,20 @@ them according to the route type (bypass, provisional, or full). It handles:
                 self._write_state_files(route, error_result, context)
             except Exception:
                 pass
+
+            # Auto-feedback on error cases too
+            if HAS_AUTO_FEEDBACK and question:
+                try:
+                    suggestion = analyze_answer_quality(
+                        query=question,
+                        route=route.route,
+                        response_text="",
+                        error_message=str(e),
+                    )
+                    if suggestion:
+                        log_auto_feedback(suggestion)
+                except Exception:
+                    pass
             
             return error_result
         
@@ -1215,8 +1264,8 @@ them according to the route type (bypass, provisional, or full). It handles:
         if output_mode != "CHAT":
             return False
         
-        # Check if local_answer.sh exists and is executable
-        if not self.LOCAL_ANSWER_SCRIPT.exists():
+        # Check if local_answer.sh or local_answer.py exists
+        if not (self.LOCAL_ANSWER_SCRIPT.exists() or self.LOCAL_ANSWER_PY_SCRIPT.exists()):
             return False
         
         # Check offline action
@@ -1944,23 +1993,58 @@ them according to the route type (bypass, provisional, or full). It handles:
                 )
         
         # Special handling for NEWS route: return news directly
-        if route.route == "NEWS" and evidence and evidence.get("context"):
+        if route.route == "NEWS":
+            if evidence and evidence.get("context"):
+                # Use HTML for display (clean "Read more" links); fall back to plain text.
+                # voice_text in metadata is used by TTS pipeline only.
+                full_text = evidence.get("html_context") or evidence["context"]
+                voice_text = ""
+                articles = evidence.get("articles")
+                if articles:
+                    voice_parts = []
+                    for a in articles:
+                        title = a.get("title", "")
+                        source = a.get("source", "")
+                        desc = a.get("description", "")
+                        part = f"{title}, from {source}."
+                        if desc and len(desc) > 20:
+                            part += f" {desc}"
+                        voice_parts.append(part)
+                    voice_text = " ".join(voice_parts)
+
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="answered",
+                    route="NEWS",
+                    provider="news",
+                    provider_usage_class="free",
+                    response_text=full_text,
+                    error_message="",
+                    metadata={
+                        "route_type": "news_live",
+                        "evidence_fetched": True,
+                        "evidence_title": "Latest News",
+                        "evidence_url": "",
+                        "trust_class": "unverified",
+                        "real_route_preserved": True,
+                        "news_source": evidence.get("provider", "unknown"),
+                        "voice_text": voice_text,
+                        "news_partial": evidence.get("partial", False),
+                        "news_errors": evidence.get("errors"),
+                    },
+                )
+            # News fetch failed — do not fall through to local model
             return ExecutionResult(
-                status="completed",
-                outcome_code="answered",
+                status="failed",
+                outcome_code="news_fetch_failed",
                 route="NEWS",
                 provider="news",
                 provider_usage_class="free",
-                response_text=evidence["context"],
-                error_message="",
+                response_text="Unable to fetch live news at this time. Please check your internet connection or try again later.",
+                error_message="News provider returned no articles",
                 metadata={
-                    "route_type": "news_live",
-                    "evidence_fetched": True,
-                    "evidence_title": "Latest News",
-                    "evidence_url": "",
-                    "trust_class": "unverified",
+                    "route_type": "news_live_failed",
                     "real_route_preserved": True,
-                    "news_source": evidence.get("provider", "unknown"),
                 },
             )
         
@@ -1974,14 +2058,14 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         # Step 3: Call appropriate provider
         if route.provider == "local":
-            response = await self._call_local_model_async(prompt, context, session_memory)
+            response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
         elif route.provider in ("openai", "kimi"):
             response = await self._call_api_provider_async(route.provider, prompt, context)
         elif route.provider == "wikipedia":
             response = await self._call_wikipedia_provider_async(prompt, evidence, context)
         else:
             # Default to local model
-            response = await self._call_local_model_async(prompt, context, session_memory)
+            response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
         
         # Step 4: Validate response
         validated = self._validate_response(response, route)
@@ -2103,6 +2187,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         Fetch live news from RSS feeds.
         
         Uses the news_provider module to fetch fresh news from RSS sources.
+        Parallel async fetching. News is always fetched fresh — never cached.
         
         Args:
             question: The user question (may contain search terms)
@@ -2115,30 +2200,35 @@ them according to the route type (bypass, provisional, or full). It handles:
             self._logger.warning("News provider not available")
             return None
         
+        import time
+        fetch_start = time.time()
         try:
-            
-            # Run news fetch in thread pool to not block event loop
-            loop = asyncio.get_event_loop()
-            # Use functools.partial to pass for_voice parameter
-            import functools
-            result = await loop.run_in_executor(
-                None, functools.partial(NewsProvider.fetch_news, question, for_voice=for_voice)
-            )
+            result = await NewsProvider.fetch_news(question, for_voice=for_voice)
+            elapsed = time.time() - fetch_start
             
             if result.ok:
+                article_count = len(result.articles) if result.articles else 0
+                self._logger.info(
+                    f"NEWS fetched fresh: {article_count} articles in {elapsed:.2f}s "
+                    f"(partial={result.partial}, source={result.source})"
+                )
                 return {
                     "context": result.text,
+                    "html_context": result.html_text,
                     "title": "Latest News",
                     "url": "",
                     "provider": result.source,
                     "class": "news_live",
                     "articles": result.articles,
+                    "partial": result.partial,
+                    "errors": result.errors,
                 }
             else:
-                self._logger.warning(f"News fetch failed: {result.error}")
+                self._logger.warning(f"News fetch failed after {elapsed:.2f}s: {result.error}")
                 return None
         except Exception as e:
-            self._logger.warning(f"News evidence fetch failed: {e}")
+            elapsed = time.time() - fetch_start
+            self._logger.warning(f"News evidence fetch failed after {elapsed:.2f}s: {e}")
             return None
     
     async def _fetch_time_evidence(self, question: str) -> dict[str, Any] | None:
@@ -2395,6 +2485,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         prompt: str,
         context: dict[str, Any],
         session_memory: str = "",
+        route_mode: str = "LOCAL",
     ) -> str:
         """
         Call local model asynchronously using Python-native path.
@@ -2416,6 +2507,11 @@ them according to the route type (bypass, provisional, or full). It handles:
         from router_py.local_answer import LocalAnswer, LocalAnswerConfig
         
         config = LocalAnswerConfig.from_env()
+        # Override with the model selected in the HMI (passed via ExecutionEngine config).
+        configured_model = self.config.get("model")
+        if configured_model:
+            config.model = str(configured_model)
+            self._logger.info(f"[MODEL] Async local model set to: {configured_model}")
         answer = LocalAnswer(config)
         
         if session_memory:
@@ -2425,6 +2521,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             result = await answer.generate_answer(
                 query=prompt,
                 session_memory=session_memory,
+                route_mode=route_mode,
             )
             return self._render_chat_fast_from_raw(result.text)
         except Exception as e:

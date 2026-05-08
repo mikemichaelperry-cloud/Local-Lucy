@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Background learner — continuously improves embedding index from usage.
 
-Watches shadow divergence logs and adds new examples to the embedding index.
-Can also ingest explicit user feedback (thumbs up/down on routing decisions).
+Processes three sources of learning signal:
+  1. Router decision logs (high-confidence decisions)
+  2. Explicit user feedback (--feedback CLI)
+  3. Auto-feedback from answer quality analysis (execution engine)
 
 Usage:
     # Run once to process pending logs
@@ -314,7 +316,7 @@ def add_feedback(query: str, correct_route: str, feedback_type: str = "correctio
 def run_daemon(log_path: Path | None, interval: int = 60):
     """Run learner as a daemon process."""
     print(f"Background learner daemon started")
-    print(f"  Shadow log: {log_path}")
+    print(f"  Router log: {log_path}")
     print(f"  Check interval: {interval}s")
     print(f"  Index: {INDEX_PATH}")
     print(f"  Press Ctrl+C to stop\n")
@@ -380,7 +382,7 @@ def main():
     parser.add_argument("--process", action="store_true", help="Process logs once and exit")
     parser.add_argument("--daemon", action="store_true", help="Run as daemon")
     parser.add_argument("--interval", type=int, default=60, help="Daemon check interval (seconds)")
-    parser.add_argument("--log-path", type=Path, help="Shadow divergence log path")
+    parser.add_argument("--log-path", type=Path, help="Router decision log path (router_decisions.jsonl)")
     parser.add_argument("--feedback", type=str, help="Add user feedback: query string")
     parser.add_argument("--route", type=str, help="Correct route for feedback")
     parser.add_argument("--correct", action="store_true", help="Mark feedback as confirmation (legacy was right)")

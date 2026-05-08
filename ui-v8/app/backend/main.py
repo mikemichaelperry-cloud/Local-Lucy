@@ -2,7 +2,7 @@
 from backend import (
     execute_plan_python,
     execute_plan_shell,
-    execute_plan_shadow,
+    execute_plan_parity,
     _delegate_execution,
     _delegate_execution_to_python,
     _delegate_execution_to_shell,
@@ -17,7 +17,7 @@ from backend import (
 __all__ = [
     'execute_plan_python',
     'execute_plan_shell',
-    'execute_plan_shadow',
+    'execute_plan_parity',
     '_delegate_execution',
     '_delegate_execution_to_python',
     '_delegate_execution_to_shell',

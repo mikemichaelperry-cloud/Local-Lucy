@@ -704,7 +704,7 @@ class RuntimeBridge:
             # Step 1: Classify intent
             classification = classify_intent(request_text, surface="hmi")
             
-            # Step 2: Select route (with shadow logging if enabled)
+            # Step 2: Select route (embedding router primary, legacy audit logged)
             decision = select_route(classification, policy=policy, query=request_text)
             
             # Step 3: Execute via ExecutionEngine (Python-native path)

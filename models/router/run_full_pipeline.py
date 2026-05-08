@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Autonomous ModernBERT router pipeline — data generation, training, shadow mode, cutover."""
+"""Autonomous ModernBERT router pipeline — data generation, training, embedding router, cutover."""
 
 import json
 import random

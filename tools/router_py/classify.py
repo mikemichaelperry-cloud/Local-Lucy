@@ -472,10 +472,6 @@ def select_route(
     return decision
 
 
-# Backwards-compatibility alias — deprecated, use select_route directly.
-select_route_with_shadow = select_route
-
-
 def _is_news_query_typos(query: str) -> bool:
     """Detect news queries with heavy typos that the classifier misses.
 

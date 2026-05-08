@@ -3,7 +3,7 @@
 Adversarial Router Evaluation Harness
 ======================================
 
-Evaluates Legacy Router vs Embedding (Shadow) Router on hand-crafted
+Evaluates Legacy Router vs Embedding Router on hand-crafted
 adversarial queries designed to expose disagreement and failure modes.
 
 No LLM calls. No code changes. Pure router evaluation.
@@ -39,15 +39,15 @@ from router_py.policy import normalize_augmentation_policy
 class EvalResult:
     query: str
     legacy_route: str
-    shadow_route: str
-    shadow_confidence: float
-    shadow_intent: str
+    embedding_route: str
+    embedding_confidence: float
+    embedding_intent: str
     legacy_intent: str
     legacy_evidence: str
     divergence: bool
     category: str
     expected_route: str  # Ground truth by design
-    winner: str  # "legacy", "shadow", "tie", or "unclear"
+    winner: str  # "legacy", "embedding", "tie", or "unclear"
     reason: str
 
 
@@ -155,22 +155,22 @@ ADVERSARIAL_QUERIES: list[tuple[str, str, str]] = [
 # Determines which router made the "better" decision for divergences.
 # =============================================================================
 
-def adjudicate(query: str, legacy: RoutingDecision, shadow: dict, expected: str) -> tuple[str, str]:
+def adjudicate(query: str, legacy: RoutingDecision, embedding: dict, expected: str) -> tuple[str, str]:
     """Return (winner, reason) for a divergence."""
     lr = legacy.route
-    sr = shadow.get("route", "UNKNOWN")
+    sr = embedding.get("route", "UNKNOWN")
 
     # If both agree with expected, tie
     if lr == expected and sr == expected:
         return "tie", "Both routers agree with expected route."
 
-    # If legacy matches expected and shadow doesn't
+    # If legacy matches expected and embedding doesn.t
     if lr == expected and sr != expected:
-        return "legacy", f"Legacy correctly routes to {lr}; shadow incorrectly routes to {sr}."
+        return "legacy", f"Legacy correctly routes to {lr}; embedding incorrectly routes to {sr}."
 
-    # If shadow matches expected and legacy doesn't
+    # If embedding matches expected and legacy doesn't
     if sr == expected and lr != expected:
-        return "shadow", f"Shadow correctly routes to {sr}; legacy incorrectly routes to {lr}."
+        return "embedding", f"Embedding correctly routes to {sr}; legacy incorrectly routes to {lr}."
 
     # If neither matches expected, pick whichever is "closer"
     # Heuristic: AUGMENTED > LOCAL > NEWS > TIME > CLARIFY for safety
@@ -183,9 +183,9 @@ def adjudicate(query: str, legacy: RoutingDecision, shadow: dict, expected: str)
     sr_dist = abs(sr_safe - exp_safe)
 
     if lr_dist < sr_dist:
-        return "legacy", f"Neither matches expected ({expected}), but legacy ({lr}) is closer in safety space than shadow ({sr})."
+        return "legacy", f"Neither matches expected ({expected}), but legacy ({lr}) is closer in safety space than embedding ({sr})."
     elif sr_dist < lr_dist:
-        return "shadow", f"Neither matches expected ({expected}), but shadow ({sr}) is closer in safety space than legacy ({lr})."
+        return "embedding", f"Neither matches expected ({expected}), but embedding ({sr}) is closer in safety space than legacy ({lr})."
     else:
         return "tie", f"Both routers diverge equally from expected ({expected})."
 
@@ -199,7 +199,7 @@ def run_evaluation() -> list[EvalResult]:
     policy = normalize_augmentation_policy("fallback_only")
 
     print(f"Running adversarial evaluation on {len(ADVERSARIAL_QUERIES)} queries...")
-    print(f"Legacy router: keyword-based | Shadow router: ModernBERT embedding k-NN (k=3)")
+    print(f"Legacy router: keyword-based | Embedding router: ModernBERT embedding k-NN (k=3)")
     print("-" * 80)
 
     for category, query, expected in ADVERSARIAL_QUERIES:
@@ -218,9 +218,9 @@ def run_evaluation() -> list[EvalResult]:
         results.append(EvalResult(
             query=query,
             legacy_route=route,
-            shadow_route=route,
-            shadow_confidence=decision.confidence,
-            shadow_intent=decision.intent_family,
+            embedding_route=route,
+            embedding_confidence=decision.confidence,
+            embedding_intent=decision.intent_family,
             legacy_intent=classification.intent_family if classification else "unknown",
             legacy_evidence=classification.evidence_mode if classification else "unknown",
             divergence=False,
@@ -237,11 +237,11 @@ def print_report(results: list[EvalResult]) -> None:
     total = len(results)
     divergences = [r for r in results if r.divergence]
     legacy_wins = [r for r in divergences if r.winner == "legacy"]
-    shadow_wins = [r for r in divergences if r.winner == "shadow"]
+    embedding_wins = [r for r in divergences if r.winner == "embedding"]
     ties = [r for r in divergences if r.winner == "tie"]
 
     legacy_correct = sum(1 for r in results if r.legacy_route == r.expected_route)
-    shadow_correct = sum(1 for r in results if r.shadow_route == r.expected_route)
+    embedding_correct = sum(1 for r in results if r.embedding_route == r.expected_route)
 
     print()
     print("=" * 80)
@@ -254,11 +254,11 @@ def print_report(results: list[EvalResult]) -> None:
     print()
     print("ACCURACY vs GROUND TRUTH")
     print(f"  Legacy router:  {legacy_correct}/{total} = {legacy_correct/total*100:.1f}%")
-    print(f"  Shadow router:  {shadow_correct}/{total} = {shadow_correct/total*100:.1f}%")
+    print(f"  Embedding router:  {embedding_correct}/{total} = {embedding_correct/total*100:.1f}%")
     print()
     print("DIVERGENCE BREAKDOWN")
     print(f"  Legacy wins:    {len(legacy_wins)} ({len(legacy_wins)/total*100:.1f}%)")
-    print(f"  Shadow wins:    {len(shadow_wins)} ({len(shadow_wins)/total*100:.1f}%)")
+    print(f"  Embedding wins:    {len(embedding_wins)} ({len(embedding_wins)/total*100:.1f}%)")
     print(f"  Ties/unclear:   {len(ties)} ({len(ties)/total*100:.1f}%)")
     print()
 
@@ -269,9 +269,9 @@ def print_report(results: list[EvalResult]) -> None:
     for cat in categories:
         cat_results = [r for r in results if r.category == cat]
         leg_corr = sum(1 for r in cat_results if r.legacy_route == r.expected_route)
-        shd_corr = sum(1 for r in cat_results if r.shadow_route == r.expected_route)
+        emb_corr = sum(1 for r in cat_results if r.embedding_route == r.expected_route)
         divs = sum(1 for r in cat_results if r.divergence)
-        print(f"  {cat:25s}  Legacy: {leg_corr}/{len(cat_results)}  Shadow: {shd_corr}/{len(cat_results)}  Div: {divs}")
+        print(f"  {cat:25s}  Legacy: {leg_corr}/{len(cat_results)}  Embedding: {emb_corr}/{len(cat_results)}  Div: {divs}")
 
     print()
     print("DETAILED DIVERGENCES")
@@ -279,10 +279,10 @@ def print_report(results: list[EvalResult]) -> None:
     if not divergences:
         print("  No divergences found.")
     for r in divergences:
-        marker = "✅" if r.winner == "shadow" else "⚠️" if r.winner == "legacy" else "➖"
+        marker = "✅" if r.winner == "embedding" else "⚠️" if r.winner == "legacy" else "➖"
         print(f"\n  {marker} [{r.category}] {r.query[:70]}{'...' if len(r.query) > 70 else ''}")
         print(f"     Legacy:  {r.legacy_route:20s} (intent={r.legacy_intent}, evidence={r.legacy_evidence})")
-        print(f"     Shadow:  {r.shadow_route:20s} (intent={r.shadow_intent}, conf={r.shadow_confidence:.3f})")
+        print(f"     Embedding:  {r.embedding_route:20s} (intent={r.embedding_intent}, conf={r.embedding_confidence:.3f})")
         print(f"     Expected: {r.expected_route}")
         print(f"     Winner:  {r.winner.upper()}")
         print(f"     Reason:  {r.reason}")
@@ -291,21 +291,21 @@ def print_report(results: list[EvalResult]) -> None:
     print("=" * 80)
     print("SUMMARY")
     print("=" * 80)
-    if shadow_correct >= legacy_correct:
-        margin = (shadow_correct - legacy_correct) / total * 100
-        print(f"Shadow router achieves {shadow_correct/total*100:.1f}% accuracy vs Legacy {legacy_correct/total*100:.1f}%")
-        print(f"Margin: +{margin:.1f} percentage points in favor of shadow router")
-        if shadow_correct / total >= 0.97:
-            print("RECOMMENDATION: Shadow router meets the 97% threshold for cutover consideration.")
-        elif shadow_correct / total >= 0.95:
-            print("RECOMMENDATION: Shadow router is close to the 97% threshold. Continue gathering data.")
+    if embedding_correct >= legacy_correct:
+        margin = (embedding_correct - legacy_correct) / total * 100
+        print(f"Embedding router achieves {embedding_correct/total*100:.1f}% accuracy vs Legacy {legacy_correct/total*100:.1f}%")
+        print(f"Margin: +{margin:.1f} percentage points in favor of embedding router")
+        if embedding_correct / total >= 0.97:
+            print("RECOMMENDATION: Embedding router meets the 97% threshold for cutover consideration.")
+        elif embedding_correct / total >= 0.95:
+            print("RECOMMENDATION: Embedding router is close to the 97% threshold. Continue gathering data.")
         else:
-            print("RECOMMENDATION: Shadow router needs improvement before cutover.")
+            print("RECOMMENDATION: Embedding router needs improvement before cutover.")
     else:
-        margin = (legacy_correct - shadow_correct) / total * 100
-        print(f"Legacy router achieves {legacy_correct/total*100:.1f}% accuracy vs Shadow {shadow_correct/total*100:.1f}%")
+        margin = (legacy_correct - embedding_correct) / total * 100
+        print(f"Legacy router achieves {legacy_correct/total*100:.1f}% accuracy vs Embedding {embedding_correct/total*100:.1f}%")
         print(f"Margin: +{margin:.1f} percentage points in favor of legacy router")
-        print("RECOMMENDATION: Legacy router remains superior. Shadow needs more examples or tuning.")
+        print("RECOMMENDATION: Legacy router remains superior. Embedding needs more examples or tuning.")
 
     print()
     print(f"Report saved to: {PROJECT_ROOT / 'router_evaluation_report.json'}")
@@ -316,7 +316,7 @@ def save_json(results: list[EvalResult]) -> None:
         "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
         "total_queries": len(results),
         "legacy_accuracy": sum(1 for r in results if r.legacy_route == r.expected_route) / len(results),
-        "shadow_accuracy": sum(1 for r in results if r.shadow_route == r.expected_route) / len(results),
+        "embedding_accuracy": sum(1 for r in results if r.embedding_route == r.expected_route) / len(results),
         "agreement_rate": sum(1 for r in results if not r.divergence) / len(results),
         "results": [asdict(r) for r in results],
     }
