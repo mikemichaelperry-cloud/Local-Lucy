@@ -337,6 +337,42 @@ def run_daemon(log_path: Path | None, interval: int = 60):
         print("\nDaemon stopped.")
 
 
+def maybe_auto_learn(log_path: Path | None = None, min_entries: int = 3) -> bool:
+    """Trigger background learning if enough pending feedback exists.
+
+    Called from execution_engine after writing auto-feedback.
+    Runs learning in a background thread to avoid blocking response.
+
+    Args:
+        log_path: Router decision log path
+        min_entries: Minimum auto-feedback entries to trigger rebuild
+
+    Returns:
+        True if learning was triggered, False otherwise
+    """
+    sys.path.insert(0, str(ROUTER_DIR))
+    try:
+        from auto_feedback import load_auto_feedback
+    except ImportError:
+        return False
+
+    entries = load_auto_feedback(min_confidence=0.6)
+    if len(entries) < min_entries:
+        return False
+
+    # Trigger learning in background thread
+    import threading
+    def _learn():
+        try:
+            learn_once(log_path, verbose=False)
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_learn, daemon=True)
+    t.start()
+    return True
+
+
 def process_auto_feedback() -> list[dict]:
     """Process auto-feedback from answer quality analysis."""
     sys.path.insert(0, str(ROUTER_DIR))

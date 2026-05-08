@@ -936,6 +936,14 @@ them according to the route type (bypass, provisional, or full). It handles:
                             f"(suggest {suggestion['suggested_route']}, "
                             f"confidence={suggestion['confidence']})"
                         )
+                        # Trigger background learning if enough feedback accumulated
+                        try:
+                            from background_learner import maybe_auto_learn
+                            triggered = maybe_auto_learn(min_entries=5)
+                            if triggered:
+                                self._logger.info("Background learning triggered (auto)")
+                        except Exception:
+                            pass
                 except Exception:
                     pass  # Auto-feedback must never break execution
             
