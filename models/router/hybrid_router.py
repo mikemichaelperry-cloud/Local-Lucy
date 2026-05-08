@@ -164,6 +164,14 @@ class HybridRouter:
             "stock price", "bitcoin price", "crypto price", "current price",
             "price of", "trading at", "market cap", "market price",
             "exchange rate", "currency rate", "forex",
+            # Sports scores
+            "score", "who won", "game result", "match result", "final score",
+            "live score", "half time", "full time", "overtime",
+            # Traffic / transit
+            "traffic", "delay", "road closure", "accident on", "congestion",
+            "flight status", "departure", "arrival", "gate", "boarding",
+            # Election / polls
+            "election results", "vote count", "polls closed", "live updates",
         ]
         # Cooking/recipe queries should always be LOCAL
         self.cooking_keywords = [
