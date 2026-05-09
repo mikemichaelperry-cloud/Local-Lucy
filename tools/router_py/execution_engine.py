@@ -819,7 +819,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         # Use Python-native path by default for all routes (shell-free)
         # Following burn-in certification (2,221+ queries, 100% success)
-        if use_python_path and route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "LOCAL", "TIME"):
+        if use_python_path and route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "LOCAL", "TIME", "WEATHER"):
             self._logger.info("Using Python-native execution path (shell-free)")
             # Run the async version in a new event loop
             try:
@@ -1887,7 +1887,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             route_type = self._determine_route_type(route, intent, context)
             
             # Use Python-native execution based on route type
-            if route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "TIME"):
+            if route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "TIME", "WEATHER"):
                 result = await self._execute_full_route_python(intent, route, context)
             elif route_type == "provisional":
                 # Provisional: local first with fallback to augmentation
@@ -2001,10 +2001,45 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         # Step 1: Fetch evidence if needed
         evidence = None
-        if route.route in ("EVIDENCE", "NEWS", "FULL", "AUGMENTED", "TIME"):
+        if route.route in ("EVIDENCE", "NEWS", "FULL", "AUGMENTED", "TIME", "WEATHER"):
             # Check if this is a voice query for voice-optimized content
             for_voice = context.get("surface") == "voice" if context else False
             evidence = await self._fetch_evidence(question, route, for_voice=for_voice)
+        
+        # Special handling for WEATHER route: return weather directly
+        if route.route == "WEATHER":
+            if evidence and evidence.get("ok"):
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="answered",
+                    route="WEATHER",
+                    provider="weather",
+                    provider_usage_class="free",
+                    response_text=evidence["formatted"],
+                    error_message="",
+                    metadata={
+                        "route_type": "weather_lookup",
+                        "location": evidence.get("location"),
+                        "temp_c": evidence.get("temp_c"),
+                        "description": evidence.get("description"),
+                        "real_route_preserved": True,
+                    },
+                )
+            else:
+                error_msg = evidence.get("error", "Unknown location") if evidence else "Could not fetch weather"
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="error",
+                    route="WEATHER",
+                    provider="weather",
+                    provider_usage_class="free",
+                    response_text=f"Sorry, I couldn't fetch the weather. {error_msg}",
+                    error_message=error_msg,
+                    metadata={
+                        "route_type": "weather_lookup_failed",
+                        "real_route_preserved": True,
+                    },
+                )
         
         # Special handling for TIME route: return current time directly
         if route.route == "TIME":
@@ -2166,6 +2201,10 @@ them according to the route type (bypass, provisional, or full). It handles:
             Evidence dictionary with context, title, url, etc., or None if failed
         """
         self._logger.info(f"Fetching evidence for route={route.route}, provider={route.provider}, for_voice={for_voice}")
+        
+        # For WEATHER route, fetch weather from wttr.in
+        if route.route == "WEATHER":
+            return await self._fetch_weather_evidence(question)
         
         # For TIME route, fetch current time from time API
         if route.route == "TIME":
@@ -2386,6 +2425,23 @@ them according to the route type (bypass, provisional, or full). It handles:
             return "\n".join(lines)
         except Exception as e:
             return f"Current time: {data.get('time', 'unknown')}"
+    
+    async def _fetch_weather_evidence(self, question: str) -> dict[str, Any] | None:
+        """
+        Fetch weather data from wttr.in.
+        
+        Args:
+            question: The user question (e.g., "What's the weather in London?")
+            
+        Returns:
+            Evidence dictionary with weather data or None if failed
+        """
+        try:
+            from weather_provider import fetch_weather
+            return await fetch_weather(question)
+        except Exception as e:
+            self._logger.warning(f"Weather evidence fetch failed: {e}")
+            return None
     
     async def _fetch_api_evidence(
         self,
@@ -3726,9 +3782,22 @@ them according to the route type (bypass, provisional, or full). It handles:
                 continue
             lines.append(s)
         
-        if lines:
-            return " ".join(lines)
-        return raw.strip()
+        text = " ".join(lines) if lines else raw.strip()
+        
+        # Strip common model-generated error prefixes (qwen3 thinking artifacts)
+        error_prefixes = [
+            "Error:", "error:", "ERROR:",
+            "Sorry, I cannot", "sorry, i cannot",
+            "I cannot answer", "i cannot answer",
+        ]
+        for prefix in error_prefixes:
+            if text.startswith(prefix):
+                text = text[len(prefix):].strip()
+                # Also strip leading punctuation after prefix removal
+                text = text.lstrip(".:\n\r ")
+                break
+        
+        return text
     
     def _local_fast_non_empty_guard(
         self,

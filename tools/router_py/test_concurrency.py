@@ -156,7 +156,7 @@ def test_statemanager_concurrent_writes():
     results.add_test("StateManager Concurrent Writes", passed, details, error_msg)
     
     sm.close()
-    return passed
+    assert passed
 
 
 # =============================================================================
@@ -225,7 +225,7 @@ def test_statemanager_lock_contention():
         error_msg = errors[0]
     
     results.add_test("StateManager Lock Contention", passed, details, error_msg)
-    return passed
+    assert passed
 
 
 # =============================================================================
@@ -283,7 +283,7 @@ def test_connection_pool_stress():
     error_msg = errors[0] if errors else None
     
     results.add_test("Connection Pool Stress Test", passed, details, error_msg)
-    return passed
+    assert passed
 
 
 # =============================================================================
@@ -352,7 +352,7 @@ def test_concurrent_sessions():
     results.add_test("Concurrent Session Operations", passed, details, error_msg)
     
     sm.close()
-    return passed
+    assert passed
 
 
 # =============================================================================
@@ -421,7 +421,7 @@ def test_race_condition_read_modify_write():
     results.add_test("Race Condition - Read-Modify-Write", passed, details, error_msg)
     
     sm.close()
-    return passed
+    assert passed
 
 
 # =============================================================================
@@ -459,7 +459,7 @@ def test_wal_mode():
     results.add_test("WAL Mode Verification", passed, details, error_msg)
     
     sm.close()
-    return passed
+    assert passed
 
 
 # =============================================================================
@@ -523,7 +523,7 @@ def test_database_timeout():
     results.add_test("Database Timeout Handling", passed, details, error_msg)
     
     sm.close()
-    return passed
+    assert passed
 
 
 # =============================================================================
@@ -588,7 +588,7 @@ def test_concurrent_telemetry():
     results.add_test("Concurrent Telemetry Recording", passed, details, error_msg)
     
     sm.close()
-    return passed
+    assert passed
 
 
 # =============================================================================

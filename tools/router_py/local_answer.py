@@ -686,7 +686,11 @@ class LocalAnswer:
         """Build the prompt for Ollama."""
         memory_block = ""
         if session_memory.strip():
-            memory_block = f"Memory:\n{session_memory}\n\n"
+            memory_block = (
+                "The user has explicitly enabled memory and provided the following "
+                "memory contents for this session. Use them to answer follow-up questions.\n\n"
+                f"{session_memory}\n\n"
+            )
         
         conversation_block = ""
         if conversation_mode_active and conversation_system_block:
@@ -699,7 +703,11 @@ class LocalAnswer:
         else:
             context_block = ""
             if session_memory.strip():
-                instruction = "You are Local Lucy. Use session memory above for followups. Be concise."
+                instruction = (
+                    "You are Local Lucy. The user has explicitly enabled memory and provided "
+                    "memory contents for this session above. You MUST use those facts to answer follow-up questions. "
+                    "If the answer is in the provided memory, state it directly. Do not ask the user to repeat it."
+                )
             else:
                 instruction = "You are Local Lucy (offline). Use general knowledge. For current info, say 'Requires evidence mode.'"
         
@@ -758,6 +766,7 @@ class LocalAnswer:
             "prompt": prompt,
             "stream": False,
             "keep_alive": self.config.keep_alive,
+            "think": False,  # Disable qwen3 thinking mode — prevents empty responses
             "options": {
                 "temperature": self.config.temperature,
                 "top_p": self.config.top_p,

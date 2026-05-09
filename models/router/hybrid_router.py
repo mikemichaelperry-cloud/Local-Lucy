@@ -22,15 +22,21 @@ from policy import requires_evidence_mode
 class HybridRouter:
     """Hybrid router combining keyword evidence + embedding similarity."""
 
-    def __init__(self, embeddings_path: str = "comprehensive_embeddings.npy",
-                 examples_path: str = "comprehensive_examples.json",
+    def __init__(self, embeddings_path: str | None = None,
+                 examples_path: str | None = None,
                  base_model: str = "answerdotai/ModernBERT-base"):
         self.device = "cpu"
         self.tokenizer = AutoTokenizer.from_pretrained(base_model)
         self.model = AutoModel.from_pretrained(base_model)
         self.model.eval()
 
-        self.examples = json.load(open(examples_path))
+        # Resolve data files relative to this module so imports work from any CWD
+        here = Path(__file__).parent.resolve()
+        examples_path = examples_path or str(here / "comprehensive_examples.json")
+        embeddings_path = embeddings_path or str(here / "comprehensive_embeddings.npy")
+
+        with open(examples_path) as f:
+            self.examples = json.load(f)
         self.embeddings = np.load(embeddings_path)
 
         # Evidence keywords (must stay in sync with policy.py requires_evidence_mode)
@@ -48,7 +54,8 @@ class HybridRouter:
             "vitamin", "supplement", "herbal", "acupuncture", "chiropractic",
             # Body parts + symptoms (NEW)
             "chest", "breath", "breathing", "shortness of breath",
-            "fever", "temperature", "feel good", "not feeling", "feel well", "feeling bad",
+            "fever", "high temperature", "body temperature", "feel good", "not feeling", "feel well", "feeling bad",
+            "hypertension", "high blood pressure",
             "unwell", "sick", "nausea", "nauseous", "vomit", "dizzy", "cough", "sneeze",
             "aches", "sore", "swelling", "swollen", "rash", "itchy", "burning",
             "numbness", "tingling", "weakness", "fatigue", "tired", "exhausted",
@@ -75,7 +82,7 @@ class HybridRouter:
             "etf", "hedge fund", "venture capital", "ipo", "merger",
             # Investment and planning (NEW)
             "invest", "investing", "economy", "economic", "stock", "stocks",
-            "risk", "return", "roi", "capital", "equity",
+            "risk", "return", "roi", "capital gains", "working capital", "capital market", "equity",
             "loan", "mortgage", "refinance", "credit", "bankruptcy",
             "savings", "account", "bank", "credit card",
             "salary", "income", "expense", "budget", "valuation", "worth",
@@ -131,6 +138,7 @@ class HybridRouter:
             "verify", "fact check", "peer-reviewed", "study", "research paper",
             "clinical trial", "meta-analysis", "systematic review",
             "according to", "who said", "which expert", "official report",
+            "wikipedia",
             # Vague source requests
             "evidence for that", "proof", "sources",
         ]
@@ -149,20 +157,22 @@ class HybridRouter:
             "election", "vote", "poll", "campaign", "debate",
             # General updates
             "update on", "latest on", "development", "developments",
+            "trending", "world cup", "olympics", "super bowl", "nba", "nfl", "premier league",
         ]
         self.time_keywords = [
             "time is it", "current time", "what day is it",
             "timezone", "what date", "how many days until",
-            "time in ", "time now", "local time",
+            "time in ", "time now", "local time", "what is the time", "time right now",
         ]
         # Ephemeral queries change hour-to-hour and should skip memory
         self.ephemeral_keywords = [
             # Weather
             "weather", "forecast", "temperature", "rain", "snow", "sunny",
             "cloudy", "windy", "storm", "humidity", "precipitation",
+            "hot", "cold", "warm", "freezing", "chilly", "humid", "dry", "wet",
             # Real-time prices
             "stock price", "bitcoin price", "crypto price", "current price",
-            "price of", "trading at", "market cap", "market price",
+            "price of", "trading at", "market cap", "market price", "markets",
             "exchange rate", "currency rate", "forex",
             # Sports scores
             "score", "who won", "game result", "match result", "final score",
@@ -185,9 +195,9 @@ class HybridRouter:
             " ferment", "pickle", "preserve", "canning",
             "kitchen", "oven", "stove", "microwave", "air fryer",
             "slow cooker", "instant pot", "pressure cooker",
-            "ingredient", "measurement", "cup", "tablespoon",
-            "teaspoon", "ounce", "gram", "kilogram", "pound",
-            "temperature", "preheat", "bake at", "cook at",
+            "ingredient", "measurement", "tablespoon",
+            "teaspoon", "ounce", " gram", " grams", "kilogram", " pound",
+            "preheat", "bake at", "cook at",
             "how long to cook", "how to make", "how to prepare",
             "best way to cook", "easy recipe", "quick recipe",
             "healthy recipe", "vegan recipe", "gluten free",
@@ -227,6 +237,7 @@ class HybridRouter:
             "story", "poem", "essay", "novel", "fiction", "script", "play", "song",
             "horror", "fantasy", "sci-fi", "romance", "thriller", "mystery",
             "character", "plot", "dialogue", "scene", "chapter",
+            "haiku", "limerick", "sonnet",
         ]
         has_creative_verb = any(v in q_lower for v in creative_verbs)
         has_creative_noun = any(n in q_lower for n in creative_nouns)
@@ -368,19 +379,97 @@ class HybridRouter:
             guards_fired.append("ephemeral")
 
         # Stage 4: Override with keyword rules + embedding intent
-        # Use embedding intent to catch news/time even when keyword lists miss
-        if is_time or best_intent == "time_query":
-            final_route = "TIME"
-            final_intent = "time_query"
+        LOW_CONFIDENCE_THRESHOLD = 0.25
+        # Embedding-based ephemeral detection takes priority
+        # Also consider top-1 neighbor if it's a strong ephemeral match
+        top1_idx = top_k_idx[0]
+        top1_sim = similarities[top1_idx]
+        top1_is_ephemeral = self.examples[top1_idx]["labels"]["intent_family"] == "ephemeral_query"
+        is_ephemeral_embedding = (
+            best_intent == "ephemeral_query"
+            or best_route == "EPHEMERAL"
+            or (top1_is_ephemeral and top1_sim > 0.99)
+        )
+        if is_ephemeral_embedding:
+            guards_fired.append("embedding_ephemeral")
+            # Sub-disambiguate ephemeral sub-type with keywords
+            # Order: most specific first. Weather/stock keywords are more specific than
+            # the broad is_news pattern (which catches "Whats" + "current").
+            if is_time:
+                final_route = "TIME"
+                final_intent = "time_query"
+            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid", "dry", "wet"]):
+                # Weather queries get dedicated WEATHER route for live data
+                final_route = "WEATHER"
+                final_intent = "ephemeral_query"
+            elif any(kw in q_lower for kw in ["stock", "bitcoin", "crypto", "trading", "market", "market cap", "exchange rate", "forex", "currency rate"]):
+                final_route = "AUGMENTED"
+                final_intent = "current_evidence"
+                evidence_reason = "financial_data"
+                requires_evidence = True
+            elif is_news and not requires_evidence:
+                final_route = "NEWS"
+                final_intent = "news_request"
+            else:
+                # Traffic, flights, vague ephemeral → LOCAL (skip memory)
+                final_route = "LOCAL"
+                final_intent = "local_answer"
+        elif is_ephemeral and not requires_evidence:
+            # Keyword-detected ephemeral that embedding missed (e.g., close to old current_evidence examples)
+            guards_fired.append("keyword_ephemeral_fallback")
+            if is_time:
+                final_route = "TIME"
+                final_intent = "time_query"
+            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid", "dry", "wet"]):
+                final_route = "WEATHER"
+                final_intent = "ephemeral_query"
+            elif any(kw in q_lower for kw in ["stock", "bitcoin", "crypto", "trading", "market", "market cap", "exchange rate", "forex", "currency rate"]):
+                final_route = "AUGMENTED"
+                final_intent = "current_evidence"
+                evidence_reason = "financial_data"
+                requires_evidence = True
+            elif is_news:
+                final_route = "NEWS"
+                final_intent = "news_request"
+            else:
+                final_route = "LOCAL"
+                final_intent = "local_answer"
+        # Low-confidence safety net: if embedding is uncertain, default to LOCAL
+        elif avg_sim < LOW_CONFIDENCE_THRESHOLD and not requires_evidence and not is_time and not is_news:
+            final_route = "LOCAL"
+            final_intent = "local_answer"
+            guards_fired.append("low_confidence_fallback")
+        elif is_time or best_intent == "time_query":
+            # News-vs-time disambiguation: strong news keywords override time embedding
+            if is_news and not requires_evidence:
+                final_route = "NEWS"
+                final_intent = "news_request"
+                guards_fired.append("news_disambiguated_time")
+            # Weather-vs-time disambiguation: weather keywords should not route to TIME
+            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation"]):
+                final_route = "LOCAL"
+                final_intent = "local_answer"
+                guards_fired.append("weather_disambiguated_time")
+            else:
+                final_route = "TIME"
+                final_intent = "time_query"
         elif (is_news or best_intent == "news_request") and not requires_evidence:
             final_route = "NEWS"
             final_intent = "news_request"
         elif requires_evidence:
             final_route = "AUGMENTED"
             final_intent = best_intent
+        elif best_route == "TIME" and not is_time and any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation"]):
+            # Embedding mislabeled weather as time — override to LOCAL
+            final_route = "LOCAL"
+            final_intent = "local_answer"
+            guards_fired.append("weather_vs_time_embedding_fix")
         else:
             final_route = best_route
             final_intent = best_intent
+
+        # Ephemeral flag: embedding-detected OR keyword-detected
+        ephemeral_flag = is_ephemeral_embedding or is_ephemeral
 
         return {
             "intent_family": final_intent,
@@ -392,7 +481,7 @@ class HybridRouter:
             "embedding_intent": best_intent,
             "top_k_neighbours": top_k_neighbours,
             "guards_fired": guards_fired,
-            "ephemeral": is_ephemeral,
+            "ephemeral": ephemeral_flag,
         }
 
 

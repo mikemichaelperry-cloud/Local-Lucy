@@ -390,7 +390,16 @@ def select_route(
             top_k_neighbours = result.get("top_k_neighbours", [])
             ephemeral = result.get("ephemeral", False)
 
-            if route == "LOCAL":
+            # Override embedding LOCAL when intent classifier strongly signals evidence
+            raw_signals = classification.raw_plan.get("routing_signals", {}) if classification.raw_plan else {}
+            candidate_routes = classification.raw_plan.get("candidate_routes", []) if classification.raw_plan else []
+            embedding_local_override = (
+                route == "LOCAL"
+                and not ephemeral
+                and (raw_signals.get("source_request") or "EVIDENCE" in candidate_routes)
+            )
+
+            if route == "LOCAL" and not embedding_local_override:
                 decision = RoutingDecision(
                     route="LOCAL",
                     mode="AUTO",
@@ -402,6 +411,24 @@ def select_route(
                     evidence_reason=evidence_reason,
                     requires_evidence=requires_evidence,
                     policy_reason="router_local",
+                    ephemeral=ephemeral,
+                )
+            elif embedding_local_override:
+                # Intent classifier overrode embedding LOCAL → AUGMENTED
+                override_intent = classification.intent_family or "background_overview"
+                provider = "wikipedia" if override_intent in ("background_overview", "current_evidence") else "openai"
+                usage_class = provider_usage_class_for(provider)
+                decision = RoutingDecision(
+                    route="AUGMENTED",
+                    mode="AUTO",
+                    intent_family=override_intent,
+                    confidence=confidence,
+                    provider=provider,
+                    provider_usage_class=usage_class,
+                    evidence_mode="required",
+                    evidence_reason="source_request",
+                    requires_evidence=True,
+                    policy_reason="router_source_request_override",
                     ephemeral=ephemeral,
                 )
             elif route == "NEWS":
@@ -432,9 +459,24 @@ def select_route(
                     policy_reason="router_time",
                     ephemeral=True,
                 )
+            elif route == "WEATHER":
+                decision = RoutingDecision(
+                    route="WEATHER",
+                    mode="AUTO",
+                    intent_family=intent_family,
+                    confidence=confidence,
+                    provider="weather",
+                    provider_usage_class="free",
+                    evidence_mode=evidence_mode,
+                    evidence_reason=evidence_reason,
+                    requires_evidence=requires_evidence,
+                    policy_reason="router_weather",
+                    ephemeral=True,
+                )
             else:  # AUGMENTED
                 if evidence_reason == "medical_context":
-                    provider = "openai"
+                    # Use Wikipedia for medical (free, no API key, reliable general knowledge)
+                    provider = "wikipedia"
                 elif evidence_reason in ("financial_data", "legal_context", "conflict_live"):
                     provider = "openai"
                 elif intent_family in ("background_overview", "current_evidence"):
@@ -576,7 +618,7 @@ _EPHEMERAL_KEYWORDS = [
     "weather", "forecast", "temperature", "rain", "snow", "sunny",
     "cloudy", "windy", "storm", "humidity", "precipitation",
     "stock price", "bitcoin price", "crypto price", "current price",
-    "price of", "trading at", "market cap", "market price",
+    "price of", "trading at", "market cap", "market price", "markets",
     "exchange rate", "currency rate", "forex",
     "score", "who won", "game result", "match result", "final score",
     "live score", "half time", "full time", "overtime",
@@ -703,6 +745,23 @@ def _make_time_decision(classification: ClassificationResult) -> RoutingDecision
         evidence_reason=classification.evidence_reason,
         requires_evidence=False,
         policy_reason="time_api_provider",
+        ephemeral=True,
+    )
+
+
+def _make_weather_decision(classification: ClassificationResult) -> RoutingDecision:
+    """Create a WEATHER route decision for weather queries."""
+    return RoutingDecision(
+        route="WEATHER",
+        mode="AUTO",
+        intent_family=classification.intent_family or "ephemeral_query",
+        confidence=classification.confidence,
+        provider="weather",
+        provider_usage_class="free",
+        evidence_mode=classification.evidence_mode,
+        evidence_reason=classification.evidence_reason,
+        requires_evidence=False,
+        policy_reason="weather_provider",
         ephemeral=True,
     )
 

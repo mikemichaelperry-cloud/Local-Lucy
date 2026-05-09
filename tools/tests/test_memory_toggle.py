@@ -95,7 +95,6 @@ def test_memory_toggle_basic():
     with open(STATE_FILE, "w") as f:
         json.dump(original, f, indent=2)
     print("\n✓ TEST 1 PASSED")
-    return True
 
 
 def test_memory_env_var():
@@ -120,12 +119,8 @@ def test_memory_env_var():
     )
     env_output = result.stdout
     
-    if "LUCY_SESSION_MEMORY=1" in env_output:
-        print("✓ LUCY_SESSION_MEMORY=1 when memory=on")
-    else:
-        print("✗ Expected LUCY_SESSION_MEMORY=1")
-        print(f"Env output: {env_output}")
-        return False
+    assert "LUCY_SESSION_MEMORY=1" in env_output, f"Expected LUCY_SESSION_MEMORY=1, got: {env_output}"
+    print("✓ LUCY_SESSION_MEMORY=1 when memory=on")
     
     # Test OFF
     print("\nSetting memory to OFF...")
@@ -139,17 +134,13 @@ def test_memory_env_var():
     )
     env_output = result.stdout
     
-    if "LUCY_SESSION_MEMORY=0" in env_output:
-        print("✓ LUCY_SESSION_MEMORY=0 when memory=off")
-    else:
-        print("✗ Expected LUCY_SESSION_MEMORY=0")
-        return False
+    assert "LUCY_SESSION_MEMORY=0" in env_output, f"Expected LUCY_SESSION_MEMORY=0, got: {env_output}"
+    print("✓ LUCY_SESSION_MEMORY=0 when memory=off")
     
     # Restore original
     with open(STATE_FILE, "w") as f:
         json.dump(original, f, indent=2)
     print("\n✓ TEST 2 PASSED")
-    return True
 
 
 def test_memory_file_operations():
@@ -178,7 +169,6 @@ def test_memory_file_operations():
     # Clean up
     clear_memory()
     print("\n✓ TEST 3 PASSED")
-    return True
 
 
 def test_memory_context_in_prompt():
@@ -212,12 +202,8 @@ def test_memory_context_in_prompt():
         conversation_system_block=False
     )
     
-    if "Oscar" in prompt and "---" in prompt:
-        print("✓ Memory context included in prompt when enabled")
-    else:
-        print("✗ Memory context NOT included in prompt")
-        print(f"Prompt: {prompt[:500]}")
-        return False
+    assert "Oscar" in prompt and "---" in prompt, f"Memory context NOT included in prompt: {prompt[:500]}"
+    print("✓ Memory context included in prompt when enabled")
     
     # Test with memory OFF (should not include)
     print("\n2. Testing with memory=OFF...")
@@ -232,17 +218,13 @@ def test_memory_context_in_prompt():
         conversation_system_block=False
     )
     
-    if "Oscar" not in prompt_no_memory:
-        print("✓ Memory context NOT included when disabled")
-    else:
-        print("✗ Memory context included when disabled")
-        return False
+    assert "Oscar" not in prompt_no_memory, "Memory context included when disabled"
+    print("✓ Memory context NOT included when disabled")
     
     # Restore original state
     with open(STATE_FILE, "w") as f:
         json.dump(original, f, indent=2)
     print("\n✓ TEST 4 PASSED")
-    return True
 
 
 def test_memory_unsafe_queries():
@@ -266,11 +248,8 @@ def test_memory_unsafe_queries():
     print("\nTesting backchannel queries (memory should be disabled)...")
     for query in backchannel_queries:
         allowed = answer._is_memory_context_allowed(query)
-        if not allowed:
-            print(f"✓ '{query}' - memory correctly DISABLED")
-        else:
-            print(f"✗ '{query}' - memory should be disabled")
-            return False
+        assert not allowed, f"'{query}' - memory should be disabled"
+        print(f"✓ '{query}' - memory correctly DISABLED")
     
     # Test normal queries (should allow memory)
     normal_queries = [
@@ -283,14 +262,10 @@ def test_memory_unsafe_queries():
     print("\nTesting normal queries (memory should be enabled)...")
     for query in normal_queries:
         allowed = answer._is_memory_context_allowed(query)
-        if allowed:
-            print(f"✓ '{query[:40]}...' - memory correctly ENABLED")
-        else:
-            print(f"✗ '{query[:40]}...' - memory should be enabled")
-            return False
+        assert allowed, f"'{query}' - memory should be enabled"
+        print(f"✓ '{query[:40]}...' - memory correctly ENABLED")
     
     print("\n✓ TEST 5 PASSED")
-    return True
 
 
 def main():
@@ -316,10 +291,12 @@ def main():
     
     for name, test_func in tests:
         try:
-            if test_func():
-                passed += 1
-            else:
-                failed += 1
+            test_func()
+            passed += 1
+        except AssertionError as e:
+            print(f"\n✗ TEST FAILED: {name}")
+            print(f"Assertion: {e}")
+            failed += 1
         except Exception as e:
             print(f"\n✗ TEST FAILED: {name}")
             print(f"Error: {e}")

@@ -234,8 +234,8 @@ def test_mode_routing(r: TestReporter) -> None:
     tests = [
         ("Simple Math → LOCAL", "What is 25 times 17?", ["LOCAL"], "Simple math stays local"),
         ("Identity → LOCAL/POLICY", "Who are you?", ["LOCAL", "POLICY", "IDENTITY"], "Identity handled locally"),
-        ("Current Info → AUGMENTED/EVIDENCE", "What time is it in Tokyo?", 
-         ["AUGMENTED", "EVIDENCE", "AUGMENT", "INTERNET"], "Current info needs augmentation"),
+        ("Current Info → TIME", "What time is it in Tokyo?", 
+         ["TIME"], "Time queries route to time API"),
         ("Wikipedia Search → LOCAL/AUGMENTED", "Search Wikipedia for Albert Einstein", 
          ["LOCAL", "AUGMENTED", "EVIDENCE"], "May route local depending on classification"),
         ("Vague Query → CLARIFY/LOCAL", "Tell me about it", 
