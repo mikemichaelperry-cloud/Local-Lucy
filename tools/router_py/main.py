@@ -342,6 +342,44 @@ def execute_plan_python(
     start_time = time.time()
     request_id = sha256_text(question)[:16]
     
+    # --- Feedback detection: check if user is correcting a prior response ---
+    try:
+        from router_py.feedback_parser import parse_feedback, log_user_feedback, trigger_background_learning
+        fb = parse_feedback(question)
+        if fb is not None:
+            print(f"[Feedback detected] {fb.feedback_type.name}: {question}")
+            logged = log_user_feedback(fb)
+            if logged:
+                trigger_background_learning()
+            
+            if fb.feedback_type.name == "ROUTE_CORRECTION":
+                msg = f"Got it. I'll remember that should route to {fb.corrected_route}."
+            elif fb.feedback_type.name == "ANSWER_NEGATIVE":
+                msg = "Noted. I'll work on improving that answer."
+            elif fb.feedback_type.name == "ANSWER_POSITIVE":
+                msg = "Thanks for the feedback!"
+            elif fb.feedback_type.name == "RETRACTION":
+                msg = "Okay, I've forgotten that."
+            else:
+                msg = "Noted."
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            return RouterOutcome(
+                status="completed",
+                outcome_code="feedback_acknowledged",
+                route="LOCAL",
+                provider="local",
+                provider_usage_class="local",
+                intent_family="feedback",
+                confidence=1.0,
+                response_text=msg,
+                error_message="",
+                execution_time_ms=execution_time,
+                request_id=request_id,
+            )
+    except Exception as e:
+        print(f"[Feedback check warning] {e}")
+    
     try:
         # Step 1: Classify intent (Phase 3)
         classification = classify_intent(question, surface="cli")
@@ -370,6 +408,19 @@ def execute_plan_python(
                 execution_time_ms=result.execution_time_ms,
                 request_id=request_id,
             )
+        
+        # Record exchange in feedback buffer for future attribution
+        try:
+            from router_py.feedback_buffer import record_exchange
+            record_exchange(
+                query=question,
+                route=result.route,
+                intent_family=classification.intent_family,
+                response_text=result.response_text or "",
+                confidence=classification.confidence,
+            )
+        except Exception:
+            pass
         
         execution_time = int((time.time() - start_time) * 1000)
         return result.with_execution_time(execution_time).with_request_id(request_id)
@@ -629,25 +680,41 @@ def _delegate_execution_to_python(
                 if len(assistant_text) > 500:
                     assistant_text = assistant_text[:500]
                 
-                # Read existing content
-                existing = ""
-                try:
-                    existing = mem_path.read_text(encoding="utf-8")
-                except FileNotFoundError:
-                    pass
+                # Sanitize: do not store refusal/failure/garbage responses
+                refusal_patterns = [
+                    "state the specific question",
+                    "tell me the practical question",
+                    "i cannot answer",
+                    "i'm not able to",
+                    "i cannot provide",
+                    "i don't know",
+                    "error:",
+                ]
+                assistant_lower = assistant_text.lower()
+                if len(assistant_text) < 10 or any(p in assistant_lower for p in refusal_patterns):
+                    logging.debug("Skipping memory storage for refusal/short response")
+                    assistant_text = ""
                 
-                # Build new block and append
-                block = f"User: {question.strip()}\nAssistant: {assistant_text}\n\n"
-                blocks = [item.strip() for item in re.split(r"\n\s*\n", existing) if item.strip()]
-                blocks.append(block.strip())
-                
-                # Keep only last 6 turns
-                max_turns = 6
-                trimmed = "\n\n".join(blocks[-max_turns:]).strip()
-                if trimmed:
-                    trimmed += "\n\n"
-                
-                mem_path.write_text(trimmed, encoding="utf-8")
+                if assistant_text:
+                    # Read existing content
+                    existing = ""
+                    try:
+                        existing = mem_path.read_text(encoding="utf-8")
+                    except FileNotFoundError:
+                        pass
+                    
+                    # Build new block and append
+                    block = f"User: {question.strip()}\nAssistant: {assistant_text}\n\n"
+                    blocks = [item.strip() for item in re.split(r"\n\s*\n", existing) if item.strip()]
+                    blocks.append(block.strip())
+                    
+                    # Keep only last 6 turns
+                    max_turns = 6
+                    trimmed = "\n\n".join(blocks[-max_turns:]).strip()
+                    if trimmed:
+                        trimmed += "\n\n"
+                    
+                    mem_path.write_text(trimmed, encoding="utf-8")
             except Exception as e:
                 logging.warning(f"Failed to persist chat memory: {e}")
         

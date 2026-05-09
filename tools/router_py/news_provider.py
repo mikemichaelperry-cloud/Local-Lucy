@@ -319,11 +319,18 @@ class RSSNewsProvider:
                     pub_date = pub_date[:-4] + " +0000"
 
             # Filter by query if provided (only for specific search terms)
-            generic_terms = ['latest', 'world news', 'news today', 'current news', 'breaking news', 'news']
+            generic_terms = ['latest', 'world news', 'news today', 'current news', 'breaking news', 'news', 'headlines', 'headline', 'todays', "today's"]
             if query and not any(term in query.lower() for term in generic_terms):
                 query_lower = query.lower()
                 search_text = f"{title} {description}".lower()
-                keywords = [w for w in query_lower.split() if len(w) > 3 and w not in {'what', 'when', 'where', 'which', 'latest', 'current', 'about'}]
+                import string
+                # Strip punctuation from keywords to avoid "headlines?" not matching "headlines"
+                stopwords = {'what', 'when', 'where', 'which', 'latest', 'current', 'about', 'are', 'the', 'for', 'any'}
+                keywords = []
+                for w in query_lower.split():
+                    w_clean = w.strip(string.punctuation)
+                    if len(w_clean) > 3 and w_clean not in stopwords:
+                        keywords.append(w_clean)
                 if keywords and not any(kw in search_text for kw in keywords):
                     continue
 

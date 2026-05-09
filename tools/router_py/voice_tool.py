@@ -920,25 +920,37 @@ class VoicePipeline(BaseToolWrapper):
                     if len(assistant_text) > 500:
                         assistant_text = assistant_text[:500]
                     
-                    # Read existing content
-                    existing = ""
-                    try:
-                        existing = mem_path.read_text(encoding="utf-8")
-                    except FileNotFoundError:
-                        pass
-                    
-                    # Build new block and append
-                    block = f"User: {transcript.strip()}\nAssistant: {assistant_text}\n\n"
-                    blocks = [item.strip() for item in re.split(r"\n\s*\n", existing) if item.strip()]
-                    blocks.append(block.strip())
-                    
-                    # Keep only last 6 turns
-                    max_turns = 6
-                    trimmed = "\n\n".join(blocks[-max_turns:]).strip()
-                    if trimmed:
-                        trimmed += "\n\n"
-                    
-                    mem_path.write_text(trimmed, encoding="utf-8")
+                    # Sanitize: do not store refusal/failure/garbage responses
+                    refusal_patterns = [
+                        "state the specific question",
+                        "tell me the practical question",
+                        "i cannot answer",
+                        "i'm not able to",
+                        "i cannot provide",
+                        "i don't know",
+                        "error:",
+                    ]
+                    assistant_lower = assistant_text.lower()
+                    if len(assistant_text) >= 10 and not any(p in assistant_lower for p in refusal_patterns):
+                        # Read existing content
+                        existing = ""
+                        try:
+                            existing = mem_path.read_text(encoding="utf-8")
+                        except FileNotFoundError:
+                            pass
+                        
+                        # Build new block and append
+                        block = f"User: {transcript.strip()}\nAssistant: {assistant_text}\n\n"
+                        blocks = [item.strip() for item in re.split(r"\n\s*\n", existing) if item.strip()]
+                        blocks.append(block.strip())
+                        
+                        # Keep only last 6 turns
+                        max_turns = 6
+                        trimmed = "\n\n".join(blocks[-max_turns:]).strip()
+                        if trimmed:
+                            trimmed += "\n\n"
+                        
+                        mem_path.write_text(trimmed, encoding="utf-8")
                 except Exception:
                     # Silently ignore memory persistence errors in voice path
                     pass

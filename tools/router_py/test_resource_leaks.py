@@ -48,7 +48,7 @@ class ResourceMonitor:
     def get_connections(self):
         """Get network connection count."""
         try:
-            return len(self.process.connections())
+            return len(self.process.net_connections())
         except:
             return 0
     
@@ -139,7 +139,7 @@ def test_memory_growth():
     else:
         print(f"✅ Memory growth acceptable ({memory_growth:.2f} MB)")
     
-    return passed
+    assert passed, f"Memory growth too high: {memory_growth:.2f} MB"
 
 
 def test_file_descriptor_leaks():
@@ -188,7 +188,7 @@ def test_file_descriptor_leaks():
     else:
         print(f"✅ FD growth acceptable ({fd_growth})")
     
-    return passed
+    assert passed, f"FD growth too high: {fd_growth}"
 
 
 def test_database_connection_cleanup():
@@ -220,10 +220,9 @@ def test_database_connection_cleanup():
         
         print(f"  Routes written: {count}")
         print(f"✅ Database accessible after connections closed")
-        return True
     except Exception as e:
         print(f"❌ ERROR: Cannot access database: {e}")
-        return False
+        raise AssertionError(f"Database not accessible: {e}") from e
 
 
 def test_zombie_processes():
@@ -270,7 +269,7 @@ def test_zombie_processes():
     else:
         print(f"⚠️  WARNING: High thread count ({thread_count})")
     
-    return passed
+    assert passed, f"Thread count too high: {thread_count}"
 
 
 def test_repeated_execution():
@@ -318,7 +317,7 @@ def test_repeated_execution():
         print(f"❌ Errors during execution: {len(errors)}")
         for err in errors[:3]:
             print(f"  {err}")
-        return False
+        raise AssertionError(f"Errors during repeated execution: {errors[0]}")
     
     # Check for resource growth
     memory_growth = monitor.measurements[-1]["memory_mb"] - monitor.measurements[0]["memory_mb"]
@@ -331,7 +330,7 @@ def test_repeated_execution():
     else:
         print(f"⚠️  WARNING: Resource growth detected")
     
-    return passed
+    assert passed, f"Resource growth too high: memory={memory_growth:.2f}MB, fds={fd_growth}"
 
 
 def main():
@@ -351,8 +350,11 @@ def main():
     results = []
     for test in tests:
         try:
-            passed = test()
-            results.append((test.__name__, passed))
+            test()
+            results.append((test.__name__, True))
+        except AssertionError as e:
+            print(f"\n❌ FAIL: {test.__name__} - {e}")
+            results.append((test.__name__, False))
         except Exception as e:
             print(f"\n❌ FAIL: {test.__name__} - Exception: {e}")
             traceback.print_exc()
