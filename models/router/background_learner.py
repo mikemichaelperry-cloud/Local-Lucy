@@ -360,7 +360,15 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
         return False
 
     entries = load_auto_feedback(min_confidence=0.6)
-    if len(entries) < min_entries:
+
+    # Also count pending user feedback (not just auto-feedback)
+    user_count = 0
+    if FEEDBACK_PATH.exists():
+        with open(FEEDBACK_PATH) as f:
+            user_count = sum(1 for line in f if line.strip())
+
+    total = len(entries) + user_count
+    if total < min_entries:
         return False
 
     # Trigger learning in background thread
