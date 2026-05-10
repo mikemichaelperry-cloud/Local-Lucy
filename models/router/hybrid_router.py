@@ -349,8 +349,15 @@ class HybridRouter:
             route_votes[labels["route"]] += weight
             total_weight += weight
 
-        best_intent = intent_votes.most_common(1)[0][0]
-        best_route = route_votes.most_common(1)[0][0]
+        # Exact-match boost: if top-1 neighbor is essentially identical,
+        # trust it over a k-NN vote that could be outvoted by other close neighbors
+        top1_sim = similarities[top_k_idx[0]]
+        if top1_sim >= 0.999:
+            best_intent = self.examples[top_k_idx[0]]["labels"]["intent_family"]
+            best_route = self.examples[top_k_idx[0]]["labels"]["route"]
+        else:
+            best_intent = intent_votes.most_common(1)[0][0]
+            best_route = route_votes.most_common(1)[0][0]
         avg_sim = total_weight / k
 
         # Build top-k neighbour info for logging/diagnostics
@@ -427,9 +434,14 @@ class HybridRouter:
                 final_route = "NEWS"
                 final_intent = "news_request"
             else:
-                # Traffic, flights, vague ephemeral → LOCAL (skip memory)
-                final_route = "LOCAL"
-                final_intent = "local_answer"
+                # No strong keyword match, but embedding was confident
+                if avg_sim >= 0.5 and best_route in ("WEATHER", "TIME", "NEWS"):
+                    final_route = best_route
+                    final_intent = best_intent
+                else:
+                    # Traffic, flights, vague ephemeral → LOCAL (skip memory)
+                    final_route = "LOCAL"
+                    final_intent = "local_answer"
         elif is_ephemeral and not requires_evidence:
             # Keyword-detected ephemeral that embedding missed (e.g., close to old current_evidence examples)
             guards_fired.append("keyword_ephemeral_fallback")
@@ -459,8 +471,12 @@ class HybridRouter:
                 final_route = "NEWS"
                 final_intent = "news_request"
             else:
-                final_route = "LOCAL"
-                final_intent = "local_answer"
+                if avg_sim >= 0.5 and best_route in ("WEATHER", "TIME", "NEWS"):
+                    final_route = best_route
+                    final_intent = best_intent
+                else:
+                    final_route = "LOCAL"
+                    final_intent = "local_answer"
         # Low-confidence safety net: if embedding is uncertain, default to LOCAL
         elif avg_sim < LOW_CONFIDENCE_THRESHOLD and not requires_evidence and not is_time and not is_news:
             final_route = "LOCAL"
@@ -481,8 +497,15 @@ class HybridRouter:
                 final_route = "TIME"
                 final_intent = "time_query"
         elif (is_news or best_intent == "news_request") and not requires_evidence:
-            final_route = "NEWS"
-            final_intent = "news_request"
+            # Don't override confident LOCAL embedding for bare "news" keyword
+            strong_news_signals = ["headlines", "breaking", "latest updates", "current events", "what happened", "what's happening", "update on", "latest on", "developments", "trending"]
+            if best_route == "LOCAL" and avg_sim >= 0.5 and not any(c in q_lower for c in strong_news_signals):
+                final_route = "LOCAL"
+                final_intent = "local_answer"
+                guards_fired.append("news_guard_respects_local")
+            else:
+                final_route = "NEWS"
+                final_intent = "news_request"
         elif requires_evidence:
             final_route = "AUGMENTED"
             final_intent = best_intent

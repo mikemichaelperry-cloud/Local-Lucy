@@ -42,8 +42,7 @@ ROUTING_TEST_CASES = [
     ("What is the weather like on Mars?", "LOCAL", "ambiguous"),
     ("Current price of a gallon of milk", "LOCAL", "ambiguous"),
     ("Bitcoin price in 2010", "LOCAL", "ambiguous"),
-    # Known limitation: "news" keyword guard fires despite embedding LOCAL
-    pytest.param("Tell me about the news industry", "LOCAL", "ambiguous", marks=pytest.mark.xfail(reason="news_keyword guard overrides embedding LOCAL")),
+    ("Tell me about the news industry", "LOCAL", "ambiguous"),
     ("Latest trends in interior design", "LOCAL", "ambiguous"),
 
     # ---- Pronoun / context follow-ups ----
@@ -54,14 +53,12 @@ ROUTING_TEST_CASES = [
 
     # ---- Keyword guard bypasses (guard words in non-triggering contexts) ----
     ("Write a story about a doctor", "LOCAL", "guard_bypass"),
-    # Known limitation: k=3 neighbors (2 TIME) override self LOCAL match
-    pytest.param("Stock characters in Shakespeare", "LOCAL", "guard_bypass", marks=pytest.mark.xfail(reason="k=NN tie-break: 2 TIME neighbors override self LOCAL")),
+    ("Stock characters in Shakespeare", "LOCAL", "guard_bypass"),
     ("Time travel stories for kids", "LOCAL", "guard_bypass"),
 
     # ---- Typos / noisy input ----
     ("how 2 chnge a tirr", "LOCAL", "typos"),
-    # Known limitation: heavy typos break embedding match; no typo guard for "wether"
-    pytest.param("whats teh wether 4cast", "WEATHER", "typos", marks=pytest.mark.xfail(reason="heavy typos break embedding match for weather")),
+    ("whats teh wether 4cast", "WEATHER", "typos"),
 
     # ---- Compound / mixed intent ----
     ("Weather forecast and news headlines", "WEATHER", "compound"),
@@ -114,7 +111,7 @@ class TestRoutingEdgeCases:
                 )
 
         accuracy = correct / len(ROUTING_TEST_CASES)
-        min_threshold = 17 / 22  # ~0.773
+        min_threshold = 18 / 22  # ~0.818
 
         if accuracy < min_threshold:
             pytest.fail(
