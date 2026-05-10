@@ -63,7 +63,7 @@ class HybridRouter:
             "chills", "shivering", "dehydration", "seizure", "convulsion", "paralysis",
             "palpitation", "sweating", "hallucination", "delusion", "panic",
             # Pediatric indicators (NEW)
-            "baby", "child", "kid", "toddler", "infant", "2-year-old", "3-year-old",
+            "baby", "child", "toddler", "infant", "2-year-old", "3-year-old",
             "4-year-old", "5-year-old", "year old", "years old", "my son", "my daughter",
             # Educational medical terms (NEW)
             "insulin", "glucose", "metabolism", "hormone", "enzyme", "protein",
@@ -81,7 +81,7 @@ class HybridRouter:
             "retirement", "pension", "401k", "ira", "mutual fund",
             "etf", "hedge fund", "venture capital", "ipo", "merger",
             # Investment and planning (NEW)
-            "invest", "investing", "economy", "economic", "stock", "stocks",
+            "invest", "investing", "economy", "economic",
             "risk", "return", "roi", "capital gains", "working capital", "capital market", "equity",
             "loan", "mortgage", "refinance", "credit", "bankruptcy",
             "savings", "account", "bank", "credit card",
@@ -169,7 +169,7 @@ class HybridRouter:
             # Weather
             "weather", "forecast", "temperature", "rain", "snow", "sunny",
             "cloudy", "windy", "storm", "humidity", "precipitation",
-            "hot", "cold", "warm", "freezing", "chilly", "humid", "dry", "wet",
+            "hot", "cold", "warm", "freezing", "chilly", "humid",
             # Real-time prices
             "stock price", "bitcoin price", "crypto price", "current price",
             "price of", "trading at", "market cap", "market price", "markets",
@@ -261,8 +261,11 @@ class HybridRouter:
                 evidence_reason = "medical_context"
                 break
         if not requires_evidence:
+            historical_price = any(kw in q_lower for kw in ["in 19", "in 200", "in 201", "back in", "was the price", "historical", "at its peak", "all time high"])
             for kw in self.financial_keywords:
                 if kw in q_lower:
+                    if historical_price and kw in ["bitcoin", "stock", "stocks"]:
+                        continue
                     requires_evidence = True
                     evidence_reason = "financial_data"
                     break
@@ -398,15 +401,28 @@ class HybridRouter:
             if is_time:
                 final_route = "TIME"
                 final_intent = "time_query"
-            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid", "dry", "wet"]):
+            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rainy", "raining", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid"]):
                 # Weather queries get dedicated WEATHER route for live data
-                final_route = "WEATHER"
-                final_intent = "ephemeral_query"
-            elif any(kw in q_lower for kw in ["stock", "bitcoin", "crypto", "trading", "market", "market cap", "exchange rate", "forex", "currency rate"]):
-                final_route = "AUGMENTED"
-                final_intent = "current_evidence"
-                evidence_reason = "financial_data"
-                requires_evidence = True
+                # BUT: other planets, historical weather, fictional weather → LOCAL
+                non_earth_weather = any(kw in q_lower for kw in ["mars", "venus", "jupiter", "saturn", "neptune", "uranus", "pluto", "mercury", "titan", "europa", "moon "])
+                historical_weather = any(kw in q_lower for kw in ["in 19", "in 200", "in 201", "was the weather", "used to be", "historical weather"])
+                if non_earth_weather or historical_weather:
+                    final_route = "LOCAL"
+                    final_intent = "local_answer"
+                else:
+                    final_route = "WEATHER"
+                    final_intent = "ephemeral_query"
+            elif any(kw in q_lower for kw in ["stock price", "share price", "bitcoin", "crypto", "trading at", "market cap", "exchange rate", "forex", "currency rate"]):
+                # Historical price queries → LOCAL (not live data)
+                historical_price = any(kw in q_lower for kw in ["in 19", "in 200", "in 201", "back in", "was the price", "historical", "at its peak", "all time high"])
+                if historical_price:
+                    final_route = "LOCAL"
+                    final_intent = "local_answer"
+                else:
+                    final_route = "AUGMENTED"
+                    final_intent = "current_evidence"
+                    evidence_reason = "financial_data"
+                    requires_evidence = True
             elif is_news and not requires_evidence:
                 final_route = "NEWS"
                 final_intent = "news_request"
@@ -420,14 +436,25 @@ class HybridRouter:
             if is_time:
                 final_route = "TIME"
                 final_intent = "time_query"
-            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid", "dry", "wet"]):
-                final_route = "WEATHER"
-                final_intent = "ephemeral_query"
-            elif any(kw in q_lower for kw in ["stock", "bitcoin", "crypto", "trading", "market", "market cap", "exchange rate", "forex", "currency rate"]):
-                final_route = "AUGMENTED"
-                final_intent = "current_evidence"
-                evidence_reason = "financial_data"
-                requires_evidence = True
+            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rainy", "raining", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid"]):
+                non_earth_weather = any(kw in q_lower for kw in ["mars", "venus", "jupiter", "saturn", "neptune", "uranus", "pluto", "mercury", "titan", "europa", "moon "])
+                historical_weather = any(kw in q_lower for kw in ["in 19", "in 200", "in 201", "was the weather", "used to be", "historical weather"])
+                if non_earth_weather or historical_weather:
+                    final_route = "LOCAL"
+                    final_intent = "local_answer"
+                else:
+                    final_route = "WEATHER"
+                    final_intent = "ephemeral_query"
+            elif any(kw in q_lower for kw in ["stock price", "share price", "bitcoin", "crypto", "trading at", "market cap", "exchange rate", "forex", "currency rate"]):
+                historical_price = any(kw in q_lower for kw in ["in 19", "in 200", "in 201", "back in", "was the price", "historical", "at its peak", "all time high"])
+                if historical_price:
+                    final_route = "LOCAL"
+                    final_intent = "local_answer"
+                else:
+                    final_route = "AUGMENTED"
+                    final_intent = "current_evidence"
+                    evidence_reason = "financial_data"
+                    requires_evidence = True
             elif is_news:
                 final_route = "NEWS"
                 final_intent = "news_request"
@@ -446,7 +473,7 @@ class HybridRouter:
                 final_intent = "news_request"
                 guards_fired.append("news_disambiguated_time")
             # Weather-vs-time disambiguation: weather keywords should not route to TIME
-            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation"]):
+            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rainy", "raining", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation"]):
                 final_route = "LOCAL"
                 final_intent = "local_answer"
                 guards_fired.append("weather_disambiguated_time")
