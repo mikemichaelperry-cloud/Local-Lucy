@@ -2339,18 +2339,30 @@ them according to the route type (bypass, provisional, or full). It handles:
         patterns = [
             r"(?:what['']?s?|what is|current)\s+time\s+(?:is it\s+)?(?:in|at)\s+([^?]+)",
             r"time\s+(?:in|at)\s+([^?]+)",
-            r"([^?]+)\s+time",
+            r"(?:in|at)\s+([^?]+)\s+time",
         ]
         
         for pattern in patterns:
             match = re.search(pattern, question, re.IGNORECASE)
             if match:
-                location = match.group(1).strip()
-                break
+                candidate = match.group(1).strip()
+                # Reject common English words that aren't locations
+                blacklist = {"what", "the", "a", "an", "this", "that", "it", "is", "are", "was", "were", "be", "being", "been", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "shall", "can", "need", "dare", "ought", "used", "to", "of", "in", "on", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "from", "up", "down", "out", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "just", "now", "also", "get", "like", "me", "my", "we", "us", "our", "you", "your", "he", "him", "his", "she", "her", "they", "them", "their", "i", "am"}
+                if candidate.lower() not in blacklist and len(candidate) > 1:
+                    location = candidate
+                    break
         
-        # Default to UTC if no location found
+        # Default to system local timezone if no location found
         if not location:
-            location = "UTC"
+            try:
+                import datetime as _dt
+                tz = _dt.datetime.now().astimezone().tzinfo
+                if tz and hasattr(tz, 'key'):
+                    location = tz.key
+                else:
+                    location = "UTC"
+            except Exception:
+                location = "UTC"
         
         self._logger.info(f"Fetching time for location: {location}")
         

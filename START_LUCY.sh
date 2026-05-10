@@ -32,6 +32,9 @@ export LUCY_VOICE_CAPTURE_DIR="$SCRIPT_DIR/voice/ui_ptt"
 # home, hiding PySide6 from the normal user-site lookup.
 export PYTHONPATH="${SCRIPT_DIR}/ui-v8/app:${WORKSPACE_HOME}/.local/lib/python3.10/site-packages:${PYTHONPATH:-}"
 
+# Router decision logging (enables feedback learning pipeline)
+export LUCY_ROUTER_LOG_DIR="${LUCY_RUNTIME_NAMESPACE_ROOT}/logs"
+
 # Runtime configuration
 export LUCY_ROUTER_PY=1
 export LUCY_EXEC_PY=1
