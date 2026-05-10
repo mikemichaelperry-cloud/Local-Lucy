@@ -234,6 +234,7 @@ def _log_decision(
     guards_fired: list[str] | None = None,
     top_k_neighbours: list[dict] | None = None,
     legacy_route_audit: str = "",
+    memory_gate_override: str = "",
 ) -> None:
     """Log routing decision if logging is enabled.
 
@@ -261,6 +262,7 @@ def _log_decision(
             "guards_fired": guards_fired or [],
             "top_k_neighbours": top_k_neighbours or [],
             "legacy_route_audit": legacy_route_audit,
+            "memory_gate_override": memory_gate_override,
             "legacy_agrees": decision.route == legacy_route_audit,
         }
         with open(log_path, "a", encoding="utf-8") as f:
@@ -390,6 +392,12 @@ def select_route(
             top_k_neighbours = result.get("top_k_neighbours", [])
             ephemeral = result.get("ephemeral", False)
 
+            # Memory-aware routing gate: override live-data routes for follow-ups
+            memory_gate_override = _memory_routing_gate(query, route)
+            if memory_gate_override:
+                route = memory_gate_override
+                guards_fired = guards_fired + ["memory_routing_gate"]
+
             # Override embedding LOCAL when intent classifier strongly signals evidence
             raw_signals = classification.raw_plan.get("routing_signals", {}) if classification.raw_plan else {}
             candidate_routes = classification.raw_plan.get("candidate_routes", []) if classification.raw_plan else []
@@ -511,6 +519,7 @@ def select_route(
                 guards_fired=guards_fired,
                 top_k_neighbours=top_k_neighbours,
                 legacy_route_audit=legacy_audit.route,
+                memory_gate_override=memory_gate_override or "",
             )
             return decision
         except Exception:
@@ -632,6 +641,104 @@ def _is_ephemeral(query: str) -> bool:
     """Check if a query is ephemeral (changes hour-to-hour)."""
     q_lower = query.lower()
     return any(kw in q_lower for kw in _EPHEMERAL_KEYWORDS)
+
+
+# ---------------------------------------------------------------------------
+# Memory-aware routing gate
+# ---------------------------------------------------------------------------
+
+# Patterns that indicate the query references prior conversation context
+_MEMORY_FOLLOWUP_RE = re.compile(
+    r"\b(him|her|it|that|this|they|them|their|those|the same|such|so|thus|there|then|"
+    r"earlier|previous|before|above|mentioned|discussed|agreed|decided|said|stated)\b",
+    re.IGNORECASE,
+)
+
+_MEMORY_EXPLICIT_RECALL_RE = re.compile(
+    r"\b(what did I say|what was my|what is my|remind me|do you remember|"
+    r"did I tell you|what did we discuss|what did I ask|what did you say|"
+    r"repeat that|say that again|what about that|how about that|"
+    r"tell me more|elaborate|continue|go on|expand on|follow up|more details|more info)\b",
+    re.IGNORECASE,
+)
+
+# Live-data keywords that should NOT be overridden even with follow-up markers
+_LIVE_DATA_KEYWORDS = [
+    "weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy", "windy",
+    "news", "headlines", "latest news", "breaking",
+    "time is it", "time in", "current time", "what time",
+    "stock", "price", "bitcoin", "crypto", "trading", "market",
+]
+
+
+def _memory_routing_gate(query: str, embedding_route: str) -> str | None:
+    """
+    Lightweight memory-aware routing gate.
+
+    Returns "LOCAL" if memory should take precedence over a live-data route,
+    or None to keep the embedding router's decision.
+
+    Rules:
+    1. Memory must be enabled (LUCY_SESSION_MEMORY == "1").
+    2. Query must look like it needs prior context (pronouns, follow-ups, explicit recall).
+    3. There must be recent conversation turns in SQLite.
+    4. Only overrides live-data routes (WEATHER, NEWS, TIME, STOCKS, AUGMENTED).
+    5. If query contains live-data keywords alongside follow-up markers, preserve embedding decision.
+    """
+    # Fast reject — memory disabled
+    if os.environ.get("LUCY_SESSION_MEMORY", "0") != "1":
+        return None
+
+    # Fast reject — kill switch
+    if os.environ.get("LUCY_MEMORY_GATE", "1") == "0":
+        return None
+
+    # Fast reject — already LOCAL (memory will be used in execution anyway)
+    if embedding_route == "LOCAL":
+        return None
+
+    # Fast reject — not a follow-up or recall query
+    q = query.strip()
+    if not q:
+        return None
+
+    has_followup = bool(_MEMORY_FOLLOWUP_RE.search(q) or _MEMORY_EXPLICIT_RECALL_RE.search(q))
+    if not has_followup:
+        return None
+
+    # Live-data guard: if query contains live-data keywords AND follow-up markers,
+    # preserve the embedding router's decision (e.g. "What about the weather?")
+    q_lower = q.lower()
+    has_live_data = any(kw in q_lower for kw in _LIVE_DATA_KEYWORDS)
+    if has_live_data:
+        return None
+
+    # Lightweight memory check: fetch recent turns from SQLite
+    try:
+        from memory.memory_service import get_recent_turns
+        turns = get_recent_turns(session_id="default", limit=2)
+        if not turns:
+            return None
+    except Exception:
+        # SQLite not available or empty — fall back to legacy text file check
+        try:
+            runtime_dir = Path(
+                os.environ.get(
+                    "LUCY_RUNTIME_NAMESPACE_ROOT",
+                    Path.home() / ".codex-api-home/lucy/runtime-v8",
+                )
+            )
+            mem_file = runtime_dir / "state" / "chat_session_memory.txt"
+            if not mem_file.exists():
+                return None
+            content = mem_file.read_text(encoding="utf-8").strip()
+            if not content:
+                return None
+        except Exception:
+            return None
+
+    # All conditions met — override to LOCAL
+    return "LOCAL"
 
 
 def _make_local_decision(classification: ClassificationResult, query: str = "") -> RoutingDecision:
