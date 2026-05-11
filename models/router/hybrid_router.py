@@ -12,6 +12,7 @@ import io
 import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -335,7 +336,15 @@ class HybridRouter:
         is_news = any(kw in q_lower for kw in self.news_keywords) or has_news_typo or (wat_pattern and has_news_context)
         is_time = any(kw in q_lower for kw in self.time_keywords)
         is_cooking = any(kw in q_lower for kw in self.cooking_keywords)
-        is_ephemeral = any(kw in q_lower for kw in self.ephemeral_keywords)
+        # Use word-boundary matching for short/ambiguous keywords to avoid
+        # false positives (e.g., "hot" in "photosynthesis", "cold" in "scold").
+        def _matches_ephemeral_keyword(query: str, keyword: str) -> bool:
+            if len(keyword) <= 4:
+                # Short keywords need word boundaries
+                return bool(re.search(rf"\\b{re.escape(keyword)}\\b", query))
+            return keyword in query
+
+        is_ephemeral = any(_matches_ephemeral_keyword(q_lower, kw) for kw in self.ephemeral_keywords)
 
         # Stage 2: Cooking -> always LOCAL
         if is_cooking:
@@ -426,7 +435,7 @@ class HybridRouter:
             if is_time:
                 final_route = "TIME"
                 final_intent = "time_query"
-            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rainy", "raining", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid"]):
+            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rain", "rainy", "raining", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid"]):
                 # Weather queries get dedicated WEATHER route for live data
                 # BUT: other planets, historical weather, fictional weather → LOCAL
                 non_earth_weather = any(kw in q_lower for kw in ["mars", "venus", "jupiter", "saturn", "neptune", "uranus", "pluto", "mercury", "titan", "europa", "moon "])
@@ -466,7 +475,7 @@ class HybridRouter:
             if is_time:
                 final_route = "TIME"
                 final_intent = "time_query"
-            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rainy", "raining", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid"]):
+            elif any(kw in q_lower for kw in ["weather", "forecast", "temperature", "rain", "rainy", "raining", "snow", "sunny", "cloudy", "windy", "storm", "humidity", "precipitation", "umbrella", "jacket", "coat", "hot", "cold", "warm", "freezing", "chilly", "humid"]):
                 non_earth_weather = any(kw in q_lower for kw in ["mars", "venus", "jupiter", "saturn", "neptune", "uranus", "pluto", "mercury", "titan", "europa", "moon "])
                 historical_weather = any(kw in q_lower for kw in ["in 19", "in 200", "in 201", "was the weather", "used to be", "historical weather"])
                 if non_earth_weather or historical_weather:

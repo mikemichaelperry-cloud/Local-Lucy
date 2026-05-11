@@ -204,29 +204,6 @@ def ensure_control_env() -> None:
 
 
 
-@dataclass
-class OutcomeComparison:
-    """Result of parity mode comparison."""
-    
-    query: str
-    shell_result: RouterOutcome | None
-    python_result: RouterOutcome | None
-    match: bool
-    differences: list[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%S%z"))
-    classification: str = ""  # "true_parity", "intended_improvement", "suspicious_drift", "hard_regression"
-    
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "timestamp": self.timestamp,
-            "query": self.query,
-            "match": self.match,
-            "classification": self.classification,
-            "differences": self.differences,
-            "shell": self.shell_result.to_dict() if self.shell_result else None,
-            "python": self.python_result.to_dict() if self.python_result else None,
-        }
-
 
 def _persist_memory_turn(question: str, response_text: str) -> None:
     """Persist a conversation turn to chat memory (SQLite + text file)."""
@@ -471,7 +448,6 @@ def execute_plan_parity(
 
 
 # Backwards-compatibility alias — deprecated.
-execute_plan_shadow = execute_plan_parity
 
 
 def main() -> int:
