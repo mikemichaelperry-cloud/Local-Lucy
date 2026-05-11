@@ -54,13 +54,12 @@ from .classify import (
 )
 
 # Phase 4: Main Orchestration
-from .main import (
-    RouterOutcome,
-    OutcomeComparison,
-    execute_plan_python,
-    execute_plan_shell,
-    execute_plan_parity,
-)
+# NOTE: Intentionally NOT eagerly imported here to avoid runpy warning
+# when executing `python3 -m router_py.main`. Import directly from
+# `router_py.main` when these symbols are needed.
+# from .main import (
+#     RouterOutcome, execute_plan_python, execute_plan_shell, execute_plan_parity
+# )
 
 # Tool Wrappers (Phase 5)
 from .base_tool_wrapper import (
@@ -112,14 +111,8 @@ __all__ = [
     "RoutingDecision",
     "classify_intent",
     "select_route",
-    # Phase 4: Main Orchestration
-    "RouterOutcome",
-    "OutcomeComparison",
-    "ShadowComparison",
-    "execute_plan_python",
-    "execute_plan_shell",
-    "execute_plan_parity",
-    "execute_plan_shadow",
+    # Phase 4: Main Orchestration (import from router_py.main directly)
+    # "RouterOutcome", "execute_plan_python", "execute_plan_shell", "execute_plan_parity",
     # Phase 5: Tool Wrappers
     "ToolConfig",
     "ToolResult",

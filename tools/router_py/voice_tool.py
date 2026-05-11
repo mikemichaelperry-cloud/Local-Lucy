@@ -828,139 +828,23 @@ class VoicePipeline(BaseToolWrapper):
         
         start_time = time.time()
         
-        # Try execute_plan_python first (preferred)
-        try:
-            from .main import execute_plan_python
-        except ImportError:
-            try:
-                from main import execute_plan_python
-            except ImportError:
-                execute_plan_python = None
+        # Unified pipeline entry point (replaces inline classify→route→execute)
+        import concurrent.futures
+        from .main import run
         
-        if execute_plan_python:
-            try:
-                outcome = await execute_plan_python(transcript)
-                response = outcome.answer
-                
-                elapsed_ms = int((time.time() - start_time) * 1000)
-                self._logger.info(f"Query processed in {elapsed_ms}ms")
-                
-                return response
-            except Exception as e:
-                self._logger.error(f"execute_plan_python failed: {e}, trying ExecutionEngine")
-        
-        # Fallback to ExecutionEngine directly (shell-free)
-        try:
-            from .classify import classify_intent, select_route
-            from .execution_engine import ExecutionEngine
-            from .policy import normalize_augmentation_policy
-            from .main import ensure_control_env
-        except ImportError:
-            from classify import classify_intent, select_route
-            from execution_engine import ExecutionEngine
-            from policy import normalize_augmentation_policy
-            from main import ensure_control_env
-        
-        # Ensure control environment is loaded from state file
-        ensure_control_env()
-        
-        engine = ExecutionEngine(config={
-            "timeout": 125,
-            "use_sqlite_state": True,
-        })
-        
-        try:
-            classification = classify_intent(transcript, surface=surface)
-            policy = normalize_augmentation_policy(
-                os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(
+                run,
+                transcript,
+                surface=surface,
+                timeout=125,
             )
-            decision = select_route(classification, policy=policy, query=transcript)
-            
-            # Map mode setting to forced_mode for execution engine
-            mode = os.environ.get("LUCY_MODE", "auto").lower()
-            forced_mode_map = {
-                "auto": "AUTO",
-                "online": "FORCED_ONLINE",
-                "offline": "FORCED_OFFLINE",
-            }
-            forced_mode = forced_mode_map.get(mode, "AUTO")
-            
-            result = engine.execute(
-                intent=classification,
-                route=decision,
-                context={
-                    "question": transcript,
-                    "forced_mode": forced_mode,
-                    "surface": surface,
-                },
-                use_python_path=True,
-            )
-            
-            # Persist chat memory turn if memory is enabled
-            if os.environ.get("LUCY_SESSION_MEMORY") == "1" and result.response_text:
-                try:
-                    from router_py.execution_engine import DEFAULT_CHAT_MEMORY_FILE
-                    # Check both runtime and standard env vars for memory file path
-                    mem_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
-                    if not mem_file:
-                        mem_file = os.environ.get("LUCY_CHAT_MEMORY_FILE", "").strip()
-                    if not mem_file:
-                        mem_file = DEFAULT_CHAT_MEMORY_FILE
-                    mem_path = Path(mem_file).expanduser()
-                    mem_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    # Format assistant text (clean up markers, truncate)
-                    assistant_text = (
-                        result.response_text.replace("BEGIN_VALIDATED", " ")
-                        .replace("END_VALIDATED", " ")
-                        .replace("\r", " ")
-                        .replace("\n", " ")
-                    )
-                    assistant_text = re.sub(r"\s+", " ", assistant_text).strip()
-                    if len(assistant_text) > 500:
-                        assistant_text = assistant_text[:500]
-                    
-                    # Sanitize: do not store refusal/failure/garbage responses
-                    refusal_patterns = [
-                        "state the specific question",
-                        "tell me the practical question",
-                        "i cannot answer",
-                        "i'm not able to",
-                        "i cannot provide",
-                        "i don't know",
-                        "error:",
-                    ]
-                    assistant_lower = assistant_text.lower()
-                    if len(assistant_text) >= 10 and not any(p in assistant_lower for p in refusal_patterns):
-                        # Read existing content
-                        existing = ""
-                        try:
-                            existing = mem_path.read_text(encoding="utf-8")
-                        except FileNotFoundError:
-                            pass
-                        
-                        # Build new block and append
-                        block = f"User: {transcript.strip()}\nAssistant: {assistant_text}\n\n"
-                        blocks = [item.strip() for item in re.split(r"\n\s*\n", existing) if item.strip()]
-                        blocks.append(block.strip())
-                        
-                        # Keep only last 6 turns
-                        max_turns = 6
-                        trimmed = "\n\n".join(blocks[-max_turns:]).strip()
-                        if trimmed:
-                            trimmed += "\n\n"
-                        
-                        mem_path.write_text(trimmed, encoding="utf-8")
-                except Exception:
-                    # Silently ignore memory persistence errors in voice path
-                    pass
-            
-            elapsed_ms = int((time.time() - start_time) * 1000)
-            self._logger.info(f"Query processed via ExecutionEngine in {elapsed_ms}ms")
-            
-            return result.response_text or ""
-        finally:
-            engine.close()
+            outcome = await asyncio.wrap_future(future)
+        
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        self._logger.info(f"Query processed via unified pipeline in {elapsed_ms}ms")
+        return outcome.response_text or ""
     
     async def _process_query_shell(
         self,

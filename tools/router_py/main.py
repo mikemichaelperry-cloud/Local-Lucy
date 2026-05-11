@@ -1,36 +1,42 @@
 #!/usr/bin/env python3
 """
-Local Lucy Router - Python Main Orchestrator (Phase 4 Strangler Fig)
+Local Lucy Router — Python-Native Main Orchestrator
 
-This is the Python entry point for the router migration.
-It provides a hybrid execution mode:
-- LUCY_ROUTER_PY=0: Use shell implementation (default, safe)
-- LUCY_ROUTER_PY=1: Use Python implementation (new, tested)
-- LUCY_ROUTER_PY=parity: Run both, compare, log differences
+Single authoritative entry point for all execution surfaces:
+- CLI: `python -m router_py.main "question"`
+- HMI: `runtime_bridge._run_submit_request_direct()` → `run()`
+- Voice: `streaming_voice.py`, `voice_tool.py`, `runtime_voice.py` → `run()`
 
-Execution Engine Toggle (LUCY_EXEC_PY):
-- LUCY_EXEC_PY=0 or unset: Use shell execute_plan.sh (default, safe)
-- LUCY_EXEC_PY=1: Use Python ExecutionEngine (new)
-- LUCY_EXEC_PY=parity: Run both, compare, log differences to /tmp/exec_parity_diffs.log
+Architecture (post Stage 9):
+    run() ──→ execute_plan_python() ──→ request_pipeline.process()
+                                            │
+    ├─ classify_intent() ──→ select_route() ─┤
+    │                                          │
+    ├─ provider_resolver.apply_provider() ────┤
+    │                                          │
+    └─ ExecutionEngine.execute() ─────────────┘
 
-CRITICAL DESIGN PRINCIPLE:
-The Python router makes routing decisions but DELEGATES execution to the
-existing governed execution path. It does NOT invent new provider calls.
-This preserves authority semantics and truth metadata.
+All shell/parity fallback paths have been removed. Python-native is
+authoritative. Legacy entry points (`execute_plan_shell`,
+`execute_plan_parity`) delegate to `execute_plan_python` with a
+deprecation warning.
+
+State is loaded from `current_state.json` via `ensure_control_env()`
+before classification. Memory persistence, feedback detection, and
+outcome telemetry are handled in the wrapper, not in the engine.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
+import fcntl
 import json
 import logging
 import os
 import re
-import subprocess
 import sys
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -38,17 +44,61 @@ from typing import Any
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
-from router_py.classify import ClassificationResult, RoutingDecision, classify_intent, select_route
-from router_py.policy import normalize_augmentation_policy, provider_usage_class_for
+from router_py.request_types import RouterOutcome
 from router_py.utils import sha256_text
-from router_py.execution_engine import ExecutionEngine, ExecutionResult, DEFAULT_CHAT_MEMORY_FILE
+from router_py.execution_engine import DEFAULT_CHAT_MEMORY_FILE
+from router_py import request_pipeline
 
 
 # Configuration
-PARITY_LOG_DIR = ROOT_DIR / "logs" / "router_py_parity"
-SHELL_EXECUTE_PLAN = ROOT_DIR / "tools" / "router" / "execute_plan.sh"
-SHELL_LUCY_CHAT = ROOT_DIR / "lucy_chat.sh"
 DEFAULT_TIMEOUT = 130
+
+
+# ============================================================================
+# Unified Entry Point
+# ============================================================================
+
+def run(
+    question: str,
+    *,
+    policy: str = "fallback_only",
+    timeout: int = DEFAULT_TIMEOUT,
+    surface: str = "cli",
+    augmented_direct_once: bool = False,
+    self_review: bool = False,
+    context: dict[str, Any] | None = None,
+) -> RouterOutcome:
+    """
+    Unified entry point for all execution surfaces (HMI, CLI, voice).
+
+    This is the single entry point that runtime_bridge.py, CLI, and voice
+    pipelines should call. It handles state resolution, feedback detection,
+    classification, routing, execution, memory persistence, and telemetry.
+
+    Args:
+        question: The user's query text
+        policy: Augmentation policy (disabled, fallback_only, direct_allowed)
+        timeout: Request timeout in seconds
+        surface: Origin surface (hmi, cli, voice)
+        augmented_direct_once: Force augmented route for this query
+        self_review: Whether this is a self-review request
+        context: Extra execution context (merged into engine context)
+
+    Returns:
+        RouterOutcome with status, route, provider, response_text, etc.
+    """
+    return execute_plan_python(
+        question=question,
+        policy=policy,
+        timeout=timeout,
+        surface=surface,
+        augmented_direct_once=augmented_direct_once,
+        self_review=self_review,
+        context=context,
+    )
+
+
+# Configuration
 
 
 def resolve_state_dir(root: Path) -> Path:
@@ -68,6 +118,31 @@ def resolve_state_dir(root: Path) -> Path:
 STATE_DIR = resolve_state_dir(ROOT_DIR)
 LAST_ROUTE_FILE = STATE_DIR / "last_route.env"
 LAST_OUTCOME_FILE = STATE_DIR / "last_outcome.env"
+
+
+def _write_outcome_telemetry(
+    outcome: RouterOutcome,
+    question: str,
+    execution_time_ms: int,
+) -> None:
+    """Write outcome telemetry to last_outcome.env (mirror shell path)."""
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        lines = [
+            f"OUTCOME_CODE={outcome.outcome_code}",
+            f"FINAL_MODE={outcome.route}",
+            f"PROVIDER={outcome.provider}",
+            f"PROVIDER_USAGE_CLASS={outcome.provider_usage_class}",
+            f"INTENT_FAMILY={outcome.intent_family}",
+            f"CONFIDENCE={outcome.confidence}",
+            f"EXECUTION_TIME_MS={execution_time_ms}",
+            f"STATUS={outcome.status}",
+            f"QUESTION={question}",
+            f"TRUST_CLASS={'unverified' if outcome.route in ('AUGMENTED', 'NEWS', 'WEATHER', 'TIME') else 'local'}",
+        ]
+        LAST_OUTCOME_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except Exception:
+        pass
 
 
 def load_state_from_file() -> dict[str, Any]:
@@ -127,36 +202,6 @@ def ensure_control_env() -> None:
         os.environ["LUCY_VOICE_ENABLED"] = "1" if voice in ("on", "true", "1") else "0"
 
 
-@dataclass(frozen=True)
-class RouterOutcome:
-    """Structured outcome from router execution."""
-    
-    status: str
-    outcome_code: str
-    route: str
-    provider: str
-    provider_usage_class: str
-    intent_family: str
-    confidence: float
-    response_text: str = ""
-    error_message: str = ""
-    execution_time_ms: int = 0
-    request_id: str = ""
-    
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "status": self.status,
-            "outcome_code": self.outcome_code,
-            "route": self.route,
-            "provider": self.provider,
-            "provider_usage_class": self.provider_usage_class,
-            "intent_family": self.intent_family,
-            "confidence": self.confidence,
-            "response_text": self.response_text,
-            "error_message": self.error_message,
-            "execution_time_ms": self.execution_time_ms,
-            "request_id": self.request_id,
-        }
 
 
 @dataclass
@@ -183,165 +228,121 @@ class OutcomeComparison:
         }
 
 
-def query_sha256(query: str) -> str:
-    """Compute SHA256 hash of query for matching."""
-    return hashlib.sha256(query.encode("utf-8")).hexdigest().lower()
-
-
-def file_signature(path: Path) -> tuple[int, int, int] | None:
-    """Get file signature for change detection."""
+def _persist_memory_turn(question: str, response_text: str) -> None:
+    """Persist a conversation turn to chat memory (SQLite + text file)."""
+    # Dual-write: SQLite first (best effort)
     try:
-        stat = path.stat()
-        return (stat.st_ino, stat.st_size, int(stat.st_mtime))
-    except (OSError, FileNotFoundError):
-        return None
+        from memory.memory_service import store_turn, maybe_summarize_session
+        store_turn("user", question)
+        store_turn("assistant", response_text)
+        maybe_summarize_session()
+    except Exception:
+        pass  # Text-file write below still happens
 
-
-def load_env_file(path: Path) -> dict[str, str]:
-    """Load env file into dict."""
-    values = {}
     try:
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if "=" in line:
-                    key, _, val = line.partition("=")
-                    values[key] = val
-    except (OSError, FileNotFoundError):
-        pass
-    return values
+        mem_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
+        if not mem_file:
+            mem_file = os.environ.get("LUCY_CHAT_MEMORY_FILE", "").strip()
+        if not mem_file:
+            mem_file = DEFAULT_CHAT_MEMORY_FILE
+        mem_path = Path(mem_file).expanduser()
+        mem_path.parent.mkdir(parents=True, exist_ok=True)
 
+        assistant_text = (
+            response_text.replace("BEGIN_VALIDATED", " ")
+            .replace("END_VALIDATED", " ")
+            .replace("\r", " ")
+            .replace("\n", " ")
+        )
+        assistant_text = re.sub(r"\s+", " ", assistant_text).strip()
+        if len(assistant_text) > 500:
+            assistant_text = assistant_text[:500]
 
-def load_fresh_env_file(
-    path: Path,
-    previous_signature: tuple[int, int, int] | None,
-    expected_query: str
-) -> dict[str, str]:
-    """Load env file if it has changed and matches query."""
-    current_signature = file_signature(path)
-    if current_signature is None or current_signature == previous_signature:
-        return {}
-    
-    values = load_env_file(path)
-    expected_hash = query_sha256(expected_query)
-    actual_hash = values.get("QUERY_SHA256", "").strip().lower()
-    
-    query_matches = actual_hash == expected_hash if actual_hash else values.get("QUERY", "") == expected_query
-    if not query_matches:
-        return {}
-    
-    values["QUERY"] = expected_query
-    values["QUERY_SHA256"] = expected_hash
-    return values
-
-
-def strip_validated_text(text: str) -> str:
-    """Strip VALIDATED markers from response text."""
-    lines = text.splitlines()
-    result = []
-    skip = False
-    for line in lines:
-        if line.strip() == "--- VALIDATED BEGIN ---":
-            skip = True
-            continue
-        if line.strip() == "--- VALIDATED END ---":
-            skip = False
-            continue
-        if not skip:
-            result.append(line)
-    return "\n".join(result).strip()
-
-
-def _enhance_response_with_context(
-    response_text: str,
-    outcome_code: str,
-    provider: str,
-    trust_class: str,
-    evidence_mode: str,
-    final_mode: str,
-) -> str:
-    """
-    Enhance responses with context for unverified or low-confidence answers.
-    
-    This improves UX by explaining what sources were consulted and why
-    the answer may be limited.
-    """
-    # Don't modify empty responses
-    if not response_text or not response_text.strip():
-        return response_text
-    
-    # Check if response is already detailed enough (has sources listed)
-    has_source_detail = "sources:" in response_text.lower() or "- " in response_text and any(domain in response_text for domain in [".com", ".org", ".net", ".gov"])
-    if has_source_detail and len(response_text) > 300:
-        return response_text
-    
-    # Build context footer for unverified/augmented responses
-    context_parts = []
-    
-    # Add route info if not local
-    if final_mode and final_mode != "LOCAL":
-        context_parts.append(f"Route: {final_mode}")
-    
-    # Add provider context if external sources were used
-    if provider and provider != "local" and provider != "none":
-        context_parts.append(f"Provider: {provider}")
-    
-    # Add trust/context information for non-verified responses
-    if trust_class and trust_class not in ("local", "verified", ""):
-        context_parts.append(f"Trust: {trust_class}")
-    
-    # Add evidence mode info if applicable
-    if evidence_mode and evidence_mode not in ("none", ""):
-        context_parts.append(f"Evidence: {evidence_mode}")
-    
-    # If we have context to add, append it
-    if context_parts:
-        # Remove vague prefix lines that don't add value
-        lines = response_text.split("\n")
-        new_lines = []
-        skip_patterns = [
-            "augmented fallback",
-            "give me one concrete detail",
-            "i will respond precisely",
-            "best-effort recovery",
-            "not source-backed"
+        refusal_patterns = [
+            "state the specific question",
+            "tell me the practical question",
+            "i cannot answer",
+            "i'm not able to",
+            "i cannot provide",
+            "i don't know",
+            "error:",
         ]
-        
-        for line in lines:
-            # Skip vague prefix lines but keep the actual content
-            if any(vague in line.lower() for vague in skip_patterns):
-                continue
-            new_lines.append(line)
-        
-        response_text = "\n".join(new_lines).strip()
-        
-        # Append context footer
-        if response_text:
-            response_text += f"\n\n[{' | '.join(context_parts)}]"
-    
-    return response_text
+        assistant_lower = assistant_text.lower()
+        if len(assistant_text) < 10 or any(p in assistant_lower for p in refusal_patterns):
+            logging.debug("Skipping memory storage for refusal/short response")
+            assistant_text = ""
+
+        if assistant_text:
+            existing = ""
+            try:
+                existing = mem_path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                pass
+
+            block = f"User: {question.strip()}\nAssistant: {assistant_text}\n\n"
+            blocks = [item.strip() for item in re.split(r"\n\s*\n", existing) if item.strip()]
+            blocks.append(block.strip())
+
+            max_turns = 6
+            trimmed = "\n\n".join(blocks[-max_turns:]).strip()
+            if trimmed:
+                trimmed += "\n\n"
+
+            mem_path.write_text(trimmed, encoding="utf-8")
+    except Exception as e:
+        logging.warning(f"Failed to persist chat memory: {e}")
 
 
 def execute_plan_python(
     question: str,
     policy: str = "fallback_only",
     timeout: int = DEFAULT_TIMEOUT,
+    surface: str = "cli",
+    augmented_direct_once: bool = False,
+    self_review: bool = False,
+    context: dict[str, Any] | None = None,
 ) -> RouterOutcome:
     """
     Execute routing plan using Python implementation.
-    
-    CRITICAL: This makes routing decisions using Python, but DELEGATES
-    execution to the existing governed shell path. It does NOT call
-    providers directly.
+
+    This is now a thin wrapper around request_pipeline.process() that handles
+    entry-point concerns (prefix parsing, locks, feedback, telemetry, memory)
+    while delegating the classify → route → execute flow to the pipeline.
     """
     # Ensure control environment is set from state file if not in env
     ensure_control_env()
-    
+
     start_time = time.time()
     request_id = sha256_text(question)[:16]
-    
+
+    # --- Route prefix parsing (mirror execute_plan.sh) ---
+    route_prefix = ""
+    prefix_patterns = [
+        (r"^local:\s*(.*)$", "LOCAL"),
+        (r"^news:\s*(.*)$", "NEWS"),
+        (r"^evidence:\s*(.*)$", "EVIDENCE"),
+        (r"^augmented:\s*(.*)$", "AUGMENTED"),
+    ]
+    for pattern, prefix_route in prefix_patterns:
+        match = re.match(pattern, question, re.IGNORECASE)
+        if match:
+            route_prefix = prefix_route
+            question = match.group(1).strip()
+            break
+
+    # --- Shared execution lock (mirror execute_plan.sh) ---
+    lock_file = STATE_DIR / "execute_plan.active.lock"
+    lock_acquired = False
+    lock_fd = None
+    try:
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_fd = open(lock_file, "w")
+        if os.environ.get("LUCY_SHARED_STATE_PARALLEL_ALLOW", "").lower() not in ("1", "on", "true", "yes"):
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+            lock_acquired = True
+    except Exception:
+        pass
+
     # --- Feedback detection: check if user is correcting a prior response ---
     try:
         from router_py.feedback_parser import parse_feedback, log_user_feedback, trigger_background_learning
@@ -351,7 +352,7 @@ def execute_plan_python(
             logged = log_user_feedback(fb)
             if logged:
                 trigger_background_learning()
-            
+
             if fb.feedback_type.name == "ROUTE_CORRECTION":
                 msg = f"Got it. I'll remember that should route to {fb.corrected_route}."
             elif fb.feedback_type.name == "ANSWER_NEGATIVE":
@@ -362,7 +363,7 @@ def execute_plan_python(
                 msg = "Okay, I've forgotten that."
             else:
                 msg = "Noted."
-            
+
             execution_time = int((time.time() - start_time) * 1000)
             return RouterOutcome(
                 status="completed",
@@ -379,52 +380,53 @@ def execute_plan_python(
             )
     except Exception as e:
         print(f"[Feedback check warning] {e}")
-    
+
     try:
-        # Step 1: Classify intent (Phase 3)
-        classification = classify_intent(question, surface="cli")
-        
-        # Step 2: Select route (Phase 3)
-        decision = select_route(classification, policy=policy, query=question)
-        
-        # Step 3: DELEGATE execution to governed path
-        # This preserves authority semantics and truth metadata
-        # Uses LUCY_EXEC_PY to control whether to use shell or Python execution
-        result = _delegate_execution(question, decision, timeout, classification)
-        
-        # Override with Python's classification for accurate intent_family
-        # (The shell may leave this as "unknown")
-        if result.intent_family == "unknown":
-            result = RouterOutcome(
-                status=result.status,
-                outcome_code=result.outcome_code,
-                route=result.route,
-                provider=result.provider,
-                provider_usage_class=result.provider_usage_class,
-                intent_family=classification.intent_family,
-                confidence=classification.confidence,
-                response_text=result.response_text,
-                error_message=result.error_message,
-                execution_time_ms=result.execution_time_ms,
-                request_id=request_id,
-            )
-        
-        # Record exchange in feedback buffer for future attribution
+        # --- Delegate to unified pipeline ---
+        result, classification, decision = request_pipeline.process(
+            question,
+            policy=policy,
+            timeout=timeout,
+            surface=surface,
+            augmented_direct_once=augmented_direct_once,
+            route_prefix=route_prefix,
+            context=context,
+        )
+
+        # --- Memory persistence ---
+        if os.environ.get("LUCY_SESSION_MEMORY") == "1" and result.response_text:
+            _persist_memory_turn(question, result.response_text)
+
+        # --- Record exchange in feedback buffer for future attribution ---
+        if classification:
+            try:
+                from router_py.feedback_buffer import record_exchange
+                record_exchange(
+                    query=question,
+                    route=result.route,
+                    intent_family=classification.intent_family,
+                    response_text=result.response_text or "",
+                    confidence=classification.confidence,
+                )
+            except Exception:
+                pass
+
+        # --- Execution time + request ID ---
+        execution_time = int((time.time() - start_time) * 1000)
+        result = result.with_execution_time(execution_time).with_request_id(request_id)
+
+        # --- Outcome telemetry: write last_outcome.env (mirror shell path) ---
         try:
-            from router_py.feedback_buffer import record_exchange
-            record_exchange(
-                query=question,
-                route=result.route,
-                intent_family=classification.intent_family,
-                response_text=result.response_text or "",
-                confidence=classification.confidence,
+            _write_outcome_telemetry(
+                outcome=result,
+                question=question,
+                execution_time_ms=execution_time,
             )
         except Exception:
             pass
-        
-        execution_time = int((time.time() - start_time) * 1000)
-        return result.with_execution_time(execution_time).with_request_id(request_id)
-        
+
+        return result
+
     except Exception as e:
         execution_time = int((time.time() - start_time) * 1000)
         return RouterOutcome(
@@ -439,385 +441,13 @@ def execute_plan_python(
             execution_time_ms=execution_time,
             request_id=request_id,
         )
-
-
-def _delegate_execution(
-    question: str,
-    decision: RoutingDecision,
-    timeout: int,
-    classification: ClassificationResult | None = None,
-) -> RouterOutcome:
-    """
-    Delegate execution to either Python ExecutionEngine or shell path.
-    
-    Controlled by LUCY_EXEC_PY environment variable:
-    - LUCY_EXEC_PY=0 or unset: Use shell execute_plan.sh (default, safe)
-    - LUCY_EXEC_PY=1: Use Python ExecutionEngine (new)
-    - LUCY_EXEC_PY=parity: Run both, compare, return shell result, log differences
-    
-    This preserves:
-    - Authority chain
-    - Truth metadata
-    - Provider dispatch governance
-    - Evidence mode handling
-    """
-    exec_mode = os.environ.get("LUCY_EXEC_PY", "1")  # Default to Python execution
-    
-    if exec_mode == "1":
-        # Use Python ExecutionEngine
-        return _delegate_execution_to_python(question, decision, timeout, classification)
-    elif exec_mode == "parity":
-        # Shadow mode: run both, compare, return shell result
-        return _delegate_execution_parity(question, decision, timeout, classification)
-    else:
-        # Default: use shell execution
-        return _delegate_execution_to_shell(question, decision, timeout)
-
-
-def _delegate_execution_to_shell(
-    question: str,
-    decision: RoutingDecision,
-    timeout: int,
-) -> RouterOutcome:
-    """
-    Delegate execution to the existing governed shell path.
-    
-    This preserves:
-    - Authority chain
-    - Truth metadata
-    - Provider dispatch governance
-    - Evidence mode handling
-    """
-    # Ensure state directory exists
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # Capture file signatures before execution
-    route_sig_before = file_signature(LAST_ROUTE_FILE)
-    outcome_sig_before = file_signature(LAST_OUTCOME_FILE)
-    
-    env = os.environ.copy()
-    env["LUCY_QUESTION"] = question
-    # Preserve evidence/control settings from parent environment (set by runtime_request.py based on HMI state)
-    # Only set defaults if not already present
-    if "LUCY_AUGMENTATION_POLICY" not in env:
-        env["LUCY_AUGMENTATION_POLICY"] = "fallback_only"
-    if "LUCY_EVIDENCE_ENABLED" not in env:
-        env["LUCY_EVIDENCE_ENABLED"] = "0"
-    if "LUCY_ENABLE_INTERNET" not in env:
-        env["LUCY_ENABLE_INTERNET"] = env.get("LUCY_EVIDENCE_ENABLED", "0")
-    if "LUCY_CONVERSATION_MODE_FORCE" not in env:
-        env["LUCY_CONVERSATION_MODE_FORCE"] = "0"
-    if "LUCY_SESSION_MEMORY" not in env:
-        env["LUCY_SESSION_MEMORY"] = "0"
-    
-    # Pass force_local flag to shell script (creative writing requests)
-    # This ensures creative writing (stories, poems) stays local and avoids
-    # identity preamble issues with augmented providers
-    if classification and classification.force_local:
-        env["LUCY_FORCE_LOCAL"] = "1"
-    
-    # Route to appropriate execution path based on decision
-    if decision.route == "CLARIFY":
-        # Clarification needed - return early
-        return RouterOutcome(
-            status="completed",
-            outcome_code="clarification_requested",
-            route="CLARIFY",
-            provider="local",
-            provider_usage_class="local",
-            intent_family=decision.intent_family,
-            confidence=decision.confidence,
-            response_text="I need more information to answer this question. Could you clarify what you're looking for?",
-        )
-    
-    # Use execute_plan.sh directly (NOT lucy_chat.sh to avoid circular dependency)
-    # This goes through the full governed execution path
-    try:
-        result = subprocess.run(
-            [str(SHELL_EXECUTE_PLAN), question],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-            cwd=str(ROOT_DIR),
-        )
-        
-        response_text = strip_validated_text(result.stdout)
-        
-        # Load metadata from state files (same as runtime_request.py)
-        route_meta = load_fresh_env_file(LAST_ROUTE_FILE, route_sig_before, question)
-        outcome_meta = load_fresh_env_file(LAST_OUTCOME_FILE, outcome_sig_before, question)
-        
-        # Extract outcome info
-        outcome_code = outcome_meta.get("OUTCOME_CODE", "unknown")
-        final_mode = outcome_meta.get("FINAL_MODE", "LOCAL")
-        provider = outcome_meta.get("AUGMENTED_PROVIDER_USED", outcome_meta.get("PROVIDER", "local"))
-        intent_family = outcome_meta.get("INTENT_FAMILY", decision.intent_family)
-        trust_class = outcome_meta.get("TRUST_CLASS", "unknown")
-        evidence_mode = outcome_meta.get("MANIFEST_EVIDENCE_MODE", "")
-        
-        # Enhance unverified/low-confidence responses with context
-        response_text = _enhance_response_with_context(
-            response_text, outcome_code, provider, trust_class, evidence_mode, final_mode
-        )
-        
-        if result.returncode == 0:
-            return RouterOutcome(
-                status="completed",
-                outcome_code=outcome_code,
-                route=final_mode,
-                provider=provider,
-                provider_usage_class=provider_usage_class_for(provider),
-                intent_family=intent_family,
-                confidence=decision.confidence,
-                response_text=response_text,
-            )
-        else:
-            return RouterOutcome(
-                status="failed",
-                outcome_code=outcome_code or "execution_error",
-                route=final_mode,
-                provider=provider,
-                provider_usage_class=provider_usage_class_for(provider),
-                intent_family=intent_family,
-                confidence=decision.confidence,
-                response_text=response_text,
-                error_message=result.stderr.strip() or "Execution failed",
-            )
-            
-    except subprocess.TimeoutExpired as e:
-        return RouterOutcome(
-            status="timeout",
-            outcome_code="timeout",
-            route=decision.route,
-            provider=decision.provider,
-            provider_usage_class=decision.provider_usage_class,
-            intent_family=decision.intent_family,
-            confidence=decision.confidence,
-            error_message="Request timed out",
-        )
-    except Exception as e:
-        return RouterOutcome(
-            status="failed",
-            outcome_code="router_error",
-            route=decision.route,
-            provider=decision.provider,
-            provider_usage_class=decision.provider_usage_class,
-            intent_family=decision.intent_family,
-            confidence=decision.confidence,
-            error_message=str(e),
-        )
-
-
-def _delegate_execution_to_python(
-    question: str,
-    decision: RoutingDecision,
-    timeout: int,
-    classification: ClassificationResult | None = None,
-) -> RouterOutcome:
-    """
-    Delegate execution to Python ExecutionEngine.
-    
-    This uses the new Python-based execution engine instead of shell scripts.
-    """
-    try:
-        # Create execution engine with configuration
-        engine = ExecutionEngine(config={"timeout": timeout})
-        
-        # Build context for execution
-        context = {
-            "question": question,
-            "session_id": os.environ.get("LUCY_SESSION_ID", ""),
-            "state_namespace": os.environ.get("LUCY_SHARED_STATE_NAMESPACE", "default"),
-            "augmentation_policy": os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only"),
-            "evidence_enabled": os.environ.get("LUCY_EVIDENCE_ENABLED", "0") == "1",
-            "conversation_mode_active": os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0") == "1",
-        }
-        
-        # Execute using the engine
-        # If we don't have classification, create a minimal one from decision
-        if classification is None:
-            from router_py.classify import ClassificationResult
-            classification = ClassificationResult(
-                intent=decision.intent_family,
-                intent_family=decision.intent_family,
-                confidence=decision.confidence,
-                surface="cli",
-                needs_web=False,
-            )
-        
-        result = engine.execute(classification, decision, context, use_python_path=True)
-        
-        # Persist chat memory turn if memory is enabled
-        if os.environ.get("LUCY_SESSION_MEMORY") == "1" and result.response_text:
+    finally:
+        if lock_acquired and lock_fd:
             try:
-                # Dual-write: SQLite first (best effort)
-                from memory.memory_service import store_turn, maybe_summarize_session
-                store_turn("user", question)
-                store_turn("assistant", result.response_text)
-                maybe_summarize_session()
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+                lock_fd.close()
             except Exception:
-                pass  # Text-file write below still happens
-            
-            try:
-                # Check both runtime and standard env vars for memory file path
-                mem_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
-                if not mem_file:
-                    mem_file = os.environ.get("LUCY_CHAT_MEMORY_FILE", "").strip()
-                if not mem_file:
-                    mem_file = DEFAULT_CHAT_MEMORY_FILE
-                mem_path = Path(mem_file).expanduser()
-                mem_path.parent.mkdir(parents=True, exist_ok=True)
-                
-                # Format assistant text (clean up markers, truncate)
-                assistant_text = (
-                    result.response_text.replace("BEGIN_VALIDATED", " ")
-                    .replace("END_VALIDATED", " ")
-                    .replace("\r", " ")
-                    .replace("\n", " ")
-                )
-                assistant_text = re.sub(r"\s+", " ", assistant_text).strip()
-                if len(assistant_text) > 500:
-                    assistant_text = assistant_text[:500]
-                
-                # Sanitize: do not store refusal/failure/garbage responses
-                refusal_patterns = [
-                    "state the specific question",
-                    "tell me the practical question",
-                    "i cannot answer",
-                    "i'm not able to",
-                    "i cannot provide",
-                    "i don't know",
-                    "error:",
-                ]
-                assistant_lower = assistant_text.lower()
-                if len(assistant_text) < 10 or any(p in assistant_lower for p in refusal_patterns):
-                    logging.debug("Skipping memory storage for refusal/short response")
-                    assistant_text = ""
-                
-                if assistant_text:
-                    # Read existing content
-                    existing = ""
-                    try:
-                        existing = mem_path.read_text(encoding="utf-8")
-                    except FileNotFoundError:
-                        pass
-                    
-                    # Build new block and append
-                    block = f"User: {question.strip()}\nAssistant: {assistant_text}\n\n"
-                    blocks = [item.strip() for item in re.split(r"\n\s*\n", existing) if item.strip()]
-                    blocks.append(block.strip())
-                    
-                    # Keep only last 6 turns
-                    max_turns = 6
-                    trimmed = "\n\n".join(blocks[-max_turns:]).strip()
-                    if trimmed:
-                        trimmed += "\n\n"
-                    
-                    mem_path.write_text(trimmed, encoding="utf-8")
-            except Exception as e:
-                logging.warning(f"Failed to persist chat memory: {e}")
-        
-        # Convert ExecutionResult to RouterOutcome
-        return RouterOutcome(
-            status=result.status,
-            outcome_code=result.outcome_code,
-            route=result.route,
-            provider=result.provider,
-            provider_usage_class=result.provider_usage_class,
-            intent_family=classification.intent_family,
-            confidence=classification.confidence,
-            response_text=result.response_text,
-            error_message=result.error_message,
-            execution_time_ms=result.execution_time_ms,
-        )
-        
-    except Exception as e:
-        logging.error(f"ExecutionEngine failed: {e}")
-        # Fall back to shell execution on error
-        return _delegate_execution_to_shell(question, decision, timeout)
-
-
-def _delegate_execution_parity(
-    question: str,
-    decision: RoutingDecision,
-    timeout: int,
-    classification: ClassificationResult | None = None,
-) -> RouterOutcome:
-    """
-    Shadow mode: run both shell and Python execution, compare results.
-    
-    Returns shell result (trusted) but logs any differences.
-    """
-    # Run shell execution first (trusted)
-    shell_result = _delegate_execution_to_shell(question, decision, timeout)
-    
-    # Run Python execution
-    python_result = _delegate_execution_to_python(question, decision, timeout, classification)
-    
-    # Compare and log differences
-    _log_execution_parity_diff(question, shell_result, python_result)
-    
-    # Return shell result (safety first)
-    return shell_result
-
-
-def _log_execution_parity_diff(
-    query: str,
-    shell_outcome: RouterOutcome,
-    python_outcome: RouterOutcome,
-) -> None:
-    """Log differences between shell and Python execution to parity log file."""
-    SHADOW_LOG_FILE = Path("/tmp/exec_parity_diffs.log")
-    
-    # Determine if results match
-    match = (
-        shell_outcome.status == python_outcome.status and
-        shell_outcome.outcome_code == python_outcome.outcome_code and
-        shell_outcome.route == python_outcome.route and
-        shell_outcome.provider == python_outcome.provider
-    )
-    
-    # Build log entry
-    timestamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    entry = {
-        "timestamp": timestamp,
-        "query": query,
-        "shell_outcome": shell_outcome.to_dict(),
-        "python_outcome": python_outcome.to_dict(),
-        "match": match,
-        "differences": []
-    }
-    
-    # Record specific differences
-    differences = []
-    if shell_outcome.status != python_outcome.status:
-        differences.append(f"status: shell={shell_outcome.status}, python={python_outcome.status}")
-    if shell_outcome.outcome_code != python_outcome.outcome_code:
-        differences.append(f"outcome_code: shell={shell_outcome.outcome_code}, python={python_outcome.outcome_code}")
-    if shell_outcome.route != python_outcome.route:
-        differences.append(f"route: shell={shell_outcome.route}, python={python_outcome.route}")
-    if shell_outcome.provider != python_outcome.provider:
-        differences.append(f"provider: shell={shell_outcome.provider}, python={python_outcome.provider}")
-    if shell_outcome.response_text != python_outcome.response_text:
-        # Truncate response for comparison
-        shell_resp = shell_outcome.response_text[:100] + "..." if len(shell_outcome.response_text) > 100 else shell_outcome.response_text
-        python_resp = python_outcome.response_text[:100] + "..." if len(python_outcome.response_text) > 100 else python_outcome.response_text
-        differences.append(f"response_text differs: shell='{shell_resp}', python='{python_resp}'")
-    
-    entry["differences"] = differences
-    
-    # Append to log file
-    try:
-        with open(SHADOW_LOG_FILE, "a") as f:
-            f.write(json.dumps(entry) + "\n")
-        
-        if not match:
-            logging.warning(
-                f"[EXEC_SHADOW] MISMATCH for '{query[:50]}...': {', '.join(differences)}"
-            )
-    except Exception as e:
-        logging.error(f"[EXEC_SHADOW] Failed to log difference: {e}")
+                pass
 
 
 def execute_plan_shell(
@@ -825,87 +455,9 @@ def execute_plan_shell(
     policy: str = "fallback_only",
     timeout: int = DEFAULT_TIMEOUT,
 ) -> RouterOutcome:
-    """
-    Execute routing plan using shell implementation.
-    
-    This calls lucy_chat.sh and reads metadata from state files.
-    """
-    start_time = time.time()
-    
-    # Ensure state directory exists
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # Capture file signatures
-    route_sig_before = file_signature(LAST_ROUTE_FILE)
-    outcome_sig_before = file_signature(LAST_OUTCOME_FILE)
-    
-    env = os.environ.copy()
-    env["LUCY_QUESTION"] = question
-    env["LUCY_AUGMENTATION_POLICY"] = policy
-    
-    try:
-        result = subprocess.run(
-            [str(SHELL_LUCY_CHAT), question],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-            cwd=str(ROOT_DIR),
-        )
-        
-        execution_time = int((time.time() - start_time) * 1000)
-        response_text = strip_validated_text(result.stdout)
-        
-        # Load metadata from state files
-        route_meta = load_fresh_env_file(LAST_ROUTE_FILE, route_sig_before, question)
-        outcome_meta = load_fresh_env_file(LAST_OUTCOME_FILE, outcome_sig_before, question)
-        
-        # Extract fields with fallbacks
-        outcome_code = outcome_meta.get("OUTCOME_CODE", "unknown")
-        final_mode = outcome_meta.get("FINAL_MODE", "LOCAL")
-        provider = outcome_meta.get("AUGMENTED_PROVIDER_USED", outcome_meta.get("PROVIDER", "local"))
-        intent_family = outcome_meta.get("INTENT_FAMILY", "unknown")
-        confidence = float(outcome_meta.get("CONFIDENCE", "0")) if outcome_meta.get("CONFIDENCE") else 0.0
-        
-        return RouterOutcome(
-            status="completed" if result.returncode == 0 else "failed",
-            outcome_code=outcome_code,
-            route=final_mode,
-            provider=provider,
-            provider_usage_class=provider_usage_class_for(provider),
-            intent_family=intent_family,
-            confidence=confidence,
-            response_text=response_text,
-            error_message=result.stderr.strip() if result.returncode != 0 else "",
-            execution_time_ms=execution_time,
-        )
-        
-    except subprocess.TimeoutExpired:
-        execution_time = int((time.time() - start_time) * 1000)
-        return RouterOutcome(
-            status="timeout",
-            outcome_code="timeout",
-            route="LOCAL",
-            provider="local",
-            provider_usage_class="local",
-            intent_family="unknown",
-            confidence=0.0,
-            error_message="Request timed out",
-            execution_time_ms=execution_time,
-        )
-    except Exception as e:
-        execution_time = int((time.time() - start_time) * 1000)
-        return RouterOutcome(
-            status="failed",
-            outcome_code="router_error",
-            route="LOCAL",
-            provider="local",
-            provider_usage_class="local",
-            intent_family="unknown",
-            confidence=0.0,
-            error_message=str(e),
-            execution_time_ms=execution_time,
-        )
+    """DEPRECATED: Shell path removed. Delegates to Python-native execution."""
+    logging.warning("execute_plan_shell is deprecated; using Python-native path")
+    return execute_plan_python(question, policy, timeout)
 
 
 def execute_plan_parity(
@@ -913,129 +465,13 @@ def execute_plan_parity(
     policy: str = "fallback_only",
     timeout: int = DEFAULT_TIMEOUT,
 ) -> RouterOutcome:
-    """
-    Execute with parity checking - run both shell and Python implementations and compare.
-
-    Returns shell result (trusted) but logs any differences with classification.
-    """
-    # Run both implementations
-    shell_result = execute_plan_shell(question, policy, timeout)
-    python_result = execute_plan_python(question, policy, timeout)
-    
-    # Compare
-    comparison = _compare_outcomes(question, shell_result, python_result)
-    
-    # Classify the difference
-    classification = _classify_difference(comparison, shell_result, python_result)
-    comparison.classification = classification
-    
-    # Log if different
-    if not comparison.match:
-        _log_parity_difference(comparison)
-    
-    # Return shell result (safety first)
-    return shell_result
+    """DEPRECATED: Parity mode removed. Delegates to Python-native execution."""
+    logging.warning("execute_plan_parity is deprecated; using Python-native path")
+    return execute_plan_python(question, policy, timeout)
 
 
-# Backwards-compatibility alias — deprecated, use execute_plan_parity.
+# Backwards-compatibility alias — deprecated.
 execute_plan_shadow = execute_plan_parity
-
-
-def _compare_outcomes(
-    query: str,
-    shell: RouterOutcome,
-    python: RouterOutcome,
-) -> OutcomeComparison:
-    """Compare shell and Python outcomes."""
-    differences = []
-    
-    if shell.status != python.status:
-        differences.append(f"status: shell={shell.status}, python={python.status}")
-    
-    if shell.route != python.route:
-        differences.append(f"route: shell={shell.route}, python={python.route}")
-    
-    if shell.provider != python.provider:
-        differences.append(f"provider: shell={shell.provider}, python={python.provider}")
-    
-    if shell.intent_family != python.intent_family:
-        differences.append(f"intent_family: shell={shell.intent_family}, python={python.intent_family}")
-    
-    if shell.outcome_code != python.outcome_code:
-        differences.append(f"outcome_code: shell={shell.outcome_code}, python={python.outcome_code}")
-    
-    return OutcomeComparison(
-        query=query,
-        shell_result=shell,
-        python_result=python,
-        match=len(differences) == 0,
-        differences=differences,
-    )
-
-
-def _classify_difference(
-    comparison: OutcomeComparison,
-    shell: RouterOutcome,
-    python: RouterOutcome,
-) -> str:
-    """
-    Classify the difference between shell and Python results.
-    
-    Categories:
-    - true_parity: Results are functionally equivalent
-    - intended_improvement: Python is better by design (e.g., correct intent_family)
-    - suspicious_drift: Unexpected difference that needs investigation
-    - hard_regression: Python is worse than shell
-    """
-    if comparison.match:
-        return "true_parity"
-    
-    # Check for known intended improvements
-    # 1. intent_family correction: shell leaves as "unknown", Python sets correctly
-    if ("intent_family: shell=unknown, python=" in str(comparison.differences) and
-        shell.intent_family == "unknown" and
-        python.intent_family != "unknown" and
-        shell.route == python.route and
-        shell.provider == python.provider and
-        shell.status == python.status):
-        return "intended_improvement"
-    
-    # 2. Check for hard regressions
-    # Python fails but shell succeeds
-    if python.status == "failed" and shell.status == "completed":
-        return "hard_regression"
-    
-    # Python routes differently than shell (potential policy drift)
-    if shell.route != python.route:
-        # If shell went augmented but Python went local, that's suspicious
-        if shell.route == "AUGMENTED" and python.route == "LOCAL":
-            return "suspicious_drift"
-        # If shell went local but Python went augmented, also suspicious
-        if shell.route == "LOCAL" and python.route == "AUGMENTED":
-            return "suspicious_drift"
-    
-    # Default: suspicious drift
-    return "suspicious_drift"
-
-
-def _log_parity_difference(comparison: OutcomeComparison) -> None:
-    """Log parity mode differences to file."""
-    try:
-        PARITY_LOG_DIR.mkdir(parents=True, exist_ok=True)
-        
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        query_hash = sha256_text(comparison.query)[:8]
-        log_file = PARITY_LOG_DIR / f"parity_diff_{timestamp}_{query_hash}.json"
-        
-        with open(log_file, "w") as f:
-            json.dump(comparison.to_dict(), f, indent=2, default=str)
-        
-        logging.warning(
-            f"[SHADOW] {comparison.classification.upper()}: '{comparison.query[:50]}...': "
-            f"{', '.join(comparison.differences)}"
-        )
-    except Exception as e:
-        logging.error(f"[SHADOW] Failed to log difference: {e}")
 
 
 def main() -> int:
@@ -1044,8 +480,6 @@ def main() -> int:
     parser.add_argument("question", nargs="?", help="User question")
     parser.add_argument("--policy", default="fallback_only", help="Augmentation policy")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="Request timeout")
-    parser.add_argument("--mode", choices=["shell", "python", "parity", "auto"], 
-                        default="auto", help="Execution mode")
     parser.add_argument("--json", action="store_true", help="Output JSON")
     args = parser.parse_args()
     
@@ -1058,30 +492,13 @@ def main() -> int:
             parser.print_help()
             return 1
     
-    # Determine execution mode
-    mode = args.mode
-    if mode == "auto":
-        env_mode = os.environ.get("LUCY_ROUTER_PY", "0")
-        if env_mode == "1":
-            mode = "python"
-        elif env_mode == "parity":
-            mode = "parity"
-        else:
-            mode = "shell"
-    
     # Determine policy: command line arg > environment variable > default
     policy = args.policy
     if policy == "fallback_only" and os.environ.get("LUCY_AUGMENTATION_POLICY"):
-        # Use environment variable if set (from HMI/runtime_request.py)
         policy = os.environ.get("LUCY_AUGMENTATION_POLICY")
     
-    # Execute
-    if mode == "python":
-        result = execute_plan_python(question, policy, args.timeout)
-    elif mode == "parity":
-        result = execute_plan_parity(question, policy, args.timeout)
-    else:  # shell
-        result = execute_plan_shell(question, policy, args.timeout)
+    # Execute via Python-native path (shell path removed in Stage 9)
+    result = execute_plan_python(question, policy, args.timeout)
     
     # Output
     if args.json:
@@ -1095,42 +512,6 @@ def main() -> int:
     
     return 0
 
-
-# Monkey patch for with_* methods on frozen dataclass
-def _with_execution_time(self, ms: int) -> RouterOutcome:
-    return RouterOutcome(
-        status=self.status,
-        outcome_code=self.outcome_code,
-        route=self.route,
-        provider=self.provider,
-        provider_usage_class=self.provider_usage_class,
-        intent_family=self.intent_family,
-        confidence=self.confidence,
-        response_text=self.response_text,
-        error_message=self.error_message,
-        execution_time_ms=ms,
-        request_id=self.request_id,
-    )
-
-
-def _with_request_id(self, req_id: str) -> RouterOutcome:
-    return RouterOutcome(
-        status=self.status,
-        outcome_code=self.outcome_code,
-        route=self.route,
-        provider=self.provider,
-        provider_usage_class=self.provider_usage_class,
-        intent_family=self.intent_family,
-        confidence=self.confidence,
-        response_text=self.response_text,
-        error_message=self.error_message,
-        execution_time_ms=self.execution_time_ms,
-        request_id=req_id,
-    )
-
-
-RouterOutcome.with_execution_time = _with_execution_time
-RouterOutcome.with_request_id = _with_request_id
 
 
 if __name__ == "__main__":

@@ -396,7 +396,7 @@ class StreamingVoicePipeline:
         
         # Decode common HTML entities
         text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-        text = text.replace('&quot;', '"').replace('&#39;', "'")
+        text = text.replace('&quot;', '"').replace('&#39;', "'").replace('&#x27;', "'")
         text = text.replace('&nbsp;', ' ').replace('&#160;', ' ')
         text = text.replace('&#8211;', '–').replace('&#8212;', '—')
         text = text.replace('&#8216;', ''').replace('&#8217;', ''')
@@ -500,134 +500,28 @@ class StreamingVoicePipeline:
         return result.text
     
     async def _get_full_response(self, query: str) -> dict:
-        """Get response from Lucy using Python-native router."""
-        from router_py.classify import classify_intent, select_route
-        from router_py.execution_engine import ExecutionEngine
-        from router_py.policy import normalize_augmentation_policy
-        from router_py.main import ensure_control_env
+        """Get response from Lucy using unified pipeline entry point."""
+        import concurrent.futures
+        from router_py.main import run
         
-        
-        # Ensure control environment is loaded from state file
-        ensure_control_env()
-        
-        # Longer timeout for voice - needs time for TTS + playback
-        # News digests can take 2-3 minutes to speak completely
-        engine = ExecutionEngine(config={
-            "timeout": 300,  # 5 minutes for voice
-            "use_sqlite_state": True,
-        })
-        
-        try:
-            classification = classify_intent(query, surface="voice")
-            policy = normalize_augmentation_policy(
-                os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(
+                run,
+                query,
+                surface="voice",
+                timeout=300,
             )
-            decision = select_route(classification, policy=policy, query=query)
-            
-            # Map mode setting to forced_mode for execution engine
-            mode = os.environ.get("LUCY_MODE", "auto").lower()
-            forced_mode_map = {
-                "auto": "AUTO",
-                "online": "FORCED_ONLINE",
-                "offline": "FORCED_OFFLINE",
-            }
-            forced_mode = forced_mode_map.get(mode, "AUTO")
-            
-            context = {
-                "question": query,
-                "output_mode": "DETAIL",
-                "forced_mode": forced_mode,
-                "surface": "voice",
-            }
-            result = engine.execute(
-                intent=classification,
-                route=decision,
-                context=context,
-                use_python_path=True,
-            )
-            
-            # Persist chat memory turn if memory is enabled
-            session_mem = os.environ.get("LUCY_SESSION_MEMORY", "NOT_SET")
-            if os.environ.get("LUCY_SESSION_MEMORY") == "1" and result.response_text:
-                try:
-                    from router_py.execution_engine import DEFAULT_CHAT_MEMORY_FILE
-                    # Check both runtime and standard env vars for memory file path
-                    mem_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
-                    if not mem_file:
-                        mem_file = os.environ.get("LUCY_CHAT_MEMORY_FILE", "").strip()
-                    if not mem_file:
-                        mem_file = DEFAULT_CHAT_MEMORY_FILE
-                    mem_path = Path(mem_file).expanduser()
-                    mem_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    # Format assistant text (clean up markers, truncate)
-                    assistant_text = (
-                        result.response_text.replace("BEGIN_VALIDATED", " ")
-                        .replace("END_VALIDATED", " ")
-                        .replace("\r", " ")
-                        .replace("\n", " ")
-                    )
-                    assistant_text = re.sub(r"\s+", " ", assistant_text).strip()
-                    if len(assistant_text) > 500:
-                        assistant_text = assistant_text[:500]
-                    
-                    # Sanitize: do not store refusal/failure/garbage responses
-                    refusal_patterns = [
-                        "state the specific question",
-                        "tell me the practical question",
-                        "i cannot answer",
-                        "i'm not able to",
-                        "i cannot provide",
-                        "i don't know",
-                        "error:",
-                    ]
-                    assistant_lower = assistant_text.lower()
-                    if len(assistant_text) >= 10 and not any(p in assistant_lower for p in refusal_patterns):
-                        # Read existing content
-                        existing = ""
-                        try:
-                            existing = mem_path.read_text(encoding="utf-8")
-                        except FileNotFoundError:
-                            pass
-                        
-                        # Build new block and append
-                        block = f"User: {query.strip()}\nAssistant: {assistant_text}\n\n"
-                        blocks = [item.strip() for item in re.split(r"\n\s*\n", existing) if item.strip()]
-                        blocks.append(block.strip())
-                        
-                        # Keep only last 6 turns
-                        max_turns = 6
-                        trimmed = "\n\n".join(blocks[-max_turns:]).strip()
-                        if trimmed:
-                            trimmed += "\n\n"
-                        
-                        mem_path.write_text(trimmed, encoding="utf-8")
-                except Exception as e:
-                    pass
-            
-            # Record exchange in feedback buffer for future attribution
-            try:
-                from router_py.feedback_buffer import record_exchange
-                record_exchange(
-                    query=query,
-                    route=result.route,
-                    intent_family=classification.intent_family if classification else "",
-                    response_text=result.response_text or "",
-                    confidence=classification.confidence if classification else 0.0,
-                )
-            except Exception:
-                pass
-            
-            return {
-                "status": "completed" if result.status == "completed" else result.status,
-                "response_text": result.response_text or "",
-                "route": result.route,
-                "provider": result.provider,
-                "outcome_code": result.outcome_code,
-                "execution_time_ms": result.execution_time_ms,
-            }
-        finally:
-            engine.close()
+            outcome = await asyncio.wrap_future(future)
+        
+        return {
+            "status": "completed" if outcome.status == "completed" else outcome.status,
+            "response_text": outcome.response_text or "",
+            "route": outcome.route,
+            "provider": outcome.provider,
+            "outcome_code": outcome.outcome_code,
+            "execution_time_ms": outcome.execution_time_ms,
+        }
     
     async def _stream_tts_continuous(
         self,

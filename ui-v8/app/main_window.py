@@ -343,7 +343,7 @@ class OperatorConsoleWindow(QMainWindow):
         # Gracefully quit kokoro worker
         try:
             from pathlib import Path
-            socket_path = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev" / "tmp" / "run" / "kokoro_tts_worker.sock"
+            socket_path = Path.home() / "lucy-v8" / "tmp" / "run" / "kokoro_tts_worker.sock"
             if socket_path.exists():
                 import socket, json
                 client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -357,7 +357,7 @@ class OperatorConsoleWindow(QMainWindow):
         try:
             from pathlib import Path
             import os, signal
-            whisper_pid_file = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev" / "tmp" / "run" / "whisper_worker.pid"
+            whisper_pid_file = Path.home() / "lucy-v8" / "tmp" / "run" / "whisper_worker.pid"
             if whisper_pid_file.exists():
                 whisper_pid = int(whisper_pid_file.read_text().strip())
                 os.kill(whisper_pid, signal.SIGTERM)

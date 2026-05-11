@@ -49,9 +49,6 @@ try:
         execute_plan_python,
         execute_plan_shell,
         execute_plan_parity,
-        _delegate_execution,
-        _delegate_execution_to_python,
-        _delegate_execution_to_shell,
         ensure_control_env,
         RouterOutcome,
         DEFAULT_TIMEOUT,
@@ -109,12 +106,8 @@ except ImportError as e:
 __all__ = [
     # Main entry points
     "execute_plan_python",
-    "execute_plan_shell", 
+    "execute_plan_shell",
     "execute_plan_parity",
-    "execute_plan_shadow",
-    "_delegate_execution",
-    "_delegate_execution_to_python",
-    "_delegate_execution_to_shell",
     "ensure_control_env",
     "RouterOutcome",
     "DEFAULT_TIMEOUT",
