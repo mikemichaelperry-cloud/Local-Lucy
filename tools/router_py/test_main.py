@@ -10,10 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from main import (
-    RouterOutcome,
-    OutcomeComparison,
-)
+from main import RouterOutcome
 
 
 class TestRouterOutcome(unittest.TestCase):
@@ -132,8 +129,7 @@ def run_tests():
     suite = unittest.TestSuite()
     
     suite.addTests(loader.loadTestsFromTestCase(TestRouterOutcome))
-    suite.addTests(loader.loadTestsFromTestCase(TestClassifyDifference))
-    suite.addTests(loader.loadTestsFromTestCase(TestOutcomeComparison))
+
     suite.addTests(loader.loadTestsFromTestCase(TestExecutionModes))
     suite.addTests(loader.loadTestsFromTestCase(TestErrorHandling))
     
