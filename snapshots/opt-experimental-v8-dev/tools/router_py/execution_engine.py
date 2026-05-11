@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """
-Execution Engine - Python implementation for plan execution.
+Execution Engine — Python-native plan execution.
 
-This module replaces execute_plan.sh functionality, handling the actual
-execution of routing decisions made by the Python Router.
+Receives RoutingDecision from the pipeline and executes it:
+- WEATHER / TIME / NEWS: fetch evidence, return formatted result
+- LOCAL: call local model worker
+- AUGMENTED / FULL / EVIDENCE: fetch evidence, build prompt, call provider
+- CLARIFY: return clarification request
 
-The ExecutionEngine receives routing decisions from the Router and handles:
-- Route-specific execution logic (bypass, provisional, full)
-- Tool dispatch and result formatting
-- Response enhancement and metadata tracking
-- State persistence for post-execution analysis
+Provider resolution is now centralized in `provider_resolver.py`.
+The engine trusts `route.provider` as the single source of truth.
 
-CRITICAL DESIGN PRINCIPLE:
-The ExecutionEngine DELEGATES to governed tool paths rather than calling
-providers directly. This preserves authority semantics and truth metadata.
+Response formatting and validation live in `response_formatter.py`.
+Memory persistence lives in `main._persist_memory_turn()`.
+
+This module no longer contains shell delegation paths (removed in Stage 9).
 """
 
 from __future__ import annotations
@@ -51,6 +52,8 @@ sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from router_py.classify import ClassificationResult, RoutingDecision
 from router_py.policy import requires_evidence_mode
+from router_py.request_types import ExecutionResult
+from router_py import response_formatter
 from router_py.state_manager import get_state_manager
 
 # Import auto-feedback for answer quality analysis
@@ -59,6 +62,14 @@ try:
     HAS_AUTO_FEEDBACK = True
 except ImportError:
     HAS_AUTO_FEEDBACK = False
+
+# Import response cache for repeated query short-circuit
+try:
+    sys.path.insert(0, str(ROOT_DIR / "models" / "router"))
+    from response_cache import get_cached, set_cached
+    HAS_RESPONSE_CACHE = True
+except ImportError:
+    HAS_RESPONSE_CACHE = False
 
 # Import Python local_answer if available
 try:
@@ -84,6 +95,26 @@ LAST_OUTCOME_FILE = STATE_DIR / "last_outcome.env"
 SHELL_EXECUTE_PLAN = ROOT_DIR / "tools" / "router" / "execute_plan.sh"
 LOCAL_ANSWER_SCRIPT = ROOT_DIR / "tools" / "local_answer.sh"
 LOCAL_ANSWER_PY_SCRIPT = ROOT_DIR / "tools" / "router_py" / "local_answer.py"
+
+# Import provider modules (extracted to keep ExecutionEngine focused on dispatch)
+try:
+    from router_py.providers import (
+        fetch_wikipedia_evidence,
+        fetch_api_evidence,
+        fetch_time_evidence,
+        fetch_weather_evidence,
+        fetch_news_evidence,
+        format_time_response,
+        format_wikipedia_response,
+        call_openai_for_response,
+        call_openai_subprocess,
+        call_kimi_for_response,
+        call_kimi_subprocess,
+        call_local_model_async,
+    )
+    HAS_PROVIDER_MODULES = True
+except ImportError:
+    HAS_PROVIDER_MODULES = False
 
 # Feature flag: Use Python local_answer instead of shell version
 # Default is "1" (Python) - shell path available via LUCY_LOCAL_ANSWER_PY=0 if needed
@@ -132,7 +163,7 @@ def _load_session_memory_context_with_telemetry(
     try:
         from memory.memory_service import assemble_context_with_telemetry
         context, telemetry = assemble_context_with_telemetry(
-            max_chars=500, query=query, depth=depth, mode=mode
+            current_session_id="default", max_chars=500, query=query, depth=depth, mode=mode
         )
         if context:
             return context, telemetry
@@ -183,50 +214,6 @@ def _load_session_memory_context(query: str = "", depth: str = "auto", mode: str
     return context
 
 
-@dataclass(frozen=True)
-class ExecutionResult:
-    """
-    Structured result from plan execution.
-    
-    This dataclass captures the outcome of executing a routing decision,
-    including the response text, metadata about the execution path taken,
-    and any error information.
-    
-    Attributes:
-        status: Execution status ("completed", "failed", "timeout")
-        outcome_code: Specific outcome code (e.g., "answered", "local_fallback")
-        route: The route that was executed ("LOCAL", "AUGMENTED", "CLARIFY")
-        provider: The provider used ("local", "wikipedia", "openai", etc.)
-        provider_usage_class: Usage classification ("local", "free", "paid")
-        response_text: The actual response content
-        error_message: Error description if status is "failed"
-        execution_time_ms: Total execution time in milliseconds
-        metadata: Additional execution metadata (trust class, evidence mode, etc.)
-    """
-    
-    status: str
-    outcome_code: str
-    route: str
-    provider: str
-    provider_usage_class: str
-    response_text: str = ""
-    error_message: str = ""
-    execution_time_ms: int = 0
-    metadata: dict[str, Any] = field(default_factory=dict)
-    
-    def to_dict(self) -> dict[str, Any]:
-        """Convert result to dictionary for serialization."""
-        return {
-            "status": self.status,
-            "outcome_code": self.outcome_code,
-            "route": self.route,
-            "provider": self.provider,
-            "provider_usage_class": self.provider_usage_class,
-            "response_text": self.response_text,
-            "error_message": self.error_message,
-            "execution_time_ms": self.execution_time_ms,
-            "metadata": self.metadata,
-        }
 
 
 class ExecutionEngine:
@@ -811,7 +798,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         # Use Python-native path by default for all routes (shell-free)
         # Following burn-in certification (2,221+ queries, 100% success)
-        if use_python_path and route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "LOCAL", "TIME"):
+        if use_python_path and route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "LOCAL", "TIME", "WEATHER"):
             self._logger.info("Using Python-native execution path (shell-free)")
             # Run the async version in a new event loop
             try:
@@ -854,6 +841,23 @@ them according to the route type (bypass, provisional, or full). It handles:
             f"Execution start: route={route.route}, provider={route.provider}, "
             f"intent={intent.intent}, question={question[:100]}..."
         )
+        
+        # Response cache short-circuit: skip LLM for repeated LOCAL queries
+        if HAS_RESPONSE_CACHE and route.route == "LOCAL" and question:
+            cached = get_cached(question)
+            if cached:
+                execution_time = int((time.time() - start_time) * 1000)
+                self._logger.info(f"Cache hit: returning cached response ({execution_time}ms)")
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="local_answer",
+                    route="LOCAL",
+                    provider="local",
+                    provider_usage_class="local",
+                    response_text=cached,
+                    execution_time_ms=execution_time,
+                    metadata={"cache_hit": True, "execution_time_ms": execution_time},
+                )
         
         try:
             # Handle CLARIFY route early
@@ -911,8 +915,23 @@ them according to the route type (bypass, provisional, or full). It handles:
                             f"(suggest {suggestion['suggested_route']}, "
                             f"confidence={suggestion['confidence']})"
                         )
+                        # Trigger background learning if enough feedback accumulated
+                        try:
+                            from background_learner import maybe_auto_learn
+                            triggered = maybe_auto_learn(min_entries=5)
+                            if triggered:
+                                self._logger.info("Background learning triggered (auto)")
+                        except Exception:
+                            pass
                 except Exception:
                     pass  # Auto-feedback must never break execution
+            
+            # Cache LOCAL responses for repeated queries
+            if HAS_RESPONSE_CACHE and route.route == "LOCAL" and question and final_result.response_text:
+                try:
+                    set_cached(question, final_result.response_text, route="LOCAL")
+                except Exception:
+                    pass  # Cache must never break execution
             
             self._logger.info(
                 f"Execution complete: status={final_result.status}, "
@@ -1358,7 +1377,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         rc = result.returncode
         
         # Check for local generation failure patterns
-        if rc == 0 and self._is_local_generation_failure_output(raw_output):
+        if rc == 0 and response_formatter.is_local_generation_failure_output(raw_output):
             guard_trigger = "local_generation_failure_phrase"
             fallback_kind = "deterministic_local_prompt_fallback"
             outcome_code = "local_guard_fallback"
@@ -1366,7 +1385,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             response_text = self._runtime_local_prompt_fallback_text(question, "0")
         else:
             # Render the response
-            response_text = self._render_chat_fast_from_raw(raw_output)
+            response_text = response_formatter.render_chat_fast_from_raw(raw_output)
             response_text = self._local_fast_non_empty_guard(
                 question, response_text, "CHAT"
             )
@@ -1375,7 +1394,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             )
             
             # Check for evidence style text (shouldn't happen in bypass)
-            if self._is_evidence_style_text(response_text):
+            if response_formatter.is_evidence_style_text(response_text):
                 outcome_code = "local_lexeme_blocked"
                 guard_trigger = "local_evidence_lexeme_detected"
                 fallback_kind = "lexeme_blocked_replacement"
@@ -1677,7 +1696,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             
             # Format response
             if rc == 0:
-                response_text = self._render_chat_fast_from_raw(raw_output)
+                response_text = response_formatter.render_chat_fast_from_raw(raw_output)
                 if (
                     is_medical_query
                     and final_mode == "AUGMENTED"
@@ -1837,7 +1856,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             route_type = self._determine_route_type(route, intent, context)
             
             # Use Python-native execution based on route type
-            if route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "TIME"):
+            if route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "TIME", "WEATHER"):
                 result = await self._execute_full_route_python(intent, route, context)
             elif route_type == "provisional":
                 # Provisional: local first with fallback to augmentation
@@ -1945,16 +1964,52 @@ them according to the route type (bypass, provisional, or full). It handles:
         """
         self._logger.info(f"Executing full Python route: {route.route}")
         question = context.get("question", "")
+
         is_medical_query = self._context_indicates_medical_query(context) or (
             route and route.evidence_reason in ("medical_safety", "medical_context")
         )
         
         # Step 1: Fetch evidence if needed
         evidence = None
-        if route.route in ("EVIDENCE", "NEWS", "FULL", "AUGMENTED", "TIME"):
+        if route.route in ("EVIDENCE", "NEWS", "FULL", "AUGMENTED", "TIME", "WEATHER"):
             # Check if this is a voice query for voice-optimized content
             for_voice = context.get("surface") == "voice" if context else False
             evidence = await self._fetch_evidence(question, route, for_voice=for_voice)
+        
+        # Special handling for WEATHER route: return weather directly
+        if route.route == "WEATHER":
+            if evidence and evidence.get("ok"):
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="answered",
+                    route="WEATHER",
+                    provider="weather",
+                    provider_usage_class="free",
+                    response_text=evidence["formatted"],
+                    error_message="",
+                    metadata={
+                        "route_type": "weather_lookup",
+                        "location": evidence.get("location"),
+                        "temp_c": evidence.get("temp_c"),
+                        "description": evidence.get("description"),
+                        "real_route_preserved": True,
+                    },
+                )
+            else:
+                error_msg = evidence.get("error", "Unknown location") if evidence else "Could not fetch weather"
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="error",
+                    route="WEATHER",
+                    provider="weather",
+                    provider_usage_class="free",
+                    response_text=f"Sorry, I couldn't fetch the weather. {error_msg}",
+                    error_message=error_msg,
+                    metadata={
+                        "route_type": "weather_lookup_failed",
+                        "real_route_preserved": True,
+                    },
+                )
         
         # Special handling for TIME route: return current time directly
         if route.route == "TIME":
@@ -2049,7 +2104,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             )
         
         # Step 2: Build augmented prompt with evidence
-        prompt = self._build_augmented_prompt(question, evidence, route)
+        prompt = response_formatter.build_augmented_prompt(question, evidence, route)
         
         # Load session memory with telemetry before calling provider
         session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(prompt)
@@ -2068,7 +2123,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
         
         # Step 4: Validate response
-        validated = self._validate_response(response, route)
+        validated = response_formatter.validate_response(response, route)
         
         # Step 5: Return with REAL route (no mapping)
         result = ExecutionResult(
@@ -2117,6 +2172,10 @@ them according to the route type (bypass, provisional, or full). It handles:
         """
         self._logger.info(f"Fetching evidence for route={route.route}, provider={route.provider}, for_voice={for_voice}")
         
+        # For WEATHER route, fetch weather from wttr.in
+        if route.route == "WEATHER":
+            return await self._fetch_weather_evidence(question)
+        
         # For TIME route, fetch current time from time API
         if route.route == "TIME":
             return await self._fetch_time_evidence(question)
@@ -2144,341 +2203,61 @@ them according to the route type (bypass, provisional, or full). It handles:
             return None
     
     async def _fetch_wikipedia_evidence(self, question: str) -> dict[str, Any] | None:
-        """
-        Fetch evidence from Wikipedia.
-        
-        Uses unverified_context_wikipedia.py fetch_context function.
-        Runs in thread pool to not block event loop.
-        
-        Args:
-            question: The user question
-        
-        Returns:
-            Evidence dictionary or None if failed
-        """
-        self._logger.debug(f"Fetching Wikipedia evidence for: {question[:50]}...")
-        
-        try:
-            # Import the Wikipedia provider
-            sys.path.insert(0, str(ROOT_DIR / "tools"))
-            import unverified_context_wikipedia as wiki_provider
-            
-            # Run the synchronous fetch in a thread pool
-            loop = asyncio.get_event_loop()
-            payload = await loop.run_in_executor(
-                None, wiki_provider.fetch_context, question
-            )
-            
-            if payload and payload.get("ok"):
-                return {
-                    "context": payload.get("text", ""),
-                    "title": payload.get("title", ""),
-                    "url": payload.get("url", ""),
-                    "provider": "wikipedia",
-                    "class": payload.get("class", "wikipedia_general"),
-                }
-            return None
-        except Exception as e:
-            self._logger.warning(f"Wikipedia evidence fetch failed: {e}")
-            return None
+        """Fetch evidence from Wikipedia (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return await fetch_wikipedia_evidence(question)
+        self._logger.warning("Provider modules not available")
+        return None
     
     async def _fetch_news_evidence(self, question: str, for_voice: bool = False) -> dict[str, Any] | None:
-        """
-        Fetch live news from RSS feeds.
-        
-        Uses the news_provider module to fetch fresh news from RSS sources.
-        Parallel async fetching. News is always fetched fresh — never cached.
-        
-        Args:
-            question: The user question (may contain search terms)
-            for_voice: If True, return condensed format optimized for TTS
-            
-        Returns:
-            Evidence dictionary with news articles or None if failed
-        """
-        if not HAS_NEWS_PROVIDER:
-            self._logger.warning("News provider not available")
-            return None
-        
-        import time
-        fetch_start = time.time()
-        try:
-            result = await NewsProvider.fetch_news(question, for_voice=for_voice)
-            elapsed = time.time() - fetch_start
-            
-            if result.ok:
-                article_count = len(result.articles) if result.articles else 0
-                self._logger.info(
-                    f"NEWS fetched fresh: {article_count} articles in {elapsed:.2f}s "
-                    f"(partial={result.partial}, source={result.source})"
-                )
-                return {
-                    "context": result.text,
-                    "html_context": result.html_text,
-                    "title": "Latest News",
-                    "url": "",
-                    "provider": result.source,
-                    "class": "news_live",
-                    "articles": result.articles,
-                    "partial": result.partial,
-                    "errors": result.errors,
-                }
-            else:
-                self._logger.warning(f"News fetch failed after {elapsed:.2f}s: {result.error}")
-                return None
-        except Exception as e:
-            elapsed = time.time() - fetch_start
-            self._logger.warning(f"News evidence fetch failed after {elapsed:.2f}s: {e}")
-            return None
+        """Fetch live news from RSS feeds (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return await fetch_news_evidence(question, for_voice=for_voice)
+        self._logger.warning("Provider modules not available")
+        return None
     
     async def _fetch_time_evidence(self, question: str) -> dict[str, Any] | None:
-        """
-        Fetch current time from TimeAPI.io.
-        
-        Extracts location from question and fetches real-time data.
-        
-        Args:
-            question: The user question (e.g., "What time is it in Tokyo?")
-            
-        Returns:
-            Evidence dictionary with time data or None if failed
-        """
-        import re
-        
-        # Extract location from question
-        location = None
-        patterns = [
-            r"(?:what['']?s?|what is|current)\s+time\s+(?:is it\s+)?(?:in|at)\s+([^?]+)",
-            r"time\s+(?:in|at)\s+([^?]+)",
-            r"([^?]+)\s+time",
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, question, re.IGNORECASE)
-            if match:
-                location = match.group(1).strip()
-                break
-        
-        # Default to UTC if no location found
-        if not location:
-            location = "UTC"
-        
-        self._logger.info(f"Fetching time for location: {location}")
-        
-        try:
-            # Call time tool using subprocess directly (not in executor to avoid async issues)
-            tool_path = ROOT_DIR / "tools" / "current_time_tool.py"
-            if not tool_path.exists():
-                self._logger.warning("Time tool not found")
-                return None
-            
-            proc = await asyncio.create_subprocess_exec(
-                sys.executable, str(tool_path), location,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(ROOT_DIR),
-            )
-            
-            try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
-            except asyncio.TimeoutError:
-                proc.kill()
-                self._logger.warning("Time tool timed out")
-                return None
-            
-            if proc.returncode == 0:
-                data = json.loads(stdout.decode('utf-8'))
-                if data.get("ok"):
-                    formatted = self._format_time_response(data)
-                    return {
-                        "ok": True,
-                        "timezone": data.get("timezone"),
-                        "datetime": data.get("datetime"),
-                        "dst": data.get("dst"),
-                        "formatted": formatted,
-                    }
-                else:
-                    self._logger.warning(f"Time API error: {data.get('error')}")
-                    return None
-            else:
-                self._logger.warning(f"Time tool failed: {stderr.decode()}")
-                return None
-        except Exception as e:
-            self._logger.warning(f"Time evidence fetch failed: {e}")
-            return None
+        """Fetch current time from TimeAPI.io (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return await fetch_time_evidence(question)
+        self._logger.warning("Provider modules not available")
+        return None
     
     def _format_time_response(self, data: dict) -> str:
-        """Format time API response into human-readable text."""
-        try:
-            time_str = data.get("time", "?")
-            date_str = data.get("date", "?")
-            timezone = data.get("timezone", "Unknown")
-            day = data.get("day_of_week", "")
-            dst = data.get("dst", False)
-            
-            # Format time nicely
-            hour = int(data.get("hour", 0))
-            minute = int(data.get("minute", 0))
-            ampm = "AM" if hour < 12 else "PM"
-            hour_12 = hour if hour <= 12 else hour - 12
-            if hour_12 == 0:
-                hour_12 = 12
-            time_formatted = f"{hour_12}:{minute:02d} {ampm}"
-            
-            lines = [
-                f"The current time in {timezone} is {time_formatted}.",
-                f"Date: {day}, {date_str}",
-            ]
-            
-            if dst:
-                lines.append("Daylight Saving Time is currently active.")
-            
-            return "\n".join(lines)
-        except Exception as e:
-            return f"Current time: {data.get('time', 'unknown')}"
+        """Format time API response into human-readable text (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return format_time_response(data)
+        return f"Current time: {data.get('time', 'unknown')}"
+    
+    async def _fetch_weather_evidence(self, question: str) -> dict[str, Any] | None:
+        """Fetch weather data from wttr.in (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return await fetch_weather_evidence(question)
+        self._logger.warning("Provider modules not available")
+        return None
     
     async def _fetch_api_evidence(
         self,
         question: str,
         provider: str,
     ) -> dict[str, Any] | None:
-        """
-        Fetch evidence from API provider (Kimi or OpenAI).
-        
-        Uses unverified_context_kimi.py or unverified_context_openai.py.
-        
-        Args:
-            question: The user question
-            provider: "kimi" or "openai"
-        
-        Returns:
-            Evidence dictionary or None if failed
-        """
-        self._logger.debug(f"Fetching {provider} evidence for: {question[:50]}...")
-        
-        try:
-            sys.path.insert(0, str(ROOT_DIR / "tools"))
-            
-            if provider == "kimi":
-                import unverified_context_kimi as kimi_provider
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    None, self._call_kimi_subprocess, question
-                )
-                return result
-            elif provider == "openai":
-                import unverified_context_openai as openai_provider
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    None, self._call_openai_subprocess, question
-                )
-                return result
-            return None
-        except Exception as e:
-            self._logger.warning(f"{provider} evidence fetch failed: {e}")
-            return None
+        """Fetch evidence from API provider (Kimi or OpenAI) (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return await fetch_api_evidence(question, provider, timeout=self.timeout)
+        self._logger.warning("Provider modules not available")
+        return None
     
     def _call_kimi_subprocess(self, question: str) -> dict[str, Any] | None:
-        """Call Kimi provider via subprocess (sync version for thread pool)."""
-        tool = ROOT_DIR / "tools" / "unverified_context_kimi.py"
-        if not tool.exists():
-            return None
-        
-        try:
-            result = subprocess.run(
-                [sys.executable, str(tool), question],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=self._prepare_subprocess_env(),
-                cwd=str(ROOT_DIR),
-            )
-            if result.returncode == 0:
-                payload = json.loads(result.stdout)
-                if payload.get("ok"):
-                    return {
-                        "context": payload.get("text", payload.get("context", "")),
-                        "title": payload.get("title", ""),
-                        "url": payload.get("url", ""),
-                        "provider": "kimi",
-                        "class": payload.get("class", "kimi_general"),
-                    }
-        except Exception as e:
-            self._logger.debug(f"Kimi subprocess failed: {e}")
+        """Call Kimi provider via subprocess (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return call_kimi_subprocess(question, timeout=self.timeout)
         return None
     
     def _call_openai_subprocess(self, question: str) -> dict[str, Any] | None:
-        """Call OpenAI provider via subprocess (sync version for thread pool)."""
-        tool = ROOT_DIR / "tools" / "unverified_context_openai.py"
-        if not tool.exists():
-            return None
-        
-        try:
-            result = subprocess.run(
-                [sys.executable, str(tool), question],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=self._prepare_subprocess_env(),
-                cwd=str(ROOT_DIR),
-            )
-            if result.returncode == 0:
-                payload = json.loads(result.stdout)
-                if payload.get("ok"):
-                    return {
-                        "context": payload.get("text", payload.get("context", "")),
-                        "title": payload.get("title", ""),
-                        "url": payload.get("url", ""),
-                        "provider": "openai",
-                        "class": payload.get("class", "openai_general"),
-                    }
-        except Exception as e:
-            self._logger.debug(f"OpenAI subprocess failed: {e}")
+        """Call OpenAI provider via subprocess (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return call_openai_subprocess(question, timeout=self.timeout)
         return None
-    
-    def _build_augmented_prompt(
-        self,
-        question: str,
-        evidence: dict[str, Any] | None,
-        route: RoutingDecision,
-    ) -> str:
-        """
-        Build augmented prompt with evidence context.
-        
-        Args:
-            question: The user question
-            evidence: Evidence dictionary from _fetch_evidence
-            route: The routing decision
-        
-        Returns:
-            Augmented prompt string
-        """
-        if not evidence or not evidence.get("context"):
-            # No evidence, return question as-is
-            return question
-        
-        context_text = evidence.get("context", "")
-        title = evidence.get("title", "")
-        url = evidence.get("url", "")
-        provider = evidence.get("provider", "unknown")
-        
-        # Build augmented prompt
-        prompt_parts = [
-            f"Question: {question}",
-            "",
-            "Background Context:",
-            context_text,
-        ]
-        
-        if title:
-            prompt_parts.append(f"\nSource: {title}")
-        if url:
-            prompt_parts.append(f"URL: {url}")
-        
-        prompt_parts.append(f"\nProvider: {provider}")
-        prompt_parts.append("\nBased on the background context above, please answer the question.")
-        
-        return "\n".join(prompt_parts)
     
     async def _call_local_model_async(
         self,
@@ -2487,46 +2266,19 @@ them according to the route type (bypass, provisional, or full). It handles:
         session_memory: str = "",
         route_mode: str = "LOCAL",
     ) -> str:
-        """
-        Call local model asynchronously using Python-native path.
-        
-        SHELL-FREE: Uses local_answer.py directly instead of local_answer.sh.
-        Following burn-in certification (2,221+ queries, 100% success).
-        
-        Args:
-            prompt: The augmented prompt
-            context: Execution context
-            session_memory: Pre-loaded session memory context (optional)
-        
-        Returns:
-            Model response text
-        """
+        """Call local model asynchronously using Python-native path (delegated to provider module)."""
         self._logger.debug(f"Calling local model async with prompt: {prompt[:50]}...")
-        
-        # Use Python-native local_answer
-        from router_py.local_answer import LocalAnswer, LocalAnswerConfig
-        
-        config = LocalAnswerConfig.from_env()
-        # Override with the model selected in the HMI (passed via ExecutionEngine config).
-        configured_model = self.config.get("model")
-        if configured_model:
-            config.model = str(configured_model)
-            self._logger.info(f"[MODEL] Async local model set to: {configured_model}")
-        answer = LocalAnswer(config)
-        
-        if session_memory:
-            self._logger.debug(f"Using provided session memory ({len(session_memory)} chars)")
-        
-        try:
-            result = await answer.generate_answer(
-                query=prompt,
+        if HAS_PROVIDER_MODULES:
+            configured_model = self.config.get("model")
+            result = await call_local_model_async(
+                prompt=prompt,
+                context=context,
                 session_memory=session_memory,
                 route_mode=route_mode,
+                model=configured_model,
             )
-            return self._render_chat_fast_from_raw(result.text)
-        except Exception as e:
-            self._logger.warning(f"Local model failed: {e}")
-            return f"Error: Local model failed to generate response. {e}"
+            return response_formatter.render_chat_fast_from_raw(result)
+        return "Error: Provider modules not available"
     
     async def _call_api_provider_async(
         self,
@@ -2534,83 +2286,34 @@ them according to the route type (bypass, provisional, or full). It handles:
         prompt: str,
         context: dict[str, Any],
     ) -> str:
-        """
-        Call API provider asynchronously (OpenAI or Kimi).
-        
-        Uses aiohttp if available, otherwise falls back to thread pool
-        with urllib/subprocess.
-        
-        Args:
-            provider: "openai" or "kimi"
-            prompt: The augmented prompt
-            context: Execution context
-        
-        Returns:
-            Provider response text
-        """
+        """Call API provider asynchronously (OpenAI or Kimi) (delegated to provider module)."""
         self._logger.debug(f"Calling {provider} API async with prompt: {prompt[:50]}...")
-        
-        # For now, use subprocess via thread pool (can be enhanced with aiohttp)
+        if not HAS_PROVIDER_MODULES:
+            return f"Error: Provider modules not available"
         loop = asyncio.get_event_loop()
-        
         if provider == "openai":
             result = await loop.run_in_executor(
-                None, self._call_openai_for_response, prompt
+                None, call_openai_for_response, prompt, self.timeout
             )
         elif provider == "kimi":
             result = await loop.run_in_executor(
-                None, self._call_kimi_for_response, prompt
+                None, call_kimi_for_response, prompt, self.timeout
             )
         else:
             result = f"Error: Unknown provider {provider}"
-        
         return result
     
     def _call_openai_for_response(self, prompt: str) -> str:
-        """Call OpenAI for direct response (sync version)."""
-        tool = ROOT_DIR / "tools" / "unverified_context_openai.py"
-        if not tool.exists():
-            return "Error: OpenAI tool not found"
-        
-        try:
-            result = subprocess.run(
-                [sys.executable, str(tool), prompt],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=self._prepare_subprocess_env(),
-                cwd=str(ROOT_DIR),
-            )
-            if result.returncode == 0:
-                payload = json.loads(result.stdout)
-                if payload.get("ok"):
-                    return payload.get("text", payload.get("context", "No response"))
-            return f"Error: {result.stderr}"
-        except Exception as e:
-            return f"Error calling OpenAI: {e}"
+        """Call OpenAI for direct response (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return call_openai_for_response(prompt, timeout=self.timeout)
+        return "Error: OpenAI tool not found"
     
     def _call_kimi_for_response(self, prompt: str) -> str:
-        """Call Kimi for direct response (sync version)."""
-        tool = ROOT_DIR / "tools" / "unverified_context_kimi.py"
-        if not tool.exists():
-            return "Error: Kimi tool not found"
-        
-        try:
-            result = subprocess.run(
-                [sys.executable, str(tool), prompt],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=self._prepare_subprocess_env(),
-                cwd=str(ROOT_DIR),
-            )
-            if result.returncode == 0:
-                payload = json.loads(result.stdout)
-                if payload.get("ok"):
-                    return payload.get("text", payload.get("context", "No response"))
-            return f"Error: {result.stderr}"
-        except Exception as e:
-            return f"Error calling Kimi: {e}"
+        """Call Kimi for direct response (delegated to provider module)."""
+        if HAS_PROVIDER_MODULES:
+            return call_kimi_for_response(prompt, timeout=self.timeout)
+        return "Error: Kimi tool not found"
     
     async def _call_wikipedia_provider_async(
         self,
@@ -2618,74 +2321,11 @@ them according to the route type (bypass, provisional, or full). It handles:
         evidence: dict[str, Any] | None,
         context: dict[str, Any],
     ) -> str:
-        """
-        Call Wikipedia provider asynchronously.
-        
-        Wikipedia provider returns evidence directly, so we format it
-        as a response with proper attribution.
-        
-        Args:
-            prompt: The augmented prompt (unused for Wikipedia)
-            evidence: Evidence dictionary from _fetch_evidence
-            context: Execution context
-        
-        Returns:
-            Formatted response with Wikipedia context
-        """
+        """Call Wikipedia provider asynchronously (delegated to provider module)."""
         self._logger.debug("Formatting Wikipedia response async")
-        
-        if not evidence:
-            return "No Wikipedia information available for this query."
-        
-        context_text = evidence.get("context", "")
-        title = evidence.get("title", "")
-        url = evidence.get("url", "")
-        
-        if not context_text:
-            return "No information found on Wikipedia for this topic."
-        
-        # Format a nice response with attribution
-        response_parts = [context_text]
-        
-        if title or url:
-            response_parts.append("\n\n---")
-            if title:
-                response_parts.append(f"Source: Wikipedia - {title}")
-            if url:
-                response_parts.append(f"Read more: {url}")
-        
-        return "\n".join(response_parts)
-    
-    def _validate_response(
-        self,
-        response: str,
-        route: RoutingDecision,
-    ) -> str:
-        """
-        Validate and sanitize model response.
-        
-        Args:
-            response: Raw model response
-            route: The routing decision
-        
-        Returns:
-            Validated response text
-        """
-        if not response or not response.strip():
-            return "I apologize, but I couldn't generate a response. Please try again."
-        
-        # Apply guards
-        validated = response.strip()
-        
-        # Check for local generation failure patterns
-        if self._is_local_generation_failure_output(validated):
-            return "I'm having trouble connecting to the model. Please try again."
-        
-        # Apply non-empty guard
-        if not validated:
-            return "I couldn't generate a response. Please rephrase your question."
-        
-        return validated
+        if HAS_PROVIDER_MODULES:
+            return format_wikipedia_response(prompt, evidence, context)
+        return "No Wikipedia information available for this query."
     
     def _call_local_worker_py(
         self,
@@ -3115,7 +2755,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                 )
             
             # Success - format and return
-            response_text = self._render_chat_fast_from_raw(local_result.stdout)
+            response_text = response_formatter.render_chat_fast_from_raw(local_result.stdout)
             
             return ExecutionResult(
                 status="completed",
@@ -3168,7 +2808,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             return False
         
         # Check for fallback phrases that indicate insufficient response
-        normalized = self._guard_normalize(response_text)
+        normalized = response_formatter.guard_normalize(response_text)
         insufficient_patterns = [
             "i could not generate a reply locally",
             "i don't have enough information",
@@ -3655,31 +3295,6 @@ them according to the route type (bypass, provisional, or full). It handles:
     # Helper Methods (ported from execute_plan.sh)
     # ====================================================================== 
     
-    def _render_chat_fast_from_raw(self, raw: str) -> str:
-        """
-        Fast render of chat output from raw response.
-        
-        Ported from render_chat_fast_from_raw (lines 357-374).
-        
-        Args:
-            raw: Raw output from local tool
-        
-        Returns:
-            Formatted chat response
-        """
-        lines = []
-        for line in raw.splitlines():
-            s = line.strip()
-            if not s:
-                continue
-            if s in ("BEGIN_VALIDATED", "END_VALIDATED"):
-                continue
-            lines.append(s)
-        
-        if lines:
-            return " ".join(lines)
-        return raw.strip()
-    
     def _local_fast_non_empty_guard(
         self,
         question: str,
@@ -3712,8 +3327,8 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         Tracks response history and breaks repetition cycles.
         """
-        qn = self._guard_normalize(question)
-        bn = self._guard_normalize(body)
+        qn = response_formatter.guard_normalize(question)
+        bn = response_formatter.guard_normalize(body)
         
         # Update repeat count
         self.REPEAT_COUNT_SESSION += 1
@@ -3731,7 +3346,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         Ported from local_fast_is_allowed_repeat_body (lines 378-387).
         """
-        n = self._guard_normalize(body)
+        n = response_formatter.guard_normalize(body)
         allowed = [
             "i could not generate a reply locally. please retry, or switch mode.",
             "error",
@@ -3752,7 +3367,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         Ported from runtime_local_prompt_fallback_text (lines 471-496).
         """
-        qn = self._guard_normalize(question)
+        qn = response_formatter.guard_normalize(question)
         
         # Handle special cases
         if qn in ("not necessary.", "not necessary", "no thanks", "never mind"):
@@ -3783,43 +3398,6 @@ them according to the route type (bypass, provisional, or full). It handles:
         Ported from render_conversation_fallback (referenced in execute_plan.sh).
         """
         return self._runtime_local_prompt_fallback_text(question, "0")
-    
-    def _is_local_generation_failure_output(self, body: str) -> bool:
-        """
-        Check if output indicates local generation failure.
-        
-        Ported from is_local_generation_failure_output (execute_plan.sh).
-        """
-        n = self._guard_normalize(body)
-        failure_patterns = [
-            "127.0.0.1:11434",
-            "ollama",
-            "connection refused",
-            "operation not permitted",
-            "dial tcp",
-        ]
-        for pattern in failure_patterns:
-            if pattern in n:
-                return True
-        return False
-    
-    def _is_evidence_style_text(self, text: str) -> bool:
-        """
-        Check if text has evidence-style formatting.
-        
-        Ported from is_evidence_style_text (execute_plan.sh).
-        """
-        n = self._guard_normalize(text)
-        evidence_patterns = [
-            "source:",
-            "sources:",
-            "according to",
-            "retrieved from",
-        ]
-        for pattern in evidence_patterns:
-            if pattern in n:
-                return True
-        return False
     
     # ====================================================================== 
     # Utility Functions (ported from execute_plan.sh)
@@ -4064,65 +3642,9 @@ them according to the route type (bypass, provisional, or full). It handles:
                 return "disabled"
     
     @staticmethod
-    def _guard_normalize(text: str | None) -> str:
-        """
-        Normalize text for guard comparisons (ported from guard_normalize, line 3740).
-        
-        Converts to lowercase and normalizes whitespace to single spaces.
-        Used for deterministic string comparison in guard conditions.
-        
-        Args:
-            text: Input text to normalize
-            
-        Returns:
-            Normalized text string
-            
-        Examples:
-            >>> ExecutionEngine._guard_normalize("  Hello   WORLD  ")
-            'hello world'
-            >>> ExecutionEngine._guard_normalize("Test\t\tText")
-            'test text'
-            >>> ExecutionEngine._guard_normalize("UPPER lower MiXeD")
-            'upper lower mixed'
-            >>> ExecutionEngine._guard_normalize("")
-            ''
-            >>> ExecutionEngine._guard_normalize(None)
-            ''
-        """
-        if not text:
-            return ""
-        # Convert to lowercase and normalize whitespace
-        normalized = text.lower()
-        # Replace any whitespace sequence with single space
-        normalized = re.sub(r'\s+', ' ', normalized)
-        # Strip leading/trailing whitespace
-        return normalized.strip()
-    
-    @staticmethod
     def _local_fast_guard_normalize(text: str | None) -> str:
-        """
-        Fast text normalization for local guard comparisons (ported from local_fast_guard_normalize, line 375).
-        
-        This is an alias for _guard_normalize with the same behavior.
-        Used in fast-path local execution for repetition detection.
-        
-        Args:
-            text: Input text to normalize
-            
-        Returns:
-            Normalized text string
-            
-        Examples:
-            >>> ExecutionEngine._local_fast_guard_normalize("  Hello   WORLD  ")
-            'hello world'
-            >>> ExecutionEngine._local_fast_guard_normalize("Test\t\tText")
-            'test text'
-            >>> ExecutionEngine._local_fast_guard_normalize("")
-            ''
-            >>> ExecutionEngine._local_fast_guard_normalize(None)
-            ''
-        """
-        return ExecutionEngine._guard_normalize(text)
+        """Alias for response_formatter.guard_normalize."""
+        return response_formatter.guard_normalize(text)
 
 
 def create_execution_engine(

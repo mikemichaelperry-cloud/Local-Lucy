@@ -17,6 +17,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# Centralized pipeline types (Stage 5 migration)
+from router_py.request_types import ClassificationResult, RoutingDecision
+
 # Add router/core to path for intent_classifier
 ROOT_DIR = Path(__file__).resolve().parent.parent
 CORE_DIR = ROOT_DIR / "router" / "core"
@@ -36,68 +39,6 @@ try:
 except ImportError:
     from policy import requires_evidence_mode, provider_usage_class_for
 
-
-@dataclass(frozen=True)
-class ClassificationResult:
-    """Structured result from intent classification."""
-
-    # Core classification
-    intent: str
-    intent_family: str
-    intent_class: str
-    category: str
-    confidence: float
-
-    # Routing signals
-    needs_web: bool = False
-    needs_memory: bool = False
-    needs_synthesis: bool = False
-    clarify_required: bool = False
-
-    # Evidence and augmentation
-    evidence_mode: str = ""
-    evidence_reason: str = ""
-    augmentation_recommended: bool = False
-
-    # Force local mode (for creative writing, privacy-sensitive requests)
-    force_local: bool = False
-
-    # Manifest fields (from plan mapper)
-    manifest_version: str = ""
-    selected_route: str = ""
-    allowed_routes: list[str] = field(default_factory=list)
-    forbidden_routes: list[str] = field(default_factory=list)
-
-    # Raw output for debugging
-    raw_plan: dict[str, Any] | None = None
-
-
-@dataclass(frozen=True)
-class RoutingDecision:
-    """Final routing decision combining classification + policy."""
-
-    # Primary decision
-    route: str  # "LOCAL", "AUGMENTED", "CLARIFY", "SELF_REVIEW"
-    mode: str  # "AUTO", "FORCED_OFFLINE", "FORCED_ONLINE"
-
-    # Intent info
-    intent_family: str
-    confidence: float
-
-    # Provider selection
-    provider: str  # "local", "wikipedia", "openai", "kimi"
-    provider_usage_class: str  # "local", "free", "paid"
-
-    # Evidence
-    evidence_mode: str
-    evidence_reason: str
-
-    # Policy checks
-    requires_evidence: bool
-    policy_reason: str
-
-    # Ephemeral queries (weather, real-time prices) — exclude from memory
-    ephemeral: bool = False
 
 
 def classify_intent(query: str, surface: str = "cli") -> ClassificationResult:
@@ -423,8 +364,8 @@ def select_route(
                 )
             elif embedding_local_override:
                 # Intent classifier overrode embedding LOCAL → AUGMENTED
-                override_intent = classification.intent_family or "background_overview"
-                provider = "wikipedia" if override_intent in ("background_overview", "current_evidence") else "openai"
+                from router_py import provider_resolver
+                provider = provider_resolver.resolve_provider(classification)
                 usage_class = provider_usage_class_for(provider)
                 decision = RoutingDecision(
                     route="AUGMENTED",
@@ -482,16 +423,8 @@ def select_route(
                     ephemeral=True,
                 )
             else:  # AUGMENTED
-                if evidence_reason == "medical_context":
-                    # Use Wikipedia for medical (free, no API key, reliable general knowledge)
-                    provider = "wikipedia"
-                elif evidence_reason in ("financial_data", "legal_context", "conflict_live"):
-                    provider = "openai"
-                elif intent_family in ("background_overview", "current_evidence"):
-                    provider = "wikipedia"
-                else:
-                    provider = "openai"
-
+                from router_py import provider_resolver
+                provider = provider_resolver.resolve_provider(classification)
                 usage_class = provider_usage_class_for(provider)
                 policy_reason = f"router_evidence_{evidence_reason}" if evidence_reason else "router_augmented"
 
@@ -758,29 +691,17 @@ def _make_local_decision(classification: ClassificationResult, query: str = "") 
     )
 
 
+
 def _make_augmented_decision(
     classification: ClassificationResult,
     prefer_paid: bool = False,
     query: str = "",
 ) -> RoutingDecision:
     """Create an augmented routing decision."""
-    # Select provider based on query type and evidence requirements
-    if prefer_paid:
-        provider = "openai"  # Default paid provider for high-confidence needs
-    elif classification.evidence_reason == "medical_context":
-        # Medical queries need high-quality sources — use paid for best results
-        provider = "openai"
-    elif classification.evidence_reason in ("financial_data", "legal_context"):
-        # Financial and legal need accurate, current info — prefer paid
-        provider = "openai"
-    elif classification.evidence_reason == "conflict_live":
-        # Live conflicts need real-time web search — paid provider has better access
-        provider = "openai"
-    elif classification.intent_family in ("background_overview", "current_evidence"):
-        # Prefer free provider (wikipedia) for background and current info queries
-        provider = "wikipedia"
-    else:
-        provider = "openai"
+    from router_py import provider_resolver
+    provider = provider_resolver.resolve_provider(
+        classification, prefer_paid=prefer_paid
+    )
 
     usage_class = provider_usage_class_for(provider)
 

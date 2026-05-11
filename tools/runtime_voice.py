@@ -1591,7 +1591,7 @@ def _write_history_entry(
 
 
 def submit_transcript(transcript: str) -> dict[str, Any]:
-    """Submit transcript to Lucy using Python-native router (shell-free)."""
+    """Submit transcript to Lucy using unified pipeline entry point."""
     import sys
     from pathlib import Path
     
@@ -1600,76 +1600,48 @@ def submit_transcript(transcript: str) -> dict[str, Any]:
     if str(router_py_path) not in sys.path:
         sys.path.insert(0, str(router_py_path))
     
-    try:
-        from classify import classify_intent, select_route
-        from execution_engine import ExecutionEngine
-        from policy import normalize_augmentation_policy
-    except ImportError:
-        from router_py.classify import classify_intent, select_route
-        from router_py.execution_engine import ExecutionEngine
-        from router_py.policy import normalize_augmentation_policy
+    from router_py.main import run
     
-    engine = ExecutionEngine(config={
-        "timeout": 125,
-        "use_sqlite_state": True,
-    })
+    outcome = run(transcript, surface="voice", timeout=125)
     
+    request_id = f"voice_{int(time.time() * 1000)}"
+    status = "completed" if outcome.status == "completed" else outcome.status
+    route = {
+        "mode": outcome.route,
+        "provider": outcome.provider,
+    }
+    outcome_dict = {
+        "outcome_code": outcome.outcome_code,
+        "success": outcome.status == "completed",
+    }
+    error = outcome.error_message or ""
+    response_text = outcome.response_text or ""
+    
+    # Write to history file for HMI display
     try:
-        classification = classify_intent(transcript, surface="voice")
-        policy = normalize_augmentation_policy(
-            os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
+        _write_history_entry(
+            _resolve_history_file(),
+            request_id=request_id,
+            request_text=transcript,
+            response_text=response_text,
+            status=status,
+            route=route,
+            outcome=outcome_dict,
+            error=error,
         )
-        decision = select_route(classification, policy=policy, query=transcript)
-        
-        result = engine.execute(
-            intent=classification,
-            route=decision,
-            context={"question": transcript},
-            use_python_path=True,
-        )
-        
-        request_id = f"voice_{int(time.time() * 1000)}"
-        status = "completed" if result.status == "completed" else result.status
-        route = {
-            "mode": result.route,
-            "provider": result.provider,
-        }
-        outcome = {
-            "outcome_code": result.outcome_code,
-            "success": result.status == "completed",
-        }
-        error = result.error_message or ""
-        response_text = result.response_text or ""
-        
-        # Write to history file for HMI display
-        try:
-            _write_history_entry(
-                _resolve_history_file(),
-                request_id=request_id,
-                request_text=transcript,
-                response_text=response_text,
-                status=status,
-                route=route,
-                outcome=outcome,
-                error=error,
-            )
-        except Exception as hist_exc:
-            # Log but don't fail the request if history write fails
-            print(f"Warning: failed to write history entry: {hist_exc}", file=sys.stderr)
-        
-        # Build payload matching runtime_request.py format
-        return {
-            "status": status,
-            "response_text": response_text,
-            "request_id": request_id,
-            "route": route,
-            "outcome": outcome,
-            "error": error,
-        }
-    except Exception as exc:
-        raise_with_state(f"voice submit failed: {exc}", PTT_STOP_REQUEST_FAILED)
-    finally:
-        engine.close()
+    except Exception as hist_exc:
+        # Log but don't fail the request if history write fails
+        print(f"Warning: failed to write history entry: {hist_exc}", file=sys.stderr)
+    
+    # Build payload matching runtime_request.py format
+    return {
+        "status": status,
+        "response_text": response_text,
+        "request_id": request_id,
+        "route": route,
+        "outcome": outcome_dict,
+        "error": error,
+    }
 
 
 def parse_json_payload(text: str) -> dict[str, Any] | None:
@@ -1820,7 +1792,7 @@ def sanitize_tts_text(text: str) -> str:
     cleaned = re.sub(r'<[^>]+>', '', cleaned)
     # Decode common HTML entities
     cleaned = cleaned.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-    cleaned = cleaned.replace('&quot;', '"').replace('&#39;', "'")
+    cleaned = cleaned.replace('&quot;', '"').replace('&#39;', "'").replace('&#x27;', "'")
     cleaned = cleaned.replace('&nbsp;', ' ').replace('&#160;', ' ')
     
     cleaned = re.sub(r"[ \t]+", " ", cleaned)

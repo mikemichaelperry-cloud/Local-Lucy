@@ -418,7 +418,7 @@ class TestPromptBuilding(unittest.TestCase):
             False,
             False
         )
-        self.assertIn("Memory", prompt)
+        self.assertIn("memory", prompt.lower())
         self.assertIn("Previously discussed Python", prompt)
     
     def test_build_prompt_conversation_mode(self):

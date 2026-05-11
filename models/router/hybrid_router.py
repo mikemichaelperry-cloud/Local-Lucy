@@ -7,7 +7,11 @@ Stage 3: Embedding k-NN for intent classification
 Stage 4: Route derived from intent + evidence
 """
 
+import contextlib
+import io
 import json
+import logging
+import os
 import sys
 from pathlib import Path
 
@@ -26,8 +30,22 @@ class HybridRouter:
                  examples_path: str | None = None,
                  base_model: str = "answerdotai/ModernBERT-base"):
         self.device = "cpu"
-        self.tokenizer = AutoTokenizer.from_pretrained(base_model)
-        self.model = AutoModel.from_pretrained(base_model)
+
+        # Suppress transformers loading output (tqdm progress bar + LOAD REPORT)
+        # Only when not in explicit debug mode.
+        _debug = os.environ.get("LUCY_DEBUG_TRANSFORMERS", "").lower() in {"1", "true", "yes"}
+        _tf_logger = logging.getLogger("transformers")
+        _orig_level = _tf_logger.level
+        if not _debug:
+            _tf_logger.setLevel(logging.ERROR)
+
+        try:
+            with contextlib.redirect_stdout(io.StringIO() if not _debug else sys.stdout):
+                self.tokenizer = AutoTokenizer.from_pretrained(base_model)
+                self.model = AutoModel.from_pretrained(base_model)
+        finally:
+            _tf_logger.setLevel(_orig_level)
+
         self.model.eval()
 
         # Resolve data files relative to this module so imports work from any CWD

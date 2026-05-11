@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT_DIR / "tools"))
 # Import from router_py package
 from router_py.classify import ClassificationResult, RoutingDecision
 from router_py.execution_engine import ExecutionEngine, ExecutionResult
+from router_py import response_formatter
 
 
 def create_test_classification() -> ClassificationResult:
@@ -107,11 +108,9 @@ def test_python_execution_methods_exist() -> None:
         '_fetch_evidence',
         '_fetch_wikipedia_evidence',
         '_fetch_api_evidence',
-        '_build_augmented_prompt',
         '_call_local_model_async',
         '_call_api_provider_async',
         '_call_wikipedia_provider_async',
-        '_validate_response',
         '_run_async_execute',
     ]
     
@@ -198,8 +197,9 @@ def test_build_augmented_prompt() -> None:
         "provider": "wikipedia",
     }
     
+    from router_py import response_formatter
     route = create_test_route_augmented()
-    prompt = engine._build_augmented_prompt(question, evidence, route)
+    prompt = response_formatter.build_augmented_prompt(question, evidence, route)
     
     assert question in prompt, "Prompt should include original question"
     assert evidence["context"] in prompt, "Prompt should include evidence context"
@@ -348,7 +348,8 @@ def test_full_route_appends_medical_sources_for_medical_augmented_answer() -> No
         "AUGMENTED_PROVIDER_USED": "wikipedia",
     }
     engine._read_state_field = lambda _path, key: state_values.get(key, "")
-    engine._render_chat_fast_from_raw = lambda _raw: "Grapefruit can affect tadalafil levels."
+    original_render = response_formatter.render_chat_fast_from_raw
+    response_formatter.render_chat_fast_from_raw = lambda _raw: "Grapefruit can affect tadalafil levels."
 
     import subprocess
     original_run = subprocess.run
@@ -367,6 +368,7 @@ def test_full_route_appends_medical_sources_for_medical_augmented_answer() -> No
         )
     finally:
         subprocess.run = original_run
+        response_formatter.render_chat_fast_from_raw = original_render
 
     assert "Authoritative sources for verification:" in result.response_text
     assert "general knowledge and should be verified" in result.response_text
@@ -387,7 +389,8 @@ def test_full_route_does_not_append_medical_sources_for_non_medical_augmented_an
         "AUGMENTED_PROVIDER_USED": "wikipedia",
     }
     engine._read_state_field = lambda _path, key: state_values.get(key, "")
-    engine._render_chat_fast_from_raw = lambda _raw: "Ada Lovelace wrote notes on the Analytical Engine."
+    original_render = response_formatter.render_chat_fast_from_raw
+    response_formatter.render_chat_fast_from_raw = lambda _raw: "Ada Lovelace wrote notes on the Analytical Engine."
 
     import subprocess
     original_run = subprocess.run
@@ -406,6 +409,7 @@ def test_full_route_does_not_append_medical_sources_for_non_medical_augmented_an
         )
     finally:
         subprocess.run = original_run
+        response_formatter.render_chat_fast_from_raw = original_render
 
     assert "Authoritative sources for verification:" not in result.response_text
     assert "general knowledge and should be verified" not in result.response_text
@@ -425,16 +429,22 @@ def test_full_python_route_appends_medical_sources_for_medical_augmented_answer(
 
     engine._fetch_evidence = fake_fetch
     engine._call_api_provider_async = fake_call_provider
-    engine._build_augmented_prompt = lambda question, evidence, route: question
-    engine._validate_response = lambda response, route: response
+    orig_build = response_formatter.build_augmented_prompt
+    orig_validate = response_formatter.validate_response
+    response_formatter.build_augmented_prompt = lambda question, evidence, route: question
+    response_formatter.validate_response = lambda response, route=None: response
 
-    result = asyncio.run(
-        engine._execute_full_route_python(
-            intent,
-            route,
-            {"question": "Can I take tadalafil with grapefruit?", "medical_context": True},
+    try:
+        result = asyncio.run(
+            engine._execute_full_route_python(
+                intent,
+                route,
+                {"question": "Can I take tadalafil with grapefruit?", "medical_context": True},
+            )
         )
-    )
+    finally:
+        response_formatter.build_augmented_prompt = orig_build
+        response_formatter.validate_response = orig_validate
 
     assert "Authoritative sources for verification:" in result.response_text
     assert "general knowledge and should be verified" in result.response_text
@@ -454,16 +464,22 @@ def test_full_python_route_does_not_append_medical_sources_for_non_medical_answe
 
     engine._fetch_evidence = fake_fetch
     engine._call_api_provider_async = fake_call_provider
-    engine._build_augmented_prompt = lambda question, evidence, route: question
-    engine._validate_response = lambda response, route: response
+    orig_build = response_formatter.build_augmented_prompt
+    orig_validate = response_formatter.validate_response
+    response_formatter.build_augmented_prompt = lambda question, evidence, route: question
+    response_formatter.validate_response = lambda response, route=None: response
 
-    result = asyncio.run(
-        engine._execute_full_route_python(
-            intent,
-            route,
-            {"question": "Who was Ada Lovelace?"},
+    try:
+        result = asyncio.run(
+            engine._execute_full_route_python(
+                intent,
+                route,
+                {"question": "Who was Ada Lovelace?"},
+            )
         )
-    )
+    finally:
+        response_formatter.build_augmented_prompt = orig_build
+        response_formatter.validate_response = orig_validate
 
     assert "Authoritative sources for verification:" not in result.response_text
     assert "general knowledge and should be verified" not in result.response_text

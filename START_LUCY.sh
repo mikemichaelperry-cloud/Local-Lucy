@@ -20,7 +20,7 @@ export QT_QPA_PLATFORM_PLUGIN_PATH="/usr/lib/x86_64-linux-gnu/qt6/plugins"
 export LUCY_ROOT="$SCRIPT_DIR"
 export LUCY_UI_ROOT="${SCRIPT_DIR}/ui-v8"
 export LUCY_RUNTIME_NAMESPACE_ROOT="$SCRIPT_DIR"
-export LUCY_RUNTIME_AUTHORITY_ROOT="${SCRIPT_DIR}/snapshots/opt-experimental-v8-dev"
+export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
 export LUCY_RUNTIME_REQUEST_HISTORY_FILE="$SCRIPT_DIR/state/request_history.jsonl"
 
 # Voice runtime requirements
@@ -74,7 +74,7 @@ fi
 for _vr_candidate in \
     "${LUCY_VOICE_RUNTIME_FILE}" \
     "${LUCY_RUNTIME_NAMESPACE_ROOT}/state/voice_runtime.json" \
-    "${LUCY_RUNTIME_AUTHORITY_ROOT}/state/voice_runtime.json"
+    "${LUCY_RUNTIME_NAMESPACE_ROOT}/state/voice_runtime.json"
 do
     if [ -f "${_vr_candidate}" ]; then
         rm -f "${_vr_candidate}"
@@ -85,7 +85,7 @@ done
 for _si_candidate in \
     "${SCRIPT_DIR}/state/semantic_interpreter_backend.json" \
     "${LUCY_RUNTIME_NAMESPACE_ROOT}/state/semantic_interpreter_backend.json" \
-    "${LUCY_RUNTIME_AUTHORITY_ROOT}/state/semantic_interpreter_backend.json"
+    "${LUCY_RUNTIME_NAMESPACE_ROOT}/state/semantic_interpreter_backend.json"
 do
     if [ -f "${_si_candidate}" ]; then
         rm -f "${_si_candidate}"
@@ -93,8 +93,8 @@ do
 done
 
 # Clear stale worker PID / socket files
-rm -f "${LUCY_RUNTIME_AUTHORITY_ROOT}/tmp/run/whisper_worker.pid"
-rm -f "${LUCY_RUNTIME_AUTHORITY_ROOT}/tmp/run/kokoro_tts_worker.sock"
+rm -f "${LUCY_RUNTIME_NAMESPACE_ROOT}/tmp/run/whisper_worker.pid"
+rm -f "${LUCY_RUNTIME_NAMESPACE_ROOT}/tmp/run/kokoro_tts_worker.sock"
 
 # =============================================================================
 # STARTUP VALIDATION

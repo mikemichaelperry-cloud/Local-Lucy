@@ -100,7 +100,9 @@ class RuntimeBridge:
         threading.Thread(target=self._background_warmup_ollama, daemon=True).start()
 
     def _workspace_root(self) -> Path:
-        return self.snapshot_root.parent.parent
+        # When authority root is the project root (e.g., /home/mike/lucy-v8),
+        # the workspace root is the same directory.
+        return self.snapshot_root
 
     def _contract_required(self) -> bool:
         raw = (os.environ.get(self.contract_required_env) or "").strip().lower()
@@ -193,6 +195,7 @@ class RuntimeBridge:
         env.setdefault("LUCY_AUGMENTATION_POLICY", os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only"))
         env.setdefault("LUCY_CONVERSATION_MODE_FORCE", os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0"))
         env.setdefault("LUCY_SESSION_MEMORY", os.environ.get("LUCY_SESSION_MEMORY", "0"))
+        env.setdefault("LUCY_AUGMENTED_PROVIDER", self._resolve_augmented_provider())
         # Router decision logging — default to project logs directory
         default_log_dir = str(Path(__file__).resolve().parents[3] / "logs" / "router")
         env.setdefault("LUCY_ROUTER_LOG_DIR", os.environ.get("LUCY_ROUTER_LOG_DIR", default_log_dir))
@@ -205,7 +208,7 @@ class RuntimeBridge:
         # Always fail loudly - no silent fallbacks allowed
         raise RuntimeError(
             f"missing required {self.authority_root_env}. "
-            f"Set it explicitly to the snapshot root (e.g., /home/mike/lucy/snapshots/opt-experimental-v7-dev)"
+            f"Set it explicitly to the project root (e.g., /home/mike/lucy-v8)"
         )
 
     def _discover_capabilities(self) -> dict[str, ActionCapability]:
@@ -632,22 +635,13 @@ class RuntimeBridge:
         context: dict[str, Any] | None = None,
     ) -> CommandResult:
         """
-        Direct Python execution path - bypasses subprocess hops.
+        Direct Python execution path via main.py — unified entry point.
         
-        Phase 1: Flattened execution chain
-        Before: runtime_bridge → runtime_request.py → lucy_chat.sh → hybrid_wrapper.sh → main.py
-        After:  runtime_bridge → ExecutionEngine (direct Python call)
+        Before: runtime_bridge → ExecutionEngine (direct, bypassed main.py)
+        After:  runtime_bridge → main.run() → ExecutionEngine
         
-        This eliminates 3 subprocess hops and reduces latency.
-        
-        Args:
-            requested_value: The user's query text
-            action: The action name (e.g., "submit_request")
-            augmented_direct_once: Whether to force augmented mode
-            self_review: Whether this is a self-review request
-            
-        Returns:
-            CommandResult with same format as subprocess path
+        This ensures all execution goes through the single entry point,
+        preserving state resolution, feedback detection, locking, and telemetry.
         """
         request_text = requested_value if requested_value is not None else ""
         if not request_text.strip():
@@ -668,10 +662,8 @@ class RuntimeBridge:
             sys.path.insert(0, router_py_path)
         
         try:
-            from router_py.classify import classify_intent, select_route
-            from router_py.execution_engine import ExecutionEngine
+            from router_py.main import run
             from router_py.policy import normalize_augmentation_policy
-            from router_py.state_manager import get_state_manager
         except ImportError as e:
             return CommandResult(
                 action=action,
@@ -684,15 +676,6 @@ class RuntimeBridge:
                 payload=None,
             )
         
-        # Build execution context
-        exec_context = {"question": request_text}
-        if context:
-            exec_context.update(context)
-        if augmented_direct_once:
-            exec_context["augmented_direct_once"] = True
-        if self_review:
-            exec_context["self_review"] = True
-        
         # Get augmentation policy from environment
         policy = normalize_augmentation_policy(
             os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
@@ -701,77 +684,76 @@ class RuntimeBridge:
         start_time = os.times()[0]  # User CPU time
         
         try:
-            # Step 1: Classify intent
-            classification = classify_intent(request_text, surface="hmi")
-            
-            # Step 2: Select route (embedding router primary, legacy audit logged)
-            decision = select_route(classification, policy=policy, query=request_text)
-            
-            # Step 3: Execute via ExecutionEngine (Python-native path)
-            engine = ExecutionEngine(config={
-                "timeout": self.request_timeout_seconds,
-                "use_sqlite_state": True,
-                "model": self._resolve_current_model(),
-            })
-            
-            result = engine.execute(
-                intent=classification,
-                route=decision,
-                context=exec_context,
-                use_python_path=True,  # KEY: Skip shell entirely
+            # Call unified entry point
+            outcome = run(
+                question=request_text,
+                policy=policy,
+                timeout=self.request_timeout_seconds,
+                surface="hmi",
+                augmented_direct_once=augmented_direct_once,
+                self_review=self_review,
+                context=context,
             )
-            
-            engine.close()
             
             # Calculate execution time
             execution_time_ms = int((os.times()[0] - start_time) * 1000)
             
-            # Step 4: Build payload from result directly
-            # Note: ExecutionEngine uses unique namespace per instance, so we
-            # use the result object directly instead of reading from StateManager
-            # to ensure we get the correct data for this execution.
+            # Build payload matching subprocess format
             route_data = {
-                "intent": classification.intent_family if classification else "unknown",
-                "confidence": decision.confidence if decision else 0.0,
-                "strategy": decision.route if decision else "LOCAL",
-                "metadata": result.metadata or {},
+                "intent": outcome.intent_family or "unknown",
+                "confidence": outcome.confidence or 0.0,
+                "strategy": outcome.route or "LOCAL",
+                "metadata": {},
             }
             outcome_data = {
-                "success": result.status == "completed",
-                "duration_ms": result.execution_time_ms,
+                "success": outcome.status == "completed",
+                "duration_ms": outcome.execution_time_ms or execution_time_ms,
                 "result": {
-                    "outcome_code": result.outcome_code,
-                    "route": result.route,
-                    "provider": result.provider,
+                    "outcome_code": outcome.outcome_code,
+                    "route": outcome.route,
+                    "provider": outcome.provider,
                 },
-                "error_message": result.error_message or "",
+                "error_message": outcome.error_message or "",
             }
             
-            # Build payload matching subprocess format
+            # Build a pseudo-ExecutionResult for payload builder compatibility
+            class _PseudoResult:
+                def __init__(self, outcome):
+                    self.status = outcome.status
+                    self.route = outcome.route
+                    self.provider = outcome.provider
+                    self.provider_usage_class = outcome.provider_usage_class
+                    self.outcome_code = outcome.outcome_code
+                    self.response_text = outcome.response_text
+                    self.error_message = outcome.error_message
+                    self.execution_time_ms = outcome.execution_time_ms
+                    self.metadata = dict(outcome.metadata) if outcome.metadata else {}
+                    self.confidence = outcome.confidence
+            
+            pseudo_result = _PseudoResult(outcome)
+            
             payload = self._build_payload_from_result(
-                result=result,
+                result=pseudo_result,
                 route_data=route_data,
                 outcome_data=outcome_data,
                 request_text=request_text,
                 execution_time_ms=execution_time_ms,
             )
             
-            # Write to history file for HMI display (same as voice path)
-            # NEWS is ephemeral — display immediately but do not persist to history.
-            if result.route != "NEWS":
+            # Write to history file for HMI display
+            if outcome.route != "NEWS":
                 try:
                     self._write_history_entry(payload)
                 except Exception as hist_exc:
-                    # Log but don't fail the request if history write fails
                     print(f"[runtime_bridge] Warning: failed to write history entry: {hist_exc}", file=sys.stderr)
             
             return CommandResult(
                 action=action,
                 requested_value=requested_value,
-                status="ok" if result.status == "completed" else result.status,
-                returncode=0 if result.status == "completed" else 1,
-                stdout=result.response_text,
-                stderr=result.error_message or "",
+                status="ok" if outcome.status == "completed" else outcome.status,
+                returncode=0 if outcome.status == "completed" else 1,
+                stdout=outcome.response_text,
+                stderr=outcome.error_message or "",
                 timed_out=False,
                 payload=payload,
             )
@@ -922,6 +904,18 @@ class RuntimeBridge:
             return state.get("model") or state.get("active_model") or "local-lucy"
         except (OSError, json.JSONDecodeError):
             return "local-lucy"
+
+    def _resolve_augmented_provider(self) -> str:
+        """Read the active augmented provider from runtime state file."""
+        namespace_root = Path(os.environ.get(self.runtime_namespace_env, "")).expanduser()
+        if not namespace_root:
+            return os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
+        state_file = namespace_root / "state" / "current_state.json"
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            return state.get("augmented_provider") or os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
+        except (OSError, json.JSONDecodeError):
+            return os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
 
     def _resolve_history_file(self) -> Path:
         """Resolve the history file path (same logic as runtime_request.py)."""

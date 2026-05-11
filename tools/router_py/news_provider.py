@@ -541,7 +541,7 @@ class RSSNewsProvider:
         fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         parts: list[str] = []
 
-        header = f"Latest news about '{html.escape(query)}':" if query else "Latest World News:"
+        header = f"Latest news about '{query}':" if query else "Latest World News:"
         parts.append(f'<p style="margin: 4px 0;"><b>{html.escape(header)}</b></p>')
         parts.append(f'<p style="margin: 4px 0; color: #888; font-size: 0.85em;">(Fetched: {html.escape(fetch_time)})</p>')
 

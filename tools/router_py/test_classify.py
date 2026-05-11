@@ -139,7 +139,7 @@ class TestAugmentedDecision(unittest.TestCase):
             confidence=0.9,
             needs_web=True,
             evidence_mode="required",
-            evidence_reason="medical_context",
+            evidence_reason="financial_data",  # Non-medical to test prefer_paid
         )
         
         decision = _make_augmented_decision(classification, prefer_paid=True)
@@ -147,6 +147,25 @@ class TestAugmentedDecision(unittest.TestCase):
         self.assertEqual(decision.route, "AUGMENTED")
         self.assertEqual(decision.provider, "openai")
         self.assertEqual(decision.provider_usage_class, "paid")
+    
+    def test_medical_safety_overrides_prefer_paid(self):
+        """Medical context forces wikipedia regardless of prefer_paid."""
+        classification = ClassificationResult(
+            intent="background_overview",
+            intent_family="background_overview",
+            intent_class="background_overview",
+            category="informational",
+            confidence=0.9,
+            needs_web=True,
+            evidence_mode="required",
+            evidence_reason="medical_context",
+        )
+        
+        decision = _make_augmented_decision(classification, prefer_paid=True)
+        
+        self.assertEqual(decision.route, "AUGMENTED")
+        self.assertEqual(decision.provider, "wikipedia")
+        self.assertEqual(decision.provider_usage_class, "free")
 
 
 class TestRouteSelection(unittest.TestCase):
