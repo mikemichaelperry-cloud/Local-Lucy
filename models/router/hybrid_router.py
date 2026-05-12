@@ -380,10 +380,22 @@ class HybridRouter:
             route_votes[labels["route"]] += weight
             total_weight += weight
 
+        # Detect embedding collapse: when top-k similarities are all
+        # extremely high (>0.995) or nearly identical (range < 0.001),
+        # the embedding space has collapsed and cannot distinguish
+        # semantically unrelated queries. Do NOT trust it for routing.
+        top_k_sims = [similarities[idx] for idx in top_k_idx]
+        embedding_collapsed = (
+            all(s > 0.995 for s in top_k_sims)
+            or (max(top_k_sims) - min(top_k_sims) < 0.001)
+        )
+
         # Exact-match boost: if top-1 neighbor is essentially identical,
         # trust it over a k-NN vote that could be outvoted by other close neighbors
+        # BUT: skip the boost if embedding has collapsed — the top-1 match is
+        # arbitrary when all vectors are nearly identical.
         top1_sim = similarities[top_k_idx[0]]
-        if top1_sim >= 0.999:
+        if top1_sim >= 0.999 and not embedding_collapsed:
             best_intent = self.examples[top_k_idx[0]]["labels"]["intent_family"]
             best_route = self.examples[top_k_idx[0]]["labels"]["route"]
         else:
@@ -548,6 +560,24 @@ class HybridRouter:
         else:
             final_route = best_route
             final_intent = best_intent
+
+        # Embedding collapse safety net: if the embedding collapsed and
+        # no keywords matched to corroborate the route, fall back to LOCAL.
+        # This prevents routing semantically-unrelated queries to TIME/NEWS
+        # purely based on collapsed [CLS] embeddings.
+        has_any_keyword = is_time or is_news or is_ephemeral or requires_evidence or is_cooking
+        if embedding_collapsed and not has_any_keyword and final_route in ("TIME", "NEWS", "WEATHER"):
+            final_route = "LOCAL"
+            final_intent = "local_answer"
+            guards_fired.append("embedding_collapse_fallback")
+
+        # No-keyword safety net: when no keyword signals matched at all
+        # but the embedding (even non-collapsed) suggests a live-data route,
+        # require stronger confidence or corroborating keywords.
+        if not has_any_keyword and final_route in ("TIME", "NEWS", "WEATHER") and avg_sim < 0.85:
+            final_route = "LOCAL"
+            final_intent = "local_answer"
+            guards_fired.append("no_keyword_live_data_fallback")
 
         # Ephemeral flag: embedding-detected OR keyword-detected
         ephemeral_flag = is_ephemeral_embedding or is_ephemeral
