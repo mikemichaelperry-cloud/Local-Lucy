@@ -44,6 +44,16 @@ LEARNED_PATH = ROUTER_DIR / "learned_examples.jsonl"
 # Lock file for atomic updates
 LOCK_PATH = ROUTER_DIR / ".learner_lock"
 
+# Kill-switch: if this file exists, auto-learning is paused
+DISABLE_FLAG = ROUTER_DIR / ".learner_disable"
+
+# Versioning directory
+VERSIONS_DIR = ROUTER_DIR / "versions"
+VERSIONS_DIR.mkdir(exist_ok=True)
+
+# Max versions to keep (default 5)
+MAX_VERSIONS = int(os.environ.get("LUCY_LEARNER_MAX_VERSIONS", "5"))
+
 
 def acquire_lock():
     """Acquire file lock for atomic index updates."""
@@ -68,6 +78,140 @@ def load_index() -> list[dict]:
                 if line:
                     examples.append(json.loads(line))
     return examples
+
+
+# ---------------------------------------------------------------------------
+# Kill switch
+# ---------------------------------------------------------------------------
+
+
+def is_learning_enabled() -> bool:
+    """Check if auto-learning is enabled.
+
+    Respects two mechanisms (checked in order):
+    1. DISABLE_FLAG file: if `.learner_disable` exists, learning is OFF.
+    2. Environment variable: LUCY_AUTO_LEARN=0 disables, anything else enables.
+
+    Returns True if learning may proceed.
+    """
+    if DISABLE_FLAG.exists():
+        return False
+    env = os.environ.get("LUCY_AUTO_LEARN", "1").strip().lower()
+    return env not in ("0", "false", "no", "off")
+
+
+def disable_learning(reason: str = "") -> None:
+    """Create the disable flag to pause auto-learning."""
+    DISABLE_FLAG.write_text(
+        f"disabled at {time.strftime('%Y-%m-%d %H:%M:%S')}\nreason: {reason}\n",
+        encoding="utf-8",
+    )
+    print(f"🛑 Auto-learning DISABLED. Reason: {reason or 'manual'}")
+
+
+def enable_learning() -> None:
+    """Remove the disable flag to resume auto-learning."""
+    if DISABLE_FLAG.exists():
+        DISABLE_FLAG.unlink()
+    print("▶️  Auto-learning ENABLED.")
+
+
+# ---------------------------------------------------------------------------
+# Versioning
+# ---------------------------------------------------------------------------
+
+
+def _version_stamp() -> str:
+    """Generate a version timestamp string."""
+    return time.strftime("%Y%m%d_%H%M%S")
+
+
+def _rotate_versions():
+    """Remove oldest versions if we exceed MAX_VERSIONS."""
+    versions = sorted(VERSIONS_DIR.glob("v_*"))
+    while len(versions) > MAX_VERSIONS:
+        oldest = versions.pop(0)
+        # Recursively remove the version directory
+        for child in oldest.iterdir():
+            child.unlink()
+        oldest.rmdir()
+
+
+def create_version(reason: str = "") -> Path:
+    """Snapshot the current index + embeddings + examples as a version.
+
+    Returns the version directory path.
+    """
+    stamp = _version_stamp()
+    vdir = VERSIONS_DIR / f"v_{stamp}"
+    vdir.mkdir(exist_ok=True)
+
+    # Copy current artifacts
+    for src in (INDEX_PATH, EMBEDDINGS_PATH, EXAMPLES_PATH):
+        if src.exists():
+            import shutil
+            shutil.copy2(str(src), str(vdir / src.name))
+
+    # Metadata
+    meta = {
+        "timestamp": stamp,
+        "reason": reason,
+        "example_count": len(load_index()) if INDEX_PATH.exists() else 0,
+    }
+    with open(vdir / "version.json", "w") as f:
+        json.dump(meta, f, indent=2)
+
+    _rotate_versions()
+    return vdir
+
+
+def list_versions() -> list[dict]:
+    """List all available versions with metadata."""
+    versions = []
+    for vdir in sorted(VERSIONS_DIR.glob("v_*")):
+        meta_file = vdir / "version.json"
+        meta = {}
+        if meta_file.exists():
+            with open(meta_file) as f:
+                meta = json.load(f)
+        versions.append({
+            "name": vdir.name,
+            "path": str(vdir),
+            **meta,
+        })
+    return versions
+
+
+def rollback_version(version_name: str) -> bool:
+    """Restore index + embeddings + examples from a named version.
+
+    Creates a backup of the current state first, then restores.
+    Returns True on success.
+    """
+    vdir = VERSIONS_DIR / version_name
+    if not vdir.exists():
+        print(f"❌ Version '{version_name}' not found.")
+        return False
+
+    # Backup current state before rollback
+    backup = create_version(reason=f"pre-rollback-from-{version_name}")
+    print(f"  Created pre-rollback backup: {backup.name}")
+
+    # Restore files
+    for src_name in (INDEX_PATH.name, EMBEDDINGS_PATH.name, EXAMPLES_PATH.name):
+        src = vdir / src_name
+        if src.exists():
+            dst = ROUTER_DIR / src_name
+            import shutil
+            shutil.copy2(str(src), str(dst))
+
+    print(f"✅ Rolled back to {version_name}")
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Index I/O
+# ---------------------------------------------------------------------------
 
 
 def save_index(examples: list[dict]):
@@ -221,6 +365,11 @@ def _route_to_intent(route: str) -> str:
 
 def learn_once(log_path: Path | None = None, verbose: bool = True) -> dict:
     """Single learning iteration: process logs, update index, rebuild embeddings."""
+    if not is_learning_enabled():
+        if verbose:
+            print("🛑 Auto-learning is DISABLED (via .learner_disable or LUCY_AUTO_LEARN=0)")
+        return {"status": "disabled", "added": 0}
+
     if verbose:
         print("=" * 60)
         print("Background Learner")
@@ -260,6 +409,11 @@ def learn_once(log_path: Path | None = None, verbose: bool = True) -> dict:
             print(f"Total after dedup: {len(all_examples)} (+{added})")
 
         if added > 0:
+            # Snapshot current state before mutation
+            vdir = create_version(reason=f"pre-update (+{added} examples)")
+            if verbose:
+                print(f"  Snapshot created: {vdir.name}")
+
             # Save updated index
             save_index(all_examples)
 
@@ -350,6 +504,9 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
     Returns:
         True if learning was triggered, False otherwise
     """
+    if not is_learning_enabled():
+        return False
+
     if min_entries is None:
         min_entries = int(os.environ.get("LUCY_AUTO_LEARN_THRESHOLD", "5"))
 
@@ -441,7 +598,55 @@ def main():
     parser.add_argument("--feedback", type=str, help="Add user feedback: query string")
     parser.add_argument("--route", type=str, help="Correct route for feedback")
     parser.add_argument("--correct", action="store_true", help="Mark feedback as confirmation (legacy was right)")
+
+    # Kill-switch commands
+    parser.add_argument("--disable", action="store_true", help="Pause auto-learning (create .learner_disable)")
+    parser.add_argument("--enable", action="store_true", help="Resume auto-learning (remove .learner_disable)")
+    parser.add_argument("--status", action="store_true", help="Show learning status (enabled/disabled)")
+
+    # Versioning commands
+    parser.add_argument("--snapshot", action="store_true", help="Create a manual snapshot of current index")
+    parser.add_argument("--list-versions", action="store_true", help="List all saved versions")
+    parser.add_argument("--rollback", type=str, metavar="VERSION", help="Rollback to a named version (e.g., v_20260512_120000)")
     args = parser.parse_args()
+
+    # Kill-switch commands
+    if args.disable:
+        disable_learning(reason="manual CLI")
+        return
+    if args.enable:
+        enable_learning()
+        return
+    if args.status:
+        enabled = is_learning_enabled()
+        print(f"Auto-learning: {'ENABLED' if enabled else 'DISABLED'}")
+        if DISABLE_FLAG.exists():
+            print(f"  Flag file: {DISABLE_FLAG}")
+            print(f"  Content: {DISABLE_FLAG.read_text().strip()}")
+        versions = list_versions()
+        print(f"  Saved versions: {len(versions)}")
+        for v in versions:
+            print(f"    {v['name']} — {v.get('example_count', '?')} examples — {v.get('reason', 'no reason')}")
+        return
+
+    # Versioning commands
+    if args.snapshot:
+        vdir = create_version(reason="manual CLI snapshot")
+        print(f"✅ Snapshot created: {vdir}")
+        return
+    if args.list_versions:
+        versions = list_versions()
+        if not versions:
+            print("No versions saved.")
+            return
+        print(f"{'Name':<25} {'Examples':<10} {'Reason'}")
+        print("-" * 60)
+        for v in versions:
+            print(f"{v['name']:<25} {v.get('example_count', '?'):<10} {v.get('reason', '')}")
+        return
+    if args.rollback:
+        ok = rollback_version(args.rollback)
+        sys.exit(0 if ok else 1)
 
     # Determine log path
     log_path = args.log_path
