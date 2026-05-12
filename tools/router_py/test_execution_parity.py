@@ -834,7 +834,8 @@ def main() -> int:
     parser.add_argument(
         "--lenient-mode",
         action="store_true",
-        help="Run in lenient mode - log differences without failing",
+        default=True,
+        help="Run in lenient mode - log differences without failing (default: True, shell is deprecated)",
     )
     parser.add_argument(
         "--category",

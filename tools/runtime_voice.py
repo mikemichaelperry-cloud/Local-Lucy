@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import audioop
+import concurrent.futures
 import json
 import math
 import os
@@ -1701,6 +1702,31 @@ def run_tts_adapter_command(
     return payload
 
 
+def _synth_one_chunk(
+    chunk: str,
+    backend: VoiceBackend,
+    output_dir: Path,
+    voice_python: str,
+) -> dict[str, Any]:
+    """Synthesize a single TTS chunk. Used by speak_response for parallel synthesis."""
+    if backend.tts_engine == "kokoro" and ensure_kokoro_worker():
+        return kokoro_worker_request(
+            {
+                "cmd": "synthesize",
+                "engine": "kokoro",
+                "text": chunk,
+                "output_dir": str(output_dir),
+            }
+        )
+    return run_tts_adapter_command(
+        python_bin=voice_python,
+        command="synthesize",
+        requested_engine=backend.tts_engine,
+        output_dir=str(output_dir),
+        text=chunk,
+    )
+
+
 def speak_response(backend: VoiceBackend, response_text: str) -> str:
     if backend.tts_engine == "none":
         return "skipped"
@@ -1716,57 +1742,67 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
         output_dir.mkdir(parents=True, exist_ok=True)
         voice_python = resolve_voice_python(backend.tts_engine)
         levels_file = audio_levels_file_for_runtime(None)
-        for index, chunk in enumerate(chunks):
-            if backend.tts_engine == "kokoro" and ensure_kokoro_worker():
-                payload = kokoro_worker_request(
-                    {
-                        "cmd": "synthesize",
-                        "engine": "kokoro",
-                        "text": chunk,
-                        "output_dir": str(output_dir),
-                    }
-                )
-            else:
-                payload = run_tts_adapter_command(
-                    python_bin=voice_python,
-                    command="synthesize",
-                    requested_engine=backend.tts_engine,
-                    output_dir=str(output_dir),
-                    text=chunk,
-                )
+
+        # Parallel synthesis: synthesize chunk N+1 while chunk N plays.
+        # This hides CPU synthesis latency behind audio playback.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as synth_pool:
+            # Synthesize first chunk synchronously (nothing to play yet)
+            payload = _synth_one_chunk(chunks[0], backend, output_dir, voice_python)
             if not payload.get("ok"):
                 raise RuntimeVoiceError(clean_text(payload.get("error")) or "tts synthesis failed")
-            wav_path = Path(str(payload.get("wav_path") or "")).expanduser()
-            if not wav_path.exists():
-                raise RuntimeVoiceError("tts synthesis produced no wav output")
-            is_first_chunk = index == 0
-            engine_name = clean_text(payload.get("engine"))
-            prepad_ms = resolve_tts_prepad_ms(engine_name, is_first_chunk=is_first_chunk)
-            prime_ms = resolve_kokoro_first_chunk_player_prime_ms() if is_first_chunk and engine_name == "kokoro" else 0
-            player = None if backend.audio_player == "none" else backend.audio_player
-            try:
-                if play_wav_file_with_levels is not None:
-                    play_wav_file_with_levels(
-                        wav_path,
-                        levels_file,
-                        player=player,
-                        prepad_ms=prepad_ms,
-                        prime_ms=prime_ms,
+
+            for index, chunk in enumerate(chunks):
+                wav_path = Path(str(payload.get("wav_path") or "")).expanduser()
+                if not wav_path.exists():
+                    raise RuntimeVoiceError("tts synthesis produced no wav output")
+
+                is_first_chunk = index == 0
+                engine_name = clean_text(payload.get("engine"))
+                prepad_ms = resolve_tts_prepad_ms(engine_name, is_first_chunk=is_first_chunk)
+                prime_ms = resolve_kokoro_first_chunk_player_prime_ms() if is_first_chunk and engine_name == "kokoro" else 0
+                player = None if backend.audio_player == "none" else backend.audio_player
+
+                # Start synthesizing next chunk in background (if any)
+                next_future: concurrent.futures.Future[dict[str, Any]] | None = None
+                if index + 1 < len(chunks):
+                    next_future = synth_pool.submit(
+                        _synth_one_chunk, chunks[index + 1], backend, output_dir, voice_python
                     )
-                else:
-                    play_wav_file(
-                        wav_path,
-                        player=player,
-                        prepad_ms=prepad_ms,
-                        prime_ms=prime_ms,
-                    )
-            finally:
+
                 try:
-                    wav_path.unlink()
-                except OSError:
-                    pass
-            if index + 1 < len(chunks) and pause_ms > 0:
-                time.sleep(pause_ms / 1000.0)
+                    if play_wav_file_with_levels is not None:
+                        play_wav_file_with_levels(
+                            wav_path,
+                            levels_file,
+                            player=player,
+                            prepad_ms=prepad_ms,
+                            prime_ms=prime_ms,
+                        )
+                    else:
+                        play_wav_file(
+                            wav_path,
+                            player=player,
+                            prepad_ms=prepad_ms,
+                            prime_ms=prime_ms,
+                        )
+                finally:
+                    try:
+                        wav_path.unlink()
+                    except OSError:
+                        pass
+
+                if index + 1 < len(chunks) and pause_ms > 0:
+                    time.sleep(pause_ms / 1000.0)
+
+                # Wait for next chunk synthesis to finish
+                if next_future is not None:
+                    try:
+                        payload = next_future.result()
+                    except Exception as exc:
+                        raise RuntimeVoiceError(f"background synthesis failed: {exc}") from exc
+                    if not payload.get("ok"):
+                        raise RuntimeVoiceError(clean_text(payload.get("error")) or "tts synthesis failed")
+
         return "completed"
     except (PlaybackError, RuntimeVoiceError):
         return "failed"

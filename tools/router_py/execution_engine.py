@@ -56,6 +56,9 @@ from router_py.request_types import ExecutionResult
 from router_py import response_formatter
 from router_py.state_manager import get_state_manager
 
+# Ensure models/router is on sys.path before importing router modules
+sys.path.insert(0, str(ROOT_DIR / "models" / "router"))
+
 # Import auto-feedback for answer quality analysis
 try:
     from auto_feedback import analyze_answer_quality, log_auto_feedback
@@ -65,7 +68,6 @@ except ImportError:
 
 # Import response cache for repeated query short-circuit
 try:
-    sys.path.insert(0, str(ROOT_DIR / "models" / "router"))
     from response_cache import get_cached, set_cached
     HAS_RESPONSE_CACHE = True
 except ImportError:
@@ -163,7 +165,7 @@ def _load_session_memory_context_with_telemetry(
     try:
         from memory.memory_service import assemble_context_with_telemetry
         context, telemetry = assemble_context_with_telemetry(
-            current_session_id="default", max_chars=500, query=query, depth=depth, mode=mode
+            current_session_id="default", max_chars=1200, query=query, depth=depth, mode=mode
         )
         if context:
             return context, telemetry
@@ -2107,7 +2109,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         prompt = response_formatter.build_augmented_prompt(question, evidence, route)
         
         # Load session memory with telemetry before calling provider
-        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(prompt)
+        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(question)
         if session_memory:
             self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
         
@@ -2115,7 +2117,11 @@ them according to the route type (bypass, provisional, or full). It handles:
         if route.provider == "local":
             response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
         elif route.provider in ("openai", "kimi"):
-            response = await self._call_api_provider_async(route.provider, prompt, context)
+            # Prepend session memory to the prompt so API providers also see it
+            api_prompt = prompt
+            if session_memory.strip():
+                api_prompt = f"Session memory:\n{session_memory}\n\n{prompt}"
+            response = await self._call_api_provider_async(route.provider, api_prompt, context)
         elif route.provider == "wikipedia":
             response = await self._call_wikipedia_provider_async(prompt, evidence, context)
         else:
@@ -2539,16 +2545,16 @@ them according to the route type (bypass, provisional, or full). It handles:
         # Build fallback chain: free providers first, then paid
         if is_category_query:
             # Try trusted sources first for news/medical/finance
-            provider_chain = ["trusted", "wikipedia", "openai", "kimi"]
+            provider_chain = ["trusted", "wikipedia", "kimi", "openai"]
             self._logger.info(f"Category-specific query detected, trying trusted sources first")
         elif primary_provider == "wikipedia":
-            provider_chain = ["wikipedia", "openai", "kimi"]
+            provider_chain = ["wikipedia", "kimi", "openai"]
         elif primary_provider == "openai":
             provider_chain = ["openai", "kimi", "wikipedia"]
         elif primary_provider == "kimi":
             provider_chain = ["kimi", "openai", "wikipedia"]
         else:
-            provider_chain = [primary_provider, "wikipedia", "openai", "kimi"]
+            provider_chain = [primary_provider, "wikipedia", "kimi", "openai"]
         
         # Try each provider in chain
         last_error = ""

@@ -450,7 +450,7 @@ def trigger_background_learning() -> bool:
     """
     try:
         import sys as _sys
-        router_dir = str(Path(__file__).parent.parent / "models" / "router")
+        router_dir = str(Path(__file__).parent.parent.parent / "models" / "router")
         inserted = False
         if router_dir not in _sys.path:
             _sys.path.insert(0, router_dir)

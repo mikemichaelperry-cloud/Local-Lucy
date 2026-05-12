@@ -38,7 +38,7 @@ export LUCY_ROUTER_LOG_DIR="${LUCY_RUNTIME_NAMESPACE_ROOT}/logs"
 # Runtime configuration
 export LUCY_ROUTER_PY=1
 export LUCY_EXEC_PY=1
-export LUCY_LOCAL_MODEL=local-lucy
+export LUCY_LOCAL_MODEL=local-lucy-fast
 export LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
 export LUCY_ENABLE_INTERNET=1
 export LUCY_SESSION_MEMORY=1
@@ -47,10 +47,13 @@ export LUCY_SESSION_MEMORY=1
 # Reduces VRAM usage for transformer attention without accuracy loss
 export OLLAMA_FLASH_ATTENTION=1
 
-# Force TTS (Kokoro) to CPU to free GPU memory for LLM inference
-# On RTX 3060 12GB, this prevents OOM when qwen3 14B is loaded alongside STT
-# NOTE: local-lucy now uses qwen3:14b (rebuilt from llama3.1:8b on 2026-05-06)
+# Force TTS (Kokoro) to CPU.
+# With 1024 context (local-lucy-fast) + Whisper large-v3-turbo on GPU,
+# VRAM is fully utilized (~11.2 GB / 12 GB).  Kokoro (~0.2 GB) does not fit
+# reliably without causing CUDA OOM.  It runs fast via the persistent worker.
 export LUCY_VOICE_KOKORO_DEVICE=cpu
+export LUCY_VOICE_KOKORO_SPEED=1.2
+export LUCY_VOICE_TTS_CHUNK_MAX_CHARS=400
 
 # Voice STT (Whisper) library path
 export LD_LIBRARY_PATH="${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src:${LD_LIBRARY_PATH:-}"

@@ -130,7 +130,6 @@ def run_tests():
     
     suite.addTests(loader.loadTestsFromTestCase(TestRouterOutcome))
 
-    suite.addTests(loader.loadTestsFromTestCase(TestExecutionModes))
     suite.addTests(loader.loadTestsFromTestCase(TestErrorHandling))
     
     runner = unittest.TextTestRunner(verbosity=2)

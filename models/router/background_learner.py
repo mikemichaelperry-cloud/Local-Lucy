@@ -353,13 +353,21 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
     if min_entries is None:
         min_entries = int(os.environ.get("LUCY_AUTO_LEARN_THRESHOLD", "5"))
 
+    # Default log_path from environment when caller doesn't provide it
+    if log_path is None:
+        log_dir = os.environ.get("LUCY_ROUTER_LOG_DIR")
+        if log_dir:
+            log_path = Path(log_dir) / "router_decisions.jsonl"
+
     sys.path.insert(0, str(ROUTER_DIR))
+
+    # Count auto-feedback if available; don't bail out if the module is missing
+    auto_count = 0
     try:
         from auto_feedback import load_auto_feedback
+        auto_count = len(load_auto_feedback(min_confidence=0.6))
     except ImportError:
-        return False
-
-    entries = load_auto_feedback(min_confidence=0.6)
+        pass
 
     # Also count pending user feedback (not just auto-feedback)
     user_count = 0
@@ -367,7 +375,7 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
         with open(FEEDBACK_PATH) as f:
             user_count = sum(1 for line in f if line.strip())
 
-    total = len(entries) + user_count
+    total = auto_count + user_count
     if total < min_entries:
         return False
 

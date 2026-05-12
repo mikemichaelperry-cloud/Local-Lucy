@@ -614,7 +614,7 @@ class LocalAnswer:
             # Token estimate: ~1.5 tokens per word for output, but qwen3 uses
             # "thinking" tokens internally, so we need ~2.5x to avoid truncation.
             # Cap at num_predict_long to stay within the model's context window.
-            if route == "AUGMENTED":
+            if route in {"AUGMENTED", "EVIDENCE"}:
                 max_tokens = self.config.num_predict_augmented_detail
             else:
                 max_tokens = self.config.num_predict_long
@@ -630,7 +630,7 @@ class LocalAnswer:
         brief_patterns = [r'(briefly|brief|concise|short answer|one sentence|single sentence|two sentences|summarize|short paragraph)']
         requests_brief = any(re.search(p, q) for p in brief_patterns)
         
-        if route == "AUGMENTED":
+        if route in {"AUGMENTED", "EVIDENCE"}:
             if requests_detail:
                 return ("augmented_detail", self.config.num_predict_augmented_detail, "- Give provisional answer from tentative background.")
             elif requests_brief:
@@ -700,6 +700,8 @@ class LocalAnswer:
         if augmented_context.strip():
             context_block = f"Context:\n{augmented_context}\n\n"
             instruction = "You are Local Lucy. Use the context above. Be concise."
+            if session_memory.strip():
+                instruction += " Also use the session memory facts provided above."
         else:
             context_block = ""
             if session_memory.strip():
@@ -880,14 +882,14 @@ class LocalAnswer:
             )
         
         # Medical queries require evidence UNLESS we have augmented context
-        if self._is_medical_high_risk(q_eval) and route_mode != "AUGMENTED":
+        if self._is_medical_high_risk(q_eval) and route_mode not in {"AUGMENTED", "EVIDENCE"}:
             return AnswerResult(
                 text=f"This requires evidence mode.\nRun: run online: {q_eval}",
                 generation_profile="medical_refusal",
                 duration_ms=int((time.time() - start_time) * 1000)
             )
         
-        if route_mode not in {"AUGMENTED", "NEWS"} and self._is_time_sensitive(q_eval):
+        if route_mode not in {"AUGMENTED", "EVIDENCE", "NEWS"} and self._is_time_sensitive(q_eval):
             return AnswerResult(
                 text=f"This requires evidence mode.\nRun: run online: {q_eval}",
                 generation_profile="time_sensitive_refusal",
@@ -944,7 +946,7 @@ class LocalAnswer:
         
         local_stage_start = self._now_ms()
         # Use augmented context passed as parameter (from execution engine)
-        augmented_context = augmented_background_context if route_mode == "AUGMENTED" else ""
+        augmented_context = augmented_background_context if route_mode in {"AUGMENTED", "EVIDENCE"} else ""
         
         prompt = self._build_prompt(
             q_eval, session_memory, profile_name, budget_instruction,
@@ -1025,7 +1027,7 @@ class LocalAnswer:
         api_text = self._sanitize_model_output(api_text)
         
         # Apply augmented completion guard for AUGMENTED routes
-        if route_mode == "AUGMENTED":
+        if route_mode in {"AUGMENTED", "EVIDENCE"}:
             api_text, guard_triggered, guard_reason = self._apply_augmented_completion_guard(api_text)
             self._diag_append("augmented_completion_guard_triggered", "1" if guard_triggered else "0")
             self._diag_append("augmented_completion_guard_reason", guard_reason)

@@ -10,6 +10,12 @@ from PySide6.QtWidgets import QFrame, QGroupBox, QLabel, QLayout, QPlainTextEdit
 
 from app.ui_levels import ENGINEERING, POWER, level_at_least
 
+# Avatar is optional — gracefully degrade if widget module is missing
+try:
+    from app.widgets.avatar_widget import LucyAvatar
+except Exception:
+    LucyAvatar = None  # type: ignore[misc,assignment]
+
 DEFAULT_HISTORY_RETENTION_MAX_ENTRIES = 200
 
 
@@ -49,6 +55,21 @@ class StatusPanel(QFrame):
         scroll_area.setWidget(content_widget)
         scroll_area.viewport().setObjectName("panelScrollViewport")
         scroll_area.viewport().setAutoFillBackground(False)
+
+        # Avatar (talking head) — shown at top of status panel
+        if LucyAvatar is not None:
+            self._avatar = LucyAvatar()
+            # Point avatar at the voice audio levels file.
+            # Matches audio_levels_file_for_runtime() in runtime_voice.py.
+            runtime_ns = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "")
+            if runtime_ns:
+                levels_path = Path(runtime_ns).expanduser().resolve() / "state" / "voice_audio_levels.json"
+            else:
+                levels_path = Path(__file__).resolve().parents[3] / "state" / "voice_audio_levels.json"
+            self._avatar.set_levels_file(levels_path)
+            layout.addWidget(self._avatar, alignment=Qt.AlignmentFlag.AlignHCenter)
+        else:
+            self._avatar = None
 
         title = QLabel("Runtime / Status")
         title.setObjectName("sectionTitle")
