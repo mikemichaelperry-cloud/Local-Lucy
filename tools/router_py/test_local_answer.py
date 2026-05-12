@@ -54,6 +54,15 @@ class TestQueryClassification(unittest.TestCase):
     def setUp(self):
         self.answer = LocalAnswer()
     
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
     def test_normalize_query(self):
         """Test query normalization."""
         self.assertEqual(
@@ -126,6 +135,15 @@ class TestSanitization(unittest.TestCase):
     def setUp(self):
         self.answer = LocalAnswer()
     
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
     def test_sanitize_model_output(self):
         """Test model output sanitization."""
         # Test User:/Assistant: removal
@@ -215,6 +233,15 @@ class TestIdentityResponses(unittest.TestCase):
     def setUp(self):
         self.answer = LocalAnswer()
     
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
     def test_who_are_you(self):
         """Test 'who are you' response."""
         response = self.answer._get_identity_response("who are you", "")
@@ -253,6 +280,15 @@ class TestPolicyResponses(unittest.TestCase):
     def setUp(self):
         self.answer = LocalAnswer()
     
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
     def test_fixed_responses(self):
         """Test fixed policy responses."""
         for policy_id, expected_response in FIXED_POLICY_RESPONSES.items():
@@ -277,6 +313,15 @@ class TestGenerationProfiles(unittest.TestCase):
     def setUp(self):
         self.answer = LocalAnswer()
     
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
     def test_local_chat_profile(self):
         """Test LOCAL/CHAT profile."""
         name, num_predict, instruction = self.answer._set_generation_profile(
@@ -320,6 +365,15 @@ class Test807Questions(unittest.TestCase):
     def setUp(self):
         self.answer = LocalAnswer()
     
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
     def test_807_400v_question(self):
         """Test 807 400V question."""
         answer = self.answer._check_807_question(
@@ -350,6 +404,15 @@ class TestAugmentedMode(unittest.TestCase):
     def setUp(self):
         self.answer = LocalAnswer()
     
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
     def test_augmented_behavior_contract_clarify(self):
         """Test clarify answer shape."""
         shape = self.answer._apply_augmented_behavior_contract(
@@ -394,6 +457,15 @@ class TestPromptBuilding(unittest.TestCase):
     def setUp(self):
         self.answer = LocalAnswer()
     
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
     def test_build_basic_prompt(self):
         """Test basic prompt building."""
         prompt = self.answer._build_prompt(
@@ -441,6 +513,15 @@ class TestCompletionGuards(unittest.TestCase):
     def setUp(self):
         self.answer = LocalAnswer()
     
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
     def test_remove_dangling_conjunction(self):
         """Test removal of dangling conjunctions."""
         text, triggered, reason = self.answer._apply_augmented_completion_guard("This is a test and.")
