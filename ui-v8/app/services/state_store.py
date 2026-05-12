@@ -256,6 +256,7 @@ def load_runtime_snapshot() -> RuntimeSnapshot:
         "Voice": _resolve_value(current_state, (("voice",), ("voice_enabled",))),
         "Augmented Policy": _resolve_value(current_state, (("augmentation_policy",),)),
         "Augmented Provider": _resolve_value(current_state, (("augmented_provider",),)),
+        "Learner": _resolve_value(current_state, (("learner",), ("auto_learn",))),
         "Selected Provider Paid": _resolve_selected_provider_paid(current_state),
         "Approval Required": _resolve_value(
             current_state,

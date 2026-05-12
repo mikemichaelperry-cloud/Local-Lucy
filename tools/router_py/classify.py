@@ -317,6 +317,57 @@ def select_route(
     if classification.force_local:
         return _make_local_decision(classification, query=query)
 
+    # Short-query guard: very short utterances that look like feedback,
+    # confirmations, or follow-ups should stay LOCAL regardless of embedding,
+    # UNLESS the prior exchange required evidence AND the current query is an
+    # informational follow-up (not feedback or social). Drug-interaction
+    # follow-ups like "why?" need AUGMENTED; "thanks" and "wrong" do not.
+    if query and len(query.strip()) < 12 and classification.intent_family == "local_answer":
+        # Feedback, social, and confirmation utterances always stay LOCAL
+        q_lower = query.strip().lower().rstrip("?")
+        local_always = {
+            "correct", "yes", "no", "right", "wrong", "thanks", "thank you",
+            "ok", "okay", "got it", "understood", "sure", "fine", "exactly",
+            "perfect", "great", "good", "nice", "awesome", "cool", "nope",
+            "nah", "not really", "that was wrong", "bad answer", "incorrect",
+            "that's wrong", "not right", "that was right", "good answer",
+            "well done", "nice job", "exactly right", "spot on", "you got it",
+            "hi", "hello", "hey", "bye", "goodbye", "see you", "yo",
+            "stop", "pause", "wait", "hold on", "never mind", "nevermind",
+            "forget it", "ignore that", "scratch that", "cancel", "redo",
+            "try again", "start over", "back", "previous", "next", "skip",
+            "done", "finished", "enough", "that's enough", "wow", "oh", "ah",
+            "oh no", "really", "seriously", "interesting", "makes sense",
+            "i see", "i get it", "of course", "obviously", "naturally",
+            "indeed", "absolutely", "definitely", "certainly", "probably",
+            "maybe", "perhaps", "possibly", "not sure", "i don't know",
+            "who knows", "whatever", "alright", "sounds good", "works for me",
+            "fair enough", "i suppose", "i guess", "thx", "kk", "k", "yea",
+            "yep", "yup", "correcr", "corect", "wrng", "wrond", "incorect",
+            "thabks", "okkk", "uh", "um", "hmm", "huh",
+        }
+        if q_lower not in local_always:
+            try:
+                # Read buffer directly from disk to avoid module-aliasing issues
+                # (classify.py may import feedback_buffer under a different name
+                # than main.py, creating separate singleton instances).
+                _ns = Path(
+                    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v8"))
+                )
+                _buf_path = _ns / "feedback_buffer.json"
+                if _buf_path.exists():
+                    import json
+                    _data = json.loads(_buf_path.read_text(encoding="utf-8"))
+                    _exchanges = _data.get("exchanges", [])
+                    if _exchanges:
+                        _last_route = str(_exchanges[-1].get("route", "")).upper()
+                        if _last_route in ("AUGMENTED", "EVIDENCE", "NEWS", "TIME", "WEATHER"):
+                            # Informational follow-up to an evidence route: inherit
+                            return _make_augmented_decision(classification, prefer_paid=False, query=query)
+            except Exception:
+                pass
+        return _make_local_decision(classification, query=query)
+
     # Fallback when no query provided
     if not query:
         if classification.evidence_mode == "required":

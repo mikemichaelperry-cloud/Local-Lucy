@@ -37,6 +37,7 @@ KNOWN_FIELDS = {
     "augmentation_policy",
     "augmented_provider",
     "model",
+    "learner",
     "approval_required",
     "status",
     "last_updated",
@@ -105,6 +106,8 @@ def main() -> int:
             result = update_state_field(state_file, "augmented_provider", args.value)
         elif args.command == "set-model":
             result = update_state_field(state_file, "model", args.value)
+        elif args.command == "set-learner":
+            result = update_learner_state(state_file, args.value)
         else:
             raise RuntimeControlError(f"unsupported command: {args.command}")
 
@@ -133,7 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode_parser = subparsers.add_parser("set-mode")
     mode_parser.add_argument("--value", required=True, choices=sorted(MODE_TO_ROUTE_CONTROL))
 
-    for name in ("set-conversation", "set-memory", "set-evidence", "set-voice"):
+    for name in ("set-conversation", "set-memory", "set-evidence", "set-voice", "set-learner"):
         toggle_parser = subparsers.add_parser(name)
         toggle_parser.add_argument("--value", required=True, choices=("on", "off"))
     augmentation_parser = subparsers.add_parser("set-augmentation")
@@ -308,10 +311,50 @@ def default_state() -> dict[str, Any]:
         "augmentation_policy": clean_text(os.environ.get("LUCY_AUGMENTATION_POLICY")) or "fallback_only",
         "augmented_provider": "wikipedia",
         "model": os.environ.get("LUCY_RUNTIME_MODEL") or os.environ.get("LUCY_LOCAL_MODEL") or "local-lucy",
+        "learner": _resolve_initial_learner_state(),
         "approval_required": False,
         "status": "ready",
         "last_updated": iso_now(),
     }
+
+
+def _resolve_initial_learner_state() -> str:
+    """Resolve initial learner state from disable flag and environment."""
+    router_dir = Path(__file__).resolve().parent.parent / "models" / "router"
+    disable_flag = router_dir / ".learner_disable"
+    if disable_flag.exists():
+        return "off"
+    if os.environ.get("LUCY_AUTO_LEARN", "1") == "0":
+        return "off"
+    return "on"
+
+
+def update_learner_state(state_file: Path, requested_value: str) -> UpdateResult:
+    """Update learner state: update state file AND manage .learner_disable flag file."""
+    router_dir = Path(__file__).resolve().parent.parent / "models" / "router"
+    disable_flag = router_dir / ".learner_disable"
+
+    with locked_state_file(state_file):
+        current_state = read_state_file(state_file)
+        state = normalize_state(current_state)
+        prior_value = state["learner"]
+        state["learner"] = requested_value
+        state["last_updated"] = iso_now()
+        state["status"] = "ready"
+        changed = prior_value != requested_value
+
+        # Synchronize the disable flag file with the state
+        if requested_value == "off":
+            if not disable_flag.exists():
+                disable_flag.touch()
+                changed = True
+        else:
+            if disable_flag.exists():
+                disable_flag.unlink()
+                changed = True
+
+        write_state_file(state_file, state)
+        return UpdateResult(field="learner", value=requested_value, changed=changed, state=state)
 
 
 def iso_now() -> str:
@@ -336,7 +379,7 @@ def update_state_field(state_file: Path, field: str, requested_value: str) -> Up
         prior_value = state[field]
         state[field] = requested_value
         state["last_updated"] = iso_now()
-        if field in {"mode", "conversation", "memory", "evidence", "voice", "augmentation_policy", "augmented_provider", "model"}:
+        if field in {"mode", "conversation", "memory", "evidence", "voice", "augmentation_policy", "augmented_provider", "model", "learner"}:
             state["status"] = "ready"
         if field == "model":
             state["active_model"] = requested_value
@@ -407,6 +450,7 @@ def normalize_state(payload: dict[str, Any] | None) -> dict[str, Any]:
     state["augmentation_policy"] = coerce_augmentation_policy(state.get("augmentation_policy"))
     state["augmented_provider"] = coerce_augmented_provider(state.get("augmented_provider"))
     state["model"] = clean_text(state.get("model")) or default_state()["model"]
+    state["learner"] = coerce_toggle(state.get("learner"))
     state["approval_required"] = bool(state.get("approval_required", False))
     state["status"] = clean_text(state.get("status")) or "ready"
     state["last_updated"] = clean_text(state.get("last_updated")) or iso_now()
@@ -549,6 +593,7 @@ def build_self_check_payload(resolved_paths: ResolvedRuntimePaths) -> dict[str, 
             "augmented_provider": state.get("augmented_provider", ""),
             "profile": state.get("profile", ""),
             "model": state.get("model", ""),
+            "learner": state.get("learner", ""),
         },
         "augmented_availability": {
             "provider": availability_provider,
@@ -579,6 +624,7 @@ def render_env(state: dict[str, Any]) -> str:
             f"status={state['status']}",
             f"profile={state['profile']}",
             f"model={state['model']}",
+            f"learner={state['learner']}",
             f"LUCY_ROUTE_CONTROL_MODE={MODE_TO_ROUTE_CONTROL[state['mode']]}",
             f"LUCY_CONVERSATION_MODE_FORCE={toggle_to_flag(state['conversation'])}",
             f"LUCY_SESSION_MEMORY={toggle_to_flag(state['memory'])}",
