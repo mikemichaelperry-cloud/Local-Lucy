@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from router_py.classify import (
     ClassificationResult,
@@ -145,7 +146,7 @@ class TestAugmentedDecision(unittest.TestCase):
         decision = _make_augmented_decision(classification, prefer_paid=True)
         
         self.assertEqual(decision.route, "AUGMENTED")
-        self.assertEqual(decision.provider, "openai")
+        self.assertEqual(decision.provider, "kimi")
         self.assertEqual(decision.provider_usage_class, "paid")
     
     def test_medical_safety_overrides_prefer_paid(self):
@@ -201,7 +202,7 @@ class TestRouteSelection(unittest.TestCase):
         decision = select_route(classification, forced_mode="FORCED_ONLINE")
         
         self.assertEqual(decision.route, "AUGMENTED")
-        self.assertEqual(decision.provider, "openai")  # Paid for forced online
+        self.assertEqual(decision.provider, "kimi")  # Paid for forced online
     
     def test_clarify_required(self):
         """Test clarify_required no longer forces CLARIFY — embedding router decides."""

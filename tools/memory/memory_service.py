@@ -30,6 +30,27 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
+def _truncate_at_turn_boundary(text: str, max_chars: int) -> str:
+    """Truncate text cleanly at a turn boundary, never mid-turn.
+
+    Splits on double-newlines (turn separators) and keeps as many
+    complete turns as fit within max_chars. If the text is already
+    within budget, returns it unchanged.
+    """
+    if len(text) <= max_chars:
+        return text
+    turns = text.split("\n\n")
+    kept: list[str] = []
+    current_len = 0
+    for turn in turns:
+        add = len(turn) + 2  # +2 for the "\n\n" separator
+        if current_len + add > max_chars and kept:
+            break
+        kept.append(turn)
+        current_len += add
+    return "\n\n".join(kept)
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -809,7 +830,7 @@ def assemble_context_with_telemetry(
     if depth == "shallow":
         recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
         if recent_turns:
-            context = format_turns_for_prompt(recent_turns)[:max_chars]
+            context = _truncate_at_turn_boundary(format_turns_for_prompt(recent_turns), max_chars)
             telemetry["memory_context_used"] = "true"
             telemetry["memory_mode_used"] = mode
             telemetry["memory_depth_used"] = "shallow"
@@ -827,8 +848,7 @@ def assemble_context_with_telemetry(
         if not parts:
             return "", telemetry
         context = "\n\n".join(parts)
-        if len(context) > max_chars:
-            context = context[-max_chars:]
+        context = _truncate_at_turn_boundary(context, max_chars)
         telemetry["memory_context_used"] = "true"
         telemetry["memory_mode_used"] = "local"
         telemetry["memory_depth_used"] = "deep"
@@ -884,8 +904,7 @@ def assemble_context_with_telemetry(
         return "", telemetry
 
     context = "\n\n".join(parts)
-    if len(context) > max_chars:
-        context = context[-max_chars:]
+    context = _truncate_at_turn_boundary(context, max_chars)
 
     telemetry["memory_context_used"] = "true"
     telemetry["memory_mode_used"] = "augmented"

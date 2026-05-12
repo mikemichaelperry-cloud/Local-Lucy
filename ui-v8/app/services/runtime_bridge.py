@@ -98,6 +98,7 @@ class RuntimeBridge:
         self.voice_capability = self._discover_voice_capability()
         self._prime_voice_state()
         threading.Thread(target=self._background_warmup_ollama, daemon=True).start()
+        threading.Thread(target=self._background_warmup_router, daemon=True).start()
 
     def _workspace_root(self) -> Path:
         # When authority root is the project root (e.g., /home/mike/lucy-v8),
@@ -542,6 +543,22 @@ class RuntimeBridge:
             with urllib.request.urlopen(request, timeout=60.0) as response:
                 response.read()
         except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+
+    def _background_warmup_router(self) -> None:
+        """Eagerly load the embedding router (ModernBERT) so first query isn't penalized.
+
+        On a cold start the router can take ~4s to load tokenizer, model, and
+        embeddings.  By prewarming in a background thread during UI startup, the
+        first user query gets the fast (~30ms) path.
+        """
+        try:
+            tools_dir = self.snapshot_root / "tools"
+            if str(tools_dir) not in sys.path:
+                sys.path.insert(0, str(tools_dir))
+            from router_py.classify import prewarm_router
+            prewarm_router()
+        except Exception:
             pass
 
     def _background_prewarm_voice(self) -> None:

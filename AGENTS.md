@@ -83,6 +83,19 @@ Edit `feedback_parser.py`:
 
 Patterns are checked in order: route correction → retraction → negative → positive.
 
+### Architecture Refactor Status
+
+Stages 0–9 complete. Python-native path is authoritative. Shell/parity paths removed.
+See `tools/router_py/ARCHITECTURE.md` for full pipeline diagram.
+
+New modules introduced:
+- `tools/router_py/request_pipeline.py` — pipeline choke point
+- `tools/router_py/request_types.py` — centralized dataclasses
+- `tools/router_py/provider_resolver.py` — single source of truth for provider selection
+- `tools/router_py/response_formatter.py` — pure formatting/validation utilities
+
+All entry points (CLI, HMI, voice) now call `main.run()`.
+
 ### Testing
 
 ```bash
@@ -93,6 +106,13 @@ cd ~/lucy-v8/ui-v8
 Also run the fast routing stress test:
 ```bash
 .venv/bin/python3 fast_routing_stress_test.py
+```
+
+Router tests:
+```bash
+cd ~/lucy-v8
+source ui-v8/.venv/bin/activate
+python -m pytest tools/router_py/ --ignore=tools/router_py/test_resource_leaks.py -q
 ```
 
 ### Sync rule

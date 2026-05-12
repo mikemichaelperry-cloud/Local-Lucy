@@ -157,6 +157,19 @@ def _get_router():
     return _ROUTER if _ROUTER is not False else None
 
 
+def prewarm_router() -> bool:
+    """Eagerly load the embedding router so first query isn't penalized.
+
+    Returns True if router loaded successfully, False otherwise.
+    Safe to call multiple times; only loads on first call.
+    """
+    try:
+        router = _get_router()
+        return router is not None
+    except Exception:
+        return False
+
+
 def _get_log_path() -> Path | None:
     """Get router decision log path from environment."""
     log_dir = os.environ.get("LUCY_ROUTER_LOG_DIR")

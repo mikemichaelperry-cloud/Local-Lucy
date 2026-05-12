@@ -42,14 +42,14 @@ def _default_provider_for(classification: ClassificationResult) -> str:
     intent_family = classification.intent_family
 
     if evidence_reason == "medical_context":
-        return "openai"  # High-quality sources for medical
+        return "kimi"  # High-quality sources for medical
     if evidence_reason in ("financial_data", "legal_context"):
-        return "openai"  # Accurate, current info
+        return "kimi"  # Accurate, current info
     if evidence_reason == "conflict_live":
-        return "openai"  # Real-time web search
+        return "kimi"  # Real-time web search
     if intent_family in ("background_overview", "current_evidence"):
         return "wikipedia"  # Free, reliable background
-    return "openai"  # General fallback
+    return "kimi"  # General fallback
 
 
 # ---------------------------------------------------------------------------
@@ -93,8 +93,8 @@ def resolve_provider(
 
     # 4. Paid preference override
     if prefer_paid:
-        logger.debug("Provider from prefer_paid: openai")
-        return "openai"
+        logger.debug("Provider from prefer_paid: kimi")
+        return "kimi"
 
     # 5. Query-type default
     default = _default_provider_for(classification)

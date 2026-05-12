@@ -36,9 +36,12 @@ class HybridRouter:
         # Only when not in explicit debug mode.
         _debug = os.environ.get("LUCY_DEBUG_TRANSFORMERS", "").lower() in {"1", "true", "yes"}
         _tf_logger = logging.getLogger("transformers")
+        _hf_logger = logging.getLogger("huggingface_hub")
         _orig_level = _tf_logger.level
+        _orig_hf_level = _hf_logger.level
         if not _debug:
             _tf_logger.setLevel(logging.ERROR)
+            _hf_logger.setLevel(logging.ERROR)
 
         try:
             with contextlib.redirect_stdout(io.StringIO() if not _debug else sys.stdout):
@@ -46,6 +49,7 @@ class HybridRouter:
                 self.model = AutoModel.from_pretrained(base_model)
         finally:
             _tf_logger.setLevel(_orig_level)
+            _hf_logger.setLevel(_orig_hf_level)
 
         self.model.eval()
 

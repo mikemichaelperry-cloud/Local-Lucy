@@ -100,17 +100,23 @@ def process(
     the pipeline skips classify/route and executes directly. This ensures
     parity comparisons use the exact same routing decision for both paths.
     """
-    start_time = __import__("time").time()
+    import time as _time
+    _profiling = os.environ.get("LUCY_LATENCY_PROFILE", "").lower() in {"1", "true", "yes"}
+    _profile: dict[str, int] = {}
+    start_time = _time.time()
 
     # ------------------------------------------------------------------
     # 1. Classify (skipped if caller provides classification)
     # ------------------------------------------------------------------
     if classification is None:
+        _t0 = _time.time()
         try:
             classification = classify_intent(question, surface=surface)
+            if _profiling:
+                _profile["classify_ms"] = int((_time.time() - _t0) * 1000)
         except Exception as exc:
             logger.exception("Classification failed")
-            execution_time = int((__import__("time").time() - start_time) * 1000)
+            execution_time = int((_time.time() - start_time) * 1000)
             outcome = RouterOutcome(
                 status="failed",
                 outcome_code="classification_error",
@@ -128,12 +134,15 @@ def process(
     # 2. Route (skipped if caller provides decision)
     # ------------------------------------------------------------------
     if decision is None:
+        _t1 = _time.time()
         try:
             normalized_policy = normalize_augmentation_policy(policy)
             decision = select_route(classification, policy=normalized_policy, query=question)
+            if _profiling:
+                _profile["route_ms"] = int((_time.time() - _t1) * 1000)
         except Exception as exc:
             logger.exception("Routing failed")
-            execution_time = int((__import__("time").time() - start_time) * 1000)
+            execution_time = int((_time.time() - start_time) * 1000)
             outcome = RouterOutcome(
                 status="failed",
                 outcome_code="routing_error",
@@ -185,11 +194,15 @@ def process(
         )
 
     # 3c. Centralize provider resolution (single source of truth)
+    _t2 = _time.time()
     decision = provider_resolver.apply_provider(decision, classification, context)
+    if _profiling:
+        _profile["provider_resolve_ms"] = int((_time.time() - _t2) * 1000)
 
     # ------------------------------------------------------------------
     # 4. Build PipelineContext
     # ------------------------------------------------------------------
+    _t3 = _time.time()
     pipeline_ctx = PipelineContext.from_env(question=question, surface=surface)
     if context:
         # Merge caller-provided extras
@@ -207,9 +220,13 @@ def process(
     if classification.force_local:
         pipeline_ctx = dataclasses.replace(pipeline_ctx, force_local=True)
 
+    if _profiling:
+        _profile["context_build_ms"] = int((_time.time() - _t3) * 1000)
+
     # ------------------------------------------------------------------
     # 5. Execute
     # ------------------------------------------------------------------
+    _t4 = _time.time()
     try:
         engine = ExecutionEngine(config={
             "timeout": timeout,
@@ -228,7 +245,10 @@ def process(
 
     except Exception as exc:
         logger.exception("ExecutionEngine failed")
-        execution_time = int((__import__("time").time() - start_time) * 1000)
+        execution_time = int((_time.time() - start_time) * 1000)
+        if _profiling:
+            _profile["execute_ms"] = int((_time.time() - _t4) * 1000)
+            _profile["total_ms"] = execution_time
         outcome = RouterOutcome(
             status="failed",
             outcome_code="execution_error",
@@ -239,13 +259,25 @@ def process(
             confidence=classification.confidence,
             error_message=str(exc),
             execution_time_ms=execution_time,
+            metadata={"latency_profile": _profile} if _profiling else {},
         )
         return outcome, classification, decision
+
+    if _profiling:
+        _profile["execute_ms"] = int((_time.time() - _t4) * 1000)
 
     # ------------------------------------------------------------------
     # 6. Convert ExecutionResult → RouterOutcome
     # ------------------------------------------------------------------
-    execution_time = int((__import__("time").time() - start_time) * 1000)
+    execution_time = int((_time.time() - start_time) * 1000)
+    if _profiling:
+        _profile["total_ms"] = execution_time
+        _profile["overhead_ms"] = max(0, execution_time - _profile.get("execute_ms", 0))
+
+    _meta = dict(result.metadata) if result.metadata else {}
+    if _profiling:
+        _meta["latency_profile"] = _profile
+
     outcome = RouterOutcome(
         status=result.status,
         outcome_code=result.outcome_code,
@@ -257,7 +289,7 @@ def process(
         response_text=result.response_text,
         error_message=result.error_message,
         execution_time_ms=execution_time,
-        metadata=dict(result.metadata) if result.metadata else {},
+        metadata=_meta,
     )
 
     return outcome, classification, decision
