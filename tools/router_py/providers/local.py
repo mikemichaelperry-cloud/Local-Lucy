@@ -48,3 +48,5 @@ async def call_local_model_async(
     except Exception as e:
         logger.warning(f"Local model failed: {e}")
         return f"Error: Local model failed to generate response. {e}"
+    finally:
+        await answer.close()
