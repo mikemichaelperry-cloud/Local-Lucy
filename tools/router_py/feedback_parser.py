@@ -92,6 +92,11 @@ ANSWER_NEGATIVE_PATTERNS = [
     r"\bthat\s+made\s+no\s+sense\b",
     r"\bthat['’]?s?\s+not\s+what\s+I\s+asked\b",
     r"\byou\s+(?:didn['’]t\s+answer|misunderstood)\b",
+    # Standalone "Incorrect" at start of utterance (e.g. "Incorrect, my dog is Oscar")
+    r"^incorrect\b",
+    r"^wrong\b",
+    r"^nope\b",
+    r"^not\s+right\b",
 ]
 
 # Answer-quality positive patterns
@@ -299,6 +304,22 @@ _WEATHER_FAILURE_PATTERNS = [
     "could not parse weather data", "no location found",
 ]
 
+# Keywords used to detect semantic misroutes (query routed to live-data
+# route but lacks any keywords for that route)
+_TIME_KEYWORDS = [
+    "time", "date", "day", "clock", "hour", "minute", "schedule",
+    "timezone", "gmt", "pst", "est", "cet", "utc", "o'clock", "am", "pm",
+]
+_NEWS_KEYWORDS = [
+    "news", "headlines", "breaking", "current events", "update", "latest",
+    "report", "article", "happening", "developments", "trending",
+]
+_WEATHER_KEYWORDS = [
+    "weather", "forecast", "temperature", "rain", "snow", "sunny",
+    "cloudy", "windy", "storm", "humidity", "precipitation", "hot", "cold",
+    "warm", "freezing", "chilly", "outside", "umbrella", "jacket", "coat",
+]
+
 
 def _has_pattern(text: str, patterns: list[str]) -> bool:
     """Check if text contains any of the patterns (case-insensitive)."""
@@ -350,19 +371,29 @@ def _infer_corrected_route(result: FeedbackResult) -> Optional[str]:
         if any(kw in query_lower for kw in _LEGAL_KEYWORDS) and _has_pattern(response, _LOCAL_LEGAL_DISCLAIMER_PATTERNS):
             return "AUGMENTED"
 
-    # 3. TIME → LOCAL: timezone API failed
+    # 3. TIME → LOCAL: timezone API failed OR semantic misroute
     if original_route == "TIME":
         if _has_pattern(response, _TIME_FAILURE_PATTERNS):
             return "LOCAL"
+        # Semantic misroute: query has no time keywords → should never have been TIME
+        query_lower = query.lower()
+        if not any(kw in query_lower for kw in _TIME_KEYWORDS):
+            return "LOCAL"
 
-    # 4. NEWS → LOCAL: news fetch failed
+    # 4. NEWS → LOCAL: news fetch failed OR semantic misroute
     if original_route == "NEWS":
         if _has_pattern(response, _NEWS_FAILURE_PATTERNS):
             return "LOCAL"
+        query_lower = query.lower()
+        if not any(kw in query_lower for kw in _NEWS_KEYWORDS):
+            return "LOCAL"
 
-    # 5. WEATHER → LOCAL: weather fetch failed
+    # 5. WEATHER → LOCAL: weather fetch failed OR semantic misroute
     if original_route == "WEATHER":
         if _has_pattern(response, _WEATHER_FAILURE_PATTERNS):
+            return "LOCAL"
+        query_lower = query.lower()
+        if not any(kw in query_lower for kw in _WEATHER_KEYWORDS):
             return "LOCAL"
 
     return None
