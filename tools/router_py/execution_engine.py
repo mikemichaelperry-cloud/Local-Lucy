@@ -2122,6 +2122,12 @@ them according to the route type (bypass, provisional, or full). It handles:
             if session_memory.strip():
                 api_prompt = f"Session memory:\n{session_memory}\n\n{prompt}"
             response = await self._call_api_provider_async(route.provider, api_prompt, context)
+            # Fallback to local model if paid provider returns an error
+            if isinstance(response, str) and response.strip().lower().startswith("error"):
+                self._logger.warning(
+                    f"{route.provider} returned error: {response[:120]}. Falling back to local model."
+                )
+                response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
         elif route.provider == "wikipedia":
             response = await self._call_wikipedia_provider_async(prompt, evidence, context)
         else:

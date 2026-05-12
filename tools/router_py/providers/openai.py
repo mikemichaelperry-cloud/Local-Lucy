@@ -39,7 +39,19 @@ def call_openai_for_response(prompt: str, timeout: float = 130.0) -> str:
             payload = json.loads(result.stdout)
             if payload.get("ok"):
                 return payload.get("text", payload.get("context", "No response"))
-        return f"Error: {result.stderr}"
+        # Subprocess failed — try to extract reason from stdout JSON first,
+        # then fall back to stderr, then generic message.
+        error_detail = ""
+        if result.stdout.strip():
+            try:
+                payload = json.loads(result.stdout)
+                if isinstance(payload, dict) and not payload.get("ok"):
+                    error_detail = payload.get("reason", "")
+            except json.JSONDecodeError:
+                pass
+        if not error_detail:
+            error_detail = result.stderr.strip() or "OpenAI provider failed"
+        return f"Error: {error_detail}"
     except Exception as e:
         return f"Error calling OpenAI: {e}"
 

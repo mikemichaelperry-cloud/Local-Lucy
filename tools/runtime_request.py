@@ -420,7 +420,6 @@ def _run_backend_submit_python(
     cmd = [
         sys.executable,
         str(root / "tools" / "router_py" / "main.py"),
-        "--mode", "python",
         "--json",
         execution_text,
     ]

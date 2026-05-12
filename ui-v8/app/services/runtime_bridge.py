@@ -269,6 +269,12 @@ class RuntimeBridge:
                 allowed_values=("local-lucy",),
                 reason=reason,
             ),
+            "learner_toggle": ActionCapability(
+                name="learner_toggle",
+                available=available,
+                allowed_values=("on", "off"),
+                reason=reason,
+            ),
         }
 
     def _discover_request_capability(self) -> ActionCapability:
@@ -601,6 +607,7 @@ class RuntimeBridge:
             "augmentation_policy": ["python3", str(self.control_tool_path), "set-augmentation", "--value", requested_value],
             "augmented_provider": ["python3", str(self.control_tool_path), "set-augmented-provider", "--value", requested_value],
             "model_selection": ["python3", str(self.control_tool_path), "set-model", "--value", requested_value],
+            "learner_toggle": ["python3", str(self.control_tool_path), "set-learner", "--value", requested_value],
         }
         return command_map.get(action)
 

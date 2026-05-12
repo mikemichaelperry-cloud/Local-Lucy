@@ -35,6 +35,7 @@ class ControlPanel(QFrame):
     augmented_policy_change_requested = Signal(str)
     augmented_provider_change_requested = Signal(str)
     model_change_requested = Signal(str)
+    learner_change_requested = Signal(str)
     ptt_pressed_requested = Signal()
     ptt_released_requested = Signal()
     reload_profile_requested = Signal()
@@ -83,6 +84,7 @@ class ControlPanel(QFrame):
             "augmented_provider": "",
             "model": "",
             "profile": "",
+            "learner": "",
         }
         self._backend_available = False
         self._backend_busy = False
@@ -184,6 +186,10 @@ class ControlPanel(QFrame):
         self._augmented_provider_selector.addItems(["wikipedia", "openai", "kimi"])
         self._augmented_provider_selector.activated.connect(self._handle_augmented_provider_activated)
 
+        self._learner_selector = QComboBox()
+        self._learner_selector.addItems(["on", "off"])
+        self._learner_selector.activated.connect(self._handle_learner_activated)
+
         self._model_selector = QComboBox()
         self._model_selector.addItems(list(self._MODEL_LABELS.values()))
         self._model_selector.activated.connect(self._handle_model_activated)
@@ -195,6 +201,7 @@ class ControlPanel(QFrame):
         layout.addWidget(self._build_labeled_row("voice", self._voice_selector))
         layout.addWidget(self._build_labeled_row("augmented policy", self._augmentation_policy_selector))
         layout.addWidget(self._build_labeled_row("augmented provider", self._augmented_provider_selector))
+        layout.addWidget(self._build_labeled_row("auto-learn", self._learner_selector))
         note = QLabel("Feature toggles unavailable.")
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -506,6 +513,7 @@ class ControlPanel(QFrame):
             "augmentation_policy": top_status.get("Augmented Policy", "").strip().lower(),
             "augmented_provider": top_status.get("Augmented Provider", "").strip().lower(),
             "model": top_status.get("Model", "").strip(),
+            "learner": top_status.get("Learner", "").strip().lower(),
         }
         self._current_values.update(values)
         if self._profile_value_label is not None:
@@ -518,6 +526,7 @@ class ControlPanel(QFrame):
         self._set_selector_value(self._voice_selector, values["voice"])
         self._set_selector_value(self._augmentation_policy_selector, values["augmentation_policy"])
         self._set_selector_value(self._augmented_provider_selector, values["augmented_provider"])
+        self._set_selector_value(self._learner_selector, values.get("learner", ""))
         self._set_selector_value(self._model_selector, values.get("model", ""))
         self._refresh_voice_ptt()
 
@@ -646,6 +655,9 @@ class ControlPanel(QFrame):
             self.augmented_provider_change_requested,
         )
 
+    def _handle_learner_activated(self, index: int) -> None:
+        self._emit_if_changed("learner", self._learner_selector.itemText(index), self.learner_change_requested)
+
     def _handle_model_activated(self, index: int) -> None:
         label = self._model_selector.itemText(index)
         # Reverse lookup: find backend value from display label
@@ -671,6 +683,7 @@ class ControlPanel(QFrame):
                     "Voice": self._current_values["voice"],
                     "Augmented Policy": self._current_values["augmentation_policy"],
                     "Augmented Provider": self._current_values["augmented_provider"],
+                    "Learner": self._current_values.get("learner", ""),
                     "Model": self._current_values.get("model", ""),
                 }
             )

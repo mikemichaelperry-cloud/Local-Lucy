@@ -459,6 +459,9 @@ class OperatorConsoleWindow(QMainWindow):
         self.control_panel.model_change_requested.connect(
             lambda value: self._execute_backend_action("model_selection", value, "model change")
         )
+        self.control_panel.learner_change_requested.connect(
+            lambda value: self._execute_backend_action("learner_toggle", value, "learner toggle")
+        )
 
         self.control_panel.ptt_pressed_requested.connect(self._handle_voice_ptt_pressed)
         self.control_panel.ptt_released_requested.connect(self._handle_voice_ptt_released)
