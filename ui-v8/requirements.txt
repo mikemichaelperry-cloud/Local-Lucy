@@ -1,4 +1,4 @@
-# Local Lucy v8 - Core Dependencies
+# Local Lucy v8 - Complete Dependencies
 # Install with: pip install -r requirements.txt
 
 # UI Framework
@@ -8,12 +8,23 @@ PySide6>=6.4.0,<7.0.0
 aiohttp>=3.8.0
 tenacity>=8.2.0
 
+# ML / Embedding Router (all required for intent classification)
+torch>=2.0.0
+transformers>=4.30.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+sentence-transformers>=2.2.0
+
 # Required v8 local TTS
 kokoro>=0.9.4,<1.0.0
 soundfile>=0.13.0
 
+# Configuration from .env files
+python-dotenv>=1.0.0
+
 # Testing
 pytest>=7.0.0
+pytest-asyncio>=0.21.0
 
 # Local model support (optional but recommended)
 # Install ollama separately: https://ollama.com

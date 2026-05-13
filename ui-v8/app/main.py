@@ -3,6 +3,9 @@ HMI operator console for Local Lucy.
 Preferred HMI start surface for new workflows.
 """
 
+from dotenv import load_dotenv
+load_dotenv()  # Load .env file for API keys
+
 import argparse
 import os
 import sys

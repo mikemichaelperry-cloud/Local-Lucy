@@ -7,6 +7,11 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_HOME="$(dirname -- "$SCRIPT_DIR")"
 cd "$SCRIPT_DIR"
 
+# Source user .env for API keys (if present)
+if [ -f "${SCRIPT_DIR}/.env" ]; then
+    source "${SCRIPT_DIR}/.env"
+fi
+
 # Source latency optimizations (token limits for long responses)
 if [ -f "${SCRIPT_DIR}/config/latency_optimizations.env" ]; then
     source "${SCRIPT_DIR}/config/latency_optimizations.env"

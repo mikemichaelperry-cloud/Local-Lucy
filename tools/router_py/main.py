@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+
 Local Lucy Router — Python-Native Main Orchestrator
 
 Single authoritative entry point for all execution surfaces:
@@ -27,6 +28,9 @@ outcome telemetry are handled in the wrapper, not in the engine.
 """
 
 from __future__ import annotations
+
+from dotenv import load_dotenv
+load_dotenv()  # Load .env file for API keys
 
 import argparse
 import fcntl
