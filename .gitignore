@@ -76,3 +76,21 @@ feedback_buffer.json
 logs/
 models/router/*.tmp
 models/router/*.bak
+
+# Build and temporary artifacts
+/tmp/
+tmp/
+*.bak
+*.orig
+
+# Generated reports (moved from root)
+/reports/
+
+# Runtime downloads
+runtime/voice/models/
+
+# Router versioned backups
+models/router/versions/
+
+# Deprecated tools
+tools/deprecated/
