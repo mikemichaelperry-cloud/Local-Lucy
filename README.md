@@ -97,6 +97,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete technical specification.
 - **GPU recommended** — RTX 3060 12GB or better for local LLM inference
 
 > **Note:** On first run, the embedding router will auto-build its index from the bundled training examples (~645 queries). This takes 5–10 seconds and is saved to `models/router/comprehensive_embeddings.npy` for subsequent runs.
+>
+> **Disk space:** ~10 GB for the Ollama model + ~2 GB for PyTorch/Transformers pip packages.
 
 ### Quick Start
 
@@ -112,7 +114,8 @@ source ui-v8/.venv/bin/activate
 # Install dependencies
 pip install -r ui-v8/requirements.txt
 
-# Create the local model from the bundled Modelfile
+# Download the base model (~9.8 GB) and create the custom variant
+ollama pull qwen3:14b
 ollama create local-lucy -f config/Modelfile.local-lucy
 
 # (Optional) Copy and configure API keys for cloud providers

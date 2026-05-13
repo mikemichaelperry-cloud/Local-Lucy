@@ -8,6 +8,11 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${SCRIPT_DIR}"
 
+# Source user .env for API keys (if present)
+if [ -f "${ROOT}/.env" ]; then
+    source "${ROOT}/.env"
+fi
+
 export LUCY_ROOT="${ROOT}"
 export LUCY_RUNTIME_AUTHORITY_ROOT="${ROOT}"
 export LUCY_CONF_DIR="${ROOT}/config"
