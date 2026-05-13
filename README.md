@@ -96,6 +96,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete technical specification.
 - **Qt6 platform plugins** (for Linux: `qt6-base-dev` or equivalent)
 - **GPU recommended** — RTX 3060 12GB or better for local LLM inference
 
+> **Note:** On first run, the embedding router will auto-build its index from the bundled training examples (~645 queries). This takes 5–10 seconds and is saved to `models/router/comprehensive_embeddings.npy` for subsequent runs.
+
 ### Quick Start
 
 ```bash
@@ -110,8 +112,12 @@ source ui-v8/.venv/bin/activate
 # Install dependencies
 pip install -r ui-v8/requirements.txt
 
-# Pull the local model
-ollama pull local-lucy-fast:latest
+# Create the local model from the bundled Modelfile
+ollama create local-lucy -f config/Modelfile.local-lucy
+
+# (Optional) Copy and configure API keys for cloud providers
+cp .env.example .env
+# Edit .env and add your keys
 
 # Launch the desktop application
 ./START_LUCY.sh

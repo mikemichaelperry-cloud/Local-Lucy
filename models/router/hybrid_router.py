@@ -58,9 +58,22 @@ class HybridRouter:
         examples_path = examples_path or str(here / "comprehensive_examples.json")
         embeddings_path = embeddings_path or str(here / "comprehensive_embeddings.npy")
 
+        logger = logging.getLogger(__name__)
+
         with open(examples_path) as f:
             self.examples = json.load(f)
-        self.embeddings = np.load(embeddings_path)
+
+        try:
+            self.embeddings = np.load(embeddings_path)
+        except FileNotFoundError:
+            logger.warning(
+                "Embeddings file not found (%s). Building from %d examples — "
+                "this will take ~30-60s on first run.",
+                embeddings_path, len(self.examples),
+            )
+            self.embeddings = self._build_embeddings_from_examples()
+            np.save(embeddings_path, self.embeddings)
+            logger.info("Saved rebuilt embeddings to %s (%s)", embeddings_path, self.embeddings.shape)
 
         # Evidence keywords (must stay in sync with policy.py requires_evidence_mode)
         self.medical_keywords = [
@@ -236,6 +249,24 @@ class HybridRouter:
         with torch.no_grad():
             outputs = self.model(**inputs)
         return outputs.last_hidden_state[:, 0, :].cpu().numpy()
+
+    def _build_embeddings_from_examples(self) -> np.ndarray:
+        """Batch-encode all training examples to rebuild the embedding matrix."""
+        import torch
+        texts = [ex["query"] for ex in self.examples]
+        batch_size = 16
+        embeddings = []
+        with torch.no_grad():
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i:i + batch_size]
+                inputs = self.tokenizer(
+                    batch, return_tensors="pt", truncation=True,
+                    max_length=256, padding=True,
+                )
+                outputs = self.model(**inputs)
+                cls = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+                embeddings.append(cls)
+        return np.vstack(embeddings)
 
     def predict(self, query: str, k: int = 3) -> dict:
         """Predict route using hybrid approach."""
