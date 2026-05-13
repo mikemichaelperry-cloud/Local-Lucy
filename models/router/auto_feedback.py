@@ -219,6 +219,13 @@ def analyze_answer_quality(
     return None
 
 
+# Auto-feedback is lower-trust than manual user feedback.
+# Cap confidence to prevent auto-feedback from dominating the router.
+_MAX_AUTO_FEEDBACK_CONFIDENCE = float(
+    os.environ.get("LUCY_AUTO_FEEDBACK_MAX_CONFIDENCE", "0.5")
+)
+
+
 def log_auto_feedback(suggestion: dict[str, Any]) -> None:
     """Write auto-feedback entry to the auto-feedback log.
 
@@ -227,13 +234,16 @@ def log_auto_feedback(suggestion: dict[str, Any]) -> None:
     """
     try:
         AUTO_FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
+        # Cap confidence to the auto-feedback trust tier
+        raw_confidence = suggestion.get("confidence", 0.5)
+        capped_confidence = min(raw_confidence, _MAX_AUTO_FEEDBACK_CONFIDENCE)
         entry = {
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source": "auto_feedback",
             "query": suggestion["query"],
             "correct_route": suggestion["suggested_route"],
             "reason": suggestion["reason"],
-            "confidence": suggestion["confidence"],
+            "confidence": capped_confidence,
             "details": suggestion.get("details", ""),
             "feedback_type": "auto_correction",
         }
