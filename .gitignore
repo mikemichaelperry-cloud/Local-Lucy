@@ -69,3 +69,10 @@ state/voice_audio_levels.json
 # Local reports
 burn_in_report*.json
 thrash_report*.json
+
+# Additional runtime artifacts
+state/current_state.json
+feedback_buffer.json
+logs/
+models/router/*.tmp
+models/router/*.bak

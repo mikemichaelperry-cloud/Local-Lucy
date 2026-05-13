@@ -7,10 +7,11 @@ import sys
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from main import RouterOutcome
+from main import RouterOutcome, _persist_memory_turn
 
 
 class TestRouterOutcome(unittest.TestCase):
@@ -123,13 +124,35 @@ class TestErrorHandling(unittest.TestCase):
         self.assertIn(result.status, ["completed", "failed"])
 
 
+class TestPersistMemoryTurn(unittest.TestCase):
+    """Test _persist_memory_turn session_id threading."""
+
+    @patch("memory.memory_service.maybe_summarize_session")
+    @patch("memory.memory_service.store_turn")
+    def test_persist_turn_passes_session_id(self, mock_store_turn, mock_summarize):
+        """store_turn receives the custom session_id."""
+        _persist_memory_turn("Hello", "Hi there", session_id="session-42")
+        calls = mock_store_turn.call_args_list
+        self.assertEqual(calls[0], (("user", "Hello"), {"session_id": "session-42"}))
+        self.assertEqual(calls[1], (("assistant", "Hi there"), {"session_id": "session-42"}))
+
+    @patch("memory.memory_service.maybe_summarize_session")
+    @patch("memory.memory_service.store_turn")
+    def test_persist_turn_defaults_to_default_session(self, mock_store_turn, mock_summarize):
+        """store_turn defaults to 'default' when no session_id provided."""
+        _persist_memory_turn("Hello", "Hi there")
+        calls = mock_store_turn.call_args_list
+        self.assertEqual(calls[0], (("user", "Hello"), {"session_id": "default"}))
+        self.assertEqual(calls[1], (("assistant", "Hi there"), {"session_id": "default"}))
+
+
 def run_tests():
     """Run all tests."""
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
     
     suite.addTests(loader.loadTestsFromTestCase(TestRouterOutcome))
-
+    suite.addTests(loader.loadTestsFromTestCase(TestPersistMemoryTurn))
     suite.addTests(loader.loadTestsFromTestCase(TestErrorHandling))
     
     runner = unittest.TextTestRunner(verbosity=2)

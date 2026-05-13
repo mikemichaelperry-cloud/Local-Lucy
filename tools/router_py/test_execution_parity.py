@@ -139,7 +139,7 @@ class ComparisonResult:
 
 
 @dataclass
-class TestReport:
+class ParityReport:
     """Overall test report."""
     
     timestamp: str
@@ -663,7 +663,7 @@ class ParityTestRunner:
         
         self.results: list[ComparisonResult] = []
     
-    def run_all_tests(self, test_fixtures: list[dict[str, Any]] | None = None) -> TestReport:
+    def run_all_tests(self, test_fixtures: list[dict[str, Any]] | None = None) -> ParityReport:
         """Run all test fixtures."""
         timestamp = datetime.now().isoformat()
         
@@ -707,7 +707,7 @@ class ParityTestRunner:
             "categories_tested": list(set(r.category for r in self.results)),
         }
         
-        return TestReport(
+        return ParityReport(
             timestamp=timestamp,
             total_tests=total,
             passed=passed,
@@ -775,7 +775,7 @@ class ParityTestRunner:
 # Reporting
 # =============================================================================
 
-def generate_console_report(report: TestReport) -> str:
+def generate_console_report(report: ParityReport) -> str:
     """Generate console-friendly report."""
     lines = []
     lines.append("\n" + "=" * 70)
@@ -816,7 +816,7 @@ def generate_console_report(report: TestReport) -> str:
     return '\n'.join(lines)
 
 
-def generate_json_report(report: TestReport, output_path: Path) -> None:
+def generate_json_report(report: ParityReport, output_path: Path) -> None:
     """Generate JSON report file."""
     with open(output_path, 'w') as f:
         json.dump(report.to_dict(), f, indent=2)
