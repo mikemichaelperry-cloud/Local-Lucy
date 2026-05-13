@@ -137,7 +137,8 @@ def process(
         _t1 = _time.time()
         try:
             normalized_policy = normalize_augmentation_policy(policy)
-            decision = select_route(classification, policy=normalized_policy, query=question)
+            session_id = (context or {}).get("session_id", os.environ.get("LUCY_SESSION_ID", "default")) or "default"
+            decision = select_route(classification, policy=normalized_policy, query=question, session_id=session_id)
             if _profiling:
                 _profile["route_ms"] = int((_time.time() - _t1) * 1000)
         except Exception as exc:

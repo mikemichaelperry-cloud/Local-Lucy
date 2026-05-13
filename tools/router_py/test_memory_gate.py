@@ -82,6 +82,17 @@ class TestMemoryRoutingGate(unittest.TestCase):
         mock_get_turns.assert_called_once_with(session_id="default", limit=2)
 
     @patch("memory.memory_service.get_recent_turns")
+    def test_gate_passes_custom_session_id(self, mock_get_turns):
+        """Gate passes custom session_id to get_recent_turns."""
+        os.environ["LUCY_SESSION_MEMORY"] = "1"
+        mock_get_turns.return_value = [
+            {"role": "user", "text": "Hello"},
+        ]
+        result = _memory_routing_gate("What about that?", "WEATHER", session_id="session-42")
+        self.assertEqual(result, "LOCAL")
+        mock_get_turns.assert_called_once_with(session_id="session-42", limit=2)
+
+    @patch("memory.memory_service.get_recent_turns")
     def test_gate_noop_when_memory_empty(self, mock_get_turns):
         """Gate returns None when SQLite is empty."""
         os.environ["LUCY_SESSION_MEMORY"] = "1"

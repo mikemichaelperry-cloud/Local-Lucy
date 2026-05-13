@@ -25,9 +25,8 @@ from router_py.voice_tool import clean_text, iso_now
 try:
     from router_py.voice_tool import (
         VoicePipeline,
-        VoicePipelineConfig,
+        VADConfig,
         VoiceResult,
-        use_python_voice,
     )
     VOICE_TOOL_AVAILABLE = True
 except ImportError as exc:
@@ -52,32 +51,6 @@ class TestVoiceToolBasics:
         assert ts.endswith("Z")
 
 
-class TestVoicePipelineConfig:
-    """Tests for VoicePipelineConfig."""
-    
-    def test_default_config(self):
-        """Test default configuration."""
-        if not VOICE_TOOL_AVAILABLE:
-            pytest.skip("Voice tool not available")
-        
-        config = VoicePipelineConfig()
-        assert config.max_duration == 30.0
-        assert config.capture_dir is None
-    
-    def test_custom_config(self):
-        """Test custom configuration."""
-        if not VOICE_TOOL_AVAILABLE:
-            pytest.skip("Voice tool not available")
-        
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config = VoicePipelineConfig(
-                max_duration=60.0,
-                capture_dir=Path(tmpdir),
-            )
-            assert config.max_duration == 60.0
-            assert config.resolve_capture_dir() == Path(tmpdir)
-
-
 class TestVoicePipeline:
     """Tests for VoicePipeline."""
     
@@ -88,7 +61,7 @@ class TestVoicePipeline:
         
         pipeline = VoicePipeline()
         assert pipeline is not None
-        assert pipeline.config is not None
+        assert pipeline.vad_config is not None
     
     def test_detect_recorder(self):
         """Test recorder detection."""
@@ -148,18 +121,20 @@ class TestVoiceResult:
             pytest.skip("Voice tool not available")
         
         result = VoiceResult(
+            success=True,
             status="completed",
             transcript="Hello",
             response_text="Hi there",
-            error="",
+            error_message="",
             tts_status="completed",
             request_id="test-123",
         )
         
+        assert result.success is True
         assert result.status == "completed"
         assert result.transcript == "Hello"
         assert result.response_text == "Hi there"
-        assert result.error == ""
+        assert result.error_message == ""
         assert result.tts_status == "completed"
         assert result.request_id == "test-123"
     
@@ -169,10 +144,11 @@ class TestVoiceResult:
             pytest.skip("Voice tool not available")
         
         result = VoiceResult(
+            success=True,
             status="completed",
             transcript="Hello",
             response_text="Hi there",
-            error="",
+            error_message="",
             tts_status="completed",
             request_id="test-123",
         )
@@ -181,40 +157,6 @@ class TestVoiceResult:
         assert d["status"] == "completed"
         assert d["transcript"] == "Hello"
         assert "response_text" in d
-
-
-class TestUsePythonVoice:
-    """Tests for the use_python_voice toggle."""
-    
-    def test_toggle_off_by_default(self):
-        """Test that Python voice is off by default."""
-        if not VOICE_TOOL_AVAILABLE:
-            pytest.skip("Voice tool not available")
-        
-        # Clear the env var
-        old_val = os.environ.pop("LUCY_VOICE_PY", None)
-        try:
-            assert use_python_voice() is False
-        finally:
-            if old_val is not None:
-                os.environ["LUCY_VOICE_PY"] = old_val
-    
-    def test_toggle_on_when_set(self):
-        """Test that Python voice can be enabled."""
-        if not VOICE_TOOL_AVAILABLE:
-            pytest.skip("Voice tool not available")
-        
-        old_val = os.environ.get("LUCY_VOICE_PY")
-        os.environ["LUCY_VOICE_PY"] = "1"
-        try:
-            result = use_python_voice()
-            # Should be True if voice tool is available
-            assert isinstance(result, bool)
-        finally:
-            if old_val is not None:
-                os.environ["LUCY_VOICE_PY"] = old_val
-            else:
-                del os.environ["LUCY_VOICE_PY"]
 
 
 class TestTextProcessing:
@@ -234,36 +176,23 @@ class TestTextProcessing:
         assert pipeline._normalize_transcript("[BLANK_AUDIO]") == ""
         assert pipeline._normalize_transcript("[silence]") == ""
     
-    def test_sanitize_tts_text(self):
-        """Test TTS text sanitization."""
+    def test_strip_html_for_tts(self):
+        """Test TTS HTML stripping."""
         if not VOICE_TOOL_AVAILABLE:
             pytest.skip("Voice tool not available")
         
         pipeline = VoicePipeline()
         
-        # Test URL removal
-        sanitized = pipeline._sanitize_tts_text("Check out https://example.com for more info")
-        assert "https://" not in sanitized
+        # Test HTML tag removal
+        sanitized = pipeline._strip_html_for_tts("Check out <a href='https://example.com'>link</a> for more info")
+        assert "<a" not in sanitized
         
-        # Test markdown removal
-        sanitized = pipeline._sanitize_tts_text("This is **bold** and `code`")
-        assert "**" not in sanitized
-        assert "`" not in sanitized
+        # Test script removal
+        sanitized = pipeline._strip_html_for_tts("Hello <script>alert(1)</script> world")
+        assert "<script>" not in sanitized
+        assert "alert" not in sanitized
     
-    def test_split_tts_chunks(self):
-        """Test TTS chunk splitting."""
-        if not VOICE_TOOL_AVAILABLE:
-            pytest.skip("Voice tool not available")
-        
-        pipeline = VoicePipeline()
-        
-        # Test basic splitting
-        chunks = pipeline._split_tts_chunks("Hello world. This is a test.")
-        assert len(chunks) >= 1
-        
-        # Test empty text
-        chunks = pipeline._split_tts_chunks("")
-        assert chunks == []
+
 
 
 if __name__ == "__main__":

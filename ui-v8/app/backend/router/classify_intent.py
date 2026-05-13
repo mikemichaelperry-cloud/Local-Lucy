@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
-CORE_DIR = THIS_DIR / "core"
+# Import canonical router core from tools/ (single source of truth)
+CORE_DIR = THIS_DIR.parent.parent.parent.parent / "tools" / "router" / "core"
 if str(CORE_DIR) not in sys.path:
     sys.path.insert(0, str(CORE_DIR))
 
