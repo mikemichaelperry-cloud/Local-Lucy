@@ -73,6 +73,12 @@ ROUTE_CORRECTION_PATTERNS = [
     r"not\s+" + ROUTE_NAMES + r".*?should\s+be\s+" + ROUTE_NAMES,
     # "re-route to LOCAL"
     r"re[-\s]?route\s+(?:to|as)\s+" + ROUTE_NAMES,
+    # "the correct routing is LOCAL"
+    r"correct\s+routing\s+(?:is|was)\s+" + ROUTE_NAMES,
+    # "the correct answer is LOCAL"
+    r"correct\s+answer\s+(?:is|was)\s+" + ROUTE_NAMES,
+    # "it is LOCAL" / "it's LOCAL" (standalone correction)
+    r"(?:it['\u2019]?s|it\s+is)\s+" + ROUTE_NAMES + r"\b",
 ]
 
 # Answer-quality negative patterns

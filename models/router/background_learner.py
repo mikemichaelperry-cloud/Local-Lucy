@@ -217,8 +217,9 @@ def rollback_version(version_name: str) -> bool:
 def save_index(examples: list[dict]):
     """Save embedding index atomically."""
     import tempfile
+    tmp_dir = str(Path(INDEX_PATH).parent)
     tmp = tempfile.NamedTemporaryFile(
-        mode="w", dir=ROUTER_DIR, delete=False,
+        mode="w", dir=tmp_dir, delete=False,
         prefix=".comprehensive_index.", suffix=".tmp"
     )
     for ex in examples:
@@ -408,7 +409,10 @@ def learn_once(log_path: Path | None = None, verbose: bool = True) -> dict:
         if verbose:
             print(f"Total after dedup: {len(all_examples)} (+{added})")
 
-        if added > 0:
+        # Save if new examples were added OR existing entries were modified
+        # (e.g. user feedback corrected the route for an existing query)
+        index_changed = added > 0 or all_examples != examples
+        if index_changed:
             # Snapshot current state before mutation
             vdir = create_version(reason=f"pre-update (+{added} examples)")
             if verbose:
@@ -507,8 +511,14 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
     if not is_learning_enabled():
         return False
 
-    if min_entries is None:
-        min_entries = int(os.environ.get("LUCY_AUTO_LEARN_THRESHOLD", "5"))
+    # Separate thresholds: user feedback is high-trust, auto-feedback is low-trust.
+    # min_entries parameter overrides user_threshold for backward compatibility.
+    user_threshold = (
+        min_entries
+        if min_entries is not None
+        else int(os.environ.get("LUCY_AUTO_LEARN_THRESHOLD", "3"))
+    )
+    auto_threshold = int(os.environ.get("LUCY_AUTO_FEEDBACK_THRESHOLD", "5"))
 
     # Default log_path from environment when caller doesn't provide it
     if log_path is None:
@@ -532,8 +542,18 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
         with open(FEEDBACK_PATH) as f:
             user_count = sum(1 for line in f if line.strip())
 
-    total = auto_count + user_count
-    if total < min_entries:
+    # Combined threshold as a fallback (e.g. 3 user + 2 auto = 5)
+    combined_threshold = int(
+        os.environ.get("LUCY_AUTO_LEARN_THRESHOLD", str(max(user_threshold, auto_threshold)))
+    ) if min_entries is None else user_threshold
+
+    # Trigger learning if any threshold is met.
+    # User feedback is higher-trust, so it triggers at a lower count.
+    if (
+        user_count < user_threshold
+        and auto_count < auto_threshold
+        and (user_count + auto_count) < combined_threshold
+    ):
         return False
 
     # Trigger learning in background thread

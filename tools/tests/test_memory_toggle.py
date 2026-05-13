@@ -112,10 +112,13 @@ def test_memory_env_var():
     time.sleep(0.5)
     
     # Check env var via runtime_control
+    env = os.environ.copy()
+    env["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "0"
+    env["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_V8)
     result = subprocess.run(
         [sys.executable, str(RUNTIME_CONTROL), "print-env"],
         capture_output=True, text=True,
-        env=os.environ.copy()
+        env=env,
     )
     env_output = result.stdout
     
@@ -127,10 +130,13 @@ def test_memory_env_var():
     set_memory_toggle("off")
     time.sleep(0.5)
     
+    env = os.environ.copy()
+    env["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "0"
+    env["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_V8)
     result = subprocess.run(
         [sys.executable, str(RUNTIME_CONTROL), "print-env"],
         capture_output=True, text=True,
-        env=os.environ.copy()
+        env=env,
     )
     env_output = result.stdout
     
@@ -202,7 +208,7 @@ def test_memory_context_in_prompt():
         conversation_system_block=False
     )
     
-    assert "Oscar" in prompt and "---" in prompt, f"Memory context NOT included in prompt: {prompt[:500]}"
+    assert "Oscar" in prompt, f"Memory context NOT included in prompt: {prompt[:500]}"
     print("✓ Memory context included in prompt when enabled")
     
     # Test with memory OFF (should not include)

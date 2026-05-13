@@ -240,6 +240,11 @@ class VoiceResult:
     tts_status: str = "none"
     request_id: str = ""
 
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary."""
+        from dataclasses import asdict
+        return asdict(self)
+
 
 @dataclass
 class VADConfig:

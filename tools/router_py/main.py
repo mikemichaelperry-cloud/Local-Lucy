@@ -48,6 +48,9 @@ from router_py.request_types import RouterOutcome
 from router_py.utils import sha256_text
 from router_py.execution_engine import DEFAULT_CHAT_MEMORY_FILE
 from router_py import request_pipeline
+from router_py.security_guard import validate_input
+from router_py.shutdown_handler import install as install_shutdown_handler
+from router_py.structured_logging import get_structured_logger
 
 
 # Configuration
@@ -205,13 +208,13 @@ def ensure_control_env() -> None:
 
 
 
-def _persist_memory_turn(question: str, response_text: str) -> None:
+def _persist_memory_turn(question: str, response_text: str, session_id: str = "default") -> None:
     """Persist a conversation turn to chat memory (SQLite + text file)."""
     # Dual-write: SQLite first (best effort)
     try:
         from memory.memory_service import store_turn, maybe_summarize_session
-        store_turn("user", question)
-        store_turn("assistant", response_text)
+        store_turn("user", question, session_id=session_id)
+        store_turn("assistant", response_text, session_id=session_id)
         maybe_summarize_session()
     except Exception:
         pass  # Text-file write below still happens
@@ -292,6 +295,32 @@ def execute_plan_python(
     start_time = time.time()
     request_id = sha256_text(question)[:16]
 
+    # --- Input validation / prompt injection guard ---
+    validation = validate_input(question, surface=surface)
+    if not validation.accepted:
+        return RouterOutcome(
+            status="failed",
+            outcome_code="input_rejected",
+            route="LOCAL",
+            provider="local",
+            provider_usage_class="local",
+            intent_family="unknown",
+            confidence=0.0,
+            response_text="",
+            error_message=validation.reason or "input_rejected",
+            execution_time_ms=int((time.time() - start_time) * 1000),
+            request_id=request_id,
+        )
+    question = validation.sanitized
+
+    # --- Structured logger ---
+    logger = get_structured_logger("router_py.main").bind(
+        request_id=request_id,
+        surface=surface,
+        question=question[:100],
+    )
+    logger.info("pipeline_start")
+
     # --- Route prefix parsing (mirror execute_plan.sh) ---
     route_prefix = ""
     prefix_patterns = [
@@ -320,46 +349,48 @@ def execute_plan_python(
     except Exception:
         pass
 
-    # --- Feedback detection: check if user is correcting a prior response ---
     try:
-        from router_py.feedback_parser import parse_feedback, log_user_feedback, trigger_background_learning
-        fb = parse_feedback(question)
-        if fb is not None:
-            print(f"[Feedback detected] {fb.feedback_type.name}: {question}")
-            logged = log_user_feedback(fb)
-            if logged:
-                trigger_background_learning()
+        # --- Feedback detection: check if user is correcting a prior response ---
+        try:
+            from router_py.feedback_parser import parse_feedback, log_user_feedback, trigger_background_learning
+            fb = parse_feedback(question)
+            if fb is not None:
+                print(f"[Feedback detected] {fb.feedback_type.name}: {question}")
+                logged = log_user_feedback(fb)
+                if logged:
+                    trigger_background_learning()
 
-            if fb.feedback_type.name == "ROUTE_CORRECTION":
-                msg = f"Got it. I'll remember that should route to {fb.corrected_route}."
-            elif fb.feedback_type.name == "ANSWER_NEGATIVE":
-                msg = "Noted. I'll work on improving that answer."
-            elif fb.feedback_type.name == "ANSWER_POSITIVE":
-                msg = "Thanks for the feedback!"
-            elif fb.feedback_type.name == "RETRACTION":
-                msg = "Okay, I've forgotten that."
-            else:
-                msg = "Noted."
+                if fb.feedback_type.name == "ROUTE_CORRECTION":
+                    msg = f"Got it. I'll remember that should route to {fb.corrected_route}."
+                elif fb.feedback_type.name == "ANSWER_NEGATIVE":
+                    msg = "Noted. I'll work on improving that answer."
+                elif fb.feedback_type.name == "ANSWER_POSITIVE":
+                    msg = "Thanks for the feedback!"
+                elif fb.feedback_type.name == "RETRACTION":
+                    msg = "Okay, I've forgotten that."
+                else:
+                    msg = "Noted."
 
-            execution_time = int((time.time() - start_time) * 1000)
-            return RouterOutcome(
-                status="completed",
-                outcome_code="feedback_acknowledged",
-                route="LOCAL",
-                provider="local",
-                provider_usage_class="local",
-                intent_family="feedback",
-                confidence=1.0,
-                response_text=msg,
-                error_message="",
-                execution_time_ms=execution_time,
-                request_id=request_id,
-            )
-    except Exception as e:
-        print(f"[Feedback check warning] {e}")
+                execution_time = int((time.time() - start_time) * 1000)
+                return RouterOutcome(
+                    status="completed",
+                    outcome_code="feedback_acknowledged",
+                    route="LOCAL",
+                    provider="local",
+                    provider_usage_class="local",
+                    intent_family="feedback",
+                    confidence=1.0,
+                    response_text=msg,
+                    error_message="",
+                    execution_time_ms=execution_time,
+                    request_id=request_id,
+                )
+        except Exception as e:
+            print(f"[Feedback check warning] {e}")
 
-    try:
         # --- Delegate to unified pipeline ---
+        pipeline_context = dict(context or {})
+        pipeline_context["_logger"] = logger
         result, classification, decision = request_pipeline.process(
             question,
             policy=policy,
@@ -367,12 +398,13 @@ def execute_plan_python(
             surface=surface,
             augmented_direct_once=augmented_direct_once,
             route_prefix=route_prefix,
-            context=context,
+            context=pipeline_context,
         )
 
         # --- Memory persistence ---
         if os.environ.get("LUCY_SESSION_MEMORY") == "1" and result.response_text:
-            _persist_memory_turn(question, result.response_text)
+            session_id = os.environ.get("LUCY_SESSION_ID", "default") or "default"
+            _persist_memory_turn(question, result.response_text, session_id=session_id)
 
         # --- Record exchange in feedback buffer for future attribution ---
         if classification:
@@ -402,10 +434,27 @@ def execute_plan_python(
         except Exception:
             pass
 
+        logger.info(
+            "pipeline_complete",
+            extra={
+                "latency_ms": execution_time,
+                "route": result.route,
+                "provider": result.provider,
+                "status": result.status,
+                "outcome_code": result.outcome_code,
+            },
+        )
         return result
 
     except Exception as e:
         execution_time = int((time.time() - start_time) * 1000)
+        logger.error(
+            "pipeline_error",
+            extra={
+                "latency_ms": execution_time,
+                "error": str(e),
+            },
+        )
         return RouterOutcome(
             status="failed",
             outcome_code="router_error",
@@ -422,6 +471,10 @@ def execute_plan_python(
         if lock_acquired and lock_fd:
             try:
                 fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+        if lock_fd:
+            try:
                 lock_fd.close()
             except Exception:
                 pass
@@ -488,6 +541,10 @@ def main() -> int:
     
     return 0
 
+
+
+# Install graceful shutdown handlers once at module load
+install_shutdown_handler()
 
 
 if __name__ == "__main__":

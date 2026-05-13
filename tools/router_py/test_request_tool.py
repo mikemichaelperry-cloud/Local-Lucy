@@ -13,37 +13,24 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from base_tool_wrapper import ToolConfig, ToolResult
 from request_tool import RequestTool
 
-pytestmark = pytest.mark.asyncio
-
-
 # Skip integration tests when Ollama is not available
-async def _ollama_available() -> bool:
-    import aiohttp
+def _ollama_is_up() -> bool:
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get("http://127.0.0.1:11434/api/tags", timeout=aiohttp.ClientTimeout(total=2)):
-                return True
+        import urllib.request
+        req = urllib.request.Request("http://127.0.0.1:11434/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            return resp.status == 200
     except Exception:
         return False
 
 
-OLLAMA_UP = False
-
-def setup_module(module):
-    """Check if Ollama is running before module tests."""
-    global OLLAMA_UP
-    try:
-        import asyncio
-        OLLAMA_UP = asyncio.run(_ollama_available())
-    except Exception:
-        OLLAMA_UP = False
-
-
-@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
+@pytest.mark.asyncio
 async def test_generate():
     """Test the generate method with a simple prompt."""
+    if not _ollama_is_up():
+        pytest.skip("Ollama not running on localhost:11434")
     async with RequestTool(ToolConfig(timeout=30.0)) as tool:
-        result = await tool.generate("What is 2+2?", model="llama3.1:8b")
+        result = await tool.generate("What is 2+2?", model="local-lucy-fast:latest")
         
         assert result.success, f"Failed: {result.error_message}"
         assert "4" in result.data or "four" in result.data.lower() or len(result.data) > 0
@@ -52,14 +39,16 @@ async def test_generate():
         print(f"✅ Generate test passed: {result.data[:50]}")
 
 
-@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
+@pytest.mark.asyncio
 async def test_chat():
     """Test the chat method with messages."""
+    if not _ollama_is_up():
+        pytest.skip("Ollama not running on localhost:11434")
     async with RequestTool() as tool:
         messages = [
             {"role": "user", "content": "What is the capital of France?"}
         ]
-        result = await tool.chat(messages, model="llama3.1:8b")
+        result = await tool.chat(messages, model="local-lucy-fast:latest")
         
         assert result.success, f"Chat failed: {result.error_message}"
         assert len(result.data) > 0, "Empty response"
@@ -67,26 +56,32 @@ async def test_chat():
         print(f"✅ Chat test passed: {result.data[:50]}")
 
 
-@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
+@pytest.mark.asyncio
 async def test_health_check():
     """Test the health check endpoint."""
+    if not _ollama_is_up():
+        pytest.skip("Ollama not running on localhost:11434")
     async with RequestTool() as tool:
         is_healthy = await tool.health_check()
         print(f"Ollama health: {'✅ UP' if is_healthy else '❌ DOWN'}")
 
 
-@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
+@pytest.mark.asyncio
 async def test_context_manager():
     """Test async context manager usage."""
+    if not _ollama_is_up():
+        pytest.skip("Ollama not running on localhost:11434")
     async with RequestTool() as tool:
         result = await tool.generate("Hello!")
         assert isinstance(result.success, bool)
         print(f"✅ Context manager test passed")
 
 
-@pytest.mark.skipif(not OLLAMA_UP, reason="Ollama not running on localhost:11434")
+@pytest.mark.asyncio
 async def test_invalid_model():
     """Test error handling for invalid model."""
+    if not _ollama_is_up():
+        pytest.skip("Ollama not running on localhost:11434")
     async with RequestTool() as tool:
         result = await tool.generate("Hello", model="nonexistent-model-xyz")
         assert not result.success
