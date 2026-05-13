@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-lucy"
+version = "8.0.0"
+description = "A self-learning, privacy-first desktop AI assistant"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Mike Perry", email = "mike@michaelperry.cloud"}
+]
+keywords = [
+    "ai",
+    "assistant",
+    "llm",
+    "local",
+    "privacy",
+    "voice",
+    "desktop",
+    "pyside6",
+    "ollama",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Communications",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.4.0,<7.0.0",
+    "aiohttp>=3.8.0",
+    "tenacity>=8.2.0",
+    "kokoro>=0.9.4,<1.0.0",
+    "soundfile>=0.13.0",
+    "pytest>=7.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/mikemichaelperry-cloud/Local-Lucy"
+Repository = "https://github.com/mikemichaelperry-cloud/Local-Lucy"
+Issues = "https://github.com/mikemichaelperry-cloud/Local-Lucy/issues"
+Documentation = "https://github.com/mikemichaelperry-cloud/Local-Lucy/blob/main/ARCHITECTURE.md"
+
+[project.scripts]
+lucy = "tools.router_py.main:main"
+
+[tool.setuptools]
+py-modules = []
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tools/router_py",
+    "models/router",
+    "tools/tests",
+]
+asyncio_mode = "auto"
