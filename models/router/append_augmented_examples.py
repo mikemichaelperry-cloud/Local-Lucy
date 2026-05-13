@@ -501,7 +501,7 @@ def rebuild_examples_json():
 
 def rebuild_embeddings():
     """Trigger embedding rebuild."""
-    rebuild_script = Path(__file__).parent.parent.parent / "rebuild_embeddings.py"
+    rebuild_script = Path(__file__).parent.parent.parent / "scripts" / "rebuild_embeddings.py"
     if rebuild_script.exists():
         import subprocess
         result = subprocess.run(

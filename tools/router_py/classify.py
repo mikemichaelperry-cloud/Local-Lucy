@@ -278,6 +278,7 @@ def select_route(
     policy: str = "fallback_only",
     forced_mode: str | None = None,
     query: str = "",
+    session_id: str = "default",
 ) -> RoutingDecision:
     """
     Select final route using the embedding router.
@@ -398,7 +399,7 @@ def select_route(
             ephemeral = result.get("ephemeral", False)
 
             # Memory-aware routing gate: override live-data routes for follow-ups
-            memory_gate_override = _memory_routing_gate(query, route)
+            memory_gate_override = _memory_routing_gate(query, route, session_id=session_id)
             if memory_gate_override:
                 route = memory_gate_override
                 guards_fired = guards_fired + ["memory_routing_gate"]
@@ -668,7 +669,7 @@ _LIVE_DATA_KEYWORDS = [
 ]
 
 
-def _memory_routing_gate(query: str, embedding_route: str) -> str | None:
+def _memory_routing_gate(query: str, embedding_route: str, session_id: str = "default") -> str | None:
     """
     Lightweight memory-aware routing gate.
 
@@ -713,7 +714,7 @@ def _memory_routing_gate(query: str, embedding_route: str) -> str | None:
     # Lightweight memory check: fetch recent turns from SQLite
     try:
         from memory.memory_service import get_recent_turns
-        turns = get_recent_turns(session_id="default", limit=2)
+        turns = get_recent_turns(session_id=session_id, limit=2)
         if not turns:
             return None
     except Exception:

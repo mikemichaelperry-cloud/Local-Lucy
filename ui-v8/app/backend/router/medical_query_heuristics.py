@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 import argparse
+import sys
+from pathlib import Path
 
-from core.medical_query_heuristics import (
+# Import canonical router core from tools/ (single source of truth)
+CORE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "tools" / "router" / "core"
+if str(CORE_DIR) not in sys.path:
+    sys.path.insert(0, str(CORE_DIR))
+
+from medical_query_heuristics import (
     detect_human_medication_query,
     has_human_medication_topic_query,
     is_human_medication_high_risk_query,

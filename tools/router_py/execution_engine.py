@@ -20,8 +20,6 @@ This module no longer contains shell delegation paths (removed in Stage 9).
 from __future__ import annotations
 
 import asyncio
-import fcntl
-import hashlib
 import json
 import logging
 import os
@@ -33,11 +31,10 @@ import subprocess
 import sys
 import time
 import uuid
-from contextlib import contextmanager
 import dataclasses
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, Generator
+from typing import Any
 
 # Async HTTP support for provider calls
 try:
@@ -55,6 +52,19 @@ from router_py.policy import requires_evidence_mode
 from router_py.request_types import ExecutionResult
 from router_py import response_formatter
 from router_py.state_manager import get_state_manager
+from router_py.execution_engine_state import StateWriter
+from router_py.resilience import get_breaker, CircuitBreakerOpen
+from router_py.shutdown_handler import register_closeable
+from router_py.structured_logging import get_structured_logger, ContextualLogger
+from router_py.execution_engine_utils import (
+    is_truthy,
+    sha256_text,
+    deterministic_pick_index,
+    provider_usage_class_for,
+    is_category_specific_query,
+    normalize_augmentation_policy,
+    local_fast_guard_normalize,
+)
 
 # Ensure models/router is on sys.path before importing router modules
 sys.path.insert(0, str(ROOT_DIR / "models" / "router"))
@@ -133,7 +143,7 @@ DEFAULT_CHAT_MEMORY_FILE = "~/.codex-api-home/lucy/runtime-v8/state/chat_session
 
 
 def _load_session_memory_context_with_telemetry(
-    query: str = "", depth: str = "auto", mode: str = "local"
+    query: str = "", depth: str = "auto", mode: str = "local", session_id: str = "default"
 ) -> tuple[str, dict[str, str]]:
     """
     Load session memory context and capture telemetry.
@@ -165,7 +175,7 @@ def _load_session_memory_context_with_telemetry(
     try:
         from memory.memory_service import assemble_context_with_telemetry
         context, telemetry = assemble_context_with_telemetry(
-            current_session_id="default", max_chars=1200, query=query, depth=depth, mode=mode
+            current_session_id=session_id, max_chars=1200, query=query, depth=depth, mode=mode
         )
         if context:
             return context, telemetry
@@ -206,13 +216,13 @@ def _load_session_memory_context_with_telemetry(
     return context, telemetry
 
 
-def _load_session_memory_context(query: str = "", depth: str = "auto", mode: str = "local") -> str:
+def _load_session_memory_context(query: str = "", depth: str = "auto", mode: str = "local", session_id: str = "default") -> str:
     """
     Load session memory context from the chat memory file.
 
     Backward-compatible wrapper that returns only the context string.
     """
-    context, _ = _load_session_memory_context_with_telemetry(query, depth, mode)
+    context, _ = _load_session_memory_context_with_telemetry(query, depth, mode, session_id=session_id)
     return context
 
 
@@ -563,6 +573,13 @@ them according to the route type (bypass, provisional, or full). It handles:
         namespace = (config or {}).get("namespace", self._execution_namespace)
         self.state_manager = get_state_manager(namespace)
         self.use_sqlite_state = (config or {}).get("use_sqlite_state", True)
+        self.state_writer = StateWriter(
+            state_dir=self._state_dir,
+            state_manager=self.state_manager,
+            logger=self._logger,
+            use_sqlite_state=self.use_sqlite_state,
+        )
+        register_closeable(self.state_writer)
         self._logger.info(f"StateManager initialized with namespace: {namespace}")
         
         self._logger.debug(
@@ -637,101 +654,6 @@ them according to the route type (bypass, provisional, or full). It handles:
             self._logger.info(f"[MODEL] Subprocess env set to: {configured_model}")
         return env
     
-    @contextmanager
-    def _file_lock(
-        self, 
-        target_file: Path, 
-        max_retries: int = 3,
-        backoff_base_ms: float = 10.0
-    ) -> Generator[None, None, None]:
-        """
-        Context manager for exclusive file locking with retry logic.
-        
-        FIX: Lock File Race Condition and Retry Logic
-        
-        This implementation addresses the "shared-state overlap" errors by:
-        1. Using atomic lock acquisition with fcntl.LOCK_EX | fcntl.LOCK_NB
-        2. Implementing exponential backoff retry (10ms, 50ms, 100ms)
-        3. Proceeding without lock after retries (best-effort, with warning)
-        4. Always cleaning up lock file descriptor in finally block
-        
-        The lock file is created adjacent to the target file with a .lock suffix.
-        This ensures lock files are co-located with the data they protect.
-        
-        Args:
-            target_file: The file being protected (used to derive lock file path)
-            max_retries: Maximum number of retry attempts (default: 3)
-            backoff_base_ms: Base backoff time in milliseconds (default: 10)
-        
-        Yields:
-            None (context manager)
-        
-        Example:
-            with self._file_lock(self.LAST_ROUTE_FILE):
-                # Critical section - exclusive access to state files
-                self.LAST_ROUTE_FILE.write_text(content)
-        """
-        lock_file = Path(str(target_file) + '.lock')
-        lock_fd = None
-        lock_acquired = False
-        
-        try:
-            # Create/open lock file - this is atomic at the OS level
-            # Using 'a+' mode to create if not exists, read/write access
-            lock_fd = open(lock_file, 'a+')
-            
-            # Attempt to acquire exclusive non-blocking lock
-            for attempt in range(max_retries + 1):
-                try:
-                    # Try non-blocking exclusive lock first
-                    # LOCK_EX: Exclusive lock (writer)
-                    # LOCK_NB: Non-blocking (fail immediately if locked)
-                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    lock_acquired = True
-                    self._logger.debug(
-                        f"Lock acquired for {target_file} on attempt {attempt + 1}"
-                    )
-                    break
-                except (IOError, OSError) as e:
-                    if attempt < max_retries:
-                        # Calculate exponential backoff with jitter
-                        # Backoff: 10ms, 50ms, 100ms (with small random variation)
-                        backoff_ms = backoff_base_ms * (2 ** attempt) * (2.5 if attempt > 0 else 1)
-                        jitter_ms = random.uniform(0, 5)  # Small jitter to prevent thundering herd
-                        sleep_time = (backoff_ms + jitter_ms) / 1000.0
-                        
-                        self._logger.debug(
-                            f"Lock attempt {attempt + 1} failed for {target_file}: {e}. "
-                            f"Retrying in {sleep_time:.3f}s..."
-                        )
-                        time.sleep(sleep_time)
-                    else:
-                        # All retries exhausted
-                        self._logger.warning(
-                            f"Failed to acquire lock for {target_file} after {max_retries + 1} attempts. "
-                            f"Proceeding without lock (best-effort). Error: {e}"
-                        )
-                        # FIX: Don't return error to user, log and continue with best-effort
-                        lock_acquired = False
-            
-            yield
-            
-        finally:
-            # Always clean up the lock file descriptor
-            if lock_fd:
-                if lock_acquired:
-                    try:
-                        # Release the lock
-                        fcntl.flock(lock_fd, fcntl.LOCK_UN)
-                        self._logger.debug(f"Lock released for {target_file}")
-                    except (IOError, OSError) as e:
-                        self._logger.warning(f"Error releasing lock for {target_file}: {e}")
-                # Close the file descriptor
-                try:
-                    lock_fd.close()
-                except (IOError, OSError) as e:
-                    self._logger.debug(f"Error closing lock file for {target_file}: {e}")
-    
     def execute(
         self,
         intent: ClassificationResult,
@@ -780,7 +702,14 @@ them according to the route type (bypass, provisional, or full). It handles:
         start_time = time.time()
         context = context or {}
         question = context.get("question", "")
-        
+        session_id = context.get("session_id", "default") or "default"
+
+        # Use structured logger from context if provided
+        logger: ContextualLogger = context.get("_logger")
+        if logger is None:
+            logger = get_structured_logger("router_py.execution_engine")
+        self._logger = logger
+
         # Reject empty or whitespace-only queries at the engine boundary
         if not question or not question.strip():
             execution_time = int((time.time() - start_time) * 1000)
@@ -1337,6 +1266,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         """
         self._logger.info("Executing bypass route (local-only)")
         question = context.get("question", "")
+        session_id = context.get("session_id", "default") or "default"
         
         # Prepare environment with namespace isolation
         # _prepare_subprocess_env() ensures local_answer.sh gets the proper
@@ -1354,7 +1284,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         })
         
         # Add session memory context if enabled
-        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(question)
+        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(question, session_id=session_id)
         if session_memory:
             env["LUCY_SESSION_MEMORY_CONTEXT"] = session_memory
             self._logger.debug(f"Added session memory context ({len(session_memory)} chars)")
@@ -1465,6 +1395,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         """
         self._logger.info("Executing provisional route (local-first with fallback)")
         question = context.get("question", "")
+        session_id = context.get("session_id", "default") or "default"
         
         # Check if this is a medical query (for logging/metrics only)
         is_medical_query_flag = self._context_indicates_medical_query(context)
@@ -1966,6 +1897,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         """
         self._logger.info(f"Executing full Python route: {route.route}")
         question = context.get("question", "")
+        session_id = context.get("session_id", "default") or "default"
 
         is_medical_query = self._context_indicates_medical_query(context) or (
             route and route.evidence_reason in ("medical_safety", "medical_context")
@@ -2109,7 +2041,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         prompt = response_formatter.build_augmented_prompt(question, evidence, route)
         
         # Load session memory with telemetry before calling provider
-        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(question)
+        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(question, session_id=session_id)
         if session_memory:
             self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
         
@@ -2216,24 +2148,63 @@ them according to the route type (bypass, provisional, or full). It handles:
     
     async def _fetch_wikipedia_evidence(self, question: str) -> dict[str, Any] | None:
         """Fetch evidence from Wikipedia (delegated to provider module)."""
-        if HAS_PROVIDER_MODULES:
-            return await fetch_wikipedia_evidence(question)
-        self._logger.warning("Provider modules not available")
-        return None
+        breaker = get_breaker("wikipedia")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning("Circuit breaker open for wikipedia")
+            return None
+        try:
+            if HAS_PROVIDER_MODULES:
+                result = await fetch_wikipedia_evidence(question)
+                breaker._on_success()
+                return result
+            self._logger.warning("Provider modules not available")
+            return None
+        except Exception as e:
+            breaker._on_failure(e)
+            self._logger.warning(f"Wikipedia evidence fetch failed: {e}")
+            return None
     
     async def _fetch_news_evidence(self, question: str, for_voice: bool = False) -> dict[str, Any] | None:
         """Fetch live news from RSS feeds (delegated to provider module)."""
-        if HAS_PROVIDER_MODULES:
-            return await fetch_news_evidence(question, for_voice=for_voice)
-        self._logger.warning("Provider modules not available")
-        return None
+        breaker = get_breaker("news_api")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning("Circuit breaker open for news_api")
+            return None
+        try:
+            if HAS_PROVIDER_MODULES:
+                result = await fetch_news_evidence(question, for_voice=for_voice)
+                breaker._on_success()
+                return result
+            self._logger.warning("Provider modules not available")
+            return None
+        except Exception as e:
+            breaker._on_failure(e)
+            self._logger.warning(f"News evidence fetch failed: {e}")
+            return None
     
     async def _fetch_time_evidence(self, question: str) -> dict[str, Any] | None:
         """Fetch current time from TimeAPI.io (delegated to provider module)."""
-        if HAS_PROVIDER_MODULES:
-            return await fetch_time_evidence(question)
-        self._logger.warning("Provider modules not available")
-        return None
+        breaker = get_breaker("time_api")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning("Circuit breaker open for time_api")
+            return None
+        try:
+            if HAS_PROVIDER_MODULES:
+                result = await fetch_time_evidence(question)
+                breaker._on_success()
+                return result
+            self._logger.warning("Provider modules not available")
+            return None
+        except Exception as e:
+            breaker._on_failure(e)
+            self._logger.warning(f"Time evidence fetch failed: {e}")
+            return None
     
     def _format_time_response(self, data: dict) -> str:
         """Format time API response into human-readable text (delegated to provider module)."""
@@ -2243,10 +2214,23 @@ them according to the route type (bypass, provisional, or full). It handles:
     
     async def _fetch_weather_evidence(self, question: str) -> dict[str, Any] | None:
         """Fetch weather data from wttr.in (delegated to provider module)."""
-        if HAS_PROVIDER_MODULES:
-            return await fetch_weather_evidence(question)
-        self._logger.warning("Provider modules not available")
-        return None
+        breaker = get_breaker("weather_api")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning("Circuit breaker open for weather_api")
+            return None
+        try:
+            if HAS_PROVIDER_MODULES:
+                result = await fetch_weather_evidence(question)
+                breaker._on_success()
+                return result
+            self._logger.warning("Provider modules not available")
+            return None
+        except Exception as e:
+            breaker._on_failure(e)
+            self._logger.warning(f"Weather evidence fetch failed: {e}")
+            return None
     
     async def _fetch_api_evidence(
         self,
@@ -2254,10 +2238,23 @@ them according to the route type (bypass, provisional, or full). It handles:
         provider: str,
     ) -> dict[str, Any] | None:
         """Fetch evidence from API provider (Kimi or OpenAI) (delegated to provider module)."""
-        if HAS_PROVIDER_MODULES:
-            return await fetch_api_evidence(question, provider, timeout=self.timeout)
-        self._logger.warning("Provider modules not available")
-        return None
+        breaker = get_breaker("api_provider")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning("Circuit breaker open for api_provider")
+            return None
+        try:
+            if HAS_PROVIDER_MODULES:
+                result = await fetch_api_evidence(question, provider, timeout=self.timeout)
+                breaker._on_success()
+                return result
+            self._logger.warning("Provider modules not available")
+            return None
+        except Exception as e:
+            breaker._on_failure(e)
+            self._logger.warning(f"API evidence fetch failed: {e}")
+            return None
     
     def _call_kimi_subprocess(self, question: str) -> dict[str, Any] | None:
         """Call Kimi provider via subprocess (delegated to provider module)."""
@@ -2279,18 +2276,30 @@ them according to the route type (bypass, provisional, or full). It handles:
         route_mode: str = "LOCAL",
     ) -> str:
         """Call local model asynchronously using Python-native path (delegated to provider module)."""
+        breaker = get_breaker("local_model")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning("Circuit breaker open for local_model")
+            return "Error: Local model circuit breaker is OPEN."
         self._logger.debug(f"Calling local model async with prompt: {prompt[:50]}...")
-        if HAS_PROVIDER_MODULES:
-            configured_model = self.config.get("model")
-            result = await call_local_model_async(
-                prompt=prompt,
-                context=context,
-                session_memory=session_memory,
-                route_mode=route_mode,
-                model=configured_model,
-            )
-            return response_formatter.render_chat_fast_from_raw(result)
-        return "Error: Provider modules not available"
+        try:
+            if HAS_PROVIDER_MODULES:
+                configured_model = self.config.get("model")
+                result = await call_local_model_async(
+                    prompt=prompt,
+                    context=context,
+                    session_memory=session_memory,
+                    route_mode=route_mode,
+                    model=configured_model,
+                )
+                breaker._on_success()
+                return response_formatter.render_chat_fast_from_raw(result)
+            return "Error: Provider modules not available"
+        except Exception as e:
+            breaker._on_failure(e)
+            self._logger.error(f"Local model call failed: {e}")
+            raise
     
     async def _call_api_provider_async(
         self,
@@ -2299,21 +2308,33 @@ them according to the route type (bypass, provisional, or full). It handles:
         context: dict[str, Any],
     ) -> str:
         """Call API provider asynchronously (OpenAI or Kimi) (delegated to provider module)."""
+        breaker = get_breaker("api_provider")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning("Circuit breaker open for api_provider")
+            return f"Error: API provider circuit breaker is OPEN."
         self._logger.debug(f"Calling {provider} API async with prompt: {prompt[:50]}...")
         if not HAS_PROVIDER_MODULES:
             return f"Error: Provider modules not available"
-        loop = asyncio.get_event_loop()
-        if provider == "openai":
-            result = await loop.run_in_executor(
-                None, call_openai_for_response, prompt, self.timeout
-            )
-        elif provider == "kimi":
-            result = await loop.run_in_executor(
-                None, call_kimi_for_response, prompt, self.timeout
-            )
-        else:
-            result = f"Error: Unknown provider {provider}"
-        return result
+        try:
+            loop = asyncio.get_event_loop()
+            if provider == "openai":
+                result = await loop.run_in_executor(
+                    None, call_openai_for_response, prompt, self.timeout
+                )
+            elif provider == "kimi":
+                result = await loop.run_in_executor(
+                    None, call_kimi_for_response, prompt, self.timeout
+                )
+            else:
+                result = f"Error: Unknown provider {provider}"
+            breaker._on_success()
+            return result
+        except Exception as e:
+            breaker._on_failure(e)
+            self._logger.error(f"API provider call failed: {e}")
+            raise
     
     def _call_openai_for_response(self, prompt: str) -> str:
         """Call OpenAI for direct response (delegated to provider module)."""
@@ -2611,7 +2632,24 @@ them according to the route type (bypass, provisional, or full). It handles:
         Returns:
             ExecutionResult from the provider
         """
+        session_id = context.get("session_id", "default") or "default"
         self._logger.info(f"Trying provider: {provider}")
+
+        # Circuit breaker for augmented provider subprocess
+        breaker = get_breaker("augmented_provider")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning(f"Circuit breaker open for provider {provider}")
+            return ExecutionResult(
+                status="failed",
+                outcome_code="circuit_open",
+                route="AUGMENTED",
+                provider=provider,
+                provider_usage_class=self._provider_usage_class_for(provider),
+                error_message=f"Circuit breaker open for provider {provider}",
+                metadata={"provider": provider, "circuit_breaker": "augmented_provider"},
+            )
         
         # Prepare environment for subprocess with namespace isolation
         # _prepare_subprocess_env() sets STATE_NAMESPACE_RAW to tell shell scripts
@@ -2655,6 +2693,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             )
             
             if result.returncode != 0:
+                breaker._on_failure(Exception("provider_dispatch_failed"))
                 # Dispatch tool writes structured errors to stdout; try to extract reason
                 dispatch_error = result.stderr or ""
                 if not dispatch_error and result.stdout:
@@ -2680,6 +2719,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             try:
                 payload = json.loads(result.stdout)
             except json.JSONDecodeError:
+                breaker._on_failure(Exception("JSONDecodeError"))
                 return ExecutionResult(
                     status="failed",
                     outcome_code="augmentation_parse_error",
@@ -2691,6 +2731,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                 )
             
             if not payload.get("ok"):
+                breaker._on_failure(Exception("provider_error"))
                 return ExecutionResult(
                     status="failed",
                     outcome_code="augmentation_provider_error",
@@ -2747,7 +2788,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             # Add session memory context if enabled
             # Augmented mode gets deep context since the model handles mixed sources well
             session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(
-                question, depth="deep", mode="augmented"
+                question, depth="deep", mode="augmented", session_id=session_id
             )
             if session_memory:
                 env["LUCY_SESSION_MEMORY_CONTEXT"] = session_memory
@@ -2756,6 +2797,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             local_result = self._call_local_worker(question, env)
             
             if local_result.returncode != 0:
+                breaker._on_failure(Exception("local_worker_failed"))
                 return ExecutionResult(
                     status="failed",
                     outcome_code="augmentation_generation_failed",
@@ -2769,6 +2811,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             # Success - format and return
             response_text = response_formatter.render_chat_fast_from_raw(local_result.stdout)
             
+            breaker._on_success()
             return ExecutionResult(
                 status="completed",
                 outcome_code="augmented_answer",
@@ -2786,6 +2829,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             )
             
         except subprocess.TimeoutExpired:
+            breaker._on_failure(Exception("timeout"))
             return ExecutionResult(
                 status="timeout",
                 outcome_code="augmentation_timeout",
@@ -2796,6 +2840,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                 metadata={**memory_telemetry},
             )
         except Exception as e:
+            breaker._on_failure(e)
             return ExecutionResult(
                 status="failed",
                 outcome_code="augmentation_error",
@@ -2908,283 +2953,44 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         return raw_response.strip()
     
+    # ------------------------------------------------------------------
+    # State persistence (delegated to StateWriter)
+    # ------------------------------------------------------------------
+
     def _get_state_file_paths(self) -> tuple[Path, Path]:
-        """
-        Get the current state file paths based on instance state directory.
-        
-        FIX: Dynamic state file path resolution
-        - Uses instance _state_dir instead of class constants
-        - Respects LUCY_SHARED_STATE_NAMESPACE per query
-        - Ensures state files are isolated per namespace
-        
-        Returns:
-            Tuple of (route_file_path, outcome_file_path)
-        """
-        route_file = self._state_dir / "last_route.env"
-        outcome_file = self._state_dir / "last_outcome.env"
-        return route_file, outcome_file
-    
+        """Return (route_file, outcome_file) for the current namespace."""
+        return self.state_writer.get_state_file_paths()
+
     def _write_state_files(
-        self,
-        route: RoutingDecision,
-        result: ExecutionResult,
-        context: dict[str, Any],
+        self, route: RoutingDecision, result: ExecutionResult, context: dict[str, Any]
     ) -> None:
-        """
-        Write execution state to storage.
-        
-        Phase 2: Dual-write to both SQLite and files during transition.
-        Phase 3: SQLite only (when use_sqlite_state=True and files deprecated).
-        
-        This method updates both SQLite (via StateManager) and file-based state
-        (last_route.env, last_outcome.env) for backwards compatibility during
-        the transition period.
-        
-        FIX: State File Locking and Namespace Isolation
-        - Uses _file_lock() context manager for exclusive access to files
-        - Uses instance _state_dir for proper namespace isolation
-        - Prevents "shared-state overlap" errors during concurrent writes
-        - Falls back to best-effort write if lock cannot be acquired
-        - Shell-compatible format (KEY=value pairs, newline-terminated)
-        
-        Args:
-            route: The routing decision that was executed
-            result: The execution result
-            context: Execution context
-        """
-        # Write to SQLite (new way) if enabled
-        if self.use_sqlite_state:
-            try:
-                self._write_state_to_sqlite(route, result, context)
-                self._logger.debug("State written to SQLite successfully")
-            except Exception as e:
-                self._logger.error(f"SQLite state write failed: {e}")
-                # Continue to file write as fallback
-        
-        # Always write to files for backwards compatibility during transition
-        self._write_state_to_files(route, result, context)
-    
+        """Dual-write execution state to SQLite and/or legacy .env files."""
+        self.state_writer.write_state(route, result, context)
+
     def _write_state_to_sqlite(
-        self,
-        route: RoutingDecision,
-        result: ExecutionResult,
-        context: dict[str, Any],
+        self, route: RoutingDecision, result: ExecutionResult, context: dict[str, Any]
     ) -> None:
-        """
-        Write state to SQLite via StateManager.
-        
-        Args:
-            route: The routing decision that was executed
-            result: The execution result
-            context: Execution context
-        """
-        try:
-            # Write route record
-            self.state_manager.write_route({
-                "intent": context.get("intent", ""),
-                "confidence": route.confidence,
-                "strategy": route.route,  # REAL route, not mapped
-                "metadata": {
-                    "question": context.get("question", "")[:200],
-                    "provider": route.provider,
-                    "provider_usage_class": route.provider_usage_class,
-                    "is_medical_query": context.get("is_medical_query", False),
-                    "final_mode": result.route,
-                    "requested_mode": route.route,
-                }
-            })
-            
-            # Build outcome metadata for SQLite
-            outcome_meta: dict[str, Any] = {
-                "route": result.route,
-                "provider": result.provider,
-                "outcome_code": result.outcome_code,
-                "trust_class": result.metadata.get("trust_class", "local"),
-            }
-            # Include memory telemetry if present
-            for key in ("memory_context_used", "memory_mode_used", "memory_top_score",
-                        "memory_session_injected", "memory_top_gap"):
-                if key in result.metadata:
-                    outcome_meta[key] = result.metadata[key]
-            
-            # Write outcome record
-            self.state_manager.write_outcome({
-                "success": result.status == "completed",
-                "duration_ms": result.execution_time_ms,
-                "result": outcome_meta,
-                "error_message": result.error_message or ""
-            })
-            
-            self._logger.info("State written to SQLite")
-        except Exception as e:
-            self._logger.error(f"SQLite state write failed: {e}")
-            raise
-    
+        """Write state to SQLite via StateManager."""
+        self.state_writer._write_state_to_sqlite(route, result, context)
+
     def _write_state_to_files(
-        self,
-        route: RoutingDecision,
-        result: ExecutionResult,
-        context: dict[str, Any],
+        self, route: RoutingDecision, result: ExecutionResult, context: dict[str, Any]
     ) -> None:
-        """
-        Write execution state to file-based storage.
-        
-        This method maintains backwards compatibility with existing shell scripts
-        and components that read from .env state files.
-        
-        Args:
-            route: The routing decision that was executed
-            result: The execution result
-            context: Execution context
-        """
-        question = context.get("question", "")
-        timestamp = int(time.time())
-        
-        # Get dynamic state file paths (respects namespace)
-        route_file, outcome_file = self._get_state_file_paths()
-        
-        # Build route metadata
-        route_fields = [
-            ("TIMESTAMP", str(timestamp)),
-            ("FINAL_MODE", result.route),
-            ("REQUESTED_MODE", route.route),
-            ("ROUTE_REASON", "router_classifier_mapper"),
-            ("ORIGINAL_QUESTION", question),
-            ("RESOLVED_QUESTION", context.get("resolved_question", question)),
-            ("LOCAL_DIRECT_USED", "true" if result.metadata.get("local_direct_used") else "false"),
-            ("LOCAL_DIRECT_FALLBACK", "true" if result.metadata.get("local_direct_fallback") else "false"),
-            ("LOCAL_DIRECT_PATH", result.metadata.get("local_direct_path", "disabled")),
-        ]
-        
-        # Build outcome metadata
-        outcome_fields = [
-            ("TIMESTAMP", str(timestamp)),
-            ("OUTCOME_CODE", result.outcome_code),
-            ("FINAL_MODE", result.route),
-            ("ROUTE_REASON", "router_classifier_mapper"),
-            ("ORIGINAL_QUESTION", question),
-            ("RESOLVED_QUESTION", context.get("resolved_question", question)),
-            ("FALLBACK_USED", "true" if result.metadata.get("fallback_used") else "false"),
-            ("FALLBACK_REASON", result.metadata.get("fallback_reason", "none")),
-            ("TRUST_CLASS", result.metadata.get("trust_class", "local")),
-            ("AUGMENTED_PROVIDER_USED", result.provider if result.route == "AUGMENTED" else "none"),
-            ("AUGMENTED_PROVIDER_USAGE_CLASS", result.provider_usage_class),
-            ("EXECUTION_TIME_MS", str(result.execution_time_ms)),
-            ("ROUTING_SIGNAL_MEDICAL_CONTEXT", "true" if context.get("is_medical_query") else "false"),
-        ]
-        
-        # Memory telemetry (added if present in metadata)
-        if "memory_context_used" in result.metadata:
-            outcome_fields.append(("MEMORY_CONTEXT_USED", result.metadata["memory_context_used"]))
-        if "memory_mode_used" in result.metadata:
-            outcome_fields.append(("MEMORY_MODE_USED", result.metadata["memory_mode_used"]))
-        if "memory_depth_used" in result.metadata:
-            outcome_fields.append(("MEMORY_DEPTH_USED", result.metadata["memory_depth_used"]))
-        if "memory_top_score" in result.metadata:
-            outcome_fields.append(("MEMORY_TOP_SCORE", result.metadata["memory_top_score"]))
-        if "memory_session_injected" in result.metadata:
-            outcome_fields.append(("MEMORY_SESSION_INJECTED", result.metadata["memory_session_injected"]))
-        if "memory_top_gap" in result.metadata:
-            outcome_fields.append(("MEMORY_TOP_GAP", result.metadata["memory_top_gap"]))
-        
-        # Write last_route.env with locking
-        try:
-            # Ensure parent directory exists (in case namespace changed)
-            route_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            route_content = "\n".join(f"{k}={v}" for k, v in route_fields) + "\n"
-            
-            # Use file lock to prevent concurrent write corruption
-            with self._file_lock(route_file):
-                route_file.write_text(route_content, encoding="utf-8")
-                
-        except Exception as e:
-            # FIX: Don't return "ERR: shared-state overlap" to user
-            # Log the error internally and continue with best-effort
-            self._logger.warning(f"Failed to write last_route.env: {e}")
-            # Attempt unprotected write as last resort (best-effort)
-            try:
-                route_file.write_text(route_content, encoding="utf-8")
-            except Exception as e2:
-                self._logger.error(f"Unprotected write also failed: {e2}")
-        
-        # Write last_outcome.env with locking
-        try:
-            # Ensure parent directory exists
-            outcome_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            outcome_content = "\n".join(f"{k}={v}" for k, v in outcome_fields) + "\n"
-            
-            # Use file lock to prevent concurrent write corruption
-            with self._file_lock(outcome_file):
-                outcome_file.write_text(outcome_content, encoding="utf-8")
-                
-        except Exception as e:
-            # FIX: Don't return "ERR: shared-state overlap" to user
-            # Log the error internally and continue with best-effort
-            self._logger.warning(f"Failed to write last_outcome.env: {e}")
-            # Attempt unprotected write as last resort (best-effort)
-            try:
-                outcome_file.write_text(outcome_content, encoding="utf-8")
-            except Exception as e2:
-                self._logger.error(f"Unprotected write also failed: {e2}")
-    
+        """Write execution state to file-based storage."""
+        self.state_writer._write_state_to_files(route, result, context)
+
     def read_last_route_from_sqlite(self) -> dict | None:
-        """
-        Read last route from SQLite.
-        
-        Returns:
-            dict: Route data from SQLite, or None if not found
-        """
-        return self.state_manager.read_last_route()
-    
+        """Read last route from SQLite."""
+        return self.state_writer.read_last_route()
+
     def read_last_outcome_from_sqlite(self) -> dict | None:
-        """
-        Read last outcome from SQLite.
-        
-        Returns:
-            dict: Outcome data from SQLite, or None if not found
-        """
-        return self.state_manager.read_last_outcome()
-    
+        """Read last outcome from SQLite."""
+        return self.state_writer.read_last_outcome()
+
     def verify_state_consistency(self) -> bool:
-        """
-        Verify SQLite and file-based states match.
-        
-        This is a debugging/validation method for the dual-write transition.
-        Compares the last route written to both SQLite and files to ensure
-        they are consistent.
-        
-        Returns:
-            bool: True if states match, False otherwise
-        """
-        sqlite_route = self.read_last_route_from_sqlite()
-        
-        # Read from files
-        route_file, _ = self._get_state_file_paths()
-        file_strategy = None
-        if route_file.exists():
-            file_strategy = self._read_state_field(route_file, "FINAL_MODE")
-        
-        if sqlite_route and file_strategy:
-            match = sqlite_route.get("strategy") == file_strategy
-            if not match:
-                self._logger.warning(
-                    f"State mismatch between SQLite and files! "
-                    f"SQLite: {sqlite_route.get('strategy')}, "
-                    f"File: {file_strategy}"
-                )
-            else:
-                self._logger.debug("State consistency verified: SQLite and files match")
-            return match
-        
-        # If one is missing, we can't verify
-        if sqlite_route or file_strategy:
-            self._logger.warning("Cannot verify consistency: only one state source available")
-            return False
-        
-        return True
-    
+        """Verify SQLite and file-based states match."""
+        return self.state_writer.verify_consistency()
+
     def _record_terminal_outcome(
         self,
         outcome_code: str,
@@ -3192,82 +2998,16 @@ them according to the route type (bypass, provisional, or full). It handles:
         error_msg: str | None = None,
         execution_time_ms: int = 0,
     ) -> None:
-        """
-        Record terminal outcome for cases where normal flow is interrupted.
-        
-        This is used when execution ends early (e.g., CLARIFY, timeout, error)
-        and we need to ensure state is recorded.
-        
-        Args:
-            outcome_code: The outcome code (e.g., "clarification_requested")
-            mode: The execution mode (e.g., "CLARIFY")
-            error_msg: Optional error message
-            execution_time_ms: Execution time in milliseconds
-        """
-        # Write to SQLite if enabled
-        if self.use_sqlite_state:
-            try:
-                self.state_manager.write_outcome({
-                    "success": outcome_code != "execution_error",
-                    "duration_ms": execution_time_ms,
-                    "result": {"outcome_code": outcome_code, "mode": mode},
-                    "error_message": error_msg or ""
-                })
-                self._logger.debug("Terminal outcome recorded in SQLite")
-            except Exception as e:
-                self._logger.error(f"Failed to record terminal outcome in SQLite: {e}")
-    
+        """Record terminal outcome for early-exit paths."""
+        self.state_writer.record_terminal_outcome(outcome_code, mode, error_msg, execution_time_ms)
+
     def close(self) -> None:
-        """
-        Close the execution engine and cleanup resources.
-        
-        This should be called when done with the engine to properly
-        release resources like database connections.
-        """
-        try:
-            if hasattr(self, 'state_manager'):
-                self.state_manager.close()
-                self._logger.debug("StateManager connection closed")
-        except Exception as e:
-            self._logger.warning(f"Error closing StateManager: {e}")
-    
+        """Close the execution engine and cleanup resources."""
+        self.state_writer.close()
+
     def _read_state_field(self, state_file: Path, field: str) -> str | None:
-        """
-        Read a field value from a state file.
-        
-        FIX: File Locking for Reads
-        - Uses shared lock (LOCK_SH) for concurrent read access
-        - Prevents reading partially-written state during concurrent access
-        - Falls back to unprotected read if lock fails (best-effort)
-        
-        Args:
-            state_file: Path to the state file
-            field: Field name to read
-        
-        Returns:
-            Field value or None if not found/error
-        """
-        if not state_file.exists():
-            return None
-        
-        try:
-            # Use shared lock for reading (allows concurrent reads, blocks writes)
-            with self._file_lock(state_file):
-                content = state_file.read_text(encoding="utf-8")
-                for line in content.splitlines():
-                    if line.startswith(f"{field}="):
-                        return line[len(field) + 1:].strip()
-        except Exception:
-            # Best-effort fallback: try unprotected read
-            try:
-                content = state_file.read_text(encoding="utf-8")
-                for line in content.splitlines():
-                    if line.startswith(f"{field}="):
-                        return line[len(field) + 1:].strip()
-            except Exception:
-                pass
-        
-        return None
+        """Read a field value from a state file."""
+        return self.state_writer._read_state_field(state_file, field)
     
     def _map_route_to_chat_mode(self, route: str) -> str:
         """
@@ -3411,252 +3151,17 @@ them according to the route type (bypass, provisional, or full). It handles:
         """
         return self._runtime_local_prompt_fallback_text(question, "0")
     
-    # ====================================================================== 
-    # Utility Functions (ported from execute_plan.sh)
-    # ====================================================================== 
-    
-    @staticmethod
-    def _is_truthy(value: str | None) -> bool:
-        """
-        Parse boolean from string (ported from is_truthy, line 348).
-        
-        Args:
-            value: String to parse (e.g., "true", "1", "yes", "")
-            
-        Returns:
-            True for "true", "1", "yes", "on" (case-insensitive), False otherwise
-            
-        Examples:
-            >>> ExecutionEngine._is_truthy("true")
-            True
-            >>> ExecutionEngine._is_truthy("false")
-            False
-            >>> ExecutionEngine._is_truthy("1")
-            True
-            >>> ExecutionEngine._is_truthy("0")
-            False
-            >>> ExecutionEngine._is_truthy("yes")
-            True
-            >>> ExecutionEngine._is_truthy("no")
-            False
-            >>> ExecutionEngine._is_truthy("on")
-            True
-            >>> ExecutionEngine._is_truthy("off")
-            False
-            >>> ExecutionEngine._is_truthy("")
-            False
-            >>> ExecutionEngine._is_truthy(None)
-            False
-        """
-        if not value:
-            return False
-        return value.lower() in ("1", "true", "yes", "on")
-    
-    @staticmethod
-    def _sha256_text(text: str) -> str:
-        """
-        Generate SHA-256 hash of text (ported from sha256_text, line 444).
-        
-        Args:
-            text: String to hash
-            
-        Returns:
-            Hexadecimal SHA-256 hash string (64 characters)
-            
-        Examples:
-            >>> ExecutionEngine._sha256_text("hello")
-            '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
-            >>> ExecutionEngine._sha256_text("")
-            'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-        """
-        return hashlib.sha256(text.encode("utf-8")).hexdigest()
-    
-    @staticmethod
-    def _deterministic_pick_index(seed: str, mod: int) -> int:
-        """
-        Deterministically select an index from 0 to mod-1 based on seed (ported from deterministic_pick_index, line 452).
-        
-        Uses SHA-256 hash of the seed and takes first 8 hex digits to create
-        a deterministic pseudo-random selection. This ensures consistent
-        selection for the same seed across executions.
-        
-        Args:
-            seed: Seed string for deterministic selection
-            mod: Modulo value (must be positive)
-            
-        Returns:
-            Integer index from 0 to mod-1
-            
-        Raises:
-            ValueError: If mod is not positive
-            
-        Examples:
-            >>> ExecutionEngine._deterministic_pick_index("test", 8)
-            1
-            >>> ExecutionEngine._deterministic_pick_index("hello", 10)
-            4
-            >>> ExecutionEngine._deterministic_pick_index("same_seed", 5)
-            3
-            >>> ExecutionEngine._deterministic_pick_index("same_seed", 5)  # Same result
-            3
-        """
-        if mod <= 0:
-            raise ValueError(f"mod must be positive, got {mod}")
-        h = ExecutionEngine._sha256_text(seed)
-        hex_val = h[:8]
-        return int(hex_val, 16) % mod
-    
-    @staticmethod
-    def _provider_usage_class_for(provider: str | None) -> str:
-        """
-        Map provider name to usage class (ported from provider_usage_class_for, line 327).
-        
-        Args:
-            provider: Provider name (e.g., "openai", "kimi", "wikipedia", "local")
-            
-        Returns:
-            Usage class: "paid", "free", "local", or "none"
-            
-        Examples:
-            >>> ExecutionEngine._provider_usage_class_for("openai")
-            'paid'
-            >>> ExecutionEngine._provider_usage_class_for("kimi")
-            'paid'
-            >>> ExecutionEngine._provider_usage_class_for("wikipedia")
-            'free'
-            >>> ExecutionEngine._provider_usage_class_for("local")
-            'local'
-            >>> ExecutionEngine._provider_usage_class_for("unknown")
-            'none'
-            >>> ExecutionEngine._provider_usage_class_for(None)
-            'none'
-        """
-        if not provider:
-            return "none"
-        match provider.lower():
-            case "openai" | "kimi":
-                return "paid"
-            case "wikipedia":
-                return "free"
-            case "local":
-                return "local"
-            case "trusted":
-                return "free"  # Trusted sources are free (no paid API)
-            case _:
-                return "none"
-    
-    @staticmethod
-    def _is_category_specific_query(question: str, intent_family: str) -> bool:
-        """
-        Check if query is category-specific (news, medical, finance).
-        These queries should try trusted sources first.
-        
-        Args:
-            question: The user question
-            intent_family: Classified intent family
-            
-        Returns:
-            True if this is a category-specific query
-        """
-        q_lower = question.lower()
-        
-        # Check intent family first
-        if intent_family == "current_evidence":
-            return True
-        
-        # News keywords
-        news_keywords = [
-            "news", "headline", "headlines", "breaking", "latest",
-            "current events", "world news", "today's news"
-        ]
-        if any(kw in q_lower for kw in news_keywords):
-            return True
-        
-        # Medical keywords
-        medical_keywords = [
-            "medical", "medication", "medicine", "drug", "dose", "dosage",
-            "side effect", "interaction", "contraindication", "health",
-            "prescription", "treatment"
-        ]
-        if any(kw in q_lower for kw in medical_keywords):
-            return True
-        
-        # Finance keywords
-        finance_keywords = [
-            "finance", "stock", "market", "economy", "currency",
-            "exchange rate", "investment", "financial"
-        ]
-        if any(kw in q_lower for kw in finance_keywords):
-            return True
-        
-        return False
-    
-    @staticmethod
-    def _normalize_augmentation_policy(raw: str | None) -> str:
-        """
-        Normalize augmentation policy string to canonical value (ported from normalize_augmentation_policy, line 317).
-        
-        Args:
-            raw: Raw policy string (e.g., "disabled", "fallback", "direct")
-            
-        Returns:
-            Canonical policy: "disabled", "fallback_only", or "direct_allowed"
-            
-        Examples:
-            >>> ExecutionEngine._normalize_augmentation_policy("disabled")
-            'disabled'
-            >>> ExecutionEngine._normalize_augmentation_policy("off")
-            'disabled'
-            >>> ExecutionEngine._normalize_augmentation_policy("none")
-            'disabled'
-            >>> ExecutionEngine._normalize_augmentation_policy("0")
-            'disabled'
-            >>> ExecutionEngine._normalize_augmentation_policy("false")
-            'disabled'
-            >>> ExecutionEngine._normalize_augmentation_policy("no")
-            'disabled'
-            >>> ExecutionEngine._normalize_augmentation_policy("fallback_only")
-            'fallback_only'
-            >>> ExecutionEngine._normalize_augmentation_policy("fallback")
-            'fallback_only'
-            >>> ExecutionEngine._normalize_augmentation_policy("1")
-            'fallback_only'
-            >>> ExecutionEngine._normalize_augmentation_policy("true")
-            'fallback_only'
-            >>> ExecutionEngine._normalize_augmentation_policy("yes")
-            'fallback_only'
-            >>> ExecutionEngine._normalize_augmentation_policy("on")
-            'fallback_only'
-            >>> ExecutionEngine._normalize_augmentation_policy("direct_allowed")
-            'direct_allowed'
-            >>> ExecutionEngine._normalize_augmentation_policy("direct")
-            'direct_allowed'
-            >>> ExecutionEngine._normalize_augmentation_policy("2")
-            'direct_allowed'
-            >>> ExecutionEngine._normalize_augmentation_policy("unknown")
-            'disabled'
-            >>> ExecutionEngine._normalize_augmentation_policy("")
-            'disabled'
-            >>> ExecutionEngine._normalize_augmentation_policy(None)
-            'disabled'
-        """
-        if not raw:
-            return "disabled"
-        normalized = raw.lower()
-        match normalized:
-            case "disabled" | "off" | "none" | "0" | "false" | "no":
-                return "disabled"
-            case "fallback_only" | "fallback" | "1" | "true" | "yes" | "on":
-                return "fallback_only"
-            case "direct_allowed" | "direct" | "2":
-                return "direct_allowed"
-            case _:
-                return "disabled"
-    
-    @staticmethod
-    def _local_fast_guard_normalize(text: str | None) -> str:
-        """Alias for response_formatter.guard_normalize."""
-        return response_formatter.guard_normalize(text)
+    # ======================================================================
+    # Utility Functions (delegated to execution_engine_utils)
+    # ======================================================================
+
+    _is_truthy = staticmethod(is_truthy)
+    _sha256_text = staticmethod(sha256_text)
+    _deterministic_pick_index = staticmethod(deterministic_pick_index)
+    _provider_usage_class_for = staticmethod(provider_usage_class_for)
+    _is_category_specific_query = staticmethod(is_category_specific_query)
+    _normalize_augmentation_policy = staticmethod(normalize_augmentation_policy)
+    _local_fast_guard_normalize = staticmethod(local_fast_guard_normalize)
 
 
 def create_execution_engine(

@@ -156,14 +156,15 @@ class TestVoiceHmiBridge:
     @pytest.fixture(autouse=True)
     def _setup_env(self, monkeypatch):
         """Set required env vars for RuntimeBridge instantiation."""
-        project_root = str(Path(__file__).resolve().parents[3])
+        project_root = str(Path(__file__).resolve().parents[2])
         monkeypatch.setenv("LUCY_RUNTIME_AUTHORITY_ROOT", project_root)
         monkeypatch.setenv("LUCY_UI_ROOT", f"{project_root}/ui-v8")
         monkeypatch.setenv("LUCY_RUNTIME_NAMESPACE_ROOT", project_root)
-        # Add ui-v8/app to path for imports
-        ui_app = f"{project_root}/ui-v8/app"
-        if ui_app not in sys.path:
-            sys.path.insert(0, ui_app)
+        # Add ui-v8 to path for imports (so 'app.services.runtime_bridge' resolves)
+        ui_root = f"{project_root}/ui-v8"
+        if ui_root not in sys.path:
+            sys.path.insert(0, ui_root)
+
 
     def test_voice_ptt_stop_returns_transcript(self, monkeypatch):
         """ptt-stop action should return transcript to UI."""

@@ -31,6 +31,68 @@ except ImportError as e:
     HAS_VOICE = False
 
 
+class PTTController:
+    """Push-to-talk controller for hold and tap modes.
+    
+    Hold mode: press starts recording, release stops recording.
+    Tap mode: first tap starts recording, second tap stops recording.
+    """
+    
+    def __init__(self, mode: str = "hold", max_seconds: float = 8.0):
+        self.mode = mode
+        self.max_seconds = max_seconds
+        self._recording = False
+        self._stop_event = asyncio.Event()
+        self._lock = asyncio.Lock()
+    
+    async def press(self) -> bool:
+        """Handle PTT press/tap. Returns True if recording should start."""
+        async with self._lock:
+            if self.mode == "hold":
+                if not self._recording:
+                    self._recording = True
+                    self._stop_event.clear()
+                    return True
+                return False
+            else:  # tap
+                if not self._recording:
+                    self._recording = True
+                    self._stop_event.clear()
+                    return True
+                else:
+                    # Second tap — stop recording
+                    self._recording = False
+                    self._stop_event.set()
+                    return False
+    
+    async def release(self) -> bool:
+        """Handle PTT release (hold mode only). Returns True if stop was triggered."""
+        async with self._lock:
+            if self.mode == "hold" and self._recording:
+                self._recording = False
+                self._stop_event.set()
+                return True
+            return False
+    
+    async def wait_for_stop(self, timeout: Optional[float] = None) -> bool:
+        """Wait until stop is signaled or timeout. Returns True if stopped by signal."""
+        try:
+            await asyncio.wait_for(
+                self._stop_event.wait(),
+                timeout=timeout or self.max_seconds
+            )
+            return True
+        except asyncio.TimeoutError:
+            return False
+    
+    def is_recording(self) -> bool:
+        return self._recording
+    
+    def reset(self):
+        self._recording = False
+        self._stop_event.clear()
+
+
 class VoiceRuntime:
     """Interactive voice runtime for Local Lucy."""
     
@@ -44,6 +106,7 @@ class VoiceRuntime:
         self.pipeline: Optional[StreamingVoicePipeline] = None
         self._cancelled = False
         self._session_active = False
+        self._ptt = PTTController(mode=self.ptt_mode, max_seconds=self.max_seconds)
         
         # Setup signal handlers
         signal.signal(signal.SIGINT, self._handle_interrupt)
@@ -56,6 +119,13 @@ class VoiceRuntime:
         if self.pipeline:
             self.pipeline.cancel()
         self._session_active = False
+        # Signal PTT to stop if recording
+        if self._ptt.is_recording():
+            try:
+                loop = asyncio.get_running_loop()
+                loop.call_soon_threadsafe(self._ptt._stop_event.set)
+            except RuntimeError:
+                self._ptt._stop_event.set()
     
     def _print_banner(self):
         """Print voice mode banner."""
@@ -70,10 +140,11 @@ class VoiceRuntime:
         print()
     
     async def _record_audio(self) -> Optional[Path]:
-        """Record audio from microphone."""
+        """Record audio from microphone using PTT controller."""
         from voice_tool import VoicePipeline
         
         pipeline = VoicePipeline()
+        self._ptt.reset()
         
         print("Recording... (speak now)")
         if self.ptt_mode == "hold":
@@ -82,9 +153,29 @@ class VoiceRuntime:
             print("(Tap to start, tap again to stop)")
         
         try:
-            # For now, use fixed duration recording
-            # TODO: Implement VAD-based recording with hold/tap modes
-            audio = await pipeline.record_audio(duration=float(self.max_seconds))
+            # Start recording with no fixed duration — PTT controls stop
+            record_task = asyncio.create_task(
+                pipeline.record_audio(duration=None)
+            )
+            
+            # Wait for PTT stop signal or timeout
+            stopped_by_ptt = await self._ptt.wait_for_stop(timeout=float(self.max_seconds))
+            
+            if not stopped_by_ptt:
+                print(f"[Recording timed out after {self.max_seconds}s]")
+            
+            # Cancel the recording pipeline to stop the subprocess
+            pipeline.cancel()
+            
+            try:
+                audio = await asyncio.wait_for(record_task, timeout=2.0)
+            except asyncio.TimeoutError:
+                print("[Recording did not stop cleanly]")
+                return None
+            
+            if not audio or len(audio.data) == 0:
+                print("[No audio captured]")
+                return None
             
             # Save to temp file
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
@@ -141,6 +232,18 @@ class VoiceRuntime:
                 audio_path.unlink()
             except:
                 pass
+    
+    async def ptt_press(self) -> bool:
+        """Signal PTT press/tap. Returns True if recording should start."""
+        return await self._ptt.press()
+    
+    async def ptt_release(self) -> bool:
+        """Signal PTT release (hold mode). Returns True if stop was triggered."""
+        return await self._ptt.release()
+    
+    def is_recording(self) -> bool:
+        """Check if currently recording."""
+        return self._ptt.is_recording()
     
     async def run(self):
         """Main voice runtime loop."""

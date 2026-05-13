@@ -350,6 +350,9 @@ class HybridRouter:
 
         is_ephemeral = any(_matches_ephemeral_keyword(q_lower, kw) for kw in self.ephemeral_keywords)
 
+        # Pre-compute keyword presence for collapse detection and length normalization
+        has_any_keyword = is_time or is_news or is_ephemeral or requires_evidence or is_cooking
+
         # Stage 2: Cooking -> always LOCAL
         if is_cooking:
             return {
@@ -565,7 +568,6 @@ class HybridRouter:
         # no keywords matched to corroborate the route, fall back to LOCAL.
         # This prevents routing semantically-unrelated queries to TIME/NEWS
         # purely based on collapsed [CLS] embeddings.
-        has_any_keyword = is_time or is_news or is_ephemeral or requires_evidence or is_cooking
         if embedding_collapsed and not has_any_keyword and final_route in ("TIME", "NEWS", "WEATHER"):
             final_route = "LOCAL"
             final_intent = "local_answer"
@@ -574,10 +576,15 @@ class HybridRouter:
         # No-keyword safety net: when no keyword signals matched at all
         # but the embedding (even non-collapsed) suggests a live-data route,
         # require stronger confidence or corroborating keywords.
-        if not has_any_keyword and final_route in ("TIME", "NEWS", "WEATHER") and avg_sim < 0.85:
-            final_route = "LOCAL"
-            final_intent = "local_answer"
-            guards_fired.append("no_keyword_live_data_fallback")
+        # Short queries are more prone to embedding collapse, so we raise the
+        # threshold for queries with 5 or fewer words.
+        if not has_any_keyword and final_route in ("TIME", "NEWS", "WEATHER"):
+            word_count = len(query.split())
+            threshold = 0.90 if word_count <= 5 else 0.85
+            if avg_sim < threshold:
+                final_route = "LOCAL"
+                final_intent = "local_answer"
+                guards_fired.append("no_keyword_live_data_fallback")
 
         # Ephemeral flag: embedding-detected OR keyword-detected
         ephemeral_flag = is_ephemeral_embedding or is_ephemeral
