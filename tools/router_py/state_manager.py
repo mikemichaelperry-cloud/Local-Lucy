@@ -28,6 +28,11 @@ from contextlib import contextmanager
 from typing import Optional, Dict, Any, List, Iterator
 from dataclasses import dataclass
 
+try:
+    from .schema_migrations import apply_migrations
+except ImportError:
+    from schema_migrations import apply_migrations
+
 
 # ============================================================================
 # Logging Setup
@@ -225,56 +230,17 @@ class StateManager:
     
     def _init_schema(self) -> None:
         """
-        Initialize database schema if not exists.
+        Initialize database schema via versioned migrations.
         
-        Creates all tables, indexes, and sets WAL mode.
-        Thread-safe, safe to call multiple times.
+        Thread-safe, safe to call multiple times (idempotent).
         """
         with self._lock:
             conn = sqlite3.connect(str(self.db_path), timeout=30.0)
             try:
-                conn.executescript(SCHEMA_SQL)
-                conn.commit()
-                # Migration: fix old sessions table with session_key UNIQUE
-                # (should be UNIQUE(namespace_id, session_key))
-                self._migrate_sessions_unique_constraint(conn)
-                logger.info(f"Schema initialized at {self.db_path}")
+                version = apply_migrations(conn)
+                logger.info(f"Schema at version {version} at {self.db_path}")
             finally:
                 conn.close()
-    
-    def _migrate_sessions_unique_constraint(self, conn: sqlite3.Connection) -> None:
-        """Migrate old sessions table from session_key UNIQUE to composite UNIQUE."""
-        try:
-            cursor = conn.execute("PRAGMA index_list(sessions)")
-            indexes = {row[1]: row for row in cursor.fetchall()}
-            # Check for old autoindex on session_key alone (not composite with namespace_id)
-            if "sqlite_autoindex_sessions_1" in indexes:
-                cursor = conn.execute("PRAGMA index_info(sqlite_autoindex_sessions_1)")
-                cols = [row[2] for row in cursor.fetchall()]
-                if cols == ["session_key"]:
-                    logger.info("Migrating sessions table: fixing UNIQUE constraint")
-                    conn.execute("ALTER TABLE sessions RENAME TO sessions_old")
-                    conn.executescript("""
-                        CREATE TABLE sessions (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            namespace_id INTEGER NOT NULL,
-                            session_key TEXT NOT NULL,
-                            data TEXT,
-                            expires_at TIMESTAMP,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            UNIQUE(namespace_id, session_key),
-                            FOREIGN KEY (namespace_id) REFERENCES namespaces(id) ON DELETE CASCADE
-                        );
-                        INSERT INTO sessions (id, namespace_id, session_key, data, expires_at, created_at, updated_at)
-                        SELECT id, namespace_id, session_key, data, expires_at, created_at, updated_at
-                        FROM sessions_old;
-                        DROP TABLE sessions_old;
-                    """)
-                    conn.commit()
-                    logger.info("Sessions table migration complete")
-        except Exception as e:
-            logger.warning(f"Sessions migration check failed (may be already correct): {e}")
     
     def _ensure_namespace(self) -> int:
         """
@@ -1120,9 +1086,8 @@ def init_database(db_path: Optional[Path] = None) -> bool:
         
         conn = sqlite3.connect(str(db_path), timeout=30.0)
         try:
-            conn.executescript(SCHEMA_SQL)
-            conn.commit()
-            logger.info(f"Database initialized at {db_path}")
+            version = apply_migrations(conn)
+            logger.info(f"Database initialized at {db_path} (version {version})")
             return True
         finally:
             conn.close()
