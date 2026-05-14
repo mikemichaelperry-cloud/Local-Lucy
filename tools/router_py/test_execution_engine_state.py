@@ -333,18 +333,17 @@ class TestSQLiteWrites:
 
 
 class TestWriteState:
-    def test_dual_write_both_paths(self, writer, mock_state_manager, sample_route, sample_result, sample_context):
+    def test_sqlite_write_invoked(self, writer, mock_state_manager, sample_route, sample_result, sample_context):
+        """write_state() must call SQLite when use_sqlite_state=True."""
         writer.write_state(sample_route, sample_result, sample_context)
         assert mock_state_manager.write_route.called
-        route_file, _ = writer.get_state_file_paths()
-        assert route_file.exists()
+        assert mock_state_manager.write_outcome.called
 
-    def test_sqlite_error_continues_to_files(self, writer, mock_state_manager, sample_route, sample_result, sample_context, caplog):
+    def test_sqlite_error_logged(self, writer, mock_state_manager, sample_route, sample_result, sample_context, caplog):
+        """SQLite errors must be logged but not raise."""
         mock_state_manager.write_route.side_effect = RuntimeError("disk full")
         with caplog.at_level(logging.ERROR, logger="test_state_writer"):
             writer.write_state(sample_route, sample_result, sample_context)
-        route_file, _ = writer.get_state_file_paths()
-        assert route_file.exists()
         assert "disk full" in caplog.text
 
 
@@ -383,26 +382,40 @@ class TestReadBack:
 
 
 class TestConsistency:
-    def test_consistent_states(self, writer, mock_state_manager, sample_route, sample_result, sample_context):
-        writer._write_state_to_files(sample_route, sample_result, sample_context)
+    def _write_json_route(self, writer, route: str = "LOCAL") -> None:
+        """Helper: write a JSON route file for consistency checks."""
+        ui_dir = writer._resolve_ui_state_dir()
+        ui_dir.mkdir(parents=True, exist_ok=True)
+        (ui_dir / "last_route.json").write_text(
+            json.dumps({"current_route": route, "outcome_code": "answered"}),
+            encoding="utf-8",
+        )
+
+    def test_consistent_states(self, writer, mock_state_manager, tmp_state_dir, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
+        self._write_json_route(writer, "LOCAL")
         mock_state_manager.read_last_route.return_value = {"strategy": "LOCAL"}
         assert writer.verify_consistency() is True
 
-    def test_inconsistent_states(self, writer, mock_state_manager, sample_route, sample_result, sample_context):
-        writer._write_state_to_files(sample_route, sample_result, sample_context)
+    def test_inconsistent_states(self, writer, mock_state_manager, tmp_state_dir, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
+        self._write_json_route(writer, "LOCAL")
         mock_state_manager.read_last_route.return_value = {"strategy": "AUGMENTED"}
         assert writer.verify_consistency() is False
 
-    def test_only_sqlite_available(self, writer, mock_state_manager):
+    def test_only_sqlite_available(self, writer, mock_state_manager, tmp_state_dir, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
         mock_state_manager.read_last_route.return_value = {"strategy": "LOCAL"}
         assert writer.verify_consistency() is False
 
-    def test_only_file_available(self, writer, mock_state_manager, sample_route, sample_result, sample_context):
-        writer._write_state_to_files(sample_route, sample_result, sample_context)
+    def test_only_json_available(self, writer, mock_state_manager, tmp_state_dir, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
+        self._write_json_route(writer, "LOCAL")
         mock_state_manager.read_last_route.return_value = None
         assert writer.verify_consistency() is False
 
-    def test_neither_available(self, writer):
+    def test_neither_available(self, writer, tmp_state_dir, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
         assert writer.verify_consistency() is True
 
 
@@ -537,7 +550,7 @@ class TestEdgeCases:
             response_text="", error_message="Model timeout",
             execution_time_ms=5000, metadata={},
         )
-        writer.write_state(route, result, {"question": "What?"})
+        writer._write_state_to_files(route, result, {"question": "What?"})
         _, outcome_file = writer.get_state_file_paths()
         content = outcome_file.read_text(encoding="utf-8")
         assert "OUTCOME_CODE=execution_error" in content
@@ -557,7 +570,7 @@ class TestPIIRedaction:
             route="LOCAL", provider="local", provider_usage_class="local",
             response_text="Done", execution_time_ms=30, metadata={},
         )
-        writer.write_state(route, result, {
+        writer._write_state_to_files(route, result, {
             "question": "Contact me at john.doe@example.com please",
         })
         _, outcome_file = writer.get_state_file_paths()
@@ -576,7 +589,7 @@ class TestPIIRedaction:
             route="LOCAL", provider="local", provider_usage_class="local",
             response_text="Done", execution_time_ms=30, metadata={},
         )
-        writer.write_state(route, result, {
+        writer._write_state_to_files(route, result, {
             "question": "My number is 555-123-4567",
         })
         _, outcome_file = writer.get_state_file_paths()
@@ -595,7 +608,7 @@ class TestPIIRedaction:
             route="LOCAL", provider="local", provider_usage_class="local",
             response_text="Done", execution_time_ms=30, metadata={},
         )
-        writer.write_state(route, result, {
+        writer._write_state_to_files(route, result, {
             "question": "SSN is 123-45-6789",
         })
         _, outcome_file = writer.get_state_file_paths()
@@ -614,7 +627,7 @@ class TestPIIRedaction:
             route="LOCAL", provider="local", provider_usage_class="local",
             response_text="Done", execution_time_ms=30, metadata={},
         )
-        writer.write_state(route, result, {
+        writer._write_state_to_files(route, result, {
             "question": "What is the capital of France?",
         })
         _, outcome_file = writer.get_state_file_paths()
@@ -633,7 +646,7 @@ class TestPIIRedaction:
             route="LOCAL", provider="local", provider_usage_class="local",
             response_text="Done", execution_time_ms=30, metadata={},
         )
-        writer.write_state(route, result, {
+        writer._write_state_to_files(route, result, {
             "question": "Hello",
             "resolved_question": "Reach me at alice@mail.com",
         })

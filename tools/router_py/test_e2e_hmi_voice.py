@@ -90,9 +90,10 @@ def tmp_state_dir():
 
 
 @pytest.fixture
-def engine(tmp_state_dir):
+def engine(tmp_state_dir, monkeypatch):
     """Real ExecutionEngine with mocked external dependencies."""
-    os.environ["LUCY_EXEC_PY"] = "1"
+    monkeypatch.setenv("LUCY_EXEC_PY", "1")
+    monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
     eng = ExecutionEngine(config={
         "state_dir": str(tmp_state_dir),
         "use_sqlite_state": True,
@@ -111,8 +112,8 @@ def engine(tmp_state_dir):
 
 
 class TestVoiceLocalRoute:
-    def test_voice_local_state_files_written(self, engine, tmp_state_dir):
-        """Voice submit to LOCAL should write both route and outcome .env files."""
+    def test_voice_local_json_state_files_written(self, engine, tmp_state_dir):
+        """Voice submit to LOCAL should write JSON state files (env deprecated in Stream 3)."""
         with patch.object(engine, "_call_single_provider", return_value="The answer is 42."):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
@@ -122,19 +123,19 @@ class TestVoiceLocalRoute:
         assert result.status == "completed"
         assert result.route == "LOCAL"
 
-        route_file = tmp_state_dir / "last_route.env"
-        outcome_file = tmp_state_dir / "last_outcome.env"
-        assert route_file.exists(), "last_route.env should be written"
-        assert outcome_file.exists(), "last_outcome.env should be written"
+        # JSON state files (Stream 2/3) — .env deprecated
+        route_json = tmp_state_dir / "last_route.json"
+        result_json = tmp_state_dir / "last_request_result.json"
+        assert route_json.exists(), "last_route.json should be written"
+        assert result_json.exists(), "last_request_result.json should be written"
 
-        route_content = route_file.read_text(encoding="utf-8")
-        assert "FINAL_MODE=LOCAL" in route_content
-        assert "REQUESTED_MODE=LOCAL" in route_content
-        assert "ORIGINAL_QUESTION=What is 2+2?" in route_content
+        route_data = json.loads(route_json.read_text(encoding="utf-8"))
+        assert route_data["current_route"] == "LOCAL"
+        assert route_data["status"] == "completed"
 
-        outcome_content = outcome_file.read_text(encoding="utf-8")
-        assert "OUTCOME_CODE=answered" in outcome_content
-        assert "FINAL_MODE=LOCAL" in outcome_content
+        result_data = json.loads(result_json.read_text(encoding="utf-8"))
+        assert result_data["outcome"]["outcome_code"] == "answered"
+        assert result_data["route"]["mode"] == "LOCAL"
 
     def test_voice_local_sqlite_written(self, engine):
         """Voice submit to LOCAL should also write to SQLite via StateManager."""
@@ -149,7 +150,7 @@ class TestVoiceLocalRoute:
         args, _ = engine.state_manager.write_route.call_args
         assert args[0]["metadata"]["question"] == "What is 2+2?"
 
-    def test_voice_surface_propagated_to_metadata(self, engine):
+    def test_voice_surface_propagated_to_metadata(self, engine, tmp_state_dir):
         """Voice surface should be available in execution context."""
         with patch.object(engine, "_call_single_provider", return_value="Voice answer."):
             intent = _make_classification("local_answer")
@@ -160,9 +161,9 @@ class TestVoiceLocalRoute:
                 use_python_path=True,
             )
         assert result.status == "completed"
-        # State files should reflect voice surface in metadata indirectly
-        route_file = engine.state_writer.get_state_file_paths()[0]
-        assert route_file.exists()
+        # JSON state files should be written (env deprecated in Stream 3)
+        route_json = tmp_state_dir / "last_route.json"
+        assert route_json.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -182,10 +183,10 @@ class TestHmiTimeRoute:
         assert result.status == "completed"
         assert result.route == "TIME"
 
-        route_file = tmp_state_dir / "last_route.env"
-        content = route_file.read_text(encoding="utf-8")
-        assert "FINAL_MODE=TIME" in content
-        assert "REQUESTED_MODE=TIME" in content
+        route_json = tmp_state_dir / "last_route.json"
+        route_data = json.loads(route_json.read_text(encoding="utf-8"))
+        assert route_data["current_route"] == "TIME"
+        assert route_data["outcome_code"] == "answered"
 
     def test_hmi_time_sqlite_outcome(self, engine):
         """HMI TIME route should write outcome to SQLite."""
@@ -241,15 +242,12 @@ class TestVoiceAugmentedTelemetry:
         )
         engine.state_writer.write_state(route, result_with_mem, ctx)
 
-        _, outcome_file = engine.state_writer.get_state_file_paths()
-        content = outcome_file.read_text(encoding="utf-8")
-        assert "MEMORY_CONTEXT_USED=session" in content
-        assert "MEMORY_MODE_USED=recall" in content
-        assert "MEMORY_DEPTH_USED=5" in content
-        assert "MEMORY_TOP_SCORE=0.91" in content
-        assert "MEMORY_SESSION_INJECTED=true" in content
-        assert "MEMORY_TOP_GAP=0.08" in content
-        assert "AUGMENTED_PROVIDER_USED=openai" in content
+        # Memory telemetry is in SQLite (env deprecated in Stream 3)
+        args, _ = engine.state_manager.write_outcome.call_args
+        outcome_meta = args[0]["result"]
+        assert outcome_meta["memory_context_used"] == "session"
+        assert outcome_meta["memory_mode_used"] == "recall"
+        assert outcome_meta["route"] == "AUGMENTED"
 
     def test_augmented_memory_telemetry_in_sqlite(self, engine):
         """AUGMENTED route with memory telemetry should write to SQLite."""
@@ -303,10 +301,10 @@ class TestTerminalOutcome:
         assert result.status == "completed"
         assert result.route == "CLARIFY"
 
-        _, outcome_file = engine.state_writer.get_state_file_paths()
-        content = outcome_file.read_text(encoding="utf-8")
-        assert "OUTCOME_CODE=clarification_requested" in content
-        assert "FINAL_MODE=CLARIFY" in content
+        result_json = tmp_state_dir / "last_request_result.json"
+        result_data = json.loads(result_json.read_text(encoding="utf-8"))
+        assert result_data["outcome"]["outcome_code"] == "clarification_requested"
+        assert result_data["route"]["mode"] == "CLARIFY"
 
     def test_clarify_records_terminal_sqlite(self, engine):
         """CLARIFY should write terminal outcome to SQLite."""
@@ -406,6 +404,7 @@ class TestFullVoiceTurn:
         verify both file and SQLite state are consistent.
         """
         os.environ["LUCY_EXEC_PY"] = "1"
+        os.environ["LUCY_UI_STATE_DIR"] = str(tmp_state_dir)
         engine = ExecutionEngine(config={
             "state_dir": str(tmp_state_dir),
             "use_sqlite_state": True,
@@ -427,9 +426,9 @@ class TestFullVoiceTurn:
         assert result.status == "completed"
         assert result.response_text  # non-empty response
 
-        # Verify state writer was invoked (via file existence)
-        route_file = tmp_state_dir / "last_route.env"
-        assert route_file.exists()
+        # Verify JSON state files were written (env deprecated in Stream 3)
+        route_json = tmp_state_dir / "last_route.json"
+        assert route_json.exists()
 
         # Verify SQLite was invoked
         assert engine.state_manager.write_route.called
@@ -444,6 +443,7 @@ class TestFullVoiceTurn:
         Full voice turn: WEATHER route with evidence fetching mocked.
         """
         os.environ["LUCY_EXEC_PY"] = "1"
+        os.environ["LUCY_UI_STATE_DIR"] = str(tmp_state_dir)
         engine = ExecutionEngine(config={
             "state_dir": str(tmp_state_dir),
             "use_sqlite_state": True,
@@ -466,10 +466,10 @@ class TestFullVoiceTurn:
         assert result.route == "WEATHER"
         assert "Sunny, 22°C" in result.response_text
 
-        route_file = tmp_state_dir / "last_route.env"
-        content = route_file.read_text(encoding="utf-8")
-        assert "FINAL_MODE=WEATHER" in content
-        assert "REQUESTED_MODE=WEATHER" in content
+        route_json = tmp_state_dir / "last_route.json"
+        route_data = json.loads(route_json.read_text(encoding="utf-8"))
+        assert route_data["current_route"] == "WEATHER"
+        assert route_data["outcome_code"] == "answered"
 
 
 if __name__ == "__main__":
