@@ -508,76 +508,23 @@ class StateWriter:
         }
 
     def _build_route_snapshot_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Build last_route.json snapshot matching runtime_request.py schema."""
-        route = payload.get("route") if isinstance(payload.get("route"), dict) else {}
-        outcome = payload.get("outcome") if isinstance(payload.get("outcome"), dict) else {}
-        authority = payload.get("authority") if isinstance(payload.get("authority"), dict) else self._build_authority_payload()
-        current_route = str(
-            route.get("selected_route") or route.get("mode") or route.get("final_mode") or route.get("requested_mode") or ""
-        ).strip()
-        provider_used = str(
-            outcome.get("augmented_provider_used")
-            or outcome.get("augmented_provider")
-            or outcome.get("augmented_provider_selected")
-            or ""
-        ).strip()
-        trust_class = str(outcome.get("trust_class", "")).strip()
-        source_type = self._determine_route_source_type(current_route, provider_used, trust_class)
-        return {
-            "current_route": current_route,
-            "final_mode": str(route.get("final_mode", "")).strip(),
-            "intent_family": str(route.get("intent_family", "")).strip(),
-            "mode": str(route.get("mode", "")).strip(),
-            "outcome_code": str(outcome.get("outcome_code", "")).strip(),
-            "provider_used": provider_used or "none",
-            "request_id": str(payload.get("request_id", "")).strip(),
-            "route": current_route,
-            "route_reason": str(route.get("reason", "")).strip(),
-            "selected_route": str(route.get("selected_route", "")).strip(),
-            "source": source_type,
-            "source_type": source_type,
-            "status": str(payload.get("status", "")).strip(),
-            "answer_class": str(outcome.get("answer_class", "")).strip(),
-            "provider_authorization": str(outcome.get("provider_authorization", "")).strip(),
-            "operator_trust_label": str(outcome.get("operator_trust_label", "")).strip(),
-            "operator_answer_path": str(outcome.get("operator_answer_path", "")).strip(),
-            "trust_class": trust_class,
-            "updated_at": str(payload.get("completed_at", "")).strip() or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "authority": authority if isinstance(authority, dict) else {},
-        }
+        """Build last_route.json snapshot — delegates to shared payload_builders."""
+        from router_py.payload_builders import build_route_snapshot_payload
 
-    def _determine_route_source_type(self, current_route: str, provider_used: str, trust_class: str) -> str:
-        """Mirror of runtime_request.py:determine_route_source_type()."""
-        route_label = current_route.strip().upper()
-        provider_label = provider_used.strip().lower()
-        trust_label = trust_class.strip().lower()
-        if provider_label in {"openai", "grok", "wikipedia"}:
-            return provider_label
-        if route_label == "LOCAL":
-            return "local"
-        if route_label == "EVIDENCE":
-            return "evidence"
-        if route_label == "SELF_REVIEW":
-            return "self_review"
-        if trust_label:
-            return trust_label
-        return "unknown"
+        snapshot = build_route_snapshot_payload(payload)
+        # Ensure authority is populated if missing from payload
+        if not snapshot.get("authority"):
+            snapshot["authority"] = self._build_authority_payload()
+        # Ensure updated_at is set
+        if not snapshot.get("updated_at"):
+            snapshot["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return snapshot
 
     def _build_history_entry(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Mirror of runtime_request.py:build_history_entry()."""
-        control_state = payload.get("control_state")
-        return {
-            "authority": payload.get("authority", {}) if isinstance(payload.get("authority"), dict) else {},
-            "completed_at": payload.get("completed_at", ""),
-            "control_state": control_state if isinstance(control_state, dict) else {},
-            "error": payload.get("error", ""),
-            "outcome": payload.get("outcome", {}) if isinstance(payload.get("outcome"), dict) else {},
-            "request_id": payload.get("request_id", ""),
-            "request_text": payload.get("request_text", ""),
-            "response_text": payload.get("response_text", ""),
-            "route": payload.get("route", {}) if isinstance(payload.get("route"), dict) else {},
-            "status": payload.get("status", ""),
-        }
+        """Build a history entry — delegates to shared payload_builders."""
+        from router_py.payload_builders import build_history_entry
+
+        return build_history_entry(payload)
 
     # -- Atomic I/O helpers --
 

@@ -38,6 +38,23 @@ try:
 except ImportError:
     HAS_STATE_MANAGER = False
 
+try:
+    from payload_builders import (
+        build_history_entry,
+        build_route_snapshot_payload,
+        determine_route_source_type,
+    )
+except ImportError:
+    # Fallback for environments where router_py is not on path
+    def build_route_snapshot_payload(payload: dict[str, Any]) -> dict[str, Any]:  # type: ignore[misc]
+        raise NotImplementedError("payload_builders not available")
+
+    def determine_route_source_type(*, current_route: str, provider_used: str, trust_class: str) -> str:  # type: ignore[misc]
+        raise NotImplementedError("payload_builders not available")
+
+    def build_history_entry(payload: dict[str, Any]) -> dict[str, Any]:  # type: ignore[misc]
+        raise NotImplementedError("payload_builders not available")
+
 
 DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_ACTIVE_HISTORY_MAX_ENTRIES = 200
@@ -2171,58 +2188,6 @@ def persist_route_snapshot(payload: dict[str, Any]) -> None:
         os.replace(tmp_path, snapshot_path)
 
 
-def build_route_snapshot_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    route = payload.get("route") if isinstance(payload.get("route"), dict) else {}
-    outcome = payload.get("outcome") if isinstance(payload.get("outcome"), dict) else {}
-    authority = payload.get("authority") if isinstance(payload.get("authority"), dict) else build_authority_payload()
-    current_route = _stringify(route.get("selected_route") or route.get("mode") or route.get("final_mode") or route.get("requested_mode"))
-    provider_used = _stringify(
-        outcome.get("augmented_provider_used")
-        or outcome.get("augmented_provider")
-        or outcome.get("augmented_provider_selected")
-    )
-    source_type = determine_route_source_type(current_route=current_route, provider_used=provider_used, trust_class=_stringify(outcome.get("trust_class")))
-    return {
-        "current_route": current_route,
-        "final_mode": _stringify(route.get("final_mode")),
-        "intent_family": _stringify(route.get("intent_family")),
-        "mode": _stringify(route.get("mode")),
-        "outcome_code": _stringify(outcome.get("outcome_code")),
-        "provider_used": provider_used or "none",
-        "request_id": _stringify(payload.get("request_id")),
-        "route": current_route,
-        "route_reason": _stringify(route.get("reason")),
-        "selected_route": _stringify(route.get("selected_route")),
-        "source": source_type,
-        "source_type": source_type,
-        "status": _stringify(payload.get("status")),
-        "answer_class": _stringify(outcome.get("answer_class")),
-        "provider_authorization": _stringify(outcome.get("provider_authorization")),
-        "operator_trust_label": _stringify(outcome.get("operator_trust_label")),
-        "operator_answer_path": _stringify(outcome.get("operator_answer_path")),
-        "trust_class": _stringify(outcome.get("trust_class")),
-        "updated_at": _stringify(payload.get("completed_at")) or iso_now(),
-        "authority": authority if isinstance(authority, dict) else {},
-    }
-
-
-def determine_route_source_type(*, current_route: str, provider_used: str, trust_class: str) -> str:
-    route_label = current_route.strip().upper()
-    provider_label = provider_used.strip().lower()
-    trust_label = trust_class.strip().lower()
-    if provider_label in {"openai", "grok", "wikipedia"}:
-        return provider_label
-    if route_label == "LOCAL":
-        return "local"
-    if route_label == "EVIDENCE":
-        return "evidence"
-    if route_label == "SELF_REVIEW":
-        return "self_review"
-    if trust_label:
-        return trust_label
-    return "unknown"
-
-
 def append_history_entry(history_file: Path, payload: dict[str, Any]) -> None:
     entry = build_history_entry(payload)
     request_id = str(entry.get("request_id", "")).strip()
@@ -2237,22 +2202,6 @@ def append_history_entry(history_file: Path, payload: dict[str, Any]) -> None:
             handle.write(json.dumps(entry, sort_keys=True))
             handle.write("\n")
         rotate_history_if_needed(history_file, max_entries=resolve_history_max_entries())
-
-
-def build_history_entry(payload: dict[str, Any]) -> dict[str, Any]:
-    control_state = payload.get("control_state")
-    return {
-        "authority": payload.get("authority", {}) if isinstance(payload.get("authority"), dict) else {},
-        "completed_at": payload.get("completed_at", ""),
-        "control_state": control_state if isinstance(control_state, dict) else {},
-        "error": payload.get("error", ""),
-        "outcome": payload.get("outcome", {}) if isinstance(payload.get("outcome"), dict) else {},
-        "request_id": payload.get("request_id", ""),
-        "request_text": payload.get("request_text", ""),
-        "response_text": payload.get("response_text", ""),
-        "route": payload.get("route", {}) if isinstance(payload.get("route"), dict) else {},
-        "status": payload.get("status", ""),
-    }
 
 
 def _history_contains_request_id(history_file: Path, request_id: str) -> bool:
