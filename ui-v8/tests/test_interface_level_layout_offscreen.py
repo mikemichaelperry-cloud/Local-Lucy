@@ -54,7 +54,8 @@ def main() -> int:
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(home / "lucy" / "snapshots" / "lucy-v8")
+        # Use real repo path so backend can import router_py
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(Path("/home/mike/lucy-v8"))
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
@@ -68,11 +69,10 @@ def main() -> int:
         window.refresh_runtime_state()
         app.processEvents()
 
-        assert_ok(set(window._level_buttons.keys()) == {"operator", "advanced"}, "only operator/advanced levels should be exposed")
-        assert_ok("engineering" not in window._level_buttons, "engineering level should no longer be exposed")
-        assert_ok("service" not in window._level_buttons, "service level should no longer be exposed")
+        # Current 3-level structure: simple, power, engineering
+        assert_ok(set(window._level_buttons.keys()) == {"simple", "power", "engineering"}, "simple/power/engineering levels should be exposed")
 
-        for level in ("advanced",):
+        for level in ("engineering",):
             window._handle_interface_level_selected(level)
             window.resize(1200, 760)
             app.processEvents()
@@ -85,10 +85,11 @@ def main() -> int:
                 window.status_panel._runtime_summary_labels["Current Route"].text() == "not yet populated",
                 f"{level}: optional route state should read as not yet populated",
             )
-            assert_ok(
-                window.status_panel._runtime_detail_labels["Preprocess Active"].text() == "not yet populated",
-                f"{level}: optional preprocess state should read as not yet populated",
-            )
+            # Preprocess Active field removed in Stream 1 (dead field cleanup)
+            # assert_ok(
+            #     window.status_panel._runtime_detail_labels["Preprocess Active"].text() == "not yet populated",
+            #     f"{level}: optional preprocess state should read as not yet populated",
+            # )
             assert_ok(
                 "file missing" not in window.status_panel._runtime_detail_labels["Voice Backend"].text().lower(),
                 f"{level}: voice backend should avoid raw file-missing wording",

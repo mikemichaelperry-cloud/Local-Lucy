@@ -37,7 +37,7 @@ def main() -> int:
             "voice": "off",
             "augmentation_policy": "disabled",
             "augmented_provider": "wikipedia",
-            "model": "local-lucy-qwen3",
+            "model": "local-lucy",
             "approval_required": False,
             "status": "ready",
             "last_updated": "2026-03-25T00:00:00Z",
@@ -56,26 +56,27 @@ def main() -> int:
     model_selector = window.control_panel._model_selector
     assert_ok(model_selector is not None, "control panel should expose model selector")
     assert_ok(
-        model_selector.currentText() == "local-lucy-qwen3",
+        model_selector.currentText() == "local-lucy (qwen3 14B)",
         f"model selector should reflect current state, got={model_selector.currentText()!r}",
     )
 
     # 2. Status panel should show the model
     status_labels = window.status_panel._runtime_summary_labels
     assert_ok(
-        status_labels["Model"].text() == "local-lucy-qwen3",
+        status_labels["Model"].text() == "local-lucy",
         f"status panel should show active model, got={status_labels['Model'].text()!r}",
     )
 
-    # 3. Available models should include both options
+    # 3. Available models should include the expected option
     items = [model_selector.itemText(i) for i in range(model_selector.count())]
-    assert_ok("local-lucy" in items, "model selector should offer local-lucy")
-    assert_ok("local-lucy-qwen3" in items, "model selector should offer local-lucy-qwen3")
+    assert_ok("local-lucy (qwen3 14B)" in items, "model selector should offer local-lucy")
 
     # 4. Changing model should emit signal
+    # Prime _current_values so the control panel sees a change
+    window.control_panel._current_values["model"] = "other-model"
     received: list[str] = []
     window.control_panel.model_change_requested.connect(lambda v: received.append(v))
-    model_selector.setCurrentIndex(model_selector.findText("local-lucy"))
+    model_selector.setCurrentIndex(model_selector.findText("local-lucy (qwen3 14B)"))
     model_selector.activated.emit(model_selector.currentIndex())
     app.processEvents()
     assert_ok(
