@@ -3,19 +3,30 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${LUCY_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)}"
+
+UI_V8_MODE=0
 MANIFEST="${LUCY_SHA_MANIFEST:-$ROOT/SHA256SUMS.clean}"
 
 usage() {
   cat <<'EOF'
-Usage: tools/sha_manifest.sh [regen|check|list]
+Usage: tools/sha_manifest.sh [--ui-v8] [regen|check|list]
 
-  regen  Regenerate SHA256SUMS.clean for clean source/config/runtime files
-  check  Verify SHA256SUMS.clean
-  list   Print tracked file list
+  --ui-v8  Target ui-v8/SHA256SUMS.clean instead of the root manifest
+  regen    Regenerate SHA256SUMS.clean for clean source/config/runtime files
+  check    Verify SHA256SUMS.clean
+  list     Print tracked file list
 EOF
 }
 
 collect_files() {
+  if [[ "$UI_V8_MODE" -eq 1 ]]; then
+    _collect_ui_v8_files
+  else
+    _collect_root_files
+  fi
+}
+
+_collect_root_files() {
   (
     cd "$ROOT"
     find \
@@ -61,7 +72,42 @@ collect_files() {
       -print0 \
       | sort -z \
       | xargs -0 -n1 printf '%s\n' \
-      | sed 's#^\./##'
+      | sed 's#^\.\/##'
+  )
+}
+
+_collect_ui_v8_files() {
+  (
+    cd "$ROOT"
+    find \
+      ./ui-v8/app \
+      ./ui-v8/tests \
+      ./ui-v8/tools \
+      -type f \
+      ! -path "*/build/*" \
+      ! -path "*/vendor/*" \
+      ! -path "*/.git/*" \
+      ! -path "*/.github/*" \
+      ! -path "*/.devops/*" \
+      ! -path "*/.idea/*" \
+      ! -path "*/.venv/*" \
+      ! -path "*/.pytest_cache/*" \
+      ! -path "*/__pycache__/*" \
+      ! -name "*.pyc" \
+      ! -name "*.bak" \
+      ! -name "*.bak*" \
+      ! -name "*.BROKEN.*" \
+      ! -name "*.fixbak.*" \
+      ! -name "*.tmp" \
+      ! -name ".DS_Store" \
+      ! -name "SHA256SUMS.clean" \
+      ! -name "SHA256SUMS" \
+      ! -name "SHA256SUMS.txt" \
+      ! -name "CHECKSUMS_SHA256.txt" \
+      -print0 \
+      | sort -z \
+      | xargs -0 -n1 printf '%s\n' \
+      | sed 's#^\.\/##'
   )
 }
 
@@ -80,6 +126,8 @@ regen_manifest() {
 
   if [[ "$MANIFEST" == "$ROOT/SHA256SUMS.clean" ]]; then
     cp "$MANIFEST" "$ROOT/SHA256SUMS"
+  elif [[ "$MANIFEST" == "$ROOT/ui-v8/SHA256SUMS.clean" ]]; then
+    cp "$MANIFEST" "$ROOT/ui-v8/SHA256SUMS"
   fi
 }
 
@@ -90,7 +138,14 @@ verify_manifest() {
   )
 }
 
+# Parse optional --ui-v8 flag
 cmd="${1:-check}"
+if [[ "$cmd" == "--ui-v8" ]]; then
+  UI_V8_MODE=1
+  MANIFEST="$ROOT/ui-v8/SHA256SUMS.clean"
+  cmd="${2:-check}"
+fi
+
 case "$cmd" in
   regen)
     regen_manifest
