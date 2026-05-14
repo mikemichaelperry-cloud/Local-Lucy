@@ -125,3 +125,58 @@ jobs:
         run: |
           cd tools/tests
           python -m pytest test_end_to_end_comprehensive.py -q || true
+
+  # ---------------------------------------------------------------------------
+  # HMI offscreen tests — PySide6 headless GUI validation
+  # QT_QPA_PLATFORM=offscreen is set at the job level so all Qt widgets
+  # render to a dummy surface. Individual tests also set it as a safety net.
+  # ---------------------------------------------------------------------------
+  test-hmi-offscreen:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('ui-v8/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio
+          if [ -f ui-v8/requirements.txt ]; then
+            pip install -r ui-v8/requirements.txt
+          fi
+
+      - name: Run HMI offscreen tests
+        run: |
+          cd ui-v8/tests
+          # Clear shared state files between tests to prevent cross-test contamination
+          # (some offscreen tests write to the runtime state directory)
+          cleanup_state() {
+            rm -f ~/.codex-api-home/lucy/runtime-v8/state/request_history.jsonl
+            rm -f ~/.codex-api-home/lucy/runtime-v8/state/last_request_result.json
+          }
+          # Standalone offscreen scripts (each exits 0 on success)
+          # Decision trace must run before augmented_controls to avoid state pollution
+          cleanup_state && python test_decision_trace_offscreen.py
+          cleanup_state && python test_news_headline_punctuation_offscreen.py
+          cleanup_state && python test_optional_missing_vs_corruption_offscreen.py
+          cleanup_state && python test_scroll_preservation_offscreen.py
+          cleanup_state && python test_voice_ptt_pause_removed_offscreen.py
+          cleanup_state && python test_augmented_controls_offscreen.py
+          # PySide6 unittest-based tests
+          pytest test_voice_ptt_state_machine.py -q
+          # Changes verification (standalone script)
+          python test_changes_verification.py
