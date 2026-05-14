@@ -3,15 +3,25 @@
 
 Handles dual-write to SQLite (via StateManager) and legacy .env files,
 plus file-locking for safe concurrent access.
+
+Additionally writes HMI-facing JSON state files:
+  - last_request_result.json
+  - last_route.json
+  - request_history.jsonl
 """
 
 from __future__ import annotations
 
 import fcntl
+import hashlib
+import json
 import logging
+import os
 import re
+import tempfile
 import time
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Generator
 
@@ -271,6 +281,352 @@ class StateWriter:
                 outcome_file.write_text(outcome_content, encoding="utf-8")
             except Exception as e2:
                 self._logger.error(f"Unprotected write also failed: {e2}")
+
+    # ------------------------------------------------------------------
+    # HMI-facing JSON state files
+    # ------------------------------------------------------------------
+
+    def write_json_state_files(
+        self,
+        route: RoutingDecision,
+        result: ExecutionResult,
+        context: dict[str, Any],
+    ) -> None:
+        """Write HMI-facing JSON state files in the same schema as runtime_request.py.
+
+        This makes the Python router publish the same live status contract
+        that the HMI already understands, without changing HMI code.
+        """
+        try:
+            payload = self._build_json_payload(route, result, context)
+            ui_state_dir = self._resolve_ui_state_dir()
+            ui_state_dir.mkdir(parents=True, exist_ok=True)
+
+            # 1. last_request_result.json
+            result_file = ui_state_dir / "last_request_result.json"
+            self._write_json_atomic(result_file, payload, prefix=".last_request_result.")
+
+            # 2. last_route.json
+            route_snapshot = self._build_route_snapshot_payload(payload)
+            route_file = ui_state_dir / "last_route.json"
+            self._write_json_atomic(route_file, route_snapshot, prefix=".last_route.")
+
+            # 3. request_history.jsonl
+            history_file = ui_state_dir / "request_history.jsonl"
+            self._append_history_entry(history_file, payload)
+        except Exception as e:
+            self._logger.warning(f"Failed to write JSON state files: {e}")
+
+    # -- Path helpers --
+
+    def _resolve_ui_state_dir(self) -> Path:
+        """Return the UI state directory (same logic as runtime_request.py)."""
+        raw = os.environ.get("LUCY_UI_STATE_DIR", "").strip()
+        if raw:
+            return Path(raw).expanduser()
+        # Fallback: same default as runtime_request.py
+        home = Path.home()
+        workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
+        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v8" / "state"
+
+    # -- Payload builder --
+
+    def _build_json_payload(
+        self,
+        route: RoutingDecision,
+        result: ExecutionResult,
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Build a payload dict matching runtime_request.py's schema."""
+        question = _redact_pii(context.get("question", ""))
+        session_id = str(context.get("session_id", "") or "").strip()
+        request_id = str(context.get("request_id", "") or "").strip()
+        if not request_id:
+            request_id = self._make_request_id()
+
+        # Control state: best-effort from context + env fallback
+        control_state = self._build_control_state(context)
+
+        # Route block
+        route_block: dict[str, Any] = {
+            "mode": result.route or route.route,
+            "selected_route": result.route or route.route,
+            "requested_mode": "",
+            "final_mode": result.route or route.route,
+            "intent_family": route.intent_family or "",
+            "evidence_mode": route.evidence_mode or "",
+            "evidence_mode_reason": route.evidence_reason or "",
+            "evidence_mode_selection": "",
+            "authority_basis": "",
+            "winning_signal": "",
+            "query": question,
+            "reason": route.policy_reason or "router_classifier_mapper",
+            "session_id": session_id,
+            "utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+        # Outcome block
+        metadata = result.metadata or {}
+        outcome_block: dict[str, Any] = {
+            "action_hint": metadata.get("action_hint", ""),
+            "requested_mode": "",
+            "final_mode": result.route,
+            "answer_class": "",
+            "provider_authorization": "not_applicable",
+            "operator_trust_label": metadata.get("trust_class", "local"),
+            "operator_answer_path": "unknown",
+            "operator_note": "",
+            "fallback_used": "true" if metadata.get("fallback_used") else "false",
+            "fallback_reason": metadata.get("fallback_reason", ""),
+            "trust_class": metadata.get("trust_class", "local"),
+            "intent_family": route.intent_family or "",
+            "evidence_mode": route.evidence_mode or "",
+            "evidence_mode_reason": route.evidence_reason or "",
+            "evidence_mode_selection": "",
+            "augmented_allowed": "",
+            "augmented_provider": "",
+            "augmented_provider_selected": "",
+            "augmented_provider_used": result.provider if result.route == "AUGMENTED" else "none",
+            "augmented_provider_usage_class": result.provider_usage_class or "local",
+            "augmented_provider_call_reason": metadata.get("augmented_provider_call_reason", ""),
+            "augmented_provider_status": metadata.get("augmented_provider_status", ""),
+            "augmented_provider_error_reason": "",
+            "augmented_provider_selection_reason": "",
+            "augmented_provider_selection_query": "",
+            "augmented_provider_selection_rule": "",
+            "augmented_provider_cost_notice": "",
+            "augmented_paid_provider_invoked": "true" if result.provider_usage_class == "paid" and result.route == "AUGMENTED" else "false",
+            "augmentation_policy": control_state.get("augmentation_policy", ""),
+            "augmented_direct_request": metadata.get("augmented_direct_request", ""),
+            "unverified_context_used": "",
+            "unverified_context_class": "",
+            "unverified_context_title": "",
+            "unverified_context_url": "",
+            "primary_outcome_code": "",
+            "primary_trust_class": "",
+            "recovery_attempted": "",
+            "recovery_used": "",
+            "recovery_eligible": "",
+            "recovery_lane": "",
+            "augmented_behavior_shape": "",
+            "augmented_clarification_required": "",
+            "augmented_answer_contract": {},
+            "self_review_request": "",
+            "self_review_mode": "",
+            "self_review_targets": "",
+            "self_review_target_count": "",
+            "evidence_created": "",
+            "outcome_code": result.outcome_code,
+            "rc": 0,
+            "utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+        # Authority block
+        authority_block = self._build_authority_payload()
+
+        return {
+            "accepted": True,
+            "authority": authority_block,
+            "completed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "control_state": control_state,
+            "error": result.error_message or "",
+            "outcome": outcome_block,
+            "request_id": request_id,
+            "request_text": question,
+            "response_text": result.response_text or "",
+            "route": route_block,
+            "status": result.status,
+        }
+
+    def _build_control_state(self, context: dict[str, Any]) -> dict[str, str]:
+        """Build control_state dict from context + environment fallbacks."""
+        # Map boolean flags to on/off strings
+        def _toggle(val: Any) -> str:
+            if val in (True, "1", "on", "yes"):
+                return "on"
+            if val in (False, "0", "off", "no", ""):
+                return "off"
+            return str(val) if val else "off"
+
+        mode = str(context.get("mode", "") or os.environ.get("LUCY_ROUTE_CONTROL_MODE", "auto")).strip()
+        memory = _toggle(context.get("memory_enabled", os.environ.get("LUCY_SESSION_MEMORY", "0")))
+        evidence = _toggle(context.get("evidence_enabled", os.environ.get("LUCY_EVIDENCE_ENABLED", "0")))
+        voice = _toggle(os.environ.get("LUCY_VOICE_ENABLED", "0"))
+        augmentation_policy = str(
+            context.get("augmentation_policy", "")
+            or os.environ.get("LUCY_AUGMENTATION_POLICY", "disabled")
+        ).strip()
+        augmented_provider = str(
+            context.get("augmented_provider", "")
+            or os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
+        ).strip()
+        model = str(
+            context.get("model", "")
+            or os.environ.get("LUCY_MODEL", "local-lucy")
+        ).strip()
+        profile = str(os.environ.get("LUCY_RUNTIME_PROFILE", "opt-experimental-v8-dev")).strip()
+
+        return {
+            "mode": mode,
+            "memory": memory,
+            "evidence": evidence,
+            "voice": voice,
+            "augmentation_policy": augmentation_policy,
+            "augmented_provider": augmented_provider,
+            "model": model,
+            "profile": profile,
+        }
+
+    def _build_authority_payload(self) -> dict[str, Any]:
+        """Build authority block matching runtime_request.py schema."""
+        # Resolve paths using same logic as runtime_request.py
+        home = Path.home()
+        workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
+        authority_root = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path(__file__).resolve().parents[2]))).expanduser()
+        runtime_namespace = workspace_home / ".codex-api-home" / "lucy" / "runtime-v8"
+        legacy_root = workspace_home / "lucy" / "runtime-v8"
+        return {
+            "active_root": str(authority_root),
+            "authority_root": str(authority_root),
+            "runtime_namespace_root": str(runtime_namespace),
+            "legacy_runtime_namespace_root": str(legacy_root),
+            "legacy_runtime_namespace_present": legacy_root.exists(),
+            "legacy_runtime_namespace_status": (
+                "same" if runtime_namespace.resolve() == legacy_root.resolve()
+                else "stale_parallel_tree_present" if legacy_root.exists()
+                else "absent"
+            ),
+        }
+
+    def _build_route_snapshot_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Build last_route.json snapshot matching runtime_request.py schema."""
+        route = payload.get("route") if isinstance(payload.get("route"), dict) else {}
+        outcome = payload.get("outcome") if isinstance(payload.get("outcome"), dict) else {}
+        authority = payload.get("authority") if isinstance(payload.get("authority"), dict) else self._build_authority_payload()
+        current_route = str(
+            route.get("selected_route") or route.get("mode") or route.get("final_mode") or route.get("requested_mode") or ""
+        ).strip()
+        provider_used = str(
+            outcome.get("augmented_provider_used")
+            or outcome.get("augmented_provider")
+            or outcome.get("augmented_provider_selected")
+            or ""
+        ).strip()
+        trust_class = str(outcome.get("trust_class", "")).strip()
+        source_type = self._determine_route_source_type(current_route, provider_used, trust_class)
+        return {
+            "current_route": current_route,
+            "final_mode": str(route.get("final_mode", "")).strip(),
+            "intent_family": str(route.get("intent_family", "")).strip(),
+            "mode": str(route.get("mode", "")).strip(),
+            "outcome_code": str(outcome.get("outcome_code", "")).strip(),
+            "provider_used": provider_used or "none",
+            "request_id": str(payload.get("request_id", "")).strip(),
+            "route": current_route,
+            "route_reason": str(route.get("reason", "")).strip(),
+            "selected_route": str(route.get("selected_route", "")).strip(),
+            "source": source_type,
+            "source_type": source_type,
+            "status": str(payload.get("status", "")).strip(),
+            "answer_class": str(outcome.get("answer_class", "")).strip(),
+            "provider_authorization": str(outcome.get("provider_authorization", "")).strip(),
+            "operator_trust_label": str(outcome.get("operator_trust_label", "")).strip(),
+            "operator_answer_path": str(outcome.get("operator_answer_path", "")).strip(),
+            "trust_class": trust_class,
+            "updated_at": str(payload.get("completed_at", "")).strip() or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "authority": authority if isinstance(authority, dict) else {},
+        }
+
+    def _determine_route_source_type(self, current_route: str, provider_used: str, trust_class: str) -> str:
+        """Mirror of runtime_request.py:determine_route_source_type()."""
+        route_label = current_route.strip().upper()
+        provider_label = provider_used.strip().lower()
+        trust_label = trust_class.strip().lower()
+        if provider_label in {"openai", "grok", "wikipedia"}:
+            return provider_label
+        if route_label == "LOCAL":
+            return "local"
+        if route_label == "EVIDENCE":
+            return "evidence"
+        if route_label == "SELF_REVIEW":
+            return "self_review"
+        if trust_label:
+            return trust_label
+        return "unknown"
+
+    def _build_history_entry(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Mirror of runtime_request.py:build_history_entry()."""
+        control_state = payload.get("control_state")
+        return {
+            "authority": payload.get("authority", {}) if isinstance(payload.get("authority"), dict) else {},
+            "completed_at": payload.get("completed_at", ""),
+            "control_state": control_state if isinstance(control_state, dict) else {},
+            "error": payload.get("error", ""),
+            "outcome": payload.get("outcome", {}) if isinstance(payload.get("outcome"), dict) else {},
+            "request_id": payload.get("request_id", ""),
+            "request_text": payload.get("request_text", ""),
+            "response_text": payload.get("response_text", ""),
+            "route": payload.get("route", {}) if isinstance(payload.get("route"), dict) else {},
+            "status": payload.get("status", ""),
+        }
+
+    # -- Atomic I/O helpers --
+
+    def _write_json_atomic(self, path: Path, data: dict[str, Any], *, prefix: str) -> None:
+        """Write JSON atomically with file locking."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with self._file_lock(path):
+            tmp = tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=path.parent, delete=False, prefix=prefix, suffix=".tmp"
+            )
+            try:
+                json.dump(data, tmp, indent=2, sort_keys=True)
+                tmp.write("\n")
+                tmp.close()
+                os.replace(tmp.name, path)
+            except Exception:
+                try:
+                    Path(tmp.name).unlink(missing_ok=True)
+                except Exception:
+                    pass
+                raise
+
+    def _append_history_entry(self, history_file: Path, payload: dict[str, Any]) -> None:
+        """Append deduplicated entry to request_history.jsonl."""
+        entry = self._build_history_entry(payload)
+        request_id = str(entry.get("request_id", "")).strip()
+        if not request_id:
+            return
+        history_file.parent.mkdir(parents=True, exist_ok=True)
+        with self._file_lock(history_file):
+            if self._history_contains_request_id(history_file, request_id):
+                return
+            with history_file.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry, sort_keys=True))
+                handle.write("\n")
+
+    def _history_contains_request_id(self, history_file: Path, request_id: str) -> bool:
+        """Check if request_id already exists in history file."""
+        if not history_file.exists():
+            return False
+        try:
+            for raw_line in history_file.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    parsed = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict) and str(parsed.get("request_id", "")).strip() == request_id:
+                    return True
+        except OSError:
+            pass
+        return False
+
+    def _make_request_id(self) -> str:
+        """Generate a request ID matching runtime_request.py format."""
+        return f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}-{os.getpid()}"
 
     # ------------------------------------------------------------------
     # SQLite read

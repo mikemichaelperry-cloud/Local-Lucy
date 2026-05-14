@@ -661,5 +661,168 @@ class TestPIIRedaction:
         assert "[REDACTED-EMAIL]" in outcome_call[0][0]["error_message"]
 
 
+# ---------------------------------------------------------------------------
+# HMI-facing JSON state files
+# ---------------------------------------------------------------------------
+
+
+class TestJsonStateFiles:
+    """Test StateWriter JSON state file publishing (Option A)."""
+
+    def test_write_json_creates_result_file(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        writer.write_json_state_files(sample_route, sample_result, sample_context)
+        assert (tmp_path / "last_request_result.json").exists()
+
+    def test_write_json_creates_route_file(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        writer.write_json_state_files(sample_route, sample_result, sample_context)
+        assert (tmp_path / "last_route.json").exists()
+
+    def test_write_json_creates_history_file(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        writer.write_json_state_files(sample_route, sample_result, sample_context)
+        assert (tmp_path / "request_history.jsonl").exists()
+
+    def test_result_payload_schema(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        writer.write_json_state_files(sample_route, sample_result, sample_context)
+        payload = json.loads((tmp_path / "last_request_result.json").read_text(encoding="utf-8"))
+        assert payload["status"] == "completed"
+        assert payload["request_text"] == "What is the meaning of life?"
+        assert payload["response_text"] == "The answer is 42."
+        assert payload["route"]["mode"] == "LOCAL"
+        assert payload["outcome"]["outcome_code"] == "answered"
+        assert payload["outcome"]["trust_class"] == "local"
+        assert payload["outcome"]["augmented_provider_used"] == "none"
+        assert payload["control_state"]["mode"] == "auto"
+        assert payload["control_state"]["memory"] == "off"
+        assert "request_id" in payload
+        assert payload["error"] == ""
+
+    def test_route_snapshot_schema(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        writer.write_json_state_files(sample_route, sample_result, sample_context)
+        snapshot = json.loads((tmp_path / "last_route.json").read_text(encoding="utf-8"))
+        assert snapshot["current_route"] == "LOCAL"
+        assert snapshot["route"] == "LOCAL"
+        assert snapshot["source_type"] == "local"
+        assert snapshot["source"] == "local"
+        assert snapshot["trust_class"] == "local"
+        assert snapshot["outcome_code"] == "answered"
+        assert snapshot["provider_used"] == "none"
+        assert "authority" in snapshot
+
+    def test_history_entry_schema(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        writer.write_json_state_files(sample_route, sample_result, sample_context)
+        lines = (tmp_path / "request_history.jsonl").read_text(encoding="utf-8").strip().splitlines()
+        assert len(lines) == 1
+        entry = json.loads(lines[0])
+        assert entry["status"] == "completed"
+        assert entry["request_text"] == "What is the meaning of life?"
+        assert entry["route"]["mode"] == "LOCAL"
+        assert entry["outcome"]["outcome_code"] == "answered"
+        assert "request_id" in entry
+
+    def test_history_deduplication(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        # First write
+        writer.write_json_state_files(sample_route, sample_result, sample_context)
+        # Second write with same request_id
+        writer.write_json_state_files(sample_route, sample_result, sample_context)
+        lines = (tmp_path / "request_history.jsonl").read_text(encoding="utf-8").strip().splitlines()
+        assert len(lines) == 1
+
+    def test_augmented_route_provider(self, writer, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        route = RoutingDecision(
+            route="AUGMENTED", mode="AUTO", intent_family="factual",
+            confidence=0.88, provider="openai", provider_usage_class="paid",
+            evidence_mode="",
+        )
+        result = ExecutionResult(
+            status="completed", outcome_code="augmented_answer",
+            route="AUGMENTED", provider="openai", provider_usage_class="paid",
+            response_text="Answer.", execution_time_ms=200,
+            metadata={"trust_class": "unverified", "augmented_direct_request": "1"},
+        )
+        writer.write_json_state_files(route, result, sample_context)
+        payload = json.loads((tmp_path / "last_request_result.json").read_text(encoding="utf-8"))
+        assert payload["route"]["mode"] == "AUGMENTED"
+        assert payload["outcome"]["augmented_provider_used"] == "openai"
+        assert payload["outcome"]["augmented_paid_provider_invoked"] == "true"
+        snapshot = json.loads((tmp_path / "last_route.json").read_text(encoding="utf-8"))
+        assert snapshot["current_route"] == "AUGMENTED"
+        assert snapshot["source_type"] == "openai"
+
+    def test_wikipedia_route_paid_false(self, writer, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        route = RoutingDecision(
+            route="AUGMENTED", mode="AUTO", intent_family="factual",
+            confidence=0.85, provider="wikipedia", provider_usage_class="free",
+            evidence_mode="",
+        )
+        result = ExecutionResult(
+            status="completed", outcome_code="augmented_answer",
+            route="AUGMENTED", provider="wikipedia", provider_usage_class="free",
+            response_text="Answer.", execution_time_ms=150,
+            metadata={"trust_class": "evidence_backed"},
+        )
+        writer.write_json_state_files(route, result, sample_context)
+        payload = json.loads((tmp_path / "last_request_result.json").read_text(encoding="utf-8"))
+        assert payload["outcome"]["augmented_provider_used"] == "wikipedia"
+        assert payload["outcome"]["augmented_paid_provider_invoked"] == "false"
+
+    def test_error_case(self, writer, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        route = RoutingDecision(
+            route="LOCAL", mode="AUTO", intent_family="local_answer",
+            confidence=0.90, provider="local", provider_usage_class="local",
+            evidence_mode="",
+        )
+        result = ExecutionResult(
+            status="failed", outcome_code="execution_error",
+            route="LOCAL", provider="local", provider_usage_class="local",
+            response_text="", error_message="Model timeout",
+            execution_time_ms=5000, metadata={},
+        )
+        writer.write_json_state_files(route, result, sample_context)
+        payload = json.loads((tmp_path / "last_request_result.json").read_text(encoding="utf-8"))
+        assert payload["status"] == "failed"
+        assert payload["error"] == "Model timeout"
+        snapshot = json.loads((tmp_path / "last_route.json").read_text(encoding="utf-8"))
+        assert snapshot["status"] == "failed"
+        assert snapshot["outcome_code"] == "execution_error"
+
+    def test_control_state_from_env(self, writer, sample_route, sample_result, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
+        monkeypatch.setenv("LUCY_EVIDENCE_ENABLED", "1")
+        monkeypatch.setenv("LUCY_VOICE_ENABLED", "1")
+        monkeypatch.setenv("LUCY_MODEL", "local-lucy-qwen3")
+        monkeypatch.setenv("LUCY_AUGMENTATION_POLICY", "fallback_only")
+        monkeypatch.setenv("LUCY_AUGMENTED_PROVIDER", "openai")
+        writer.write_json_state_files(sample_route, sample_result, {"question": "Hello"})
+        payload = json.loads((tmp_path / "last_request_result.json").read_text(encoding="utf-8"))
+        cs = payload["control_state"]
+        assert cs["memory"] == "on"
+        assert cs["evidence"] == "on"
+        assert cs["voice"] == "on"
+        assert cs["model"] == "local-lucy-qwen3"
+        assert cs["augmentation_policy"] == "fallback_only"
+        assert cs["augmented_provider"] == "openai"
+
+    def test_no_exception_on_failure(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch, caplog):
+        """JSON write failures must be swallowed (same contract as .env writes)."""
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        # Make the directory a file to force a write error
+        (tmp_path / "last_request_result.json").mkdir(parents=True, exist_ok=True)
+        # This should NOT raise
+        with caplog.at_level(logging.WARNING, logger="test_state_writer"):
+            writer.write_json_state_files(sample_route, sample_result, sample_context)
+        assert "Failed to write JSON state files" in caplog.text
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
