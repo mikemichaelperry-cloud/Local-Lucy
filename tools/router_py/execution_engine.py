@@ -725,6 +725,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                 metadata={"reason": "empty_query_rejected"},
             )
             self._write_state_files(route, result, context)
+            self._write_json_state_files(route, result, context)
             return result
         
         # Use Python-native path by default for all routes (shell-free)
@@ -829,6 +830,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             
             # Persist execution state
             self._write_state_files(route, final_result, context)
+            self._write_json_state_files(route, final_result, context)
             
             # Auto-feedback: detect obvious misroutes from answer quality
             if HAS_AUTO_FEEDBACK and question:
@@ -889,6 +891,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             # Still try to write state files for error cases
             try:
                 self._write_state_files(route, error_result, context)
+                self._write_json_state_files(route, error_result, context)
             except Exception:
                 pass
 
@@ -960,6 +963,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         )
         
         self._write_state_files(route, result, context)
+        self._write_json_state_files(route, result, context)
         return result
     
     def _handle_medical_insufficient(
@@ -1829,6 +1833,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             
             # Persist execution state
             self._write_state_files(route, final_result, context)
+            self._write_json_state_files(route, final_result, context)
             
             self._logger.info(
                 f"Async execution complete: status={final_result.status}, "
@@ -1854,6 +1859,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             
             try:
                 self._write_state_files(route, error_result, context)
+                self._write_json_state_files(route, error_result, context)
             except Exception:
                 pass
             
@@ -2966,6 +2972,12 @@ them according to the route type (bypass, provisional, or full). It handles:
     ) -> None:
         """Dual-write execution state to SQLite and/or legacy .env files."""
         self.state_writer.write_state(route, result, context)
+
+    def _write_json_state_files(
+        self, route: RoutingDecision, result: ExecutionResult, context: dict[str, Any]
+    ) -> None:
+        """Write HMI-facing JSON state files (last_request_result, last_route, request_history)."""
+        self.state_writer.write_json_state_files(route, result, context)
 
     def _write_state_to_sqlite(
         self, route: RoutingDecision, result: ExecutionResult, context: dict[str, Any]
