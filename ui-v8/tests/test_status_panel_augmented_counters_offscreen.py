@@ -42,7 +42,7 @@ def main() -> int:
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(home / "lucy" / "snapshots" / "opt-experimental-v7-dev")
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(Path("/home/mike/lucy-v8"))
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
@@ -59,7 +59,7 @@ def main() -> int:
         assert_ok(labels["Augmented Policy"].text() == "disabled", "augmented policy should reflect runtime truth")
         assert_ok(labels["Model"].text() == "local-lucy", "model should reflect runtime truth")
         assert_ok(labels["Configured Provider"].text() == "wikipedia", "configured provider should reflect runtime truth")
-        assert_ok(labels["Configured Provider Paid"].text() == "no", "configured provider paid flag should reflect provider class")
+        assert_ok(labels["Configured Provider Paid"].text() == "Free", "configured provider paid flag should reflect provider class")
         assert_ok(labels["Last Request Provider"].text() == "unknown", "last request provider should be unknown before any request")
         assert_ok(labels["Last Request Paid"].text() == "unknown", "last request paid status should be unknown before any request")
         assert_ok(labels["Session Augmented Calls"].text() == "0", "initial total counter should be 0")

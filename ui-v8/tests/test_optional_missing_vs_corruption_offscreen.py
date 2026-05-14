@@ -43,7 +43,7 @@ def main() -> int:
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(home / "lucy" / "snapshots" / "lucy-v8")
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(Path("/home/mike/lucy-v8"))
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
@@ -68,13 +68,14 @@ def main() -> int:
             runtime_summary["Source Type"].text() == "invalid json",
             f"corrupted optional route details should remain visible as invalid json, got={runtime_summary['Source Type'].text()!r}",
         )
+        # Preprocess Active and Reduced Scope removed in Stream 1 (dead field cleanup)
         assert_ok(
-            runtime_detail["Preprocess Active"].text() == "not yet populated",
-            f"missing optional preprocess artifact should stay neutral, got={runtime_detail['Preprocess Active'].text()!r}",
+            "Preprocess Active" not in runtime_detail,
+            "Preprocess Active should have been removed from runtime_detail_labels",
         )
         assert_ok(
-            runtime_detail["Reduced Scope"].text() == "not yet populated",
-            f"missing optional preprocess detail should stay neutral, got={runtime_detail['Reduced Scope'].text()!r}",
+            "Reduced Scope" not in runtime_detail,
+            "Reduced Scope should have been removed from runtime_detail_labels",
         )
 
         window.close()
