@@ -229,7 +229,6 @@ if _contract_required():
 def load_runtime_snapshot() -> RuntimeSnapshot:
     current_state = _load_json(STATE_FILES["current_state"])
     last_route = _load_json(STATE_FILES["last_route"])
-    last_preprocess = _load_json(STATE_FILES["last_preprocess"])
     health = _load_json(STATE_FILES["health"])
     lifecycle = _load_json(STATE_FILES["runtime_lifecycle"])
     voice_runtime = _load_json(STATE_FILES["voice_runtime"])
@@ -280,13 +279,6 @@ def load_runtime_snapshot() -> RuntimeSnapshot:
         "Answer Class": _resolve_optional_value(last_route, (("answer_class",),)),
         "Operator Trust": _resolve_optional_value(last_route, (("operator_trust_label",), ("trust_class",))),
         "Voice State": _resolve_voice_state(voice_runtime_data, voice_runtime.status),
-        "Preprocess Active": _resolve_optional_value(last_preprocess, (("active",), ("preprocess_active",))),
-        "Reduced Scope": _resolve_optional_value(last_preprocess, (("reduced_scope",),)),
-        "Patch Surface Summary": _resolve_optional_value(last_preprocess, (("patch_surface_summary",),)),
-        "Uncertainty / Underspecified": _resolve_optional_value(
-            last_preprocess,
-            (("underspecified",), ("uncertainty",), ("notes",)),
-        ),
         "Voice Backend": _resolve_voice_backend(voice_runtime_data, voice_runtime.status),
         "Voice Error": _resolve_voice_error(voice_runtime_data, voice_runtime.status),
         "Augmented Policy": _resolve_value(current_state, (("augmentation_policy",),)),
