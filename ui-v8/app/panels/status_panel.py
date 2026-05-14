@@ -125,10 +125,6 @@ class StatusPanel(QFrame):
         self._runtime_detail_group = self._build_group(
             "Runtime Details",
             [
-                ("Preprocess Active", "unknown"),
-                ("Reduced Scope", "unknown"),
-                ("Patch Surface Summary", "unknown"),
-                ("Uncertainty / Underspecified", "unknown"),
                 ("Voice Backend", "unknown"),
                 ("Voice Error", "none"),
                 ("GPU Acceleration", "checking..."),
