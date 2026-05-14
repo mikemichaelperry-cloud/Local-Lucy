@@ -395,6 +395,7 @@ def execute_plan_python(
         # --- Delegate to unified pipeline ---
         pipeline_context = dict(context or {})
         pipeline_context["_logger"] = logger
+        pipeline_context["request_id"] = request_id
         result, classification, decision = request_pipeline.process(
             question,
             policy=policy,

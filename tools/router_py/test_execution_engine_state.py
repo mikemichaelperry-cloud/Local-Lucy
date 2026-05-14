@@ -823,6 +823,26 @@ class TestJsonStateFiles:
             writer.write_json_state_files(sample_route, sample_result, sample_context)
         assert "Failed to write JSON state files" in caplog.text
 
+    def test_request_id_propagation(self, writer, sample_route, sample_result, tmp_path, monkeypatch):
+        """request_id from main.py must flow through context into JSON payload and SQLite."""
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        ctx = {
+            "question": "What is the meaning of life?",
+            "resolved_question": "What is the meaning of life?",
+            "intent": "local_answer",
+            "is_medical_query": False,
+            "request_id": "a3f7b2d9e8c1d4e5",
+        }
+        writer.write_json_state_files(sample_route, sample_result, ctx)
+        payload = json.loads((tmp_path / "last_request_result.json").read_text(encoding="utf-8"))
+        assert payload["request_id"] == "a3f7b2d9e8c1d4e5"
+        # Also verify SQLite metadata carries request_id
+        mock_sm = MagicMock()
+        writer_sqlite = StateWriter("default", state_manager=mock_sm, logger=logging.getLogger("test"))
+        writer_sqlite._write_state_to_sqlite(sample_route, sample_result, ctx)
+        route_call = mock_sm.write_route.call_args[0][0]
+        assert route_call["metadata"]["request_id"] == "a3f7b2d9e8c1d4e5"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
