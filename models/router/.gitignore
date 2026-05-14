@@ -1,0 +1,14 @@
+# Runtime-generated learning metadata (mutable)
+examples_metadata.json
+user_feedback.jsonl.processed
+auto_feedback.jsonl.processed
+user_feedback.jsonl.bak
+
+# Learner lock file
+.learner_lock
+
+# Temporary index files
+.comprehensive_index.*.tmp
+
+# Version snapshots (large binary artifacts)
+versions/

@@ -471,3 +471,82 @@ class TestEndToEnd:
         # Verify cleanup
         assert not bl.FEEDBACK_PATH.exists()
         assert bl.FEEDBACK_PATH.with_suffix(".processed").exists()
+
+
+class TestTimestampStripping:
+    """Verify that mutable timestamps are kept out of the tracked examples file."""
+
+    def test_rebuild_embeddings_strips_timestamps(self, isolated_learner, tmp_path):
+        bl = isolated_learner
+
+        # Seed examples with timestamps (simulating user_feedback entries)
+        seed = [
+            {
+                "query": "What is 2+2?",
+                "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+                "metadata": {"source": "router_log", "timestamp": "2026-05-13T18:16:42.043684+00:00"},
+            },
+            {
+                "query": "What time is it?",
+                "labels": {"intent_family": "time_query", "evidence_mode": "not_required", "route": "TIME", "policy_override": "none"},
+                "metadata": {"source": "user_feedback", "timestamp": "2026-05-14T10:00:00Z"},
+            },
+        ]
+        bl.save_index(seed)
+
+        with patch.object(bl, "EmbeddingRouter", return_value=MagicMock(
+            fit=lambda ex: None,
+            examples=seed,
+            embeddings=np.zeros((2, 768), dtype=np.float32),
+        )):
+            bl.rebuild_embeddings(seed)
+
+        # Tracked examples file must NOT contain timestamps
+        with open(bl.EXAMPLES_PATH) as f:
+            saved = json.load(f)
+        for ex in saved:
+            assert "timestamp" not in ex.get("metadata", {}), f"timestamp leaked into tracked file for: {ex['query']}"
+
+        # Metadata file MUST contain the runtime timestamp
+        assert bl.EXAMPLES_METADATA_PATH.exists()
+        with open(bl.EXAMPLES_METADATA_PATH) as f:
+            meta = json.load(f)
+        assert "last_rebuilt" in meta
+        assert meta["example_count"] == 2
+
+    def test_examples_file_is_stable_after_rebuild(self, isolated_learner, tmp_path):
+        bl = isolated_learner
+
+        seed = [
+            {
+                "query": "What is 2+2?",
+                "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+                "metadata": {"source": "router_log"},
+            },
+        ]
+        bl.save_index(seed)
+
+        with patch.object(bl, "EmbeddingRouter", return_value=MagicMock(
+            fit=lambda ex: None,
+            examples=seed,
+            embeddings=np.zeros((1, 768), dtype=np.float32),
+        )):
+            bl.rebuild_embeddings(seed)
+
+        # Read first write
+        with open(bl.EXAMPLES_PATH) as f:
+            first = f.read()
+
+        # Rebuild again with identical data
+        with patch.object(bl, "EmbeddingRouter", return_value=MagicMock(
+            fit=lambda ex: None,
+            examples=seed,
+            embeddings=np.zeros((1, 768), dtype=np.float32),
+        )):
+            bl.rebuild_embeddings(seed)
+
+        # Read second write
+        with open(bl.EXAMPLES_PATH) as f:
+            second = f.read()
+
+        assert first == second, "Tracked examples file drifted between identical rebuilds"
