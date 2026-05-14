@@ -172,6 +172,7 @@ class StateWriter:
                     "is_medical_query": context.get("is_medical_query", False),
                     "final_mode": result.route,
                     "requested_mode": route.route,
+                    "request_id": context.get("request_id", ""),
                 },
             })
 
