@@ -94,3 +94,12 @@ models/router/versions/
 
 # Deprecated tools
 tools/deprecated/
+
+# Lock files for JSON state files
+state/*.json.lock
+
+# Runtime voice audio files
+voice/
+
+# Desktop backup files
+desktop_backups/
