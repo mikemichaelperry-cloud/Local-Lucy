@@ -38,6 +38,7 @@ ROUTER_DIR = Path(__file__).parent
 INDEX_PATH = ROUTER_DIR / "comprehensive_index.jsonl"
 EMBEDDINGS_PATH = ROUTER_DIR / "comprehensive_embeddings.npy"
 EXAMPLES_PATH = ROUTER_DIR / "comprehensive_examples.json"
+EXAMPLES_METADATA_PATH = ROUTER_DIR / "examples_metadata.json"
 FEEDBACK_PATH = ROUTER_DIR / "user_feedback.jsonl"
 LEARNED_PATH = ROUTER_DIR / "learned_examples.jsonl"
 
@@ -228,14 +229,46 @@ def save_index(examples: list[dict]):
     os.replace(tmp.name, INDEX_PATH)
 
 
+def _strip_example_timestamps(examples: list[dict]) -> list[dict]:
+    """Return a copy of examples with runtime timestamps removed.
+
+    Timestamps are mutable runtime metadata. They belong in
+    examples_metadata.json, not in the tracked examples file.
+    """
+    cleaned = []
+    for ex in examples:
+        copy = dict(ex)
+        meta = dict(copy.get("metadata", {}))
+        meta.pop("timestamp", None)
+        if meta:
+            copy["metadata"] = meta
+        elif "metadata" in copy:
+            del copy["metadata"]
+        cleaned.append(copy)
+    return cleaned
+
+
 def rebuild_embeddings(examples: list[dict]):
     """Rebuild embedding matrix from examples."""
     print(f"  Rebuilding embeddings for {len(examples)} examples...")
     router = EmbeddingRouter()
     router.fit(examples)
     np.save(EMBEDDINGS_PATH, router.embeddings)
+
+    # Write tracked examples file WITHOUT mutable timestamps
+    cleaned = _strip_example_timestamps(router.examples)
     with open(EXAMPLES_PATH, "w") as f:
-        json.dump(router.examples, f, indent=2)
+        json.dump(cleaned, f, indent=2)
+
+    # Write mutable metadata to separate untracked file
+    metadata = {
+        "last_rebuilt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "example_count": len(router.examples),
+        "embedding_shape": list(router.embeddings.shape),
+    }
+    with open(EXAMPLES_METADATA_PATH, "w") as f:
+        json.dump(metadata, f, indent=2)
+
     print(f"  Saved: {EMBEDDINGS_PATH} ({router.embeddings.shape})")
 
 
