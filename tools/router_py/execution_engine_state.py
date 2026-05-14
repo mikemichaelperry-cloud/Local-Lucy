@@ -140,14 +140,22 @@ class StateWriter:
         result: ExecutionResult,
         context: dict[str, Any],
     ) -> None:
-        """Dual-write to SQLite (if enabled) and legacy .env files."""
+        """Write state to SQLite (if enabled) and JSON files.
+
+        Legacy .env file writes are deprecated (Stream 3). They are
+        retained in _write_state_to_files() for reference during burn-in
+        but are no longer invoked by the public entry point.
+        """
         if self.use_sqlite_state:
             try:
                 self._write_state_to_sqlite(route, result, context)
                 self._logger.debug("State written to SQLite successfully")
             except Exception as e:
                 self._logger.error(f"SQLite state write failed: {e}")
-        self._write_state_to_files(route, result, context)
+        # DEPRECATED: .env state files replaced by JSON state files (Stream 3).
+        # TODO: Remove _write_state_to_files() and get_state_file_paths()
+        # after burn-in period confirms JSON-only is sufficient.
+        # self._write_state_to_files(route, result, context)
 
     # ------------------------------------------------------------------
     # SQLite write
@@ -644,21 +652,30 @@ class StateWriter:
     # ------------------------------------------------------------------
 
     def verify_consistency(self) -> bool:
+        """Verify SQLite and JSON file states match.
+
+        DEPRECATED: Previously checked SQLite vs .env files.
+        Updated in Stream 3 to check SQLite vs JSON state files.
+        """
         sqlite_route = self.read_last_route()
-        route_file, _ = self.get_state_file_paths()
+        json_route_file = self._resolve_ui_state_dir() / "last_route.json"
         file_strategy = None
-        if route_file.exists():
-            file_strategy = self._read_state_field(route_file, "FINAL_MODE")
+        if json_route_file.exists():
+            try:
+                data = json.loads(json_route_file.read_text(encoding="utf-8"))
+                file_strategy = data.get("current_route")
+            except Exception:
+                pass
 
         if sqlite_route and file_strategy:
             match = sqlite_route.get("strategy") == file_strategy
             if not match:
                 self._logger.warning(
-                    f"State mismatch between SQLite and files! "
-                    f"SQLite: {sqlite_route.get('strategy')}, File: {file_strategy}"
+                    f"State mismatch between SQLite and JSON! "
+                    f"SQLite: {sqlite_route.get('strategy')}, JSON: {file_strategy}"
                 )
             else:
-                self._logger.debug("State consistency verified: SQLite and files match")
+                self._logger.debug("State consistency verified: SQLite and JSON match")
             return match
 
         if sqlite_route or file_strategy:
