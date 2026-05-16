@@ -26,6 +26,12 @@ export LUCY_ROOT="$SCRIPT_DIR"
 export LUCY_UI_ROOT="${SCRIPT_DIR}/ui-v8"
 export LUCY_RUNTIME_NAMESPACE_ROOT="$SCRIPT_DIR"
 export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
+
+# Unify current_state.json with HMI / runtime_control.py default location.
+# Without this, START_LUCY.sh and independent HMI launches read/write
+# different current_state.json files, causing silent state drift.
+export LUCY_RUNTIME_STATE_FILE="$HOME/.codex-api-home/lucy/runtime-v8/state/current_state.json"
+
 export LUCY_RUNTIME_REQUEST_HISTORY_FILE="$SCRIPT_DIR/state/request_history.jsonl"
 
 # Voice runtime requirements

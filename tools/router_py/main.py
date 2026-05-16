@@ -153,16 +153,33 @@ def _write_outcome_telemetry(
 
 
 def load_state_from_file() -> dict[str, Any]:
-    """Load control state from state file (fallback when env vars not set)."""
+    """Load control state from state file (fallback when env vars not set).
+
+    Respects LUCY_RUNTIME_STATE_FILE env var to stay in sync with
+    runtime_control.py and the HMI state store.
+    """
+    import json
+
+    # 1. Env var override (same contract as runtime_control.py)
+    env_path = os.environ.get("LUCY_RUNTIME_STATE_FILE", "").strip()
+    if env_path:
+        try:
+            state_file = Path(env_path).expanduser()
+            if state_file.exists():
+                with open(state_file) as f:
+                    return json.load(f)
+        except Exception:
+            pass
+
+    # 2. Legacy fallback (project root state dir)
     try:
-        # Try to find state file similar to runtime_request.py
         state_file = ROOT_DIR / "state" / "state" / "current_state.json"
         if state_file.exists():
-            import json
             with open(state_file) as f:
                 return json.load(f)
     except Exception:
         pass
+
     return {}
 
 
