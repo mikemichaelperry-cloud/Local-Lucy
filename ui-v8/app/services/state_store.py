@@ -204,7 +204,6 @@ if _contract_required():
 STATE_FILES = {
     "current_state": Path(os.environ.get("LUCY_RUNTIME_STATE_FILE", str(STATE_DIRECTORY / "current_state.json"))).expanduser(),
     "last_route": STATE_DIRECTORY / "last_route.json",
-    "last_preprocess": STATE_DIRECTORY / "last_preprocess.json",
     "health": STATE_DIRECTORY / "health.json",
     "runtime_lifecycle": Path(
         os.environ.get("LUCY_RUNTIME_LIFECYCLE_FILE", str(STATE_DIRECTORY / "runtime_lifecycle.json"))
