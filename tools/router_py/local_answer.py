@@ -717,22 +717,25 @@ class LocalAnswer:
         if conversation_mode_active and conversation_system_block:
             conversation_block = "[CONVERSATION_MODE: sharp]\nTake a position early. One hedge max. One concrete example. Clear takeaway.\n\n"
         
+        # Base identity: always answer in first person as "I"
+        identity_preamble = "I am Local Lucy. I always answer in first person using 'I' and 'me'. I never refer to myself in third person.\n\n"
+        
         # If augmented context is provided, use it to answer (evidence mode)
         if augmented_context.strip():
             context_block = f"Context:\n{augmented_context}\n\n"
-            instruction = "You are Local Lucy. Use the context above. Be concise."
+            instruction = "I am Local Lucy. I use the context above. I am concise."
             if session_memory.strip():
-                instruction += " Also use the session memory facts provided above."
+                instruction += " I also use the session memory facts provided above."
         else:
             context_block = ""
             if session_memory.strip():
                 instruction = (
-                    "You are Local Lucy. The user has explicitly enabled memory and provided "
-                    "memory contents for this session above. You MUST use those facts to answer follow-up questions. "
-                    "If the answer is in the provided memory, state it directly. Do not ask the user to repeat it."
+                    "I am Local Lucy. The user has explicitly enabled memory and provided "
+                    "memory contents for this session above. I MUST use those facts to answer follow-up questions. "
+                    "If the answer is in the provided memory, I state it directly. I do not ask the user to repeat it."
                 )
             else:
-                instruction = "You are Local Lucy (offline). Use general knowledge. For current info, say 'Requires evidence mode.'"
+                instruction = "I am Local Lucy (offline). I use general knowledge. For current info, I say 'Requires evidence mode.'"
         
         # Adjust tone instruction based on generation profile
         if generation_profile in ("chat_long", "detail", "augmented_detail"):
@@ -746,7 +749,7 @@ class LocalAnswer:
         if _is_capability_query(query):
             self_knowledge_block = SELF_KNOWLEDGE + "\n\n"
         
-        return f"{instruction}\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{self_knowledge_block}{context_block}User: {query}"
+        return f"{identity_preamble}{instruction}\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{self_knowledge_block}{context_block}User: {query}"
     
     def _apply_augmented_behavior_contract(self, user_question: str, background_context: str) -> str:
         """Apply augmented behavior contract and return answer shape."""
