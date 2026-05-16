@@ -343,7 +343,9 @@ class OperatorConsoleWindow(QMainWindow):
         # Gracefully quit kokoro worker
         try:
             from pathlib import Path
-            socket_path = Path.home() / "lucy-v8" / "tmp" / "run" / "kokoro_tts_worker.sock"
+            import os
+            root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v8")).resolve()
+            socket_path = root / "tmp" / "run" / "kokoro_tts_worker.sock"
             if socket_path.exists():
                 import socket, json
                 client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -357,7 +359,8 @@ class OperatorConsoleWindow(QMainWindow):
         try:
             from pathlib import Path
             import os, signal
-            whisper_pid_file = Path.home() / "lucy-v8" / "tmp" / "run" / "whisper_worker.pid"
+            root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v8")).resolve()
+            whisper_pid_file = root / "tmp" / "run" / "whisper_worker.pid"
             if whisper_pid_file.exists():
                 whisper_pid = int(whisper_pid_file.read_text().strip())
                 os.kill(whisper_pid, signal.SIGTERM)
@@ -1080,7 +1083,8 @@ class OperatorConsoleWindow(QMainWindow):
         """Write debug log to file."""
         import os
         from pathlib import Path
-        log_path = Path.home() / "lucy-v8" / "ui_debug.log"
+        root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v8")).resolve()
+        log_path = root / "ui_debug.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a") as f:
             from datetime import datetime
