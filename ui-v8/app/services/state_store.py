@@ -219,10 +219,22 @@ REQUEST_HISTORY_FILE = Path(
 ).expanduser()
 
 if _contract_required():
+    # Only validate default-derived paths. Explicit env-var overrides
+    # (e.g. LUCY_RUNTIME_STATE_FILE) are trusted user choices and may
+    # legitimately reside outside the runtime namespace root.
+    _env_overrides = {
+        "current_state": "LUCY_RUNTIME_STATE_FILE",
+        "runtime_lifecycle": "LUCY_RUNTIME_LIFECYCLE_FILE",
+        "voice_runtime": "LUCY_VOICE_RUNTIME_FILE",
+    }
     for key, path in STATE_FILES.items():
+        if key in _env_overrides and os.environ.get(_env_overrides[key]):
+            continue
         _validate_within_namespace(path, RUNTIME_NAMESPACE_ROOT, label=f"STATE_FILES[{key}]")
-    _validate_within_namespace(REQUEST_RESULT_FILE, RUNTIME_NAMESPACE_ROOT, label="LUCY_RUNTIME_REQUEST_RESULT_FILE")
-    _validate_within_namespace(REQUEST_HISTORY_FILE, RUNTIME_NAMESPACE_ROOT, label="LUCY_RUNTIME_REQUEST_HISTORY_FILE")
+    if not os.environ.get("LUCY_RUNTIME_REQUEST_RESULT_FILE"):
+        _validate_within_namespace(REQUEST_RESULT_FILE, RUNTIME_NAMESPACE_ROOT, label="LUCY_RUNTIME_REQUEST_RESULT_FILE")
+    if not os.environ.get("LUCY_RUNTIME_REQUEST_HISTORY_FILE"):
+        _validate_within_namespace(REQUEST_HISTORY_FILE, RUNTIME_NAMESPACE_ROOT, label="LUCY_RUNTIME_REQUEST_HISTORY_FILE")
 
 
 def load_runtime_snapshot() -> RuntimeSnapshot:
