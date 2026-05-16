@@ -35,6 +35,16 @@ try:
 except ImportError:
     HAS_AIOHTTP = False
 
+# Import capability query detector from classify (with fallback)
+try:
+    from router_py.classify import _is_capability_query
+except ImportError:
+    try:
+        from classify import _is_capability_query
+    except ImportError:
+        def _is_capability_query(query: str) -> bool:
+            return False
+
 logger = logging.getLogger(__name__)
 
 _ollama_call_lock = threading.Lock()
@@ -43,6 +53,17 @@ _ollama_call_lock = threading.Lock()
 async def _acquire_ollama_call_lock() -> None:
     """Serialize Ollama calls across worker threads without blocking the event loop."""
     await asyncio.to_thread(_ollama_call_lock.acquire)
+
+
+# Self-knowledge: architecture facts injected for capability queries
+SELF_KNOWLEDGE = """Your architecture:
+- You are Local Lucy, a local-first AI assistant running on the user's computer via Ollama.
+- You have an intelligent router that classifies each query and picks the best mode.
+- Modes: LOCAL (offline, you answer directly), AUGMENTED (online, uses Wikipedia → OpenAI → Kimi fallback chain), EVIDENCE (trusted medical/veterinary sources only), NEWS, WEATHER, TIME.
+- Voice: Whisper for speech-to-text, Kokoro/Piper for text-to-speech.
+- Memory: session memory is available when the user enables it.
+- Internet: you do NOT have direct internet access, but your router CAN escalate queries to online providers when appropriate.
+- If asked about providers, fallbacks, or architecture, answer truthfully using these facts."""
 
 
 # Fixed policy responses
@@ -719,7 +740,13 @@ class LocalAnswer:
         else:
             tone_instruction = "Tone: warm, direct, concise."
         
-        return f"{instruction}\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{context_block}User: {query}"
+        # Inject self-knowledge for capability queries so the model answers
+        # accurately about its own architecture instead of hallucinating.
+        self_knowledge_block = ""
+        if _is_capability_query(query):
+            self_knowledge_block = SELF_KNOWLEDGE + "\n\n"
+        
+        return f"{instruction}\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{self_knowledge_block}{context_block}User: {query}"
     
     def _apply_augmented_behavior_contract(self, user_question: str, background_context: str) -> str:
         """Apply augmented behavior contract and return answer shape."""

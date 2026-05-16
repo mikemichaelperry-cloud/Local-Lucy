@@ -603,6 +603,44 @@ def _is_news_query_typos(query: str) -> bool:
     return has_news_typo or (wat_pattern and has_news_context)
 
 
+def _is_capability_query(query: str) -> bool:
+    """Detect meta-questions about Lucy's own capabilities/providers.
+
+    These should route to AUGMENTED so the system can answer accurately
+    about its own architecture instead of the local model hallucinating.
+    Examples:
+        "Do you have any fallback such as OpenAI or Kimi?"
+        "Can you search the web?"
+        "What providers do you use?"
+    """
+    if not query:
+        return False
+    q = query.lower().strip()
+
+    # Fallback / provider questions
+    if "fallback" in q and any(p in q for p in ["openai", "kimi", "wikipedia", "provider", "providers"]):
+        return True
+    if "back up" in q and any(p in q for p in ["openai", "kimi", "wikipedia", "provider"]):
+        return True
+
+    # Internet / web access questions
+    if any(p in q for p in ["do you have", "can you use", "do you use", "are you using", "are you connected"]):
+        if any(t in q for t in ["internet", "online", "offline", "web", "search", "browse", "google", "bing"]):
+            return True
+
+    # Provider / backend / model questions
+    if any(p in q for p in ["what providers", "what backends", "what engines", "what models", "what llm", "what ai"]):
+        return True
+    if "what" in q and any(p in q for p in ["provider", "backend", "engine", "model", "llm"]):
+        return True
+
+    # Architecture / system questions
+    if any(p in q for p in ["how do you work", "what is your architecture", "how are you built", "what system are you", "what is your stack"]):
+        return True
+
+    return False
+
+
 def _is_creative_writing(query: str) -> bool:
     """Detect creative writing queries that should always route LOCAL.
 
