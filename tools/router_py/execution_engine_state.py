@@ -124,12 +124,6 @@ class StateWriter:
     # Path helpers
     # ------------------------------------------------------------------
 
-    def get_state_file_paths(self) -> tuple[Path, Path]:
-        """Return (route_file, outcome_file) for the current namespace."""
-        route_file = self._state_dir / "last_route.env"
-        outcome_file = self._state_dir / "last_outcome.env"
-        return route_file, outcome_file
-
     # ------------------------------------------------------------------
     # Public write entry point
     # ------------------------------------------------------------------
@@ -140,22 +134,13 @@ class StateWriter:
         result: ExecutionResult,
         context: dict[str, Any],
     ) -> None:
-        """Write state to SQLite (if enabled) and JSON files.
-
-        Legacy .env file writes are deprecated (Stream 3). They are
-        retained in _write_state_to_files() for reference during burn-in
-        but are no longer invoked by the public entry point.
-        """
+        """Write state to SQLite (if enabled)."""
         if self.use_sqlite_state:
             try:
                 self._write_state_to_sqlite(route, result, context)
                 self._logger.debug("State written to SQLite successfully")
             except Exception as e:
                 self._logger.error(f"SQLite state write failed: {e}")
-        # DEPRECATED: .env state files replaced by JSON state files (Stream 3).
-        # TODO: Remove _write_state_to_files() and get_state_file_paths()
-        # after burn-in period confirms JSON-only is sufficient.
-        # self._write_state_to_files(route, result, context)
 
     # ------------------------------------------------------------------
     # SQLite write
@@ -210,86 +195,6 @@ class StateWriter:
         except Exception as e:
             self._logger.error(f"SQLite state write failed: {e}")
             raise
-
-    # ------------------------------------------------------------------
-    # Legacy file write
-    # ------------------------------------------------------------------
-
-    def _write_state_to_files(
-        self,
-        route: RoutingDecision,
-        result: ExecutionResult,
-        context: dict[str, Any],
-    ) -> None:
-        question = _redact_pii(context.get("question", ""))
-        resolved_question = _redact_pii(context.get("resolved_question", question))
-        timestamp = int(time.time())
-        route_file, outcome_file = self.get_state_file_paths()
-
-        route_fields = [
-            ("TIMESTAMP", str(timestamp)),
-            ("FINAL_MODE", result.route),
-            ("REQUESTED_MODE", route.route),
-            ("ROUTE_REASON", "router_classifier_mapper"),
-            ("ORIGINAL_QUESTION", question),
-            ("RESOLVED_QUESTION", resolved_question),
-            ("LOCAL_DIRECT_USED", "true" if result.metadata.get("local_direct_used") else "false"),
-            ("LOCAL_DIRECT_FALLBACK", "true" if result.metadata.get("local_direct_fallback") else "false"),
-            ("LOCAL_DIRECT_PATH", result.metadata.get("local_direct_path", "disabled")),
-        ]
-
-        outcome_fields = [
-            ("TIMESTAMP", str(timestamp)),
-            ("OUTCOME_CODE", result.outcome_code),
-            ("FINAL_MODE", result.route),
-            ("ROUTE_REASON", "router_classifier_mapper"),
-            ("ORIGINAL_QUESTION", question),
-            ("RESOLVED_QUESTION", resolved_question),
-            ("FALLBACK_USED", "true" if result.metadata.get("fallback_used") else "false"),
-            ("FALLBACK_REASON", result.metadata.get("fallback_reason", "none")),
-            ("TRUST_CLASS", result.metadata.get("trust_class", "local")),
-            ("AUGMENTED_PROVIDER_USED", result.provider if result.route == "AUGMENTED" else "none"),
-            ("AUGMENTED_PROVIDER_USAGE_CLASS", result.provider_usage_class),
-            ("EXECUTION_TIME_MS", str(result.execution_time_ms)),
-            ("ROUTING_SIGNAL_MEDICAL_CONTEXT", "true" if context.get("is_medical_query") else "false"),
-        ]
-
-        for key in (
-            "memory_context_used",
-            "memory_mode_used",
-            "memory_depth_used",
-            "memory_top_score",
-            "memory_session_injected",
-            "memory_top_gap",
-        ):
-            if key in result.metadata:
-                outcome_fields.append((key.upper(), result.metadata[key]))
-
-        # Write last_route.env
-        try:
-            route_file.parent.mkdir(parents=True, exist_ok=True)
-            route_content = "\n".join(f"{k}={v}" for k, v in route_fields) + "\n"
-            with self._file_lock(route_file):
-                route_file.write_text(route_content, encoding="utf-8")
-        except Exception as e:
-            self._logger.warning(f"Failed to write last_route.env: {e}")
-            try:
-                route_file.write_text(route_content, encoding="utf-8")
-            except Exception as e2:
-                self._logger.error(f"Unprotected write also failed: {e2}")
-
-        # Write last_outcome.env
-        try:
-            outcome_file.parent.mkdir(parents=True, exist_ok=True)
-            outcome_content = "\n".join(f"{k}={v}" for k, v in outcome_fields) + "\n"
-            with self._file_lock(outcome_file):
-                outcome_file.write_text(outcome_content, encoding="utf-8")
-        except Exception as e:
-            self._logger.warning(f"Failed to write last_outcome.env: {e}")
-            try:
-                outcome_file.write_text(outcome_content, encoding="utf-8")
-            except Exception as e2:
-                self._logger.error(f"Unprotected write also failed: {e2}")
 
     # ------------------------------------------------------------------
     # HMI-facing JSON state files
@@ -599,11 +504,7 @@ class StateWriter:
     # ------------------------------------------------------------------
 
     def verify_consistency(self) -> bool:
-        """Verify SQLite and JSON file states match.
-
-        DEPRECATED: Previously checked SQLite vs .env files.
-        Updated in Stream 3 to check SQLite vs JSON state files.
-        """
+        """Verify SQLite and JSON file states match."""
         sqlite_route = self.read_last_route()
         json_route_file = self._resolve_ui_state_dir() / "last_route.json"
         file_strategy = None
@@ -666,24 +567,4 @@ class StateWriter:
             self._logger.warning(f"Error closing StateManager: {e}")
 
     # ------------------------------------------------------------------
-    # Field read helper
-    # ------------------------------------------------------------------
-
-    def _read_state_field(self, state_file: Path, field: str) -> str | None:
-        if not state_file.exists():
-            return None
-        try:
-            with self._file_lock(state_file):
-                content = state_file.read_text(encoding="utf-8")
-                for line in content.splitlines():
-                    if line.startswith(f"{field}="):
-                        return line[len(field) + 1 :].strip()
-        except Exception:
-            try:
-                content = state_file.read_text(encoding="utf-8")
-                for line in content.splitlines():
-                    if line.startswith(f"{field}="):
-                        return line[len(field) + 1 :].strip()
-            except Exception:
-                pass
-        return None
+    # Close / cleanup
