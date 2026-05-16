@@ -155,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     model_parser.add_argument(
         "--value",
         required=True,
-        choices=("local-lucy",),
+        choices=("local-lucy", "local-lucy-fast"),
     )
 
     return parser
