@@ -103,8 +103,12 @@ do
 done
 
 # Clear stale worker PID / socket files
+# Workers create sockets under LUCY_RUNTIME_AUTHORITY_ROOT (project root),
+# not LUCY_RUNTIME_NAMESPACE_ROOT. Clean both to be safe.
 rm -f "${LUCY_RUNTIME_NAMESPACE_ROOT}/tmp/run/whisper_worker.pid"
 rm -f "${LUCY_RUNTIME_NAMESPACE_ROOT}/tmp/run/kokoro_tts_worker.sock"
+rm -f "${LUCY_RUNTIME_AUTHORITY_ROOT}/tmp/run/whisper_worker.pid"
+rm -f "${LUCY_RUNTIME_AUTHORITY_ROOT}/tmp/run/kokoro_tts_worker.sock"
 
 # =============================================================================
 # STARTUP VALIDATION

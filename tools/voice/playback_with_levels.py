@@ -264,7 +264,7 @@ def play_wav_file_with_levels(
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
     )
     
     # Start level writer thread
@@ -308,13 +308,17 @@ def play_wav_file_with_levels(
     
     try:
         # Wait for playback to complete
-        returncode = proc.wait(timeout=timeout_seconds)
-        if returncode != 0:
-            raise PlaybackError("audio playback failed")
+        stdout_data, stderr_data = proc.communicate(timeout=timeout_seconds)
+        if proc.returncode != 0:
+            stderr_text = stderr_data.decode("utf-8", errors="replace").strip() if stderr_data else ""
+            raise PlaybackError(
+                f"audio playback failed (cmd: {cmd!r})"
+                + (f": {stderr_text}" if stderr_text else "")
+            )
     except subprocess.TimeoutExpired:
         proc.terminate()
         try:
-            proc.wait(timeout=2)
+            proc.communicate(timeout=2)
         except:
             proc.kill()
         raise PlaybackError("playback timed out")

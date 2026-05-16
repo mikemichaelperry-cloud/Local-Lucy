@@ -14,10 +14,13 @@ class PlaybackError(RuntimeError):
 
 
 def detect_audio_player() -> str:
-    if shutil.which("aplay"):
-        return "aplay"
+    # Prefer paplay (PulseAudio) on desktop Linux — it respects the user's
+    # default output device and handles Bluetooth/USB hot-plug gracefully.
+    # Fall back to aplay (ALSA) if PulseAudio is not available.
     if shutil.which("paplay"):
         return "paplay"
+    if shutil.which("aplay"):
+        return "aplay"
     return ""
 
 
@@ -34,12 +37,16 @@ def run_player_command(command: list[str], *, timeout_seconds: int) -> None:
         command,
         check=False,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
         timeout=timeout_seconds,
         shell=False,
     )
     if completed.returncode != 0:
-        raise PlaybackError("audio playback failed")
+        stderr_text = completed.stderr.decode("utf-8", errors="replace").strip() if completed.stderr else ""
+        raise PlaybackError(
+            f"audio playback failed (cmd: {command!r})"
+            + (f": {stderr_text}" if stderr_text else "")
+        )
 
 
 def play_wav_file(

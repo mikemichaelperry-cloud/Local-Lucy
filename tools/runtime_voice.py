@@ -1804,7 +1804,8 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
                         raise RuntimeVoiceError(clean_text(payload.get("error")) or "tts synthesis failed")
 
         return "completed"
-    except (PlaybackError, RuntimeVoiceError):
+    except (PlaybackError, RuntimeVoiceError) as exc:
+        print(f"ERROR: TTS playback failed: {exc}", file=sys.stderr)
         return "failed"
     return "skipped"
 
