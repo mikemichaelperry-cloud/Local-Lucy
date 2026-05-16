@@ -276,21 +276,36 @@ LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 LUCY_AUGMENTATION_POLICY=fallback_only \
 
 ### 📊 State File Locations
 
+**Unified location (canonical):**
 ```
 ~/.codex-api-home/lucy/runtime-v8/state/
-├── current_state.json          # HMI control state
+├── current_state.json          # HMI control state (unified — see below)
 ├── last_request_result.json    # Full request payload (NEW — Stream 2)
 ├── last_route.json             # Route snapshot (NEW — Stream 2)
 ├── request_history.jsonl       # Deduplicated history (NEW — Stream 2)
 ├── runtime_lifecycle.json      # Process status
 ├── health.json                 # System health
 ├── voice_runtime.json          # Voice backend status
-└── last_preprocess.json        # ORPHANED — no writer
 
 ~/.codex-api-home/lucy/runtime-v8/
 ├── lucy_state.db               # SQLite routes/outcomes
 └── memory.db                   # SQLite memory
 ```
+
+**Legacy location (project root):**
+```
+/home/mike/lucy-v8/state/
+├── current_state.json          # Legacy fallback
+```
+
+**Why two locations?** The project was created with state in the repo directory, but the HMI and `runtime_control.py` default to `~/.codex-api-home/lucy/runtime-v8/`. Before 2026-05-16, `START_LUCY.sh` and the HMI read/wrote different `current_state.json` files, causing silent drift (e.g. model mismatch warnings on startup).
+
+**Fix applied (2026-05-16):**
+- `START_LUCY.sh` now exports `LUCY_RUNTIME_STATE_FILE=~/.codex-api-home/lucy/runtime-v8/state/current_state.json`
+- `router_py/main.py` `load_state_from_file()` checks `LUCY_RUNTIME_STATE_FILE` env var first
+- This ensures all entry points (launcher, HMI, runtime_control.py, main.py) use the SAME `current_state.json`
+
+**Note:** `~/.codex-api-home` is a legacy directory name from the Codex era. It contains only Local Lucy data. Renaming it is deferred to a later cleanup sprint.
 
 ---
 
@@ -331,6 +346,12 @@ LUCY_STATE_DB=~/lucy-v8/state/lucy_state.db  # SQLite DB path
 5. **HMI offscreen tests are NOT pytest tests**: They are standalone Python scripts with `main()` functions. Run them directly, not via `pytest`.
 
 6. **No GPU in tests**: The user has low VRAM (~3.7GB used by whisper-server processes). Never run tests that load torch/transformers models. All router tests use mocks.
+
+7. **Two `current_state.json` files**: Before 2026-05-16 there were two independent files:
+   - `~/.codex-api-home/lucy/runtime-v8/state/current_state.json` — HMI default, runtime_control.py default
+   - `/home/mike/lucy-v8/state/current_state.json` — START_LUCY.sh, main.py legacy path
+   
+   They could diverge silently (e.g. model mismatch warnings). Fixed by adding `LUCY_RUNTIME_STATE_FILE` env var to START_LUCY.sh and making main.py respect it. Always use the env var when referring to current_state.json.
 
 ---
 
