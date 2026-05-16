@@ -116,6 +116,7 @@ try:
         fetch_time_evidence,
         fetch_weather_evidence,
         fetch_news_evidence,
+        fetch_trusted_evidence,
         format_time_response,
         format_wikipedia_response,
         call_openai_for_response,
@@ -2139,7 +2140,9 @@ them according to the route type (bypass, provisional, or full). It handles:
             provider = "wikipedia"  # Default to free provider
         
         try:
-            if provider == "wikipedia":
+            if provider == "trusted":
+                return await self._fetch_trusted_evidence(question, route)
+            elif provider == "wikipedia":
                 return await self._fetch_wikipedia_evidence(question)
             elif provider == "kimi":
                 return await self._fetch_api_evidence(question, "kimi")
@@ -2236,6 +2239,35 @@ them according to the route type (bypass, provisional, or full). It handles:
         except Exception as e:
             breaker._on_failure(e)
             self._logger.warning(f"Weather evidence fetch failed: {e}")
+            return None
+    
+    async def _fetch_trusted_evidence(
+        self,
+        question: str,
+        route: RoutingDecision,
+    ) -> dict[str, Any] | None:
+        """Fetch evidence from trusted sources (medical/veterinary domains).
+        
+        Uses the unverified_context_trusted.py provider with domain restrictions.
+        Returns None if no evidence is found, signaling the caller to return
+        an evidence-not-found response rather than falling back to general sources.
+        """
+        breaker = get_breaker("trusted_provider")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning("Circuit breaker open for trusted_provider")
+            return None
+        try:
+            if HAS_PROVIDER_MODULES:
+                result = await fetch_trusted_evidence(question, route)
+                breaker._on_success()
+                return result
+            self._logger.warning("Provider modules not available")
+            return None
+        except Exception as e:
+            breaker._on_failure(e)
+            self._logger.warning(f"Trusted evidence fetch failed: {e}")
             return None
     
     async def _fetch_api_evidence(
@@ -2560,6 +2592,35 @@ them according to the route type (bypass, provisional, or full). It handles:
             ExecutionResult from augmented provider
         """
         self._logger.info(f"Calling augmented provider for: {question[:50]}...")
+        
+        # EVIDENCE route = strict trusted sources only (medical, veterinary)
+        if route and route.route == "EVIDENCE":
+            self._logger.info("EVIDENCE route: using strict trusted sources only")
+            result = self._call_single_provider("trusted", question, intent, route, context)
+            if result.status == "completed":
+                return result
+            # Trusted provider failed or not applicable — return evidence-not-found
+            # Do NOT fall back to Wikipedia/OpenAI for EVIDENCE routes
+            return ExecutionResult(
+                status="completed",
+                outcome_code="evidence_not_found",
+                route="EVIDENCE",
+                provider="trusted",
+                provider_usage_class="local",
+                response_text=(
+                    "I couldn't find evidence from the designated trusted sources for this query.\n\n"
+                    "For medical decisions, please consult a healthcare professional and verify "
+                    "with authoritative sources such as:\n"
+                    "- cochranelibrary.com\n"
+                    "- dailymed.nlm.nih.gov\n"
+                    "- jamanetwork.com\n"
+                    "- medlineplus.gov\n"
+                    "- nejm.org\n"
+                    "- pubmed.ncbi.nlm.nih.gov"
+                ),
+                error_message="No evidence found in trusted sources",
+                metadata={"providers_attempted": ["trusted"], "strict_evidence": True},
+            )
         
         # Determine provider chain - start with requested or default
         primary_provider = context.get("augmented_provider", "wikipedia")

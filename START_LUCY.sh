@@ -24,18 +24,14 @@ export QT_QPA_PLATFORM_PLUGIN_PATH="/usr/lib/x86_64-linux-gnu/qt6/plugins"
 # Lucy paths
 export LUCY_ROOT="$SCRIPT_DIR"
 export LUCY_UI_ROOT="${SCRIPT_DIR}/ui-v8"
-export LUCY_RUNTIME_NAMESPACE_ROOT="$SCRIPT_DIR"
+# Unify all runtime state (JSON, SQLite, logs) to the user-local directory
+# where StateWriter and backend defaults already write. This eliminates the
+# split-brain where HMI reads from /home/mike/lucy-v8/state/ but router
+# writes to ~/.codex-api-home/lucy/runtime-v8/state/.
+export LUCY_RUNTIME_NAMESPACE_ROOT="$HOME/.codex-api-home/lucy/runtime-v8"
 export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
 
-# Unify current_state.json with HMI / runtime_control.py default location.
-# Without this, START_LUCY.sh and independent HMI launches read/write
-# different current_state.json files, causing silent state drift.
-export LUCY_RUNTIME_STATE_FILE="$HOME/.codex-api-home/lucy/runtime-v8/state/current_state.json"
-
-export LUCY_RUNTIME_REQUEST_HISTORY_FILE="$SCRIPT_DIR/state/request_history.jsonl"
-
-# Voice runtime requirements
-export LUCY_VOICE_RUNTIME_FILE="$SCRIPT_DIR/state/voice_runtime.json"
+# Voice capture directory stays in project tree (temporary audio, not persistent state)
 export LUCY_VOICE_CAPTURE_DIR="$SCRIPT_DIR/voice/ui_ptt"
 
 # Python path - app/ directory enables 'from backend import ...'.
@@ -85,9 +81,9 @@ fi
 # =============================================================================
 
 # Clear stale voice runtime cache (contains tts_device, stt_device, etc.)
+_voice_runtime_file="${LUCY_VOICE_RUNTIME_FILE:-${LUCY_RUNTIME_NAMESPACE_ROOT}/state/voice_runtime.json}"
 for _vr_candidate in \
-    "${LUCY_VOICE_RUNTIME_FILE}" \
-    "${LUCY_RUNTIME_NAMESPACE_ROOT}/state/voice_runtime.json" \
+    "${_voice_runtime_file}" \
     "${LUCY_RUNTIME_NAMESPACE_ROOT}/state/voice_runtime.json"
 do
     if [ -f "${_vr_candidate}" ]; then

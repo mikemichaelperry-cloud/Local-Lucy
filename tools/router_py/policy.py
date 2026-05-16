@@ -4,6 +4,7 @@ Router policy functions - Python port of shell implementations.
 Deterministic policy decisions with no side effects.
 """
 
+import re
 from typing import Literal
 
 
@@ -87,6 +88,92 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     has_creative_noun = any(n in normalized for n in creative_nouns)
     if has_creative_verb and has_creative_noun:
         return False, "creative_writing"
+    
+    # Veterinary / animal health — check FIRST so vet-specific queries get
+    # veterinary_context instead of being swallowed by medical_context.
+    
+    # Tier 1: Specific animal species — immediate trigger (very high confidence)
+    specific_animal_terms = [
+        "dog", "dogs", "puppy", "puppies", "canine",
+        "cat", "cats", "kitten", "kittens", "feline",
+        "equine", "horse", "horses", "pony", "ponies",
+        "bovine", "cow", "cows", "bull", "bulls", "calf", "calves",
+        "ovine", "sheep", "lamb", "lambs", "goat", "goats",
+        "pig", "pigs", "swine", "hog", "hogs",
+        "avian", "bird", "birds", "parrot", "parrots", "parakeet", "parakeets",
+        "canary", "canaries", "finch", "finches", "budgie", "budgies",
+        "cockatiel", "cockatiels", "macaw", "macaws",
+        "rabbit", "rabbits", "bunny", "bunnies",
+        "hamster", "hamsters", "gerbil", "gerbils",
+        "rat", "rats", "mouse", "mice",
+        "guinea pig", "guinea pigs",
+        "ferret", "ferrets", "chinchilla", "chinchillas",
+        "hedgehog", "hedgehogs",
+        "sugar glider", "sugar gliders",
+        "reptile", "reptiles",
+        "snake", "snakes", "python", "pythons",
+        "lizard", "lizards", "gecko", "geckos", "iguana", "iguanas",
+        "bearded dragon", "bearded dragons",
+        "chameleon", "chameleons",
+        "turtle", "turtles", "tortoise", "tortoises",
+        "fish", "fishes", "betta", "bettas", "goldfish", "koi",
+        "chicken", "chickens", "hen", "hens", "rooster", "roosters",
+        "duck", "ducks", "goose", "geese",
+        "turkey", "turkeys",
+        "alpaca", "alpacas", "llama", "llamas",
+        "camel", "camels", "donkey", "donkeys", "mule", "mules",
+    ]
+    for term in specific_animal_terms:
+        if " " in term:
+            # Multi-word term — substring match is safe
+            if term in normalized:
+                return True, "veterinary_context"
+        else:
+            # Single-word term — require word boundaries to avoid
+            # matching inside other words (e.g., "cat" in "medication")
+            pattern = r'(?<![a-z])' + re.escape(term) + r'(?![a-z])'
+            if re.search(pattern, normalized):
+                return True, "veterinary_context"
+    
+    # Tier 2: General animal terms — require health context to avoid false positives
+    # (e.g., "animal rights", "pet project", "pet peeve")
+    general_animal_terms = ["pet", "pets", "animal", "animals", "livestock"]
+    has_general_animal = any(t in normalized for t in general_animal_terms)
+    if has_general_animal:
+        health_indicators = [
+            "sick", "ill", "hurt", "pain", "injury", "injured", "wound", "wounded",
+            "bleeding", "vomit", "vomiting", "diarrhea", "cough", "sneeze", "sneezing",
+            "fever", "tired", "lethargic", "limp", "limping", "lame", "lameness",
+            "itch", "itchy", "scratch", "scratching", "bald", "hair loss", "losing hair",
+            "plucking feathers", "plucking",
+            "weight loss", "not eating", "wont eat", "refusing food", "dehydrated",
+            "swollen", "lump", "bump", "tumor", "cancer", "infection", "infected",
+            "parasite", "worm", "flea", "tick", "mite", "mange", "rabies",
+            "surgery", "operation", "treatment", "medication", "medicine", "drug",
+            "vaccine", "vaccination", "shot", "deworm", "neuter", "spay", "castrate",
+            "vet", "veterinary", "veterinarian", "clinic", "hospital",
+            "symptom", "symptoms", "diagnosis", "diagnose", "disease", "condition",
+            "problem", "issue", "concern", "worried", "worry", "wrong",
+        ]
+        if any(h in normalized for h in health_indicators):
+            return True, "veterinary_context"
+    
+    # Tier 3: Veterinary-specific procedures, sources, and medications
+    veterinary_procedures = [
+        "veterinary", "vet ", "veterinarian", "animal health",
+        "pet medication", "dog medication", "cat medication",
+        "heartworm", "flea treatment", "tick treatment", "deworm",
+        "parvovirus", "distemper", "kennel cough", "bordetella",
+        "spay", "neuter", "castration", "ovariohysterectomy",
+        "hip dysplasia", "luxating patella", "bloat", "gdv",
+        "pancreatitis", "kidney disease", "liver disease",
+        "diabetes in dogs", "diabetes in cats", "hyperthyroidism in cats",
+        "cushing's disease in dogs", "addison's disease in dogs",
+        "merck vet", "vcahospitals", "avma", "aaha",
+    ]
+    for keyword in veterinary_procedures:
+        if keyword in normalized:
+            return True, "veterinary_context"
     
     # Medical/health keywords — comprehensive coverage for safety-critical queries
     medical_keywords = [
@@ -208,7 +295,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "bitcoin", "ethereum", "crypto", "cryptocurrency",
         "economy", "economic", "stock", "stocks", "portfolio",
         "mutual fund", "etf", "bond", "bonds", "dividend", "yield",
-        "asset", "risk", "return", "roi", "capital", "equity",
+        "asset", "risk", "return", "roi", "capital gains", "working capital", "equity",
         "debt", "loan", "mortgage", "refinance", "credit", "credit score",
         "bankruptcy", "savings", "account", "bank", "credit card",
         "salary", "income", "expense", "budget", "valuation", "worth",
@@ -263,6 +350,24 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     for keyword in legal_keywords:
         if keyword in normalized:
             return True, "legal_context"
+    
+    # Veterinary / animal health — requires trusted sources
+    veterinary_keywords = [
+        "veterinary", "vet ", "veterinarian", "animal health",
+        "pet medication", "dog medication", "cat medication",
+        "canine", "feline", "equine", "bovine", "ovine",
+        "heartworm", "flea treatment", "tick treatment", "deworm",
+        "parvovirus", "distemper", "kennel cough", "bordetella",
+        "spay", "neuter", "castration", "ovariohysterectomy",
+        "hip dysplasia", "luxating patella", "bloat", "gdv",
+        "pancreatitis", "kidney disease", "liver disease",
+        "diabetes in dogs", "diabetes in cats", "hyperthyroidism",
+        "hypothyroidism", "cushing's disease", "addison's disease",
+        "merck vet", "vcahospitals", "avma", "aaha",
+    ]
+    for keyword in veterinary_keywords:
+        if keyword in normalized:
+            return True, "veterinary_context"
     
     # Default: no evidence required
     return False, "default_light"

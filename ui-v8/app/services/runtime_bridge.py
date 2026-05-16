@@ -883,12 +883,17 @@ class RuntimeBridge:
         """Write a history entry to the jsonl file for HMI display.
         
         Uses fcntl locking to coordinate with runtime_request.py and prevent
-        interleaved writes under concurrency.
+        interleaved writes under concurrency. Skips if request_id already exists
+        (StateWriter may have already written the same entry).
         """
         from datetime import datetime, timezone
         
         # Resolve history file path (same logic as runtime_request.py)
         history_file = self._resolve_history_file()
+        
+        request_id = str(payload.get("request_id", "")).strip()
+        if not request_id:
+            return
         
         # Build entry matching runtime_request.py format
         entry = {
@@ -897,7 +902,7 @@ class RuntimeBridge:
             "control_state": payload.get("control_state", {}),
             "error": payload.get("error", ""),
             "outcome": payload.get("outcome", {}),
-            "request_id": payload.get("request_id", ""),
+            "request_id": request_id,
             "request_text": payload.get("request_text", ""),
             "response_text": payload.get("response_text", ""),
             "route": payload.get("route", {}),
@@ -911,18 +916,44 @@ class RuntimeBridge:
         with open(lock_file, "a+", encoding="utf-8") as lock_handle:
             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
             try:
+                # Skip if StateWriter (or another writer) already recorded this request_id
+                if self._history_contains_request_id(history_file, request_id):
+                    return
                 with open(history_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(entry, sort_keys=True))
                     f.write("\n")
             finally:
                 fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+    
+    def _history_contains_request_id(self, history_file: Path, request_id: str) -> bool:
+        """Check if request_id already exists in history file."""
+        if not history_file.exists():
+            return False
+        try:
+            for raw_line in history_file.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    parsed = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict) and str(parsed.get("request_id", "")).strip() == request_id:
+                    return True
+        except OSError:
+            pass
+        return False
 
     def _resolve_current_model(self) -> str:
         """Read the active model from runtime state file."""
-        namespace_root = Path(os.environ.get(self.runtime_namespace_env, "")).expanduser()
-        if not namespace_root:
-            return "local-lucy"
-        state_file = namespace_root / "state" / "current_state.json"
+        raw_state_file = os.environ.get("LUCY_RUNTIME_STATE_FILE", "").strip()
+        if raw_state_file:
+            state_file = Path(raw_state_file).expanduser()
+        else:
+            namespace_root = Path(os.environ.get(self.runtime_namespace_env, "")).expanduser()
+            if not namespace_root:
+                return "local-lucy"
+            state_file = namespace_root / "state" / "current_state.json"
         try:
             state = json.loads(state_file.read_text(encoding="utf-8"))
             return state.get("model") or state.get("active_model") or "local-lucy"
@@ -931,10 +962,14 @@ class RuntimeBridge:
 
     def _resolve_augmented_provider(self) -> str:
         """Read the active augmented provider from runtime state file."""
-        namespace_root = Path(os.environ.get(self.runtime_namespace_env, "")).expanduser()
-        if not namespace_root:
-            return os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
-        state_file = namespace_root / "state" / "current_state.json"
+        raw_state_file = os.environ.get("LUCY_RUNTIME_STATE_FILE", "").strip()
+        if raw_state_file:
+            state_file = Path(raw_state_file).expanduser()
+        else:
+            namespace_root = Path(os.environ.get(self.runtime_namespace_env, "")).expanduser()
+            if not namespace_root:
+                return os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
+            state_file = namespace_root / "state" / "current_state.json"
         try:
             state = json.loads(state_file.read_text(encoding="utf-8"))
             return state.get("augmented_provider") or os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
