@@ -355,4 +355,24 @@ LUCY_STATE_DB=~/lucy-v8/state/lucy_state.db  # SQLite DB path
 
 ---
 
+### 🛡️ Operational Guardrails
+
+1. **Set `LUCY_AUTO_LEARN=0` during development, audit, or test sessions** unless the explicit task is to test learner behavior. Do not allow test prompts or agent-generated corrections to mutate production router examples.
+
+2. **Sync only after tests pass.** Never push a dirty snapshot.
+
+3. **Do not use `rsync --delete` unless explicitly approved by Michael.** Destructive syncs can wipe snapshot files.
+
+4. **Snapshot is NOT authoritative.** Python-native path is authoritative. Shell/parity paths are legacy compatibility only and must not be expanded.
+
+5. **Stop and ask Michael before editing:**
+   - SQLite schema changes
+   - Router classification changes
+   - HMI redesign
+   - Model replacement or retraining
+   - Launcher restructuring
+   - Production memory changes
+
+---
+
 *End of bootstrap. Read this at the start of every new session before touching code.*
