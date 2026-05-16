@@ -392,6 +392,13 @@ def select_route(
             confidence = result.get("confidence", classification.confidence)
             evidence_mode = result.get("evidence_mode", "")
             evidence_reason = result.get("evidence_reason", classification.evidence_reason)
+            # Prefer classification evidence_reason for medical/veterinary context
+            # (policy layer is more accurate than embedding router for these)
+            if classification.evidence_reason in (
+                "medical_context", "medical_body_symptom", "veterinary_context"
+            ):
+                evidence_reason = classification.evidence_reason
+                evidence_mode = "required"
             requires_evidence = evidence_mode == "required"
             embedding_route = result.get("embedding_route", route)
             guards_fired = result.get("guards_fired", [])
@@ -404,13 +411,36 @@ def select_route(
                 route = memory_gate_override
                 guards_fired = guards_fired + ["memory_routing_gate"]
 
+            # Medical/veterinary safety guard: override ANY embedding prediction
+            # (WEATHER, NEWS, TIME, LOCAL, AUGMENTED) when policy detects
+            # medical or veterinary context. Safety-critical queries must
+            # never route to weather, news, or general knowledge.
+            is_medical_or_vet = classification.evidence_reason in (
+                "medical_context", "medical_body_symptom", "veterinary_context"
+            )
+            if is_medical_or_vet and classification.evidence_mode == "required" and route != "EVIDENCE":
+                route = "EVIDENCE"
+                provider = "trusted"
+                evidence_mode = "required"
+                evidence_reason = classification.evidence_reason
+                requires_evidence = True
+                guards_fired = guards_fired + ["medical_vet_safety_override"]
+
             # Override embedding LOCAL when intent classifier strongly signals evidence
             raw_signals = classification.raw_plan.get("routing_signals", {}) if classification.raw_plan else {}
             candidate_routes = classification.raw_plan.get("candidate_routes", []) if classification.raw_plan else []
+            # Medical/veterinary evidence requirements override ephemeral classification
+            is_medical_or_vet = classification.evidence_reason in (
+                "medical_context", "medical_body_symptom", "veterinary_context"
+            )
             embedding_local_override = (
                 route == "LOCAL"
-                and not ephemeral
-                and (raw_signals.get("source_request") or "EVIDENCE" in candidate_routes)
+                and (not ephemeral or is_medical_or_vet)
+                and (
+                    raw_signals.get("source_request")
+                    or "EVIDENCE" in candidate_routes
+                    or classification.evidence_mode == "required"
+                )
             )
 
             if route == "LOCAL" and not embedding_local_override:
@@ -428,21 +458,38 @@ def select_route(
                     ephemeral=ephemeral,
                 )
             elif embedding_local_override:
-                # Intent classifier overrode embedding LOCAL → AUGMENTED
+                # Intent classifier overrode embedding LOCAL → AUGMENTED/EVIDENCE
                 from router_py import provider_resolver
                 provider = provider_resolver.resolve_provider(classification)
                 usage_class = provider_usage_class_for(provider)
+
+                # Preserve the original evidence_reason from classification
+                # (e.g., medical_context, medical_body_symptom) instead of
+                # hardcoding source_request.
+                _evidence_reason = classification.evidence_reason or "source_request"
+                _evidence_mode = classification.evidence_mode or "required"
+
+                # Medical/veterinary queries route to EVIDENCE (strict trusted sources)
+                if _evidence_reason in ("medical_context", "medical_body_symptom", "veterinary_context"):
+                    route = "EVIDENCE"
+                    provider = "trusted"
+                    usage_class = "local"
+                    policy_reason = f"router_evidence_{_evidence_reason}"
+                else:
+                    route = "AUGMENTED"
+                    policy_reason = "router_source_request_override"
+
                 decision = RoutingDecision(
-                    route="AUGMENTED",
+                    route=route,
                     mode="AUTO",
-                    intent_family=override_intent,
+                    intent_family=intent_family,
                     confidence=confidence,
                     provider=provider,
                     provider_usage_class=usage_class,
-                    evidence_mode="required",
-                    evidence_reason="source_request",
+                    evidence_mode=_evidence_mode,
+                    evidence_reason=_evidence_reason,
                     requires_evidence=True,
-                    policy_reason="router_source_request_override",
+                    policy_reason=policy_reason,
                     ephemeral=ephemeral,
                 )
             elif route == "NEWS":
@@ -487,14 +534,24 @@ def select_route(
                     policy_reason="router_weather",
                     ephemeral=True,
                 )
-            else:  # AUGMENTED
+            else:  # AUGMENTED or EVIDENCE
                 from router_py import provider_resolver
                 provider = provider_resolver.resolve_provider(classification)
                 usage_class = provider_usage_class_for(provider)
-                policy_reason = f"router_evidence_{evidence_reason}" if evidence_reason else "router_augmented"
+
+                # Medical and veterinary queries route to EVIDENCE (strict trusted sources)
+                # instead of AUGMENTED (general knowledge sources)
+                if evidence_reason in ("medical_context", "medical_body_symptom", "veterinary_context"):
+                    route = "EVIDENCE"
+                    provider = "trusted"
+                    usage_class = "local"
+                    policy_reason = f"router_evidence_{evidence_reason}"
+                else:
+                    route = "AUGMENTED"
+                    policy_reason = f"router_evidence_{evidence_reason}" if evidence_reason else "router_augmented"
 
                 decision = RoutingDecision(
-                    route="AUGMENTED",
+                    route=route,
                     mode="AUTO",
                     intent_family=intent_family,
                     confidence=confidence,
@@ -762,8 +819,25 @@ def _make_augmented_decision(
     prefer_paid: bool = False,
     query: str = "",
 ) -> RoutingDecision:
-    """Create an augmented routing decision."""
+    """Create an augmented or evidence routing decision."""
     from router_py import provider_resolver
+
+    # Medical and veterinary queries route to EVIDENCE (strict trusted sources)
+    if classification.evidence_reason in ("medical_context", "medical_body_symptom", "veterinary_context"):
+        return RoutingDecision(
+            route="EVIDENCE",
+            mode="AUTO",
+            intent_family=classification.intent_family,
+            confidence=classification.confidence,
+            provider="trusted",
+            provider_usage_class="local",
+            evidence_mode=classification.evidence_mode,
+            evidence_reason=classification.evidence_reason,
+            requires_evidence=bool(classification.evidence_mode),
+            policy_reason=f"evidence_required_{classification.evidence_reason}",
+            ephemeral=_is_ephemeral(query),
+        )
+
     provider = provider_resolver.resolve_provider(
         classification, prefer_paid=prefer_paid
     )

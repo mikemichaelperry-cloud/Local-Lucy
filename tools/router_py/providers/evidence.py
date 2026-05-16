@@ -294,3 +294,37 @@ def call_openai_subprocess(question: str, timeout: float = 130.0) -> dict[str, A
     except Exception as e:
         logger.debug(f"OpenAI subprocess failed: {e}")
     return None
+
+
+async def fetch_trusted_evidence(
+    question: str,
+    route: Any,
+) -> dict[str, Any] | None:
+    """Fetch evidence from trusted sources (medical/veterinary domains).
+    
+    Uses unverified_context_trusted.py with domain restrictions.
+    Returns None if no evidence found, signaling strict enforcement.
+    """
+    logger.debug(f"Fetching trusted evidence for: {question[:50]}...")
+    try:
+        sys.path.insert(0, str(ROOT_DIR / "tools"))
+        import unverified_context_trusted as trusted_provider
+        loop = asyncio.get_event_loop()
+        intent_family = route.intent_family if route else ""
+        payload = await loop.run_in_executor(
+            None, trusted_provider.fetch_context, question, intent_family
+        )
+        if payload and payload.get("ok"):
+            return {
+                "context": payload.get("content", ""),
+                "title": payload.get("category", "Trusted Sources"),
+                "url": "",
+                "provider": "trusted",
+                "class": payload.get("category", "trusted_general"),
+                "sources": payload.get("sources", []),
+                "bounded_response": payload.get("bounded_response", False),
+            }
+        return None
+    except Exception as e:
+        logger.warning(f"Trusted evidence fetch failed: {e}")
+        return None

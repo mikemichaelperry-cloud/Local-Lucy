@@ -30,8 +30,11 @@ def _extract_location(query: str) -> str | None:
     q = query.lower().strip()
     # Remove common prefixes
     patterns = [
+        r"what'?s\s+the\s+weather\s+like\s+(in|at|for|near)\s+",
         r"what'?s\s+the\s+weather\s+(in|at|for|near)\s+",
+        r"weather\s+like\s+(in|at|for|near)\s+",
         r"weather\s+(in|at|for|near)\s+",
+        r"how'?s\s+the\s+weather\s+like\s+(in|at|for|near)\s+",
         r"how'?s\s+the\s+weather\s+(in|at|for|near)\s+",
         r"will\s+it\s+rain\s+(in|at|for|near)\s+",
         r"is\s+it\s+sunny\s+(in|at|for|near)\s+",
@@ -46,6 +49,15 @@ def _extract_location(query: str) -> str | None:
             loc = q[m.end():].strip()
             # Remove trailing punctuation
             loc = re.sub(r"[?.,!]+$", "", loc)
+            # Strip trailing temporal/filler phrases that are not part of the location
+            loc = re.sub(
+                r"\s+(at the moment|right now|currently|as of now|for now|"
+                r"today|tonight|tomorrow|this week|this weekend|"
+                r"for today|for tonight|for tomorrow|for me|please)\s*$",
+                "",
+                loc,
+            )
+            loc = loc.strip()
             return loc if loc else None
     # Fallback: look for capitalized words or known cities
     return None

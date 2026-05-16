@@ -4,12 +4,12 @@
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "WEATHER",
       "policy_override": "none"
     },
     "metadata": {
       "source": "user_feedback",
-      "feedback_type": "answer_negative"
+      "feedback_type": "route_correction"
     }
   },
   {
@@ -5772,12 +5772,13 @@
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
-      "route": "WEATHER",
+      "route": "LOCAL",
       "policy_override": "none"
     },
     "metadata": {
       "source": "user_feedback",
-      "feedback_type": "route_correction"
+      "feedback_type": "route_correction",
+      "note": "Corrected from WEATHER to LOCAL"
     }
   },
   {

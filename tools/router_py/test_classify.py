@@ -150,7 +150,7 @@ class TestAugmentedDecision(unittest.TestCase):
         self.assertEqual(decision.provider_usage_class, "paid")
     
     def test_medical_safety_overrides_prefer_paid(self):
-        """Medical context forces wikipedia regardless of prefer_paid."""
+        """Medical context routes to EVIDENCE (strict trusted sources)."""
         classification = ClassificationResult(
             intent="background_overview",
             intent_family="background_overview",
@@ -164,9 +164,9 @@ class TestAugmentedDecision(unittest.TestCase):
         
         decision = _make_augmented_decision(classification, prefer_paid=True)
         
-        self.assertEqual(decision.route, "AUGMENTED")
-        self.assertEqual(decision.provider, "wikipedia")
-        self.assertEqual(decision.provider_usage_class, "free")
+        self.assertEqual(decision.route, "EVIDENCE")
+        self.assertEqual(decision.provider, "trusted")
+        self.assertEqual(decision.provider_usage_class, "local")
 
 
 class TestRouteSelection(unittest.TestCase):
@@ -225,7 +225,7 @@ class TestRouteSelection(unittest.TestCase):
         self.assertEqual(decision.route, "LOCAL")
     
     def test_evidence_mode_trumps_fallback_policy(self):
-        """Test evidence mode overrides fallback_only policy (but not disabled)."""
+        """Test evidence mode routes medical queries to EVIDENCE (strict trusted sources)."""
         classification = ClassificationResult(
             intent="background_overview",
             intent_family="background_overview",
@@ -239,7 +239,8 @@ class TestRouteSelection(unittest.TestCase):
         
         decision = select_route(classification, policy="fallback_only")
         
-        self.assertEqual(decision.route, "AUGMENTED")
+        self.assertEqual(decision.route, "EVIDENCE")
+        self.assertEqual(decision.provider, "trusted")
         self.assertTrue(decision.requires_evidence)
     
     def test_policy_disabled(self):
