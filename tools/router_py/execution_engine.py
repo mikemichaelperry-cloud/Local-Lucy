@@ -2135,6 +2135,13 @@ them according to the route type (bypass, provisional, or full). It handles:
         if route.route == "NEWS":
             return await self._fetch_news_evidence(question, for_voice=for_voice)
         
+        # For AUGMENTED news-synthesis requests, fetch news headlines as evidence
+        # then fall back to the standard provider chain if news is unavailable
+        if route.route == "AUGMENTED" and route.evidence_reason == "news_synthesis":
+            news_ev = await self._fetch_news_evidence(question, for_voice=for_voice)
+            if news_ev:
+                return news_ev
+        
         primary = route.provider
         if primary == "none" or not primary:
             primary = "wikipedia"

@@ -385,6 +385,22 @@ class HybridRouter:
         has_news_context = any(c in q_lower for c in news_context)
         wat_pattern = any(p in q_lower for p in ["wats ", "wat ", "wut ", "whats "])
         is_news = any(kw in q_lower for kw in self.news_keywords) or has_news_typo or (wat_pattern and has_news_context)
+        
+        # Historical context guard: suppress news keyword match when query
+        # clearly asks about historical/past events (e.g. "Cold war history",
+        # "What caused World War 2", "ancient Rome"). Conflict keywords like
+        # "war" match both current news and history; temporal markers disambiguate.
+        historical_markers = [
+            "history", "historical", "in 19", "in 20th", "century", "ancient",
+            "medieval", "renaissance", "prehistoric", "was the", "were the",
+            "in the past", "timeline", "era", "period", "old ", "former ",
+            "origin", "origins", "background", "how did", "why did", "when did",
+            "what caused", "causes of", "background on", "overview of",
+        ]
+        has_historical_marker = any(m in q_lower for m in historical_markers)
+        if is_news and has_historical_marker:
+            is_news = False
+        
         is_time = any(kw in q_lower for kw in self.time_keywords)
         is_cooking = any(kw in q_lower for kw in self.cooking_keywords)
         # Use word-boundary matching for short/ambiguous keywords to avoid
