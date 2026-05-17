@@ -48,6 +48,75 @@ def normalize_augmentation_policy(raw: str) -> AugmentationPolicy:
     return "disabled"
 
 
+def _is_personal_finance_reasoning(query: str) -> bool:
+    """
+    Detect whether a query is asking for personal-finance *reasoning/advice*
+    rather than live financial *data*.
+
+    Examples of reasoning (should stay LOCAL):
+        - "What would you consider a comfortable bank balance?"
+        - "How should I budget for retirement?"
+        - "Should I invest in stocks or bonds?"
+        - "What is your opinion on my pension plan?"
+
+    Examples of data lookups (should trigger evidence):
+        - "What is the current stock price of Apple?"
+        - "Bitcoin price today"
+        - "Current inflation rate in Israel"
+
+    Returns True if the query is a reasoning/planning/advice request.
+    """
+    if not query:
+        return False
+    q_lower = query.lower()
+
+    # Reasoning/advice indicators — these signal the user wants opinion/planning
+    reasoning_indicators = [
+        "what would you consider",
+        "what do you consider",
+        "what is a good",
+        "what is a comfortable",
+        "what is a reasonable",
+        "what do you think",
+        "what is your opinion",
+        "what is your take",
+        "how should i",
+        "how much should i",
+        "how do i",
+        "should i",
+        "would it be better",
+        "is it worth",
+        "is it a good idea",
+        "advice on",
+        "advice about",
+        "plan for",
+        "planning for",
+        "strategy for",
+        "help me decide",
+        "help me choose",
+        "recommend",
+    ]
+
+    # Financial topic anchors — ensure we only downgrade when financial topics
+    # are actually present (prevent unrelated reasoning from bypassing evidence)
+    financial_anchors = [
+        "bank", "balance", "savings", "retirement", "pension", "budget",
+        "invest", "investing", "investment", "stock", "stocks", "bond",
+        "bonds", "portfolio", "401k", "ira", "roth", "mutual fund",
+        "etf", "mortgage", "loan", "debt", "credit", "income", "salary",
+        "expense", "expenses", "net worth", "wealth", "financial",
+        "money", "cash", "fund", "funds", "asset", "assets",
+    ]
+
+    has_reasoning = any(ind in q_lower for ind in reasoning_indicators)
+    has_financial = any(
+        re.search(rf'\b{re.escape(anchor)}\b', q_lower)
+        for anchor in financial_anchors
+    )
+
+    return has_reasoning and has_financial
+
+
 def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[bool, str]:
     """
     Determine if a query requires evidence mode.
@@ -342,15 +411,30 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             return True, "source_request"
     
     # Financial / market data — accuracy matters
+    financial_match = False
+    matched_financial_keyword = ""
     for keyword in financial_keywords:
         if len(keyword) <= 4:
             # Short keywords require word boundaries to avoid false positives
             # (e.g. "ira" inside "iran", "roth" inside "troth")
             if re.search(rf'\b{re.escape(keyword)}\b', normalized):
-                return True, "financial_data"
+                financial_match = True
+                matched_financial_keyword = keyword
+                break
         else:
             if keyword in normalized:
-                return True, "financial_data"
+                financial_match = True
+                matched_financial_keyword = keyword
+                break
+    
+    if financial_match:
+        # Personal-finance reasoning (e.g. "What would you consider a comfortable
+        # bank balance?", "How should I budget for retirement?") asks for opinion
+        # and planning, not live market data. Route these LOCAL so the model can
+        # reason with its knowledge rather than forcing a generic evidence lookup.
+        if _is_personal_finance_reasoning(query):
+            return False, "personal_finance_reasoning"
+        return True, "financial_data"
     
     # Legal / regulatory — accuracy matters
     for keyword in legal_keywords:

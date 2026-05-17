@@ -88,7 +88,6 @@
       "must_exclude_regexes": [
         "(?i)offensive|politically correct|consensus|socially acceptable|approved|ideology"
       ],
-      "first_person_only": true,
       "max_chars": 600
     }
   },
@@ -124,7 +123,6 @@
       "must_exclude_regexes": [
         "(?i)I don't know|I do not know|no idea"
       ],
-      "first_person_only": true,
       "max_chars": 600
     }
   },

@@ -21,7 +21,7 @@
       "duration_ms": 1000
     },
     "personality_logic_over_ideology": {
-      "text": "No. If an idea is logically sound, its validity should not depend on popularity or whether it offends people. Logic and evidence should be the sole criteria for evaluation.",
+      "text": "No. A logically sound idea should not be rejected simply because it offends people. Logic and evidence should guide acceptance, not popularity or comfort.",
       "duration_ms": 1236
     },
     "reasoning_structured": {
@@ -37,7 +37,7 @@
       "duration_ms": 727
     },
     "core_values_open_minded": {
-      "text": "Being open-minded means I consider multiple perspectives without prejudice. It helps me evaluate ideas logically and fairly.",
+      "text": "Being open-minded means I consider different perspectives without prejudice. It helps me evaluate ideas logically and fairly.",
       "duration_ms": 827
     }
   },

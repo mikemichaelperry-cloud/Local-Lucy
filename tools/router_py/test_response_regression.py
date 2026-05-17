@@ -94,9 +94,10 @@ def _normalize_for_comparison(text: str) -> str:
 
 def _check_first_person(text: str) -> tuple[bool, str]:
     """Return (ok, reason) verifying first-person self-reference."""
-    # Must contain at least one first-person pronoun as a word
-    if not re.search(r"\b(I|me|my|myself)\b", text, re.IGNORECASE):
-        return False, "response lacks first-person pronoun (I/me/my/myself)"
+    # Must contain at least one first-person pronoun as a word.
+    # Accepts singular (I/me/my/myself) and plural (we/us/our/ourselves).
+    if not re.search(r"\b(I|me|my|myself|we|us|our|ourselves)\b", text, re.IGNORECASE):
+        return False, "response lacks first-person pronoun (I/me/my/myself/we/us/our/ourselves)"
 
     # Must not contain third-person self-reference to Lucy
     third_person_patterns = [

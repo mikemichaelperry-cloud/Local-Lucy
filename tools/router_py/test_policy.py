@@ -180,6 +180,35 @@ class TestRequiresEvidenceMode(unittest.TestCase):
         requires, reason = requires_evidence_mode("")
         self.assertFalse(requires)
         self.assertEqual(reason, "default_light")
+    
+    def test_personal_finance_reasoning_downgrades_evidence(self):
+        """Personal-finance reasoning should not trigger evidence mode."""
+        reasoning_queries = [
+            "What would you consider a comfortable bank balance?",
+            "How should I budget for retirement?",
+            "Should I invest in stocks or bonds?",
+            "What is your opinion on my pension plan?",
+            "Is it worth paying off my mortgage early?",
+        ]
+        for query in reasoning_queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertFalse(requires)
+                self.assertEqual(reason, "personal_finance_reasoning")
+    
+    def test_live_financial_data_still_requires_evidence(self):
+        """Live financial data lookups still require evidence mode."""
+        data_queries = [
+            "What is the current stock price of Apple?",
+            "Bitcoin price today",
+            "Current inflation rate in Israel",
+            "NASDAQ index right now",
+        ]
+        for query in data_queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertTrue(requires)
+                self.assertEqual(reason, "financial_data")
 
 
 class TestProviderUsageClass(unittest.TestCase):

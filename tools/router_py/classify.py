@@ -399,6 +399,14 @@ def select_route(
             ):
                 evidence_reason = classification.evidence_reason
                 evidence_mode = "required"
+            
+            # Prefer classification evidence_reason for personal-finance reasoning
+            # (policy layer distinguishes reasoning from live data; embedding router
+            # often conflates them into generic financial_data)
+            if classification.evidence_reason == "personal_finance_reasoning":
+                evidence_reason = classification.evidence_reason
+                evidence_mode = ""
+            
             requires_evidence = evidence_mode == "required"
             embedding_route = result.get("embedding_route", route)
             guards_fired = result.get("guards_fired", [])
@@ -425,6 +433,23 @@ def select_route(
                 evidence_reason = classification.evidence_reason
                 requires_evidence = True
                 guards_fired = guards_fired + ["medical_vet_safety_override"]
+
+            # Personal-finance reasoning guard: override embedding AUGMENTED when
+            # the query is asking for opinion/planning ("comfortable bank balance",
+            # "how should I budget") rather than live market data. The policy layer
+            # already downgraded evidence_mode; if the classifier agrees it's not
+            # evidence-required, keep it LOCAL so the model can reason instead of
+            # forcing a generic evidence lookup.
+            if (
+                route == "AUGMENTED"
+                and classification.evidence_reason == "personal_finance_reasoning"
+                and classification.evidence_mode != "required"
+            ):
+                route = "LOCAL"
+                evidence_mode = ""
+                evidence_reason = "personal_finance_reasoning"
+                requires_evidence = False
+                guards_fired = guards_fired + ["personal_finance_reasoning_override"]
 
             # Override embedding LOCAL when intent classifier strongly signals evidence
             raw_signals = classification.raw_plan.get("routing_signals", {}) if classification.raw_plan else {}
@@ -476,11 +501,21 @@ def select_route(
                     usage_class = "local"
                     policy_reason = f"router_evidence_{_evidence_reason}"
                 elif "NEWS" in candidate_routes:
-                    # Intent classifier detected a news query; prefer NEWS over AUGMENTED
-                    route = "NEWS"
-                    provider = "news"
-                    usage_class = "local"
-                    policy_reason = "router_news_override"
+                    # Intent classifier detected a news query
+                    if _is_synthesis_request(query):
+                        # Synthesis requests (opinion, probability, assessment) need
+                        # AUGMENTED so OpenAI/Kimi can analyze headlines + context
+                        route = "AUGMENTED"
+                        provider = "openai"
+                        usage_class = "paid"
+                        policy_reason = "router_news_synthesis"
+                        _evidence_reason = "news_synthesis"
+                    else:
+                        # Pure news request — raw headlines
+                        route = "NEWS"
+                        provider = "news"
+                        usage_class = "local"
+                        policy_reason = "router_news_override"
                 else:
                     route = "AUGMENTED"
                     policy_reason = "router_source_request_override"
@@ -499,19 +534,39 @@ def select_route(
                     ephemeral=ephemeral,
                 )
             elif route == "NEWS":
-                decision = RoutingDecision(
-                    route="NEWS",
-                    mode="AUTO",
-                    intent_family=intent_family,
-                    confidence=confidence,
-                    provider="news",
-                    provider_usage_class="local",
-                    evidence_mode=evidence_mode,
-                    evidence_reason=evidence_reason,
-                    requires_evidence=requires_evidence,
-                    policy_reason="router_news",
-                    ephemeral=True,
-                )
+                # Synthesis requests (opinion, probability, assessment) on news topics
+                # need AUGMENTED so OpenAI/Kimi can analyze headlines + context
+                if _is_synthesis_request(query):
+                    from router_py import provider_resolver
+                    provider = provider_resolver.resolve_provider(classification)
+                    usage_class = provider_usage_class_for(provider)
+                    decision = RoutingDecision(
+                        route="AUGMENTED",
+                        mode="AUTO",
+                        intent_family=intent_family,
+                        confidence=confidence,
+                        provider=provider,
+                        provider_usage_class=usage_class,
+                        evidence_mode="required",
+                        evidence_reason="news_synthesis",
+                        requires_evidence=True,
+                        policy_reason="router_news_synthesis",
+                        ephemeral=True,
+                    )
+                else:
+                    decision = RoutingDecision(
+                        route="NEWS",
+                        mode="AUTO",
+                        intent_family=intent_family,
+                        confidence=confidence,
+                        provider="news",
+                        provider_usage_class="local",
+                        evidence_mode=evidence_mode,
+                        evidence_reason=evidence_reason,
+                        requires_evidence=requires_evidence,
+                        policy_reason="router_news",
+                        ephemeral=True,
+                    )
             elif route == "TIME":
                 decision = RoutingDecision(
                     route="TIME",
@@ -645,6 +700,39 @@ def _is_capability_query(query: str) -> bool:
         return True
 
     return False
+
+
+def _is_synthesis_request(query: str) -> bool:
+    """Detect queries asking for analysis, opinion, probability, or assessment.
+
+    These should route to AUGMENTED (not NEWS) so that OpenAI/Kimi can
+    synthesize an answer from live headlines + their own knowledge.
+    Examples:
+        "What do you think the probability is of renewed military action..."
+        "How likely is a ceasefire?"
+        "Give me your assessment of the situation in Gaza."
+    """
+    if not query:
+        return False
+    q = query.lower()
+    synthesis_patterns = [
+        r"\bwhat do you think\b",
+        r"\bprobability\b",
+        r"\blikelihood\b",
+        r"\bchance\b",
+        r"\bodds\b",
+        r"\bassessment\b",
+        r"\banalysis\b",
+        r"\bevaluate\b",
+        r"\bopinion\b",
+        r"\bpredict\b",
+        r"\bforecast\b",
+        r"\boutlook\b",
+        r"\bhow likely\b",
+        r"\bgive me your\b",
+        r"\bwhat is your\b",
+    ]
+    return any(re.search(p, q) for p in synthesis_patterns)
 
 
 def _is_creative_writing(query: str) -> bool:
