@@ -7,9 +7,13 @@ A simple LED-style audio level meter with:
 - Smooth decay animation
 - Configurable orientation (horizontal/vertical)
 - Input and output modes
+- Fast file-based polling for low-latency level updates
 """
 
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QColor, QPainter, QPaintEvent
@@ -174,7 +178,13 @@ class VoiceVUMeter(QWidget):
     Shows separate meters for:
     - Input (microphone/recording)
     - Output (TTS playback)
+    
+    Reads levels directly from the voice audio levels JSON file at 50ms
+    intervals for low-latency visual feedback, bypassing the slow (~1s)
+    state refresh timer.
     """
+    
+    LEVELS_POLL_INTERVAL_MS = 50  # 20 FPS for responsive meters
     
     def __init__(self, parent: QWidget | None = None):
         """Initialize voice VU meter widget."""
@@ -203,13 +213,37 @@ class VoiceVUMeter(QWidget):
         layout.addWidget(self.output_meter)
         
         self.setStyleSheet("background-color: #1e2529; border-radius: 4px;")
+        
+        self._levels_file: Path | None = None
+        
+        # Fast timer for direct file polling (bypasses slow state refresh)
+        self._levels_timer = QTimer(self)
+        self._levels_timer.setInterval(self.LEVELS_POLL_INTERVAL_MS)
+        self._levels_timer.timeout.connect(self._poll_levels_file)
+        self._levels_timer.start()
+    
+    def set_levels_file(self, path: Path | str | None) -> None:
+        """Set the JSON levels file to monitor.  Pass None to disable."""
+        self._levels_file = Path(path) if path else None
+    
+    def _poll_levels_file(self) -> None:
+        """Read audio levels directly from the JSON file for low latency."""
+        if self._levels_file is None or not self._levels_file.exists():
+            return
+        try:
+            with open(self._levels_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.input_meter.set_level(int(data.get("input_level", 0)))
+            self.output_meter.set_level(int(data.get("output_level", 0)))
+        except Exception:
+            pass
     
     def set_input_level(self, level: int) -> None:
-        """Set input (recording) level 0-100."""
+        """Set input (recording) level 0-100 (fallback when file polling unavailable)."""
         self.input_meter.set_level(level)
     
     def set_output_level(self, level: int) -> None:
-        """Set output (playback) level 0-100."""
+        """Set output (playback) level 0-100 (fallback when file polling unavailable)."""
         self.output_meter.set_level(level)
     
     def reset(self) -> None:

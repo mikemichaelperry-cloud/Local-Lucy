@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Signal, QTimer
@@ -288,6 +289,13 @@ class ControlPanel(QFrame):
 
         # VU meters for input/output audio levels
         self._voice_vu_meter = VoiceVUMeter()
+        # Point VU meters at the voice audio levels file for fast polling.
+        runtime_ns = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "")
+        if runtime_ns:
+            levels_path = Path(runtime_ns).expanduser().resolve() / "state" / "voice_audio_levels.json"
+        else:
+            levels_path = Path(__file__).resolve().parents[3] / "state" / "voice_audio_levels.json"
+        self._voice_vu_meter.set_levels_file(levels_path)
         layout.addWidget(self._voice_vu_meter)
 
         # Transcription preview
