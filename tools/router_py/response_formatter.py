@@ -12,6 +12,7 @@ raw response text into validated, formatted output.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from router_py.request_types import RoutingDecision
@@ -109,9 +110,11 @@ def build_augmented_prompt(
     title = evidence.get("title", "")
     url = evidence.get("url", "")
     provider = evidence.get("provider", "unknown")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     prompt_parts = [
         f"Question: {question}",
+        f"Current date and time: {now}",
         "",
         "Background Context:",
         context_text,
@@ -123,7 +126,11 @@ def build_augmented_prompt(
         prompt_parts.append(f"URL: {url}")
 
     prompt_parts.append(f"\nProvider: {provider}")
-    prompt_parts.append("\nBased on the background context above, please answer the question.")
+    prompt_parts.append(
+        "\nBased on the background context above and your own knowledge, "
+        "please answer the question. If the context is outdated or incomplete, "
+        "say so and answer from your own knowledge up to your training cutoff."
+    )
 
     return "\n".join(prompt_parts)
 

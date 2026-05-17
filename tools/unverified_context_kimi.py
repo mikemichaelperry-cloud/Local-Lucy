@@ -7,6 +7,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -49,20 +50,21 @@ def main() -> int:
     if not api_base or not model:
         return _fail("missing_kimi_configuration")
 
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    system_text = (
+        "You are a current-events analyst. The user may ask about geopolitical, military, "
+        "economic, or scientific developments. Answer as of the current date. "
+        "If the topic involves rapidly changing events, explicitly note that situations evolve. "
+        "Be concise but specific. Include approximate dates or timeframes when relevant. "
+        "If you lack information beyond your training cutoff, say so directly."
+    )
+    user_text = f"Today is {now}.\n\n{question}"
+
     payload = {
         "model": model,
         "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "Provide a concise, high-level background summary for a user question. "
-                    "Do not claim verification, do not provide evidence citations, and keep under 120 words."
-                ),
-            },
-            {
-                "role": "user",
-                "content": question,
-            },
+            {"role": "system", "content": system_text},
+            {"role": "user", "content": user_text},
         ],
         "temperature": 0.2,
     }

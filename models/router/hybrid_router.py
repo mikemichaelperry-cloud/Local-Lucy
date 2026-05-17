@@ -191,6 +191,12 @@ class HybridRouter:
             "scientific discovery", "discovery", "breakthrough",
             # Politics and elections
             "election", "vote", "poll", "campaign", "debate",
+            # Conflict and geopolitics
+            "military action", "military", "war", "conflict", "ceasefire",
+            "hostilities", "invasion", "airstrike", "air strike", "missile",
+            "rocket attack", "bombing", "shelling", "troops", "army",
+            "navy", "air force", "sanctions", "embargo", "diplomatic",
+            "tensions", "escalation", "retaliation", "strike",
             # General updates
             "update on", "latest on", "development", "developments",
             "trending", "world cup", "olympics", "super bowl", "nba", "nfl", "premier league",
@@ -283,6 +289,7 @@ class HybridRouter:
             }
         
         q_lower = query.lower()
+        import re  # Ensure re is available for all keyword matching in this method
 
         # Stage 0: Creative writing guard — fictional/artistic requests are always LOCAL
         # even if they contain medical/financial/legal topic keywords.
@@ -317,12 +324,21 @@ class HybridRouter:
         if not requires_evidence:
             historical_price = any(kw in q_lower for kw in ["in 19", "in 200", "in 201", "back in", "was the price", "historical", "at its peak", "all time high"])
             for kw in self.financial_keywords:
-                if kw in q_lower:
-                    if historical_price and kw in ["bitcoin", "stock", "stocks"]:
-                        continue
-                    requires_evidence = True
-                    evidence_reason = "financial_data"
-                    break
+                # Short keywords require word boundaries to avoid false positives
+                if len(kw) <= 4:
+                    if re.search(rf'\b{re.escape(kw)}\b', q_lower):
+                        if historical_price and kw in ["bitcoin", "stock", "stocks"]:
+                            continue
+                        requires_evidence = True
+                        evidence_reason = "financial_data"
+                        break
+                else:
+                    if kw in q_lower:
+                        if historical_price and kw in ["bitcoin", "stock", "stocks"]:
+                            continue
+                        requires_evidence = True
+                        evidence_reason = "financial_data"
+                        break
         if not requires_evidence:
             for kw in self.legal_keywords:
                 if kw in q_lower:

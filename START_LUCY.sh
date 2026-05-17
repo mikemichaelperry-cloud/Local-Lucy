@@ -45,8 +45,16 @@ export LUCY_ROUTER_LOG_DIR="${LUCY_RUNTIME_NAMESPACE_ROOT}/logs"
 # Runtime configuration
 export LUCY_ROUTER_PY=1
 export LUCY_EXEC_PY=1
-export LUCY_LOCAL_MODEL=local-lucy-fast
 export LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
+
+# Read model from persistent state so the HMI toggle survives restarts.
+# Falls back to local-lucy-fast if no state file exists yet.
+_state_file_tmp="${LUCY_RUNTIME_NAMESPACE_ROOT}/state/current_state.json"
+if [ -f "${_state_file_tmp}" ]; then
+    _state_model_tmp=$(python3 -c "import sys,json; print(json.load(open('${_state_file_tmp}')).get('model',''))" 2>/dev/null || true)
+fi
+export LUCY_LOCAL_MODEL="${_state_model_tmp:-local-lucy-fast}"
+unset _state_file_tmp _state_model_tmp
 export LUCY_ENABLE_INTERNET=1
 export LUCY_SESSION_MEMORY=1
 
