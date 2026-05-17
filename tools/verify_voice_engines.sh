@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${LUCY_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)}"
 WORKSPACE_ROOT="$(dirname -- "$(dirname -- "${ROOT}")")"
-UI_ROOT="${LUCY_UI_ROOT:-${WORKSPACE_ROOT}/lucy-v8/ui-v9}"
+UI_ROOT="${LUCY_UI_ROOT:-${WORKSPACE_ROOT}/lucy-v9/ui-v9}"
 UI_VENV_PY="${UI_ROOT}/.venv/bin/python3"
 TTS_ADAPTER="${ROOT}/tools/voice/tts_adapter.py"
 

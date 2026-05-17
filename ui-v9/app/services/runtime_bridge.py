@@ -133,7 +133,7 @@ class RuntimeBridge:
         bridge_file = Path(__file__).resolve()
         if ui_root.name not in ("ui-v7", "ui-v9") or not ui_root.exists() or not ui_root.is_dir():
             raise RuntimeError(f"invalid UI root in authority contract: {ui_root}")
-        if authority_root.name not in ("opt-experimental-v7-dev", "opt-experimental-v9-dev", "lucy-v8"):
+        if authority_root.name not in ("opt-experimental-v7-dev", "opt-experimental-v9-dev", "lucy-v9"):
             raise RuntimeError(f"invalid authority root in authority contract: {authority_root}")
         if not runtime_ns_root.is_absolute():
             raise RuntimeError(f"invalid runtime namespace root in authority contract: {runtime_ns_root}")

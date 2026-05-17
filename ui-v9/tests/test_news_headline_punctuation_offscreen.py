@@ -58,7 +58,7 @@ class Sandbox:
     def __init__(self, root: Path) -> None:
         self.root = root
         self.home = root / "home"
-        self.tools_dir = self.home / ".codex-api-home" / "lucy" / "snapshots" / "lucy-v8" / "tools"
+        self.tools_dir = self.home / ".codex-api-home" / "lucy" / "snapshots" / "lucy-v9" / "tools"
         self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v9" / "state"
         self.current_state_path = self.state_dir / "current_state.json"
         self.runtime_lifecycle_path = self.state_dir / "runtime_lifecycle.json"
@@ -73,7 +73,7 @@ class Sandbox:
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(self.state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(self.home / "lucy" / "snapshots" / "lucy-v8")
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(self.home / "lucy" / "snapshots" / "lucy-v9")
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
@@ -86,7 +86,7 @@ class Sandbox:
             self.current_state_path,
             {
                 "schema_version": 1,
-                "profile": "lucy-v8",
+                "profile": "lucy-v9",
                 "mode": "auto",
                 "memory": "on",
                 "evidence": "on",
@@ -122,7 +122,7 @@ class Sandbox:
                 "augmentation_policy": "direct_allowed",
                 "augmented_provider": "openai",
                 "model": "local-lucy",
-                "profile": "lucy-v8",
+                "profile": "lucy-v9",
             },
             "error": "",
             "outcome": {

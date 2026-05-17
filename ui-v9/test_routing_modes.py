@@ -6,7 +6,7 @@ This script tests that each mode and runtime toggle routes as intended.
 It runs prompts and verifies routing decisions from state files.
 
 Usage:
-    cd ~/lucy-v8/ui-v9 && source .venv/bin/activate
+    cd ~/lucy-v9/ui-v9 && source .venv/bin/activate
     python3 test_routing_modes.py [--verbose]
 """
 
@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent / "app"))
 
 # Set required env vars for testing
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v8"))
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v9"))
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")

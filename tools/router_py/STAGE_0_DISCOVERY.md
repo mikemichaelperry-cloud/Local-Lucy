@@ -35,7 +35,7 @@
 | `streaming_voice.py` | 515 | Voice bypass ❌ |
 | `voice_tool.py` | 867 | Voice fallback ❌ |
 | `runtime_voice.py` | 1612 | Voice bypass ❌ |
-| `thrash_v8.py` | 86 | Test only |
+| `thrash_v9.py` | 86 | Test only |
 | `burn_in_test.py` | 245 | Test only |
 
 ## Provider Selection Smear

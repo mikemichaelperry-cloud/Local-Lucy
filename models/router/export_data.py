@@ -15,7 +15,7 @@ from typing import Any
 def resolve_state_dirs() -> list[Path]:
     """Find all state directories (workspace + namespaces)."""
     roots = []
-    namespace_root = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / "lucy-v8")))
+    namespace_root = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / "lucy-v9")))
     roots.append(namespace_root / "state")
     
     namespaces_dir = namespace_root / "state" / "namespaces"

@@ -85,7 +85,7 @@ class Sandbox:
         self.root = root
         self.home = root / "home"
         self.bin_dir = root / "bin"
-        self.tools_dir = self.home / "lucy" / "lucy-v8" / "tools"
+        self.tools_dir = self.home / "lucy" / "lucy-v9" / "tools"
         self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v9" / "state"
         self.voice_runtime_path = self.state_dir / "voice_runtime.json"
         self.last_request_result_path = self.state_dir / "last_request_result.json"

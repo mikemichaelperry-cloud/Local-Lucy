@@ -1020,7 +1020,7 @@ class VoicePipeline(BaseToolWrapper):
         
         # ISOLATION: V8 only uses ui-v9, NEVER falls back to ui-v7
         root = self._resolve_root()
-        workspace_root = root if root.name == "lucy-v8" else root.parent.parent
+        workspace_root = root if root.name == "lucy-v9" else root.parent.parent
         candidate = workspace_root / "ui-v9" / ".venv" / "bin" / "python3"
         
         if candidate.exists() and os.access(candidate, os.X_OK):
