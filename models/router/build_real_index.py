@@ -24,7 +24,7 @@ def extract_real_queries() -> list[dict]:
 
     for path in [
         Path("../../state/request_history.jsonl"),
-        Path("../../snapshots/opt-experimental-v8-dev/state/request_history.jsonl"),
+        Path("../../snapshots/opt-experimental-v9-dev/state/request_history.jsonl"),
     ]:
         if not path.exists():
             continue

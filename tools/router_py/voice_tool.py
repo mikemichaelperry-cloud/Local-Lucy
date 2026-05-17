@@ -973,10 +973,10 @@ class VoicePipeline(BaseToolWrapper):
                 voice_python = self._resolve_voice_python()
                 
                 # Always use subprocess to avoid Python environment issues
-                # (Kokoro is installed in ui-v8 venv, not system Python)
+                # (Kokoro is installed in ui-v9 venv, not system Python)
                 if not voice_python:
                     raise SynthesisError(
-                        "No voice Python available. Ensure ui-v8 venv exists."
+                        "No voice Python available. Ensure ui-v9 venv exists."
                     )
                 
                 result = self._synthesize_with_subprocess(
@@ -1010,7 +1010,7 @@ class VoicePipeline(BaseToolWrapper):
                 raise SynthesisError(f"Synthesis failed: {e}") from e
     
     def _resolve_voice_python(self) -> str:
-        """Resolve Python binary for TTS (ui-v8 venv has Kokoro)."""
+        """Resolve Python binary for TTS (ui-v9 venv has Kokoro)."""
         # Check explicit env var
         explicit = os.environ.get("LUCY_VOICE_PYTHON_BIN", "").strip()
         if explicit:
@@ -1018,10 +1018,10 @@ class VoicePipeline(BaseToolWrapper):
             if path.exists() and os.access(path, os.X_OK):
                 return str(path)
         
-        # ISOLATION: V8 only uses ui-v8, NEVER falls back to ui-v7
+        # ISOLATION: V8 only uses ui-v9, NEVER falls back to ui-v7
         root = self._resolve_root()
         workspace_root = root if root.name == "lucy-v8" else root.parent.parent
-        candidate = workspace_root / "ui-v8" / ".venv" / "bin" / "python3"
+        candidate = workspace_root / "ui-v9" / ".venv" / "bin" / "python3"
         
         if candidate.exists() and os.access(candidate, os.X_OK):
             return str(candidate)
@@ -1031,7 +1031,7 @@ class VoicePipeline(BaseToolWrapper):
                 return str(fallback)
         
         raise RuntimeError(
-            f"V8 ISOLATION VIOLATION: ui-v8 Python not found at {candidate}, "
+            f"V8 ISOLATION VIOLATION: ui-v9 Python not found at {candidate}, "
             "and no system python3 fallback is executable. V8 cannot use V7 components."
         )
     
@@ -1043,7 +1043,7 @@ class VoicePipeline(BaseToolWrapper):
         output_dir: str,
         python_bin: str,
     ) -> dict[str, Any]:
-        """Synthesize using TTS adapter via subprocess with ui-v8 Python."""
+        """Synthesize using TTS adapter via subprocess with ui-v9 Python."""
         import subprocess
         import json
         
@@ -1116,7 +1116,7 @@ class VoicePipeline(BaseToolWrapper):
                     # Get levels file path from environment or use default
                     import os
                     runtime_dir = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", 
-                        Path.home() / ".codex-api-home/lucy/runtime-v8"))
+                        Path.home() / ".codex-api-home/lucy/runtime-v9"))
                     levels_file = runtime_dir / "state" / "voice_audio_levels.json"
                     
                     play_wav_file_with_levels(

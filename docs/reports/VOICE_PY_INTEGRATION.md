@@ -7,7 +7,7 @@ This document describes the integration of the Python-native voice pipeline (`vo
 ## Architecture
 
 ```
-HMI (ui-v8)
+HMI (ui-v9)
     ↓
 RuntimeBridge (runtime_bridge.py)
     ↓
@@ -50,7 +50,7 @@ New functions added:
 - `handle_ptt_start_python()`: PTT start via Python
 - `handle_ptt_stop_python()`: PTT stop via Python
 
-### 3. runtime_bridge.py (`ui-v8/app/services/runtime_bridge.py`)
+### 3. runtime_bridge.py (`ui-v9/app/services/runtime_bridge.py`)
 
 Modified to propagate `LUCY_VOICE_PY` environment variable to voice subprocesses.
 
@@ -111,16 +111,16 @@ python3 voice_tool.py --test health
 
 ### Run Health Check
 ```bash
-cd /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev
+cd /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
 cd tools/router_py
 python3 voice_tool.py --test health
 ```
 
 ### Test with Runtime
 ```bash
-cd /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev
-export LUCY_RUNTIME_AUTHORITY_ROOT=/home/mike/lucy-v8/snapshots/opt-experimental-v8-dev
-export LUCY_UI_ROOT=/home/mike/lucy-v8/ui-v8
+cd /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
+export LUCY_RUNTIME_AUTHORITY_ROOT=/home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
+export LUCY_UI_ROOT=/home/mike/lucy-v9/ui-v9
 export LUCY_RUNTIME_NAMESPACE_ROOT=/home/mike/.codex-api-home/lucy/runtime-v7
 
 # Shell mode (default)
@@ -177,7 +177,7 @@ Potential improvements:
 
 1. `tools/runtime_voice.py` - Added Python voice integration
 2. `tools/router_py/__init__.py` - Added voice tool exports
-3. `ui-v8/app/services/runtime_bridge.py` - Added LUCY_VOICE_PY propagation
+3. `ui-v9/app/services/runtime_bridge.py` - Added LUCY_VOICE_PY propagation
 
 ## Files Added
 

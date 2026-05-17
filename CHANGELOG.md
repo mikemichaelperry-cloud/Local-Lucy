@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Feedback parser patterns** — New route correction patterns for "correct routing is X", "correct answer is X", and "it's X".
 
 ### Changed
-- Consolidated `ui-v8/app/backend/router/core/` modules into `tools/router_py/` as the single source of truth.
+- Consolidated `ui-v9/app/backend/router/core/` modules into `tools/router_py/` as the single source of truth.
 - Removed legacy shell scripts (`tools/classify_query.sh`, `tools/evidence_answer.sh`, etc.) superseded by Python implementations.
 - Stopped tracking runtime state files in git (`state/`, `logs/`, `feedback_buffer.json`).
 

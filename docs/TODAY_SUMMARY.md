@@ -48,7 +48,7 @@ learner for automatic index rebuild.
 ## How to Rebuild Index
 
 ```bash
-cd /home/mike/lucy-v8/models/router
+cd /home/mike/lucy-v9/models/router
 python3 background_learner.py --process
 ```
 
@@ -56,4 +56,4 @@ python3 background_learner.py --process
 
 - **GitHub:** `mikemichaelperry-cloud/Local-Lucy`
 - **Branch:** `main`
-- **Snapshot:** `snapshots/opt-experimental-v8-dev/`
+- **Snapshot:** `snapshots/opt-experimental-v9-dev/`

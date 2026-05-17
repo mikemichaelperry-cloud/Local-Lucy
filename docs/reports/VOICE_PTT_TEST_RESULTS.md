@@ -1,7 +1,7 @@
 # Voice/PTT Path Test Results
 
 **Date:** 2026-04-12
-**Target:** `/home/mike/lucy-v8/snapshots/opt-experimental-v8-dev`
+**Target:** `/home/mike/lucy-v9/snapshots/opt-experimental-v9-dev`
 **Test Objective:** Verify Voice/PTT path works with Python ExecutionEngine
 
 ---
@@ -30,7 +30,7 @@ The voice path components exist and have the correct structure, but the new Pyth
 
 ### ❌ What is MISSING
 
-- `ui-v8/app/services/runtime_voice.py` - Referenced in test plan but doesn't exist in this snapshot
+- `ui-v9/app/services/runtime_voice.py` - Referenced in test plan but doesn't exist in this snapshot
 - Voice-specific handling in ExecutionEngine for `LUCY_SURFACE=voice`
 
 ---
@@ -137,7 +137,7 @@ def _prepare_voice_response(self, response_text: str) -> str:
 
 ### Manual Test (Environment Check)
 ```bash
-cd /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev
+cd /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
 
 # Test voice path environment propagation
 export LUCY_ROUTER_PY=1
@@ -150,7 +150,7 @@ export LUCY_SURFACE=voice
 
 ### Manual Test (Voice PTT Status)
 ```bash
-cd /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev
+cd /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
 
 # Check voice runtime status
 python3 tools/runtime_voice.py status
@@ -158,7 +158,7 @@ python3 tools/runtime_voice.py status
 
 ### Manual Test (Simulated Voice Submit)
 ```bash
-cd /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev
+cd /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
 
 # Export Python router flags
 export LUCY_ROUTER_PY=1
@@ -211,7 +211,7 @@ python3 tools/runtime_request.py submit --text "test voice query"
 ### Fix runtime_request.py (Critical)
 
 ```bash
-cd /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev
+cd /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
 
 # Add LUCY_ROUTER_PY and LUCY_EXEC_PY to build_request_env()
 sed -i '/env\["LUCY_RUNTIME_PROFILE"\] = state\["profile"\]/a\    if os.environ.get("LUCY_ROUTER_PY"):\n        env["LUCY_ROUTER_PY"] = os.environ["LUCY_ROUTER_PY"]\n    if os.environ.get("LUCY_EXEC_PY"):\n        env["LUCY_EXEC_PY"] = os.environ["LUCY_EXEC_PY"]' tools/runtime_request.py
@@ -231,7 +231,7 @@ sed -i '/env\["LUCY_RUNTIME_PROFILE"\] = state\["profile"\]/a\    if os.environ.
 After applying fixes, verify with:
 
 ```bash
-cd /home/mike/lucy-v8/snapshots/opt-experimental-v8-dev
+cd /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
 
 # Set Python router flags
 export LUCY_ROUTER_PY=1

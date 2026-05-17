@@ -23,7 +23,7 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT / "tools"))
 
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(PROJECT_ROOT / "snapshots" / "opt-experimental-v8-dev"))
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(PROJECT_ROOT / "snapshots" / "opt-experimental-v9-dev"))
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(PROJECT_ROOT))
 
 from router_py.classify import (

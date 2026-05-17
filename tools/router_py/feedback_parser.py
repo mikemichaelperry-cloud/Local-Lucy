@@ -35,7 +35,7 @@ except ImportError:
 
 # Where to write user feedback for background_learner.py
 RUNTIME_NS = Path(
-    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v8"))
+    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
 )
 # feedback_parser.py lives in tools/router_py/ → go up two levels to project root → models/router
 ROUTER_DIR = Path(__file__).resolve().parent.parent.parent / "models" / "router"

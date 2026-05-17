@@ -3,7 +3,7 @@
 **Date:** 2026-05-02  
 **System:** Local Lucy v8 Alpha — Desktop AI Assistant with PySide6 HMI  
 **Hardware:** NVIDIA RTX 3060 12GB VRAM  
-**Authority Root:** `~/lucy-v8/snapshots/opt-experimental-v8-dev/`  
+**Authority Root:** `~/lucy-v8/snapshots/opt-experimental-v9-dev/`  
 **Report Focus:** Architecture, routing logic, VRAM management, source handling, with special emphasis on the NEWS path implementation.
 
 ---
@@ -71,9 +71,9 @@ Key architectural principles:
 
 ### 2.2 Authority & State Contract
 
-The snapshot at `~/lucy-v8/snapshots/opt-experimental-v8-dev/` is the runtime authority. All state mutations go through `runtime_control.py` with `fcntl.LOCK_EX` file locking. The UI root must be named `ui-v8` (V8 isolation — `ui-v7` is explicitly rejected).
+The snapshot at `~/lucy-v8/snapshots/opt-experimental-v9-dev/` is the runtime authority. All state mutations go through `runtime_control.py` with `fcntl.LOCK_EX` file locking. The UI root must be named `ui-v9` (V8 isolation — `ui-v7` is explicitly rejected).
 
-State files live under `~/.codex-api-home/lucy/runtime-v8/state/`:
+State files live under `~/.codex-api-home/lucy/runtime-v9/state/`:
 - `current_state.json` — profile, mode, model, status
 - `request_history.jsonl` — append-only query log
 - `last_route.json`, `last_preprocess.json` — routing telemetry
@@ -337,7 +337,7 @@ The voice format is constructed in `execution_engine.py` and passed via `metadat
 ### 6.5 Display Rendering
 
 ```python
-# ui-v8/app/panels/conversation_panel.py
+# ui-v9/app/panels/conversation_panel.py
 def _auto_link_urls(text):
     escaped = html.escape(text)
     paragraphs = escaped.split('\n\n')
@@ -403,7 +403,7 @@ The NEWS route is the only "full" route that **bypasses the LLM entirely**. The 
 | Evidence fetch (OpenAI/Kimi) | HTTP + subprocess | ~1–3s |
 | LLM generation (8B) | Ollama API | ~2–5s |
 | LLM generation (14B) | Ollama API | ~3–8s |
-| TTS synthesis (Kokoro) | Subprocess to ui-v8 | ~0.5–2s |
+| TTS synthesis (Kokoro) | Subprocess to ui-v9 | ~0.5–2s |
 
 ### 8.2 Bottlenecks
 

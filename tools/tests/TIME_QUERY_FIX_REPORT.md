@@ -128,7 +128,7 @@ Result: Fetches current time via web search
 
 ```bash
 # Run time query tests
-cd ~/lucy-v8/snapshots/opt-experimental-v8-dev
+cd ~/lucy-v8/snapshots/opt-experimental-v9-dev
 python3 tools/tests/test_time_queries.py
 
 # Run AUTO mode tests

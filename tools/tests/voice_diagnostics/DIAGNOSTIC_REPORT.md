@@ -212,7 +212,7 @@ print(f"[TTS Debug] Expected duration: {expected_duration}s")
 ### Step 1: Test with Real Kokoro
 Run a real voice query and capture debug output:
 ```bash
-cd ~/lucy-v8/snapshots/opt-experimental-v8-dev
+cd ~/lucy-v8/snapshots/opt-experimental-v9-dev
 python3 tools/voice/tts_adapter.py synthesize "This is a long test message with many words to see if the voice cuts off before finishing"
 ```
 

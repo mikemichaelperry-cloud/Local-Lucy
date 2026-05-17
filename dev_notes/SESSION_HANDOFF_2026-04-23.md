@@ -43,11 +43,11 @@ Refactored the entire HMI from 2 levels (Operator/Advanced) to 3 explicit levels
 
 ### Files Changed
 ```
-ui-v8/app/ui_levels.py              - New level definitions (SIMPLE/POWER/ENGINEERING)
-ui-v8/app/main_window.py            - Updated level handling logic
-ui-v8/app/panels/control_panel.py   - Visibility rules per level
-ui-v8/app/panels/status_panel.py    - Card visibility per level
-ui-v8/app/panels/conversation_panel.py - Level-based formatting
+ui-v9/app/ui_levels.py              - New level definitions (SIMPLE/POWER/ENGINEERING)
+ui-v9/app/main_window.py            - Updated level handling logic
+ui-v9/app/panels/control_panel.py   - Visibility rules per level
+ui-v9/app/panels/status_panel.py    - Card visibility per level
+ui-v9/app/panels/conversation_panel.py - Level-based formatting
 ```
 
 ### Key Technical Decisions
@@ -79,7 +79,7 @@ The Voice PTT (Push-to-Talk) button was previously hidden in Simple mode. Now:
 
 ### Files Changed
 ```
-ui-v8/app/panels/control_panel.py   - Updated set_interface_level() visibility rules
+ui-v9/app/panels/control_panel.py   - Updated set_interface_level() visibility rules
 ```
 
 ### Commit
@@ -124,8 +124,8 @@ When requesting "500+ word stories," the model:
 
 ### Files Changed
 ```
-snapshots/opt-experimental-v8-dev/config/Modelfile.local-lucy
-snapshots/opt-experimental-v8-dev/config/latency_optimizations.env
+snapshots/opt-experimental-v9-dev/config/Modelfile.local-lucy
+snapshots/opt-experimental-v9-dev/config/latency_optimizations.env
 ```
 
 ### Ollama Model Rebuild
@@ -198,11 +198,11 @@ export QT_QPA_PLATFORM=xcb
 ### Core UI Files
 | File | Lines Changed | Purpose |
 |------|---------------|---------|
-| ui-v8/app/ui_levels.py | +70 | New 3-level constants |
-| ui-v8/app/main_window.py | +42/-14 | Level handling, status visibility |
-| ui-v8/app/panels/control_panel.py | +718 | 3-level visibility rules |
-| ui-v8/app/panels/status_panel.py | +860 | Status card visibility |
-| ui-v8/app/panels/conversation_panel.py | +865 | Level-based formatting |
+| ui-v9/app/ui_levels.py | +70 | New 3-level constants |
+| ui-v9/app/main_window.py | +42/-14 | Level handling, status visibility |
+| ui-v9/app/panels/control_panel.py | +718 | 3-level visibility rules |
+| ui-v9/app/panels/status_panel.py | +860 | Status card visibility |
+| ui-v9/app/panels/conversation_panel.py | +865 | Level-based formatting |
 
 ### Configuration Files
 | File | Purpose |
@@ -234,7 +234,7 @@ f8bebb1 Fix: Prevent identity prefix and truncation in long responses
 73bc855 HMI: Voice PTT available in Simple mode
 874c60f HMI: Implement explicit 3-level interface structure
 575235d Fix: Desktop shortcut launch issues
-ae4b5ba Release: Local Lucy v8 Beta (opt-experimental-v8-dev)
+ae4b5ba Release: Local Lucy v8 Beta (opt-experimental-v9-dev)
 ```
 
 ---

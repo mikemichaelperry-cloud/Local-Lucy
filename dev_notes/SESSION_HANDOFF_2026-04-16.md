@@ -144,7 +144,7 @@ Continue migration of `execute_plan.sh` → `execution_engine.py`
 
 ### Test Voice
 ```bash
-cd ~/lucy-v8/snapshots/opt-experimental-v8-dev
+cd ~/lucy-v8/snapshots/opt-experimental-v9-dev
 python3 tools/voice/tts_adapter.py synthesize "Test message for voice"
 ```
 
@@ -167,7 +167,7 @@ python3 tools/tests/test_policy_enforcement_bug.py
 
 ### Clear Python Cache
 ```bash
-rm -rf ~/lucy-v8/snapshots/opt-experimental-v8-dev/tools/router_py/__pycache__
+rm -rf ~/lucy-v8/snapshots/opt-experimental-v9-dev/tools/router_py/__pycache__
 ```
 
 ### Check Voice Debug Output
@@ -231,7 +231,7 @@ Before considering model upgrade:
 - Current model: local-lucy 7B (~4.9 GB)
 - Voice: Kokoro TTS (af_bella) + Whisper STT
 - Numpy: Now installed (required for audio resampling)
-- State DB: SQLite at `~/.codex-api-home/lucy/runtime-v8/state/lucy_state.db`
+- State DB: SQLite at `~/.codex-api-home/lucy/runtime-v9/state/lucy_state.db`
 
 ---
 

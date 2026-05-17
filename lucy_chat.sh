@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Local Lucy V8 - Primary Chat Entry Point
-# ROLE: AUTHORITATIVE CHAT INTERFACE for opt-experimental-v8-dev
+# ROLE: AUTHORITATIVE CHAT INTERFACE for opt-experimental-v9-dev
 #
 set -euo pipefail
 

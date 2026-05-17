@@ -353,7 +353,7 @@ def select_route(
                 # (classify.py may import feedback_buffer under a different name
                 # than main.py, creating separate singleton instances).
                 _ns = Path(
-                    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v8"))
+                    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
                 )
                 _buf_path = _ns / "feedback_buffer.json"
                 if _buf_path.exists():
@@ -912,7 +912,7 @@ def _memory_routing_gate(query: str, embedding_route: str, session_id: str = "de
             runtime_dir = Path(
                 os.environ.get(
                     "LUCY_RUNTIME_NAMESPACE_ROOT",
-                    Path.home() / ".codex-api-home/lucy/runtime-v8",
+                    Path.home() / ".codex-api-home/lucy/runtime-v9",
                 )
             )
             mem_file = runtime_dir / "state" / "chat_session_memory.txt"

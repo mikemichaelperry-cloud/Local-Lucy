@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-07  
 **Auditor:** Kimi Code CLI (multi-agent analysis + automated test execution)  
-**Scope:** Full codebase (`ui-v8/app/`, `tools/`, `config/`, state management, voice pipeline, routing, memory, tests)  
+**Scope:** Full codebase (`ui-v9/app/`, `tools/`, `config/`, state management, voice pipeline, routing, memory, tests)  
 **Files Analyzed:** 362 Python files, 65+ test files, 20+ config files  
 **Tests Executed:** 250+ test cases across 15 test modules  
 **Internet Access:** Verified available (Google 204)
@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-Local Lucy V8 is **functionally operational** but carries significant **technical debt** from rapid iteration. The qwen3 migration (2026-05-06) introduced token budget changes that broke existing tests. The codebase has **real bugs** in routing precedence, state management atomicity, and voice pipeline resource leaks. The most severe issue is a **~94,000-line code duplication** between active `tools/` and `snapshots/opt-experimental-v8-dev/tools/`, creating a stale-runtime risk.
+Local Lucy V8 is **functionally operational** but carries significant **technical debt** from rapid iteration. The qwen3 migration (2026-05-06) introduced token budget changes that broke existing tests. The codebase has **real bugs** in routing precedence, state management atomicity, and voice pipeline resource leaks. The most severe issue is a **~94,000-line code duplication** between active `tools/` and `snapshots/opt-experimental-v9-dev/tools/`, creating a stale-runtime risk.
 
 | Category | Critical | High | Medium | Low |
 |----------|----------|------|--------|-----|
@@ -28,7 +28,7 @@ Local Lucy V8 is **functionally operational** but carries significant **technica
 
 ### 1.1 Critical: ~94,000 Lines of Duplicate Code (tools/ vs snapshots/)
 
-**Files:** `tools/*` ↔ `snapshots/opt-experimental-v8-dev/tools/*`  
+**Files:** `tools/*` ↔ `snapshots/opt-experimental-v9-dev/tools/*`  
 **Impact:** Stale runtime root. When active files are edited, the snapshot can drift.
 
 Identified byte-for-byte duplicates:
@@ -43,17 +43,17 @@ Identified byte-for-byte duplicates:
 
 **Already observed drift:** `runtime_control.py` — active version removed `"active_model"` field; snapshot still retains it.
 
-**Fix:** Eliminate the snapshot-as-runtime-root pattern. The UI should run directly from `tools/` and `ui-v8/app/`. The snapshot should be a read-only backup or generated artifact, not a dual source of truth.
+**Fix:** Eliminate the snapshot-as-runtime-root pattern. The UI should run directly from `tools/` and `ui-v9/app/`. The snapshot should be a read-only backup or generated artifact, not a dual source of truth.
 
 ### 1.2 Critical: UI Hardcodes Paths into Snapshot Directory
 
 **Files:**
-- `ui-v8/app/main_window.py:346` — kokoro socket path
-- `ui-v8/app/main_window.py:360` — whisper PID file path
-- `ui-v8/app/backend/news_provider.py:5`
-- `ui-v8/app/backend/state_manager.py:5`
-- `ui-v8/app/backend/streaming_voice.py:6`
-- `ui-v8/app/services/runtime_bridge.py:132` — whitelists `"opt-experimental-v8-dev"`
+- `ui-v9/app/main_window.py:346` — kokoro socket path
+- `ui-v9/app/main_window.py:360` — whisper PID file path
+- `ui-v9/app/backend/news_provider.py:5`
+- `ui-v9/app/backend/state_manager.py:5`
+- `ui-v9/app/backend/streaming_voice.py:6`
+- `ui-v9/app/services/runtime_bridge.py:132` — whitelists `"opt-experimental-v9-dev"`
 
 **Impact:** The UI is bound to a manually-copied snapshot. Any edit to active `tools/` is invisible to the running system unless the snapshot is re-synced.
 
@@ -71,7 +71,7 @@ Identified byte-for-byte duplicates:
 | File | Imports |
 |------|---------|
 | `tools/runtime_voice.py` | `VoiceResult`, `VADConfig`, `StreamingVoicePipeline` |
-| `ui-v8/app/services/runtime_bridge_consolidated.py` | `asyncio`, `tempfile` |
+| `ui-v9/app/services/runtime_bridge_consolidated.py` | `asyncio`, `tempfile` |
 
 ### 1.5 Medium: Duplicate Utility Functions
 
@@ -80,7 +80,7 @@ Identified byte-for-byte duplicates:
 ### 1.6 Low: Hardcoded Magic Values
 
 - Audio sample rate `16000` hardcoded 5× in `runtime_voice.py`
-- Profile string `"opt-experimental-v8-dev"` hardcoded in 9 locations across 8 files
+- Profile string `"opt-experimental-v9-dev"` hardcoded in 9 locations across 8 files
 - Timeout values (`120`, `125`, `300`) scattered without constants
 
 ---
@@ -89,7 +89,7 @@ Identified byte-for-byte duplicates:
 
 ### 2.1 Critical: Non-Atomic State Writes in runtime_bridge_consolidated
 
-**File:** `ui-v8/app/services/runtime_bridge_consolidated.py:598-665` (`_set_state_field`)  
+**File:** `ui-v9/app/services/runtime_bridge_consolidated.py:598-665` (`_set_state_field`)  
 **Issue:** Uses bare `open(state_file, "w")` + `json.dump()`. No `fcntl` locking. No `tempfile.NamedTemporaryFile` + `os.replace()`.
 
 **Impact:** Concurrent writes from UI thread + CLI tool → truncated or corrupted JSON.
@@ -117,8 +117,8 @@ Identified byte-for-byte duplicates:
 ### 2.4 High: History Append Without File Locking
 
 **Files:**
-- `ui-v8/app/services/runtime_bridge.py:872-897`
-- `ui-v8/app/services/runtime_bridge_consolidated.py:694-758`
+- `ui-v9/app/services/runtime_bridge.py:872-897`
+- `ui-v9/app/services/runtime_bridge_consolidated.py:694-758`
 
 **Issue:** Both append to `request_history.jsonl` without `fcntl` locking, while `runtime_request.py` **does** use `locked_state_file`.
 
@@ -126,22 +126,22 @@ Identified byte-for-byte duplicates:
 
 ### 2.5 High: Lost Updates in _set_state_field
 
-**File:** `ui-v8/app/services/runtime_bridge_consolidated.py`  
+**File:** `ui-v9/app/services/runtime_bridge_consolidated.py`  
 **Issue:** Read-modify-write without re-reading or locking. Concurrent toggles from HMI + CLI can silently overwrite each other.
 
 ### 2.6 High: Non-Atomic Multi-File State Reads
 
-**File:** `ui-v8/app/services/state_store.py:229-331`  
+**File:** `ui-v9/app/services/state_store.py:229-331`  
 **Issue:** `load_runtime_snapshot()` reads 7 JSON files sequentially. No atomic snapshot semantics. Composite state may mix timestamps.
 
 ### 2.7 Medium: Read Without Locking
 
-**File:** `ui-v8/app/services/state_store.py:435-452` (`_load_json`)  
+**File:** `ui-v9/app/services/state_store.py:435-452` (`_load_json`)  
 **Issue:** Reads without `fcntl` lock. If a non-atomic writer is mid-write, returns `"invalid json"` instead of retrying.
 
 ### 2.8 Medium: runtime_bridge Reads State Without Locking
 
-**File:** `ui-v8/app/services/runtime_bridge.py:899-909` (`_resolve_current_model`)  
+**File:** `ui-v9/app/services/runtime_bridge.py:899-909` (`_resolve_current_model`)  
 **Issue:** Direct `json.loads(state_file.read_text())` without coordinating with `runtime_control.py` locks.
 
 ---
@@ -302,7 +302,7 @@ At least 12 tests across `test_policy_enforcement_bug.py`, `test_resource_leaks.
 
 ### 6.4 Medium: UI Offscreen Tests Not Discovered
 
-**File:** `ui-v8/tests/test_interface_level_layout_offscreen.py`  
+**File:** `ui-v9/tests/test_interface_level_layout_offscreen.py`  
 **Issue:** 0 items collected. Likely missing `if __name__ == "__main__":` runner or PySide6 display requirements not met.
 
 ---
@@ -400,7 +400,7 @@ No critical issues found in memory service. Dual-write SQLite + text-file archit
 | `tools/tests/test_whisper_worker_direct.py` | 5 | 0 | All passed |
 | `tools/tests/test_whisper_fallback_direct.py` | 5 | 3 | GPU fallback logic bugs |
 | `tools/voice/tests/*` | 0 | 0 | 0 collected (import/config issues) |
-| `ui-v8/tests/*` | 0 | 0 | 0 collected (display/offscreen issues) |
+| `ui-v9/tests/*` | 0 | 0 | 0 collected (display/offscreen issues) |
 | **Custom regression tests** | — | — | Confirmed 4 state management bugs |
 
 **Total: ~175 passed, ~37 failed, ~30 not-collected**
@@ -412,7 +412,7 @@ No critical issues found in memory service. Dual-write SQLite + text-file archit
 | File | Change | Reason |
 |------|--------|--------|
 | `tools/runtime_voice.py` | Added TTS state write in `internal-prewarm-tts` | Fix TTS: none display bug |
-| `snapshots/opt-experimental-v8-dev/tools/runtime_voice.py` | Synced same change | Snapshot parity |
+| `snapshots/opt-experimental-v9-dev/tools/runtime_voice.py` | Synced same change | Snapshot parity |
 | `AUDIT_REPORT_2026-05-07.md` | Created this report | Audit deliverable |
 
 ---

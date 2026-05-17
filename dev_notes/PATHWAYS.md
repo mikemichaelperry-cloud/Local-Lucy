@@ -2,11 +2,11 @@
 
 ## Python Environments
 - System Python: `/usr/bin/python3`
-- UI Venv (has Kokoro): `/home/mike/lucy-v8/ui-v8/.venv/bin/python3`
+- UI Venv (has Kokoro): `/home/mike/lucy-v9/ui-v9/.venv/bin/python3`
 
 ## Critical Paths
-- Project Root: `/home/mike/lucy-v8`
-- Snapshot Mirror: `/home/mike/lucy-v8/snapshots/opt-experimental-v8-dev`
+- Project Root: `/home/mike/lucy-v9`
+- Snapshot Mirror: `/home/mike/lucy-v9/snapshots/opt-experimental-v9-dev`
 - Kokoro Socket: `tmp/run/kokoro_tts_worker.sock`
 - Logs: `~/.local/share/lucy/logs/`
 
@@ -27,10 +27,10 @@
 ## Architecture Notes
 
 ### Kokoro TTS Resolution (FIXED)
-**Problem:** Kokoro is installed in ui-v8 venv but voice_tool.py runs in system Python.
+**Problem:** Kokoro is installed in ui-v9 venv but voice_tool.py runs in system Python.
 Direct import fails because Kokoro is not in system Python's site-packages.
 
-**Solution:** voice_tool.py always uses subprocess with ui-v8 Python for TTS synthesis.
+**Solution:** voice_tool.py always uses subprocess with ui-v9 Python for TTS synthesis.
 The `_synthesize_with_subprocess()` method calls tts_adapter.py via subprocess,
 avoiding Python environment issues.
 
@@ -39,7 +39,7 @@ avoiding Python environment issues.
 # In voice_tool.py::synthesize()
 voice_python = self._resolve_voice_python()
 if not voice_python:
-    raise SynthesisError("No voice Python available. Ensure ui-v8 venv exists.")
+    raise SynthesisError("No voice Python available. Ensure ui-v9 venv exists.")
 
 result = self._synthesize_with_subprocess(
     text=text.strip(),
