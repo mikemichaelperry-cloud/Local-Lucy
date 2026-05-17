@@ -263,7 +263,7 @@ def default_runtime_namespace_root() -> Path:
         return Path(explicit_root).expanduser()
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v8"
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v9"
 
 
 DEFAULT_VOICE_RUNTIME_FILE = str(default_runtime_namespace_root() / "state" / "voice_runtime.json")
@@ -318,8 +318,8 @@ def resolve_voice_python(requested_engine: str | None = None) -> str:
             else:
                 return str(explicit_path)
 
-    # ISOLATION: V8 only uses ui-v8, NEVER falls back to ui-v7
-    candidate = workspace_root / "ui-v8" / ".venv" / "bin" / "python3"
+    # ISOLATION: V8 only uses ui-v9, NEVER falls back to ui-v7
+    candidate = workspace_root / "ui-v9" / ".venv" / "bin" / "python3"
     if candidate.exists() and os.access(candidate, os.X_OK):
         if preferred_engine in {"kokoro", "piper"} and adapter_tool.exists():
             payload = run_tts_adapter_command(

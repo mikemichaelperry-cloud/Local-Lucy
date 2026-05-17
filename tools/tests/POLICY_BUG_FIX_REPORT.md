@@ -109,7 +109,7 @@ All existing tests in `tools/router_py/test_main.py` continue to pass.
 
 ```bash
 # Run bug fix tests
-cd ~/lucy-v8/snapshots/opt-experimental-v8-dev
+cd ~/lucy-v8/snapshots/opt-experimental-v9-dev
 python3 tools/tests/test_policy_enforcement_bug.py
 
 # Run existing test suite

@@ -16,11 +16,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "router_py"))
 
-RUNTIME_V8 = Path.home() / ".codex-api-home" / "lucy" / "runtime-v8"
+RUNTIME_V8 = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"
 STATE_FILE = RUNTIME_V8 / "state" / "current_state.json"
 MEMORY_FILE = RUNTIME_V8 / "state" / "chat_session_memory.txt"
 # Try snapshot path first, fall back to repo root
-LUCY_V8_SNAPSHOT = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev"
+LUCY_V8_SNAPSHOT = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v9-dev"
 LUCY_V8_REPO = Path.home() / "lucy-v8"
 if (LUCY_V8_SNAPSHOT / "tools" / "runtime_control.py").exists():
     LUCY_V8 = LUCY_V8_SNAPSHOT
@@ -281,7 +281,7 @@ def main():
     
     # Set required env vars
     os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(LUCY_V8))
-    os.environ.setdefault("LUCY_UI_ROOT", str(Path.home() / "lucy-v8" / "ui-v8"))
+    os.environ.setdefault("LUCY_UI_ROOT", str(Path.home() / "lucy-v8" / "ui-v9"))
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(RUNTIME_V8))
     
     tests = [

@@ -15,15 +15,15 @@ import wave
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-sys.path.insert(0, str(Path.home() / "lucy-v8" / "ui-v8" / "app"))
+sys.path.insert(0, str(Path.home() / "lucy-v8" / "ui-v9" / "app"))
 
-SNAPSHOT = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v8-dev"
+SNAPSHOT = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v9-dev"
 TOOLS = SNAPSHOT / "tools"
 sys.path.insert(0, str(TOOLS))
 
 os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(SNAPSHOT)
-os.environ["LUCY_UI_ROOT"] = str(Path.home() / "lucy-v8" / "ui-v8")
-os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v8")
+os.environ["LUCY_UI_ROOT"] = str(Path.home() / "lucy-v8" / "ui-v9")
+os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9")
 os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
 os.environ["LUCY_ROUTER_PY"] = "1"
 os.environ["LUCY_EXEC_PY"] = "1"
@@ -422,7 +422,7 @@ def test_news_freshness() -> None:
 
     # --- Test 6: No history persistence (delta check) ---
     def _count_news_in_history() -> int:
-        history_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v8" / "state" / "request_history.jsonl"
+        history_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "request_history.jsonl"
         count = 0
         if history_file.exists():
             for line in history_file.read_text(encoding="utf-8").splitlines():

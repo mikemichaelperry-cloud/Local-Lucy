@@ -158,10 +158,10 @@ class TestVoiceHmiBridge:
         """Set required env vars for RuntimeBridge instantiation."""
         project_root = str(Path(__file__).resolve().parents[2])
         monkeypatch.setenv("LUCY_RUNTIME_AUTHORITY_ROOT", project_root)
-        monkeypatch.setenv("LUCY_UI_ROOT", f"{project_root}/ui-v8")
+        monkeypatch.setenv("LUCY_UI_ROOT", f"{project_root}/ui-v9")
         monkeypatch.setenv("LUCY_RUNTIME_NAMESPACE_ROOT", project_root)
-        # Add ui-v8 to path for imports (so 'app.services.runtime_bridge' resolves)
-        ui_root = f"{project_root}/ui-v8"
+        # Add ui-v9 to path for imports (so 'app.services.runtime_bridge' resolves)
+        ui_root = f"{project_root}/ui-v9"
         if ui_root not in sys.path:
             sys.path.insert(0, ui_root)
 

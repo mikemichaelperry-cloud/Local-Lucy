@@ -14,8 +14,8 @@ if [[ -n "${AUTHORITY_ROOT_OVERRIDE}" ]]; then
 else
   ROOT="${DEFAULT_ROOT}"
 fi
-if [[ "$(basename -- "${ROOT}")" != "lucy-v8" && "$(basename -- "${ROOT}")" != "opt-experimental-v8-dev" ]]; then
-  echo "ERR: active v8 terminal authority requires lucy-v8 or opt-experimental-v8-dev root, got: ${ROOT}" >&2
+if [[ "$(basename -- "${ROOT}")" != "lucy-v8" && "$(basename -- "${ROOT}")" != "opt-experimental-v9-dev" ]]; then
+  echo "ERR: active v8 terminal authority requires lucy-v8 or opt-experimental-v9-dev root, got: ${ROOT}" >&2
   exit 2
 fi
 cd "$ROOT"
@@ -23,17 +23,17 @@ cd "$ROOT"
 if [[ -n "${LUCY_UI_ROOT:-}" ]]; then
   UI_ROOT="${LUCY_UI_ROOT}"
 elif [[ "$(basename -- "${ROOT}")" == "lucy-v8" ]]; then
-  UI_ROOT="${ROOT}/ui-v8"
+  UI_ROOT="${ROOT}/ui-v9"
 else
   WORKSPACE_ROOT="$(dirname -- "$(dirname -- "${ROOT}")")"
-  UI_ROOT="${WORKSPACE_ROOT}/ui-v8"
+  UI_ROOT="${WORKSPACE_ROOT}/ui-v9"
 fi
 UI_ROOT="$(CDPATH= cd -- "${UI_ROOT}" 2>/dev/null && pwd)" || {
   echo "ERR: invalid LUCY_UI_ROOT/UI_ROOT: ${UI_ROOT}" >&2
   exit 2
 }
-if [[ "$(basename -- "${UI_ROOT}")" != "ui-v8" ]]; then
-  echo "ERR: active v8 terminal authority requires ui-v8 root, got: ${UI_ROOT}" >&2
+if [[ "$(basename -- "${UI_ROOT}")" != "ui-v9" ]]; then
+  echo "ERR: active v8 terminal authority requires ui-v9 root, got: ${UI_ROOT}" >&2
   exit 2
 fi
 
@@ -71,7 +71,7 @@ elif [[ -n "${LUCY_VOICE_PYTHON_BIN:-}" ]]; then
 fi
 export PYTHONPATH="${UI_ROOT}/app:${WORKSPACE_HOME}/.local/lib/python3.10/site-packages:${PYTHONPATH:-}"
 export LUCY_RUNTIME_CONTRACT_REQUIRED=1
-export LUCY_LAUNCHER_LABEL="opt-experimental-v8-dev"
+export LUCY_LAUNCHER_LABEL="opt-experimental-v9-dev"
 export LUCY_LAUNCHER_FAMILY="launcher v8"
 
 echo "Local Lucy v8 started"

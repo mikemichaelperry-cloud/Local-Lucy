@@ -112,7 +112,7 @@ class TestTemporalInjection(unittest.TestCase):
         self.assertIn("datetime.now(timezone.utc)", source)
 
     def test_ui_kimi_tool_matches_root(self):
-        """The ui-v8 copy of the Kimi tool must match the root copy."""
+        """The ui-v9 copy of the Kimi tool must match the root copy."""
         root_tool = (
             Path(__file__).resolve().parent.parent.parent
             / "tools"
@@ -120,7 +120,7 @@ class TestTemporalInjection(unittest.TestCase):
         )
         ui_tool = (
             Path(__file__).resolve().parent.parent.parent
-            / "ui-v8"
+            / "ui-v9"
             / "tools"
             / "unverified_context_kimi.py"
         )

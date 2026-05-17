@@ -1,7 +1,7 @@
 # Local Lucy V8 — Complete System Architecture
 
 **Generated:** 2026-05-08  
-**Version:** opt-experimental-v8-dev  
+**Version:** opt-experimental-v9-dev  
 **Hardware:** RTX 3060 12GB, 31GB RAM, CPU+GPU hybrid  
 **Test Suite:** 161 passed, 19 skipped, 0 failed  
 **Philosophy:** *Correct answer > locality. The end justifies the means.*
@@ -14,14 +14,14 @@
 graph TB
     subgraph "User Interfaces"
         CLI["🖥️ CLI Terminal<br/>lucy_chat.sh"]
-        GUI["🖼️ Qt HMI (PySide6)<br/>ui-v8/"]
+        GUI["🖼️ Qt HMI (PySide6)<br/>ui-v9/"]
         VOICE["🎤 Voice Mode<br/>PTT + STT + TTS"]
     end
 
     subgraph "Orchestration Layer"
         CORE["⚙️ Lucy Core<br/>runtime/lucy_core.py"]
         ENGINE["🔧 Execution Engine<br/>tools/router_py/execution_engine.py"]
-        BRIDGE["🔗 Consolidated Bridge<br/>ui-v8/app/services/runtime_bridge_consolidated.py"]
+        BRIDGE["🔗 Consolidated Bridge<br/>ui-v9/app/services/runtime_bridge_consolidated.py"]
     end
 
     subgraph "Router (Single-Path + Auto-Feedback)"
@@ -96,7 +96,7 @@ graph TB
 │                                    USER INTERFACES                                       │
 │  ┌──────────────┐  ┌──────────────────────────────┐  ┌────────────────────────────────┐ │
 │  │  CLI Shell   │  │     Qt HMI (PySide6)         │  │       Voice Mode (PTT)         │ │
-│  │ lucy_chat.sh │  │  ui-v8/app/ui/main_window.py │  │  Press-to-Talk + STT + TTS     │ │
+│  │ lucy_chat.sh │  │  ui-v9/app/ui/main_window.py │  │  Press-to-Talk + STT + TTS     │ │
 │  └──────┬───────┘  └──────────────┬───────────────┘  └───────────────┬────────────────┘ │
 └─────────┼─────────────────────────┼────────────────────────────────────┼──────────────────┘
           │                         │                                    │
@@ -108,7 +108,7 @@ graph TB
 │                                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────┐ │
 │  │                         CONSOLIDATED HMI BRIDGE                                      │ │
-│  │   ui-v8/app/services/runtime_bridge_consolidated.py                                   │ │
+│  │   ui-v9/app/services/runtime_bridge_consolidated.py                                   │ │
 │  │   • Atomic state writes (fcntl + tempfile + os.replace)                              │ │
 │  │   • Voice PTT state machine                                                          │ │
 │  │   • Model selector / augmented controls                                              │ │
@@ -375,7 +375,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant User
-    participant HMI as Qt HMI (ui-v8)
+    participant HMI as Qt HMI (ui-v9)
     participant Bridge as Consolidated Bridge
     participant Core as Lucy Core
     participant Router as Embedding Router
@@ -424,7 +424,7 @@ sequenceDiagram
 | **Policy Engine** | `tools/router_py/policy.py` | Evidence detection, provider selection | Expanded |
 | **Auto-Feedback** | `models/router/auto_feedback.py` | Answer quality misroute detection | **NEW** |
 | **Background Learner** | `models/router/background_learner.py` | Index rebuild from feedback | **Active** |
-| **Consolidated Bridge** | `ui-v8/app/services/runtime_bridge_consolidated.py` | HMI ↔ Core communication | Fixed |
+| **Consolidated Bridge** | `ui-v9/app/services/runtime_bridge_consolidated.py` | HMI ↔ Core communication | Fixed |
 | **Voice Runtime** | `tools/runtime_voice.py` | PTT, TTS, STT state management | Fixed |
 | **Whisper Worker** | `tools/voice/whisper_worker.py` | STT server management | Fixed |
 | **Kokoro Backend** | `tools/voice/kokoro_backend.py` | TTS synthesis | Fixed |
@@ -436,7 +436,7 @@ sequenceDiagram
 ## File Locations
 
 ```
-/home/mike/lucy-v8/
+/home/mike/lucy-v9/
 ├── runtime/
 │   └── lucy_core.py                    # Main orchestration
 │
@@ -468,7 +468,7 @@ sequenceDiagram
 │       ├── comprehensive_embeddings.npy# ModernBERT vectors
 │       └── checkpoints/              # Trained model (not deployed)
 │
-├── ui-v8/
+├── ui-v9/
 │   └── app/
 │       ├── ui/
 │       │   └── main_window.py          # Qt HMI

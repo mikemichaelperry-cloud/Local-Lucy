@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-INDEX_PATH = Path("/home/mike/lucy-v8/models/router/comprehensive_index.jsonl")
+INDEX_PATH = Path("/home/mike/lucy-v9/models/router/comprehensive_index.jsonl")
 
 # Evaluation queries with correct labels
 EVAL_QUERIES = [

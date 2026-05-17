@@ -15,7 +15,7 @@
 **Fix Applied**:
 - Increased `voice_stop_timeout_seconds` from 150s → **300s** (5 minutes)
 - Files modified:
-  - `ui-v8/app/services/runtime_bridge.py` (line 75)
+  - `ui-v9/app/services/runtime_bridge.py` (line 75)
   - `ui-v7/app/services/runtime_bridge.py` (line 75) - for consistency
 
 **Verification**: Tested "What's the latest world news?" - all text spoken completely, no cutoff
@@ -62,7 +62,7 @@ cd ~/lucy-v8
 
 ### 5. Architecture Cleanup
 **Issue**: `ui-v7` folder was mistakenly created inside `~/lucy-v8/`  
-**Action**: Deleted `~/lucy-v8/ui-v7/` - only `ui-v8` should exist there
+**Action**: Deleted `~/lucy-v8/ui-v7/` - only `ui-v9` should exist there
 
 ---
 
@@ -78,8 +78,8 @@ cd ~/lucy-v8
 | Kokoro Worker | Running on socket |
 
 ### Active Components
-- **UI**: `~/lucy-v8/ui-v8/`
-- **Backend**: `~/lucy-v8/snapshots/opt-experimental-v8-dev/`
+- **UI**: `~/lucy-v8/ui-v9/`
+- **Backend**: `~/lucy-v8/snapshots/opt-experimental-v9-dev/`
 - **Launcher**: `~/lucy-v8/start_v8_hmi_python.sh`
 - **Desktop Icon**: "Local Lucy HMI v8 (Python Router)"
 
@@ -111,7 +111,7 @@ cd ~/lucy-v8
 
 ### Check Kokoro Worker
 ```bash
-ls -la ~/lucy-v8/snapshots/opt-experimental-v8-dev/tmp/run/kokoro_tts_worker.sock
+ls -la ~/lucy-v8/snapshots/opt-experimental-v9-dev/tmp/run/kokoro_tts_worker.sock
 ```
 
 ---
@@ -121,7 +121,7 @@ ls -la ~/lucy-v8/snapshots/opt-experimental-v8-dev/tmp/run/kokoro_tts_worker.soc
 - **Hardware**: RTX 3060 12GB VRAM
 - **Current model**: local-lucy 7B (~4.9 GB)
 - **Voice**: Kokoro TTS (af_bella) + Whisper STT
-- **State DB**: SQLite at `~/.codex-api-home/lucy/runtime-v8/state/lucy_state.db`
+- **State DB**: SQLite at `~/.codex-api-home/lucy/runtime-v9/state/lucy_state.db`
 
 ---
 

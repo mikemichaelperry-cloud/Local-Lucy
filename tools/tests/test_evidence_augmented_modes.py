@@ -11,8 +11,8 @@ Tests:
 6. Memory injection in augmented modes
 
 Usage:
-    cd /home/mike/lucy-v8
-    source ui-v8/.venv/bin/activate
+    cd /home/mike/lucy-v9
+    source ui-v9/.venv/bin/activate
     python3 tools/tests/test_evidence_augmented_modes.py
 """
 

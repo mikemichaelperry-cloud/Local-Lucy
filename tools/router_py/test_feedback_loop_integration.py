@@ -13,7 +13,7 @@ This test exercises:
   7. Re-running the router and verifying the corrected route
 
 Run with pytest:
-    cd /home/mike/lucy-v8/tools/router_py
+    cd /home/mike/lucy-v9/tools/router_py
     python -m pytest test_feedback_loop_integration.py -v
 """
 

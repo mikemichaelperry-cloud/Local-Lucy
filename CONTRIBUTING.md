@@ -12,11 +12,11 @@ git clone git@github.com:YOUR_USERNAME/Local-Lucy.git
 cd Local-Lucy
 
 # Create virtual environment
-python3 -m venv ui-v8/.venv
-source ui-v8/.venv/bin/activate
+python3 -m venv ui-v9/.venv
+source ui-v9/.venv/bin/activate
 
 # Install dependencies
-pip install -r ui-v8/requirements.txt
+pip install -r ui-v9/requirements.txt
 
 # Verify setup
 python3 -m pytest tools/router_py/ -q

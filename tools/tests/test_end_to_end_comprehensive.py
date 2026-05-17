@@ -13,8 +13,8 @@ Tests:
 - Auto-feedback pipeline trigger
 
 Usage:
-    cd /home/mike/lucy-v8
-    source ui-v8/.venv/bin/activate
+    cd /home/mike/lucy-v9
+    source ui-v9/.venv/bin/activate
     python3 tools/tests/test_end_to_end_comprehensive.py
 """
 
@@ -145,7 +145,7 @@ def test_infrastructure():
     print("\n  1d. SQLite memory database...")
     try:
         import sqlite3
-        mem_db = Path.home() / ".codex-api-home" / "lucy" / "runtime-v8" / "state" / "memory.db"
+        mem_db = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "memory.db"
         test("Memory DB file exists", mem_db.exists(), f"path={mem_db}")
         if mem_db.exists():
             conn = sqlite3.connect(str(mem_db))

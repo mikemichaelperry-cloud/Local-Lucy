@@ -28,7 +28,7 @@ class TestSingleAuthoritativePath:
 
     def test_hmi_bridge_uses_main_run_not_direct_engine(self):
         """HMI bridge must call main.run(), not instantiate ExecutionEngine directly."""
-        source = Path(__file__).resolve().parent.parent.parent / "ui-v8" / "app" / "services" / "runtime_bridge.py"
+        source = Path(__file__).resolve().parent.parent.parent / "ui-v9" / "app" / "services" / "runtime_bridge.py"
         source_text = source.read_text()
         assert "main.run(" in source_text or "from router_py.main import run" in source_text
         assert "ExecutionEngine(" not in source_text

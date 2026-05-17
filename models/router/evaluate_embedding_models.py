@@ -9,8 +9,8 @@ cross-validation (or a held-out split) to compare:
   - Short-query robustness (the key weakness of ModernBERT [CLS])
 
 Usage:
-    cd /home/mike/lucy-v8
-    source ui-v8/.venv/bin/activate
+    cd /home/mike/lucy-v9
+    source ui-v9/.venv/bin/activate
     python models/router/evaluate_embedding_models.py
 """
 

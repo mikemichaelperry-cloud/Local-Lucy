@@ -213,13 +213,13 @@ def default_runtime_namespace_root() -> Path:
         return Path(explicit_root).expanduser()
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v8"
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v9"
 
 
 def legacy_runtime_namespace_root() -> Path:
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / "lucy" / "runtime-v8"
+    return workspace_home / "lucy" / "runtime-v9"
 
 
 def legacy_runtime_namespace_status(
@@ -503,7 +503,7 @@ def _run_backend_submit_python(
                 "augmentation_policy": state.get("augmentation_policy", "disabled"),
                 "augmented_provider": state.get("augmented_provider", "wikipedia"),
                 "model": state.get("model", "local-lucy"),
-                "profile": state.get("profile", "opt-experimental-v8-dev"),
+                "profile": state.get("profile", "opt-experimental-v9-dev"),
             },
             "error": "",
             "outcome": build_outcome_payload(

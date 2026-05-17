@@ -7,7 +7,7 @@
 
 ## Entry Points
 
-### 1. HMI bridge (`ui-v8/app/services/runtime_bridge.py`)
+### 1. HMI bridge (`ui-v9/app/services/runtime_bridge.py`)
 - Path: `_run_submit_request_direct()` → `main.run()` ✅ (already unified)
 - No longer instantiates ExecutionEngine directly
 - Still has `_resolve_augmented_provider()` which duplicates `main.py`'s `ensure_control_env()`

@@ -9,9 +9,9 @@ MANIFEST="${LUCY_SHA_MANIFEST:-$ROOT/SHA256SUMS.clean}"
 
 usage() {
   cat <<'EOF'
-Usage: tools/sha_manifest.sh [--ui-v8] [regen|check|list]
+Usage: tools/sha_manifest.sh [--ui-v9] [regen|check|list]
 
-  --ui-v8  Target ui-v8/SHA256SUMS.clean instead of the root manifest
+  --ui-v9  Target ui-v9/SHA256SUMS.clean instead of the root manifest
   regen    Regenerate SHA256SUMS.clean for clean source/config/runtime files
   check    Verify SHA256SUMS.clean
   list     Print tracked file list
@@ -80,9 +80,9 @@ _collect_ui_v8_files() {
   (
     cd "$ROOT"
     find \
-      ./ui-v8/app \
-      ./ui-v8/tests \
-      ./ui-v8/tools \
+      ./ui-v9/app \
+      ./ui-v9/tests \
+      ./ui-v9/tools \
       -type f \
       ! -path "*/build/*" \
       ! -path "*/vendor/*" \
@@ -126,8 +126,8 @@ regen_manifest() {
 
   if [[ "$MANIFEST" == "$ROOT/SHA256SUMS.clean" ]]; then
     cp "$MANIFEST" "$ROOT/SHA256SUMS"
-  elif [[ "$MANIFEST" == "$ROOT/ui-v8/SHA256SUMS.clean" ]]; then
-    cp "$MANIFEST" "$ROOT/ui-v8/SHA256SUMS"
+  elif [[ "$MANIFEST" == "$ROOT/ui-v9/SHA256SUMS.clean" ]]; then
+    cp "$MANIFEST" "$ROOT/ui-v9/SHA256SUMS"
   fi
 }
 
@@ -138,11 +138,11 @@ verify_manifest() {
   )
 }
 
-# Parse optional --ui-v8 flag
+# Parse optional --ui-v9 flag
 cmd="${1:-check}"
-if [[ "$cmd" == "--ui-v8" ]]; then
+if [[ "$cmd" == "--ui-v9" ]]; then
   UI_V8_MODE=1
-  MANIFEST="$ROOT/ui-v8/SHA256SUMS.clean"
+  MANIFEST="$ROOT/ui-v9/SHA256SUMS.clean"
   cmd="${2:-check}"
 fi
 

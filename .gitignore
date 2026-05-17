@@ -1,5 +1,5 @@
 # Local Lucy v8 - Git Ignore
-# Local /home/mike/lucy-v8 is the definitive alpha source.
+# Local /home/mike/lucy-v9 is the definitive alpha source.
 
 # Legacy shell tools (kept locally, not on GitHub)
 /tools/router/

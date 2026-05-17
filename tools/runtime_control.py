@@ -226,7 +226,7 @@ def default_runtime_namespace_root() -> Path:
 def home_fallback_runtime_namespace_root() -> Path:
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v8"
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v9"
 
 
 def contract_required() -> bool:
@@ -271,9 +271,9 @@ def enforce_authority_contract(*, expected_authority_root: Path | None = None) -
         )
     if not ui_root.exists() or not ui_root.is_dir():
         raise RuntimeControlError(f"invalid UI root in contract: {ui_root}")
-    if ui_root.name != "ui-v8":
+    if ui_root.name != "ui-v9":
         raise RuntimeControlError(
-            f"V8 ISOLATION VIOLATION: invalid UI root in contract (expected ui-v8): {ui_root}. "
+            f"V8 ISOLATION VIOLATION: invalid UI root in contract (expected ui-v9): {ui_root}. "
             f"V8 cannot use V7 (ui-v7) components."
         )
     if not runtime_ns_root.is_absolute():
@@ -302,7 +302,7 @@ def default_state() -> dict[str, Any]:
         "schema_version": 1,
         "profile": os.environ.get("LUCY_RUNTIME_PROFILE")
         or os.environ.get("LUCY_LAUNCHER_LABEL")
-        or "opt-experimental-v8-dev",
+        or "opt-experimental-v9-dev",
         "mode": "auto",
         "conversation": coerce_toggle(os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0")),
         "memory": "on",
