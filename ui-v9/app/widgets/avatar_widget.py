@@ -192,8 +192,8 @@ class LucyAvatar(QWidget):
         cx, cy = w / 2, h / 2
         face_r = min(w, h) * 0.35
 
-        # Subtle head bob tied to audio level (very slight)
-        bob = self._audio_level * 0.003 * face_r
+        # Head bob disabled (was tied to audio level)
+        bob = 0.0
         cy += bob
 
         # ---- Face circle ----
@@ -233,12 +233,12 @@ class LucyAvatar(QWidget):
 
         # Mouth center: explicitly at cx (no x-offset)
         mouth_cx = cx
-        mouth_cy = cy + face_r * 0.56 + level * face_r * 0.06
+        mouth_cy = cy + face_r * 0.56 + level * face_r * 0.09
 
         # Width: 55% of face diameter, grows slightly with level
         mouth_w = face_r * 1.10 + level * face_r * 0.10
-        # Height: grows from 8% to 35% of face radius based on audio level
-        mouth_h = face_r * 0.08 + level * face_r * 0.28
+        # Height: grows from 8% to ~50% of face radius based on audio level (1.5x opening)
+        mouth_h = face_r * 0.08 + level * face_r * 0.42
 
         # Dark interior
         painter.setBrush(QColor("#0a0a14"))
