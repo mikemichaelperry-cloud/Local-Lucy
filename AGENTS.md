@@ -1,4 +1,4 @@
-# Local Lucy v8 — Codex Execution Rules
+# Local Lucy v9 — Codex Execution Rules
 
 ## Authority
 
@@ -17,7 +17,9 @@
 ## System Privileges
 
 - **Never use `sudo`.** The system blocks external sudo requests and the shell crashes.
-- Make changes only within `~/lucy-v8/` directories.
+- Make changes only within `~/lucy-v9/` directories.
+- **V8 is frozen.** Do not modify `/home/mike/lucy-v8/` under any circumstances.
+- V9 (`/home/mike/lucy-v9/`) is the sole active development branch.
 - For system-level changes (e.g., systemd, global env vars), use user-level alternatives:
   - Modify `START_LUCY.sh` to export env vars
   - Use per-user systemd overrides (`~/.config/systemd/user/`) if available
@@ -99,7 +101,7 @@ All entry points (CLI, HMI, voice) now call `main.run()`.
 ### Testing
 
 ```bash
-cd ~/lucy-v8/ui-v9
+cd ~/lucy-v9/ui-v9
 .venv/bin/python3 -m pytest tests/ -q
 ```
 
@@ -110,7 +112,7 @@ Also run the fast routing stress test:
 
 Router tests:
 ```bash
-cd ~/lucy-v8
+cd ~/lucy-v9
 source ui-v9/.venv/bin/activate
 python -m pytest tools/router_py/ --ignore=tools/router_py/test_resource_leaks.py -q
 ```
@@ -145,7 +147,9 @@ The user's rating for this session:
 - Ready for daily dogfood: **yes**
 - Ready for no-supervision production: **not yet**
 
-v8 is the foundation. v9 will build on it. v10 is the target beta release. Every fix in v8 must be load-bearing for v9.
+V8 is frozen at tag `local-lucy-v8-freeze-2026-05-17`. Do not modify V8.
+V9 is the active development branch. v10 is the target beta release.
+All work, fixes, and improvements belong in V9 only. No cross-contamination to V8.
 
 ---
 
@@ -247,7 +251,7 @@ v8 is the foundation. v9 will build on it. v10 is the target beta release. Every
 
 ```bash
 # Full router suite (CPU only, ~1min40s)
-cd ~/lucy-v8
+cd ~/lucy-v9
 source ui-v9/.venv/bin/activate
 python -m pytest tools/router_py/ -q
 
@@ -328,7 +332,7 @@ LUCY_ROUTER_PY=1          # Use Python router (active)
 LUCY_EXEC_PY=1            # Use Python execution engine (active)
 LUCY_AUGMENTATION_POLICY=fallback_only   # Current policy
 LUCY_UI_STATE_DIR=~/.codex-api-home/lucy/runtime-v9/state  # JSON state output
-LUCY_STATE_DB=~/lucy-v8/state/lucy_state.db  # SQLite DB path
+LUCY_STATE_DB=~/lucy-v9/state/lucy_state.db  # SQLite DB path
 ```
 
 ---
