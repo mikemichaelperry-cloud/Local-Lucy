@@ -6,7 +6,7 @@ Tests routing modes and toggles, logging results to state files for verification
 Run with HMI active or standalone.
 
 Usage:
-    cd ~/lucy-v8/ui-v9 && source .venv/bin/activate
+    cd ~/lucy-v9/ui-v9 && source .venv/bin/activate
     python3 test_routing_verification.py [--quick|--full]
 
 Test Categories:
@@ -31,7 +31,7 @@ from typing import Any
 # This ensures we test the latest code, not cached bytecode
 def _clear_python_caches():
     """Clear all Python __pycache__ directories and .pyc files."""
-    lucy_base = Path.home() / "lucy-v8"
+    lucy_base = Path.home() / "lucy-v9"
     codex_base = Path.home() / ".codex-api-home"
     
     # Clear router_py cache
@@ -73,7 +73,7 @@ sys.path.insert(0, str(Path(__file__).parent / "app"))
 
 # Set required environment BEFORE importing backend
 # (backend uses these at import time)
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v9-dev"))
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev"))
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")  # CRITICAL: Use Python execution path, not shell

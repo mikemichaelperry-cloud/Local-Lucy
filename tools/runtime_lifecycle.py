@@ -98,7 +98,7 @@ def resolve_launcher_path(explicit_path: str | None) -> Path:
     env_path = os.environ.get("LUCY_RUNTIME_LAUNCHER_PATH")
     if env_path:
         return Path(env_path).expanduser()
-    return Path(__file__).with_name("start_local_lucy_v8.sh")
+    return Path(__file__).with_name("start_local_lucy_v9.sh")
 
 
 def resolve_log_file(explicit_path: str | None) -> Path:

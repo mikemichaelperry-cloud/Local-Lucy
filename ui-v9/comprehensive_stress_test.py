@@ -3,7 +3,7 @@
 Local Lucy v8 — Comprehensive Stress & End-to-End Validation Test
 
 Tests all routing paths, monitors resources, validates correctness.
-Run: cd ~/lucy-v8/ui-v9 && python3 comprehensive_stress_test.py
+Run: cd ~/lucy-v9/ui-v9 && python3 comprehensive_stress_test.py
 """
 
 from __future__ import annotations
@@ -21,9 +21,9 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent / "app"))
-sys.path.insert(0, str(Path.home() / "lucy-v8" / "models" / "router"))
+sys.path.insert(0, str(Path.home() / "lucy-v9" / "models" / "router"))
 
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v9-dev"))
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev"))
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")

@@ -66,4 +66,4 @@ exec "${ROOT}/lucy_chat.sh" "${SUPPORTED_QUERY}"
 
 # RENAMED: This is a MINIMAL reproducibility slice, NOT a production launcher.
 # It only supports the query "What is Git?" and has no UI/voice/conversation.
-# For production, use: ~/lucy-v8/start_v8_hmi_python.sh
+# For production, use: ~/lucy-v9/start_v8_hmi_python.sh

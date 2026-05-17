@@ -135,7 +135,7 @@ class LocalAnswerConfig:
     cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "lucy" / "local_repeat")
     cache_ttl_seconds: int = 300
     cache_max_entries: int = 100
-    root_path: Path = field(default_factory=lambda: Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v9-dev")
+    root_path: Path = field(default_factory=lambda: Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev")
     conversation_mode_active: bool = False
     conversation_mode_force: bool = False
     conversation_system_block: bool = False
@@ -152,7 +152,7 @@ class LocalAnswerConfig:
     def from_env(cls) -> LocalAnswerConfig:
         root = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", 
                                    os.environ.get("LUCY_ROOT", 
-                                                  str(Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v9-dev"))))
+                                                  str(Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev"))))
         cache_dir = os.environ.get("LUCY_LOCAL_REPEAT_CACHE_DIR")
         return cls(
             model=os.environ.get("LUCY_LOCAL_MODEL", "local-lucy"),
@@ -1160,7 +1160,7 @@ class LocalAnswerLogger:
         if v8_logs:
             self.log_dir = Path(v8_logs)
         else:
-            self.log_dir = Path.home() / ".local" / "share" / "lucy-v8" / "logs"
+            self.log_dir = Path.home() / ".local" / "share" / "lucy-v9" / "logs"
         self.log_file = self.log_dir / "local_answer_py.log"
         self._ensure_log_dir()
     

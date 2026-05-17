@@ -14,15 +14,15 @@ if [[ -n "${AUTHORITY_ROOT_OVERRIDE}" ]]; then
 else
   ROOT="${DEFAULT_ROOT}"
 fi
-if [[ "$(basename -- "${ROOT}")" != "lucy-v8" && "$(basename -- "${ROOT}")" != "opt-experimental-v9-dev" ]]; then
-  echo "ERR: active v8 terminal authority requires lucy-v8 or opt-experimental-v9-dev root, got: ${ROOT}" >&2
+if [[ "$(basename -- "${ROOT}")" != "lucy-v9" && "$(basename -- "${ROOT}")" != "opt-experimental-v9-dev" ]]; then
+  echo "ERR: active v8 terminal authority requires lucy-v9 or opt-experimental-v9-dev root, got: ${ROOT}" >&2
   exit 2
 fi
 cd "$ROOT"
 
 if [[ -n "${LUCY_UI_ROOT:-}" ]]; then
   UI_ROOT="${LUCY_UI_ROOT}"
-elif [[ "$(basename -- "${ROOT}")" == "lucy-v8" ]]; then
+elif [[ "$(basename -- "${ROOT}")" == "lucy-v9" ]]; then
   UI_ROOT="${ROOT}/ui-v9"
 else
   WORKSPACE_ROOT="$(dirname -- "$(dirname -- "${ROOT}")")"

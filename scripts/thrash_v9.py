@@ -15,14 +15,14 @@ import wave
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-sys.path.insert(0, str(Path.home() / "lucy-v8" / "ui-v9" / "app"))
+sys.path.insert(0, str(Path.home() / "lucy-v9" / "ui-v9" / "app"))
 
-SNAPSHOT = Path.home() / "lucy-v8" / "snapshots" / "opt-experimental-v9-dev"
+SNAPSHOT = Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev"
 TOOLS = SNAPSHOT / "tools"
 sys.path.insert(0, str(TOOLS))
 
 os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(SNAPSHOT)
-os.environ["LUCY_UI_ROOT"] = str(Path.home() / "lucy-v8" / "ui-v9")
+os.environ["LUCY_UI_ROOT"] = str(Path.home() / "lucy-v9" / "ui-v9")
 os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9")
 os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
 os.environ["LUCY_ROUTER_PY"] = "1"
@@ -310,7 +310,7 @@ def test_self_review() -> None:
 
 def test_voice_silent_audio() -> None:
     log("=== Voice Silent Audio ===")
-    runtime_voice = Path.home() / "lucy-v8" / "tools" / "runtime_voice.py"
+    runtime_voice = Path.home() / "lucy-v9" / "tools" / "runtime_voice.py"
     with tempfile.TemporaryDirectory() as tmp:
         # Create a silent WAV
         path = Path(tmp) / "silent.wav"
@@ -330,7 +330,7 @@ def test_voice_silent_audio() -> None:
 
 def test_voice_tts_speak() -> None:
     log("=== Voice TTS Speak Command ===")
-    runtime_voice = Path.home() / "lucy-v8" / "tools" / "runtime_voice.py"
+    runtime_voice = Path.home() / "lucy-v9" / "tools" / "runtime_voice.py"
     result = subprocess.run(
         [sys.executable, str(runtime_voice), "speak", "--text", "test"],
         capture_output=True, text=True, timeout=15,
@@ -510,7 +510,7 @@ def main() -> int:
     log(f"Ollama PS: {ollama_ps()}")
 
     # Write report
-    report_path = Path.home() / "lucy-v8" / "thrash_report.json"
+    report_path = Path.home() / "lucy-v9" / "thrash_report.json"
     report_path.write_text(json.dumps({
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "passed": passed,

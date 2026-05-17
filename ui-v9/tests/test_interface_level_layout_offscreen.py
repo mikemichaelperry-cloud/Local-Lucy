@@ -15,7 +15,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="interface_level_layout_") as tmp_dir:
         home = Path(tmp_dir) / "home"
         state_dir = home / "lucy" / "runtime" / "state"
-        tools_dir = home / "lucy" / "snapshots" / "lucy-v8" / "tools"
+        tools_dir = home / "lucy" / "snapshots" / "lucy-v9" / "tools"
         state_dir.mkdir(parents=True, exist_ok=True)
         tools_dir.mkdir(parents=True, exist_ok=True)
 
