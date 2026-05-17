@@ -334,15 +334,15 @@ class RSSNewsProvider:
                 if keywords and not any(kw in search_text for kw in keywords):
                     continue
 
-            # Truncate description to 1-2 sentences (~200 chars) for clean display
+            # Truncate description to 2-3 sentences (~400 chars) for clean display
             clean_desc = description.strip()
-            if len(clean_desc) > 220:
+            if len(clean_desc) > 400:
                 # Try to break at sentence boundary
-                sentence_end = clean_desc.find('. ', 100, 220)
+                sentence_end = clean_desc.find('. ', 150, 400)
                 if sentence_end == -1:
-                    sentence_end = clean_desc.rfind(' ', 180, 220)
+                    sentence_end = clean_desc.rfind(' ', 350, 400)
                 if sentence_end == -1:
-                    sentence_end = 200
+                    sentence_end = 380
                 clean_desc = clean_desc[:sentence_end].rstrip() + "."
 
             articles.append({
@@ -660,12 +660,12 @@ class NewsAPIProvider:
         for article in articles:
             pub_date = article.get("publishedAt", "")
             desc = article.get("description", "") or ""
-            if len(desc) > 220:
-                sentence_end = desc.find('. ', 100, 220)
+            if len(desc) > 400:
+                sentence_end = desc.find('. ', 150, 400)
                 if sentence_end == -1:
-                    sentence_end = desc.rfind(' ', 180, 220)
+                    sentence_end = desc.rfind(' ', 350, 400)
                 if sentence_end == -1:
-                    sentence_end = 200
+                    sentence_end = 380
                 desc = desc[:sentence_end].rstrip() + "."
 
             formatted_articles.append({

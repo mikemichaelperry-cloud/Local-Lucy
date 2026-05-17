@@ -135,9 +135,11 @@ class ConversationPanel(QFrame):
         self._draft.setPlaceholderText(
             "Type an operator prompt here.\n\n"
             "Submit dispatches a single authoritative backend request.\n"
-            "Slash text (for example /status) is sent as request text."
+            "Slash text (for example /status) is sent as request text.\n"
+            "Press Enter to submit; Shift+Enter for a new line."
         )
         self._draft.setFixedHeight(120)
+        self._draft.installEventFilter(self)
         layout.addWidget(self._draft)
 
         self._force_augmented_once_checkbox = QCheckBox("Force Augmented Once (test)")
@@ -314,6 +316,13 @@ class ConversationPanel(QFrame):
             self._draft.setTextCursor(draft_cursor)
             self.focus_draft()
         return applied_selection
+
+    def eventFilter(self, obj, event) -> bool:
+        if obj is self._draft and event.type() == event.Type.KeyPress:
+            if event.key() in (Qt.Key_Return, Qt.Key_Enter) and not event.modifiers() & Qt.ShiftModifier:
+                self._emit_submit_requested()
+                return True
+        return super().eventFilter(obj, event)
 
     def _emit_submit_requested(self) -> None:
         self.submit_requested.emit(self.draft_text())

@@ -2135,25 +2135,44 @@ them according to the route type (bypass, provisional, or full). It handles:
         if route.route == "NEWS":
             return await self._fetch_news_evidence(question, for_voice=for_voice)
         
-        provider = route.provider
-        if provider == "none" or not provider:
-            provider = "wikipedia"  # Default to free provider
+        primary = route.provider
+        if primary == "none" or not primary:
+            primary = "wikipedia"
         
-        try:
-            if provider == "trusted":
-                return await self._fetch_trusted_evidence(question, route)
-            elif provider == "wikipedia":
-                return await self._fetch_wikipedia_evidence(question)
-            elif provider == "kimi":
-                return await self._fetch_api_evidence(question, "kimi")
-            elif provider == "openai":
-                return await self._fetch_api_evidence(question, "openai")
-            else:
-                # Try Wikipedia as fallback for unknown providers
-                return await self._fetch_wikipedia_evidence(question)
-        except Exception as e:
-            self._logger.warning(f"Evidence fetch failed for {provider}: {e}")
-            return None
+        # Build fallback chain matching _call_augmented_provider logic
+        if primary == "wikipedia":
+            chain = ["wikipedia", "openai", "kimi"]
+        elif primary == "openai":
+            chain = ["openai", "kimi", "wikipedia"]
+        elif primary == "kimi":
+            chain = ["kimi", "openai", "wikipedia"]
+        elif primary == "trusted":
+            chain = ["trusted", "wikipedia", "openai", "kimi"]
+        else:
+            chain = [primary, "wikipedia", "openai", "kimi"]
+        
+        last_error = ""
+        for provider in chain:
+            try:
+                result: dict[str, Any] | None = None
+                if provider == "trusted":
+                    result = await self._fetch_trusted_evidence(question, route)
+                elif provider == "wikipedia":
+                    result = await self._fetch_wikipedia_evidence(question)
+                elif provider == "kimi":
+                    result = await self._fetch_api_evidence(question, "kimi")
+                elif provider == "openai":
+                    result = await self._fetch_api_evidence(question, "openai")
+                
+                if result:
+                    self._logger.info(f"Evidence fetched successfully from {provider}")
+                    return result
+            except Exception as e:
+                last_error = str(e)
+                self._logger.warning(f"Evidence fetch failed for {provider}: {e}")
+        
+        self._logger.warning(f"All evidence providers failed. Last error: {last_error}")
+        return None
     
     async def _fetch_wikipedia_evidence(self, question: str) -> dict[str, Any] | None:
         """Fetch evidence from Wikipedia (delegated to provider module)."""
@@ -2642,7 +2661,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             provider_chain = ["trusted", "wikipedia", "kimi", "openai"]
             self._logger.info(f"Category-specific query detected, trying trusted sources first")
         elif primary_provider == "wikipedia":
-            provider_chain = ["wikipedia", "kimi", "openai"]
+            provider_chain = ["wikipedia", "openai", "kimi"]
         elif primary_provider == "openai":
             provider_chain = ["openai", "kimi", "wikipedia"]
         elif primary_provider == "kimi":

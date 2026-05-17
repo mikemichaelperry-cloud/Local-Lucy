@@ -343,8 +343,14 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     
     # Financial / market data — accuracy matters
     for keyword in financial_keywords:
-        if keyword in normalized:
-            return True, "financial_data"
+        if len(keyword) <= 4:
+            # Short keywords require word boundaries to avoid false positives
+            # (e.g. "ira" inside "iran", "roth" inside "troth")
+            if re.search(rf'\b{re.escape(keyword)}\b', normalized):
+                return True, "financial_data"
+        else:
+            if keyword in normalized:
+                return True, "financial_data"
     
     # Legal / regulatory — accuracy matters
     for keyword in legal_keywords:

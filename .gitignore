@@ -103,3 +103,6 @@ voice/
 
 # Desktop backup files
 desktop_backups/
+.env
+*.env
+.env.*

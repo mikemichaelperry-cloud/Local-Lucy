@@ -114,9 +114,10 @@ source ui-v8/.venv/bin/activate
 # Install dependencies
 pip install -r ui-v8/requirements.txt
 
-# Download the base model (~9.8 GB) and create the custom variant
+# Download the base model (~9.8 GB) and create the custom variants
 ollama pull qwen3:14b
 ollama create local-lucy -f config/Modelfile.local-lucy
+ollama create local-lucy-fast -f config/Modelfile.local-lucy-fast
 
 # (Optional) Copy and configure API keys for cloud providers
 cp .env.example .env

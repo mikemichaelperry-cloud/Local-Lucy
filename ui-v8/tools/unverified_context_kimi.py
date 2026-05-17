@@ -7,6 +7,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -40,29 +41,30 @@ def main() -> int:
             rc=0,
         )
 
-    api_key = os.environ.get("KIMI_API_KEY", "").strip()
+    api_key = os.environ.get("KIMI_API_KEY", "").strip() or os.environ.get("MOONSHOT_API_KEY", "").strip()
     if not api_key:
         return _fail("missing_kimi_configuration")
 
-    api_base = os.environ.get("KIMI_API_BASE_URL", "https://api.moonshot.cn/v1").strip().rstrip("/")
+    api_base = os.environ.get("KIMI_API_BASE_URL", "https://api.moonshot.ai/v1").strip().rstrip("/")
     model = os.environ.get("KIMI_MODEL", "moonshot-v1-8k").strip()
     if not api_base or not model:
         return _fail("missing_kimi_configuration")
 
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    system_text = (
+        "You are a current-events analyst. The user may ask about geopolitical, military, "
+        "economic, or scientific developments. Answer as of the current date. "
+        "If the topic involves rapidly changing events, explicitly note that situations evolve. "
+        "Be concise but specific. Include approximate dates or timeframes when relevant. "
+        "If you lack information beyond your training cutoff, say so directly."
+    )
+    user_text = f"Today is {now}.\n\n{question}"
+
     payload = {
         "model": model,
         "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "Provide a concise, high-level background summary for a user question. "
-                    "Do not claim verification, do not provide evidence citations, and keep under 120 words."
-                ),
-            },
-            {
-                "role": "user",
-                "content": question,
-            },
+            {"role": "system", "content": system_text},
+            {"role": "user", "content": user_text},
         ],
         "temperature": 0.2,
     }
@@ -78,10 +80,10 @@ def main() -> int:
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=5.0) as response:
+        with urllib.request.urlopen(request, timeout=10.0) as response:
             raw = response.read().decode("utf-8", errors="replace")
-    except urllib.error.HTTPError:
-        return _fail("kimi_http_error")
+    except urllib.error.HTTPError as e:
+        return _fail(f"kimi_http_error_{e.code}")
     except urllib.error.URLError:
         return _fail("kimi_network_error")
     except Exception:

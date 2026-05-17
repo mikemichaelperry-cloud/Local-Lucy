@@ -475,6 +475,12 @@ def select_route(
                     provider = "trusted"
                     usage_class = "local"
                     policy_reason = f"router_evidence_{_evidence_reason}"
+                elif "NEWS" in candidate_routes:
+                    # Intent classifier detected a news query; prefer NEWS over AUGMENTED
+                    route = "NEWS"
+                    provider = "news"
+                    usage_class = "local"
+                    policy_reason = "router_news_override"
                 else:
                     route = "AUGMENTED"
                     policy_reason = "router_source_request_override"

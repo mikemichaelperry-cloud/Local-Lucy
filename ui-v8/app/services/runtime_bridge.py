@@ -266,7 +266,7 @@ class RuntimeBridge:
             "model_selection": ActionCapability(
                 name="model_selection",
                 available=available,
-                allowed_values=("local-lucy",),
+                allowed_values=("local-lucy", "local-lucy-fast"),
                 reason=reason,
             ),
             "learner_toggle": ActionCapability(
