@@ -2,7 +2,6 @@
 # Local /home/mike/lucy-v9 is the definitive alpha source.
 
 # Legacy shell tools (kept locally, not on GitHub)
-/tools/router/
 
 # Snapshots (large archives, kept locally)
 /snapshots/
