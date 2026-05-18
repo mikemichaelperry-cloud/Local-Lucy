@@ -73,10 +73,10 @@ export LUCY_VOICE_TTS_CHUNK_MAX_CHARS=400
 # Voice STT (Whisper) library path
 export LD_LIBRARY_PATH="${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src:${LD_LIBRARY_PATH:-}"
 
-V8_PYTHON="${SCRIPT_DIR}/ui-v9/.venv/bin/python3"
-if [ -x "$V8_PYTHON" ]; then
-    export LUCY_VOICE_PYTHON_BIN="$V8_PYTHON"
-    APP_PYTHON="$V8_PYTHON"
+V9_PYTHON="${SCRIPT_DIR}/ui-v9/.venv/bin/python3"
+if [ -x "$V9_PYTHON" ]; then
+    export LUCY_VOICE_PYTHON_BIN="$V9_PYTHON"
+    APP_PYTHON="$V9_PYTHON"
 else
     APP_PYTHON="/usr/bin/python3"
 fi

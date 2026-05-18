@@ -847,13 +847,33 @@ class RuntimeBridge:
         }
         
         # Build outcome payload
+        is_augmented = (result.route or "") == "AUGMENTED"
+        is_completed = (result.status or "") == "completed"
         outcome_payload = {
             "outcome_code": result.outcome_code if result.outcome_code else "completed",
-            "fallback_used": "false" if result.status == "completed" else "true",
+            "fallback_used": "false" if is_completed else "true",
             "fallback_reason": result.error_message or "none",
             "trust_class": result.metadata.get("trust_class", "local") if result.metadata else "local",
             "error_message": result.error_message or "",
             "execution_time_ms": execution_time_ms,
+            "augmented_provider_used": result.provider if is_augmented else "none",
+            "augmented_provider_usage_class": result.provider_usage_class if result.provider_usage_class else "local",
+            "augmented_provider_call_reason": (
+                "direct" if is_augmented and result.outcome_code == "augmented_answer"
+                else "fallback" if is_augmented and result.outcome_code == "augmented_fallback"
+                else "error" if is_augmented and not is_completed
+                else "not_needed"
+            ),
+            "augmented_provider_status": (
+                "available" if is_augmented and is_completed
+                else "error" if is_augmented
+                else "none"
+            ),
+            "augmented_paid_provider_invoked": (
+                "true" if is_augmented and result.provider_usage_class == "paid"
+                else "false"
+            ),
+            "augmented_direct_request": "",
         }
         
         return {

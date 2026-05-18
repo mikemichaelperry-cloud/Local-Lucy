@@ -721,7 +721,14 @@ class LocalAnswer:
             conversation_block = "[CONVERSATION_MODE: sharp]\nTake a position early. One hedge max. One concrete example. Clear takeaway.\n\n"
         
         # Base identity: always answer in first person as "I"
-        identity_preamble = "I am Local Lucy. I always answer in first person using 'I' and 'me'. I never refer to myself in third person.\n\n"
+        # Skip identity preamble for creative writing to avoid contradicting the
+        # Modelfile system prompt, which explicitly forbids self-introduction for
+        # stories, poems, etc.  The model gets stuck and echoes instructions when
+        # both the runtime prompt and the Modelfile give opposite orders.
+        if generation_profile in ("detail", "chat_long"):
+            identity_preamble = ""
+        else:
+            identity_preamble = "I am Local Lucy. I always answer in first person using 'I' and 'me'. I never refer to myself in third person.\n\n"
         
         # If augmented context is provided, use it to answer (evidence mode)
         if augmented_context.strip():
@@ -752,7 +759,7 @@ class LocalAnswer:
         if _is_capability_query(query):
             self_knowledge_block = SELF_KNOWLEDGE + "\n\n"
         
-        return f"{identity_preamble}{instruction}\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{self_knowledge_block}{context_block}User: {query}"
+        return f"{identity_preamble}{instruction}\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{self_knowledge_block}{context_block}User: {query}\n\nAssistant:"
     
     def _apply_augmented_behavior_contract(self, user_question: str, background_context: str) -> str:
         """Apply augmented behavior contract and return answer shape."""
@@ -793,7 +800,7 @@ class LocalAnswer:
             return "Which person or company do you want the current status for?"
         return "Which person or company do you mean?"
 
-    async def _call_ollama(self, prompt: str, num_predict: int) -> Tuple[str, int]:
+    async def _call_ollama(self, prompt: str, num_predict: int, temperature: Optional[float] = None) -> Tuple[str, int]:
         """Call Ollama API with retry for model-load transitions."""
         start_time = time.time()
         payload = {
@@ -803,7 +810,7 @@ class LocalAnswer:
             "keep_alive": self.config.keep_alive,
             "think": False,  # Disable qwen3 thinking mode — prevents empty responses
             "options": {
-                "temperature": self.config.temperature,
+                "temperature": temperature if temperature is not None else self.config.temperature,
                 "top_p": self.config.top_p,
                 "seed": self.config.seed,
                 "num_predict": num_predict,
@@ -1006,7 +1013,13 @@ class LocalAnswer:
         self._latprof_append("local_answer", "pre_model", pre_model_ms)
         
         try:
-            api_text, api_duration_ms = await self._call_ollama(prompt, num_predict)
+            # Use higher temperature for creative/detail requests so the model
+            # can actually generate varied, imaginative text instead of getting
+            # stuck in deterministic instruction-echo mode.
+            temp_override = None
+            if profile_name in ("detail", "chat_long"):
+                temp_override = 0.7
+            api_text, api_duration_ms = await self._call_ollama(prompt, num_predict, temp_override)
             api_done = self._now_ms()
             
             self._latprof_append("local_answer", "ollama_api_call", api_duration_ms)

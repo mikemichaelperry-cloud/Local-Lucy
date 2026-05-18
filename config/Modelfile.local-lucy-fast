@@ -1,9 +1,10 @@
 FROM qwen3:14b
 
-# Context window: 1024 tokens (reduced for VRAM optimization on RTX 3060)
-# Supports shorter responses with lower VRAM footprint
-# VRAM: ~8.5 GB on RTX 3060 12GB (more headroom for Whisper GPU)
-PARAMETER num_ctx 1024
+# Context window: 2048 tokens (balanced for VRAM on RTX 3060)
+# Gives enough headroom for creative writing prompts (~500 tokens) +
+# generation budgets up to 768 tokens without truncation.
+# VRAM: ~9 GB on RTX 3060 12GB (still leaves headroom for Whisper GPU)
+PARAMETER num_ctx 2048
 
 # Use all available CPU threads for generation
 PARAMETER num_thread 8
