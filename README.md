@@ -1,8 +1,10 @@
 <div align="center">
 
-# 🤖 Local Lucy V8
+# 🤖 Local Lucy V9 — Frozen Baseline
 
 **A Self-Learning, Privacy-First Desktop AI Assistant**
+
+> **⚠️ This version is frozen.** V9 is the stable baseline tagged `local-lucy-v9-frozen-2026-05-28`. Active development continues in [V10](https://github.com/mikemichaelperry-cloud/Local-Lucy).
 
 [![CI](https://github.com/mikemichaelperry-cloud/Local-Lucy/actions/workflows/ci.yml/badge.svg)](https://github.com/mikemichaelperry-cloud/Local-Lucy/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
@@ -17,14 +19,14 @@
 
 ## Overview
 
-Local Lucy V8 is a **privacy-first, self-learning desktop AI assistant** built with PySide6. It runs entirely on your local machine with optional cloud augmentation, giving you full control over your data while providing intelligent conversation, voice interaction, and real-time information retrieval.
+Local Lucy V9 is a **privacy-first, self-learning desktop AI assistant** built with PySide6. It runs entirely on your local machine with optional cloud augmentation, giving you full control over your data while providing intelligent conversation, voice interaction, and real-time information retrieval.
 
 Unlike cloud-only assistants, Lucy learns from your corrections in natural language — tell her "that should have been LOCAL" and she updates her routing model automatically.
 
 ## Features
 
 ### 🧠 Intelligent Routing
-- **ModernBERT-base embedding router** (768-dim) with k-NN similarity for intent classification
+- **MiniLM-L6-v2 embedding router** (384-dim, ~900 examples) with k-NN similarity and semantic disambiguation
 - **Keyword guard rails** prevent misrouting on ambiguous short queries
 - **Self-learning feedback loop** — natural language corrections rebuild the embedding index
 - **Auto-feedback trust tiers** — separate confidence thresholds for user vs. auto-detected corrections
@@ -68,7 +70,7 @@ Unlike cloud-only assistants, Lucy learns from your corrections in natural langu
 ┌──────────────────────▼──────────────────────────────────────┐
 │  Lucy Core (tools/router_py/)                               │
 │  ├─ Execution Engine — route dispatch & provider fallback   │
-│  ├─ Hybrid Router — ModernBERT embeddings + keyword guards  │
+│  ├─ Hybrid Router V2 — MiniLM-L6-v2 embeddings + keyword guards  │
 │  ├─ Feedback Parser — NL correction detection               │
 │  ├─ Background Learner — auto-rebuilds from feedback        │
 │  └─ Schema Migrations — versioned SQLite evolution          │
