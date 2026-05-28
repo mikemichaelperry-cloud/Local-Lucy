@@ -1,0 +1,1 @@
+Local Lucy V10 fork created from frozen V9. Work only in ~/lucy-v10.
