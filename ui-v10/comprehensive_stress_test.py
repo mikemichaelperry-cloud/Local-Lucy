@@ -3,7 +3,7 @@
 Local Lucy v8 — Comprehensive Stress & End-to-End Validation Test
 
 Tests all routing paths, monitors resources, validates correctness.
-Run: cd ~/lucy-v10/ui-v9 && python3 comprehensive_stress_test.py
+Run: cd ~/lucy-v10/ui-v10 && python3 comprehensive_stress_test.py
 """
 
 from __future__ import annotations

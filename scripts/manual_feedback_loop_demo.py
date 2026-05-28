@@ -13,7 +13,7 @@ This script:
 
 Run with:
     cd /home/mike/lucy-v10
-    source ui-v9/.venv/bin/activate
+    source ui-v10/.venv/bin/activate
     python3 manual_feedback_loop_demo.py
 """
 

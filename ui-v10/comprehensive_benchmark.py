@@ -13,7 +13,7 @@ from pathlib import Path
 
 # Configuration
 SNAPSHOT_ROOT = Path("/home/mike/lucy-v10")
-UI_ROOT = Path("/home/mike/lucy-v10/ui-v9")
+UI_ROOT = Path("/home/mike/lucy-v10/ui-v10")
 RUNTIME_NS = Path("/home/mike/.codex-api-home/lucy/runtime-v10")
 
 # Environment setup
@@ -248,7 +248,7 @@ def main():
     print("\n" + "=" * 60)
     print("NEXT STEPS FOR MANUAL TESTING:")
     print("=" * 60)
-    print("  1. Launch HMI: cd /home/mike/lucy-v10/ui-v9 && source .venv/bin/activate && python app/main.py")
+    print("  1. Launch HMI: cd /home/mike/lucy-v10/ui-v10 && source .venv/bin/activate && python app/main.py")
     print("  2. Enable voice mode")
     print("  3. Run 10 voice turns, watch for:")
     print("     - Clipped first words")

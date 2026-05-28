@@ -9,7 +9,7 @@ Metrics tracked per prompt:
 
 Usage:
     cd ~/lucy-v10
-    source ui-v9/.venv/bin/activate
+    source ui-v10/.venv/bin/activate
     LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 python3 tools/burn_in_v9_2026_05_18.py
 
 Output:

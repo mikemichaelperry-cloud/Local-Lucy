@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QApplication
 # Ensure required env vars for state_store
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
 os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
-os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v9")
+os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v10")
 os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
 
 from app.main_window import OperatorConsoleWindow as MainWindow

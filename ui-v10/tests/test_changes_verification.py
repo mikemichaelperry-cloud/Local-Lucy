@@ -125,7 +125,7 @@ def test_direct_request_ids_are_unique():
     """Direct HMI submits should not reuse request IDs for identical prompts."""
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
     os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
-    os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v9")
+    os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v10")
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
 
     from app.services.runtime_bridge import RuntimeBridge
@@ -166,7 +166,7 @@ def test_operator_response_preserves_blank_line_separators():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
     os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
-    os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v9")
+    os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v10")
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
 
     from PySide6.QtWidgets import QApplication
@@ -230,7 +230,7 @@ def test_strict_contract_boundary_violation():
         "LUCY_RUNTIME_NAMESPACE_ROOT": "/tmp/fake_runtime_root",
         "LUCY_UI_STATE_DIR": "/tmp/outside_namespace",
         "LUCY_RUNTIME_AUTHORITY_ROOT": "/home/mike/lucy-v10",
-        "LUCY_UI_ROOT": "/home/mike/lucy-v10/ui-v9",
+        "LUCY_UI_ROOT": "/home/mike/lucy-v10/ui-v10",
     }
     
     result = subprocess.run(
@@ -254,7 +254,7 @@ def main() -> int:
     # Set up required environment for tests that need it
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
     os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
-    os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v9")
+    os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v10")
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
     
     print("Test 1: Staleness indicators")

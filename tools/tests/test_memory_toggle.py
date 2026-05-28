@@ -275,7 +275,7 @@ def main():
     
     # Set required env vars
     os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(LUCY_V8))
-    os.environ.setdefault("LUCY_UI_ROOT", str(Path.home() / "lucy-v10" / "ui-v9"))
+    os.environ.setdefault("LUCY_UI_ROOT", str(Path.home() / "lucy-v10" / "ui-v10"))
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(RUNTIME_V8))
     
     tests = [

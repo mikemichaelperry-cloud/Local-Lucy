@@ -1,24 +1,24 @@
-# HMI Virtual Environment (`ui-v9/.venv`)
+# HMI Virtual Environment (`ui-v10/.venv`)
 
-Local Lucy v8 uses a single Python virtual environment located at **`ui-v9/.venv`**. This document explains why it lives inside `ui-v9/`, what it contains, and how to verify it.
+Local Lucy v8 uses a single Python virtual environment located at **`ui-v10/.venv`**. This document explains why it lives inside `ui-v10/`, what it contains, and how to verify it.
 
 ---
 
-## Why `ui-v9/.venv`?
+## Why `ui-v10/.venv`?
 
-The venv is nested under `ui-v9/` for historical reasons:
+The venv is nested under `ui-v10/` for historical reasons:
 
-1. **Origin:** The venv was originally created for the PySide6 desktop HMI (Human-Machine Interface) in `ui-v9/app/`. It contains `PySide6` and the Qt stack required to run the GUI.
+1. **Origin:** The venv was originally created for the PySide6 desktop HMI (Human-Machine Interface) in `ui-v10/app/`. It contains `PySide6` and the Qt stack required to run the GUI.
 2. **Evolution:** Over time it also became the project's heavy-ML dependency home — `torch`, `transformers`, `kokoro`, and `sentence-transformers` are installed there because the HMI needs voice (TTS) and the router needs embeddings.
 3. **Current reality:** Many backend tools, test suites, and voice pipelines now source this venv even though they have nothing to do with the GUI. It is the *de facto* project-wide ML environment.
 
-> **We do not plan to move or rename it.** Dozens of launchers, test headers, and CI references hard-code `ui-v9/.venv`. The cost of migration exceeds the benefit.
+> **We do not plan to move or rename it.** Dozens of launchers, test headers, and CI references hard-code `ui-v10/.venv`. The cost of migration exceeds the benefit.
 
 ---
 
 ## What It Contains
 
-Key packages installed in `ui-v9/.venv`:
+Key packages installed in `ui-v10/.venv`:
 
 | Package | Purpose |
 |---------|---------|
@@ -31,7 +31,7 @@ Key packages installed in `ui-v9/.venv`:
 | `numpy`, `scikit-learn` | Math / similarity for router |
 | `pytest`, `pytest-asyncio` | Test runner |
 
-Full list: see `ui-v9/requirements.txt`.
+Full list: see `ui-v10/requirements.txt`.
 
 ---
 
@@ -40,51 +40,51 @@ Full list: see `ui-v9/requirements.txt`.
 ### 1. Check that the venv exists
 
 ```bash
-ls ui-v9/.venv/bin/python3
-# Expected: ui-v9/.venv/bin/python3
+ls ui-v10/.venv/bin/python3
+# Expected: ui-v10/.venv/bin/python3
 ```
 
 ### 2. Show the active Python path
 
 ```bash
 # From project root
-ui-v9/.venv/bin/python3 -c "import sys; print(sys.executable)"
-# Expected: /home/mike/lucy-v10/ui-v9/.venv/bin/python3
+ui-v10/.venv/bin/python3 -c "import sys; print(sys.executable)"
+# Expected: /home/mike/lucy-v10/ui-v10/.venv/bin/python3
 ```
 
 ### 3. Verify key imports
 
 ```bash
-ui-v9/.venv/bin/python3 -c "import torch; import transformers; import kokoro; print('OK')"
+ui-v10/.venv/bin/python3 -c "import torch; import transformers; import kokoro; print('OK')"
 ```
 
 ### 4. Run the test suite
 
 ```bash
 cd ~/lucy-v8
-source ui-v9/.venv/bin/activate
+source ui-v10/.venv/bin/activate
 python -m pytest tools/router_py/ --ignore=tools/router_py/test_resource_leaks.py -q
 ```
 
 ---
 
-## Files That Reference `ui-v9/.venv`
+## Files That Reference `ui-v10/.venv`
 
 The following launchers and scripts expect the venv at exactly this path:
 
 | File | Reference |
 |------|-----------|
-| `START_LUCY.sh` | `V8_PYTHON="${SCRIPT_DIR}/ui-v9/.venv/bin/python3"` |
-| `README.md` | Setup instructions create venv at `ui-v9/.venv` |
-| `CONTRIBUTING.md` | Dev setup uses `ui-v9/.venv` |
-| `tools/lucy_voice_ptt.sh` | Falls back to `ui-v9/.venv/bin/python3` |
-| `tools/diagnostics/check_gpu_allocation.sh` | `VENV_PYTHON=".../ui-v9/.venv/bin/python"` |
-| Multiple test files in `tools/tests/` and `tools/router_py/` | Docstring headers reference `source ui-v9/.venv/bin/activate` |
+| `START_LUCY.sh` | `V8_PYTHON="${SCRIPT_DIR}/ui-v10/.venv/bin/python3"` |
+| `README.md` | Setup instructions create venv at `ui-v10/.venv` |
+| `CONTRIBUTING.md` | Dev setup uses `ui-v10/.venv` |
+| `tools/lucy_voice_ptt.sh` | Falls back to `ui-v10/.venv/bin/python3` |
+| `tools/diagnostics/check_gpu_allocation.sh` | `VENV_PYTHON=".../ui-v10/.venv/bin/python"` |
+| Multiple test files in `tools/tests/` and `tools/router_py/` | Docstring headers reference `source ui-v10/.venv/bin/activate` |
 
 ---
 
 ## Notes for Contributors
 
-- **Do not create a second venv at the project root.** Use `ui-v9/.venv` for all Python work.
-- **Do not rename or move `ui-v9/.venv`.** If you need a different Python version, create a new venv inside `ui-v9/` with a different name (e.g., `ui-v9/.venv-3.11`) and update `START_LUCY.sh` locally — but do not commit the rename.
-- The venv is **not tracked by Git**. It is rebuilt from `ui-v9/requirements.txt` after clone.
+- **Do not create a second venv at the project root.** Use `ui-v10/.venv` for all Python work.
+- **Do not rename or move `ui-v10/.venv`.** If you need a different Python version, create a new venv inside `ui-v10/` with a different name (e.g., `ui-v10/.venv-3.11`) and update `START_LUCY.sh` locally — but do not commit the rename.
+- The venv is **not tracked by Git**. It is rebuilt from `ui-v10/requirements.txt` after clone.

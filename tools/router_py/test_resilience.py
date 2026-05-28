@@ -3,7 +3,7 @@
 Tests for resilience.py (circuit breaker).
 
 Run with:
-    cd /home/mike/lucy-v10 && source ui-v9/.venv/bin/activate
+    cd /home/mike/lucy-v10 && source ui-v10/.venv/bin/activate
     python3 -m pytest tools/router_py/test_resilience.py -v
 """
 

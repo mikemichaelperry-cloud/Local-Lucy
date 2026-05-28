@@ -271,9 +271,9 @@ def enforce_authority_contract(*, expected_authority_root: Path | None = None) -
         )
     if not ui_root.exists() or not ui_root.is_dir():
         raise RuntimeControlError(f"invalid UI root in contract: {ui_root}")
-    if ui_root.name != "ui-v9":
+    if ui_root.name != "ui-v10":
         raise RuntimeControlError(
-            f"V8 ISOLATION VIOLATION: invalid UI root in contract (expected ui-v9): {ui_root}. "
+            f"V8 ISOLATION VIOLATION: invalid UI root in contract (expected ui-v10): {ui_root}. "
             f"V8 cannot use V7 (ui-v7) components."
         )
     if not runtime_ns_root.is_absolute():
@@ -302,7 +302,7 @@ def default_state() -> dict[str, Any]:
         "schema_version": 1,
         "profile": os.environ.get("LUCY_RUNTIME_PROFILE")
         or os.environ.get("LUCY_LAUNCHER_LABEL")
-        or "opt-experimental-v9-dev",
+        or "lucy-v10",
         "mode": "auto",
         "conversation": coerce_toggle(os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0")),
         "memory": "on",

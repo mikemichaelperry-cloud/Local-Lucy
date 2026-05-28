@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HMI/backend sync guard — proves that ui-v9/app/backend uses the canonical
+HMI/backend sync guard — proves that ui-v10/app/backend uses the canonical
 router/execution code from tools/router_py, not stale duplicates.
 """
 
@@ -15,7 +15,7 @@ import pytest
 # Path setup so we can import the backend wrappers
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-BACKEND_PKG = PROJECT_ROOT / "ui-v9" / "app"
+BACKEND_PKG = PROJECT_ROOT / "ui-v10" / "app"
 if str(BACKEND_PKG) not in sys.path:
     sys.path.insert(0, str(BACKEND_PKG))
 if str(PROJECT_ROOT / "tools") not in sys.path:

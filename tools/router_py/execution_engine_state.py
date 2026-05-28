@@ -392,7 +392,7 @@ class StateWriter:
             context.get("model", "")
             or os.environ.get("LUCY_MODEL", "local-lucy")
         ).strip()
-        profile = str(os.environ.get("LUCY_RUNTIME_PROFILE", "opt-experimental-v9-dev")).strip()
+        profile = str(os.environ.get("LUCY_RUNTIME_PROFILE", "lucy-v10")).strip()
 
         return {
             "mode": mode,

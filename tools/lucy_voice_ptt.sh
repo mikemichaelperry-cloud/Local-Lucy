@@ -74,10 +74,10 @@ resolve_voice_python(){
       preferred_engine="kokoro"
       ;;
   esac
-  # ISOLATION: V8 only uses ui-v9, NEVER falls back to ui-v7
-  candidate="${LUCY_WORKSPACE_ROOT}/ui-v9/.venv/bin/python3"
+  # ISOLATION: V8 only uses ui-v10, NEVER falls back to ui-v7
+  candidate="${LUCY_WORKSPACE_ROOT}/ui-v10/.venv/bin/python3"
   if [[ ! -x "${candidate}" ]]; then
-    echo "V8 ISOLATION VIOLATION: ui-v9 Python not found at ${candidate}. V8 cannot use V7 components." >&2
+    echo "V8 ISOLATION VIOLATION: ui-v10 Python not found at ${candidate}. V8 cannot use V7 components." >&2
     return 1
   fi
   

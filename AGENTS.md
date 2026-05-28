@@ -106,7 +106,7 @@ All entry points (CLI, HMI, voice) now call `main.run()`.
 ### Testing
 
 ```bash
-cd ~/lucy-v10/ui-v9
+cd ~/lucy-v10/ui-v10
 .venv/bin/python3 -m pytest tests/ -q
 ```
 
@@ -153,7 +153,7 @@ LUCY_SYNTHETIC_FULL_ANSWER=1 python3 -m pytest tools/router_py/test_synthetic_ad
 Router tests:
 ```bash
 cd ~/lucy-v10
-source ui-v9/.venv/bin/activate
+source ui-v10/.venv/bin/activate
 python -m pytest tools/router_py/ --ignore=tools/router_py/test_resource_leaks.py -q
 ```
 
@@ -270,7 +270,7 @@ All work, fixes, and improvements belong in V9 only. No cross-contamination to V
 - `execution_engine_state.py` — state persistence
 - `execution_engine.py` — dispatch and state write calls
 - `payload_builders.py` — pure payload formatting
-- Tests in `tools/router_py/test_*.py` and `ui-v9/tests/test_*.py`
+- Tests in `tools/router_py/test_*.py` and `ui-v10/tests/test_*.py`
 - Documentation and reports
 
 ---
@@ -286,8 +286,8 @@ All work, fixes, and improvements belong in V9 only. No cross-contamination to V
 | `tools/router_py/payload_builders.py` | Shared pure payload builders | Yes — both routers depend on this |
 | `tools/router_py/request_types.py` | Centralized frozen dataclasses | Yes — schema changes ripple |
 | `tools/runtime_request.py` | Shell router, imports payload builders | Yes — graceful fallback required |
-| `ui-v9/app/services/state_store.py` | HMI reads JSON state files | No — read-only per constraints |
-| `ui-v9/app/panels/status_panel.py` | HMI displays state | No — read-only per constraints |
+| `ui-v10/app/services/state_store.py` | HMI reads JSON state files | No — read-only per constraints |
+| `ui-v10/app/panels/status_panel.py` | HMI displays state | No — read-only per constraints |
 | `models/router/background_learner.py` | Rebuilds embedding index | Yes — keep timestamp normalization |
 | `data/tubes/tube_database.db` | SQLite tube specs (648 tubes) | Yes — HMI answers depend on it |
 | `data/tubes/tube_database.py` | Schema + seed + lookup helpers | Yes — local_answer.py imports this |
@@ -300,7 +300,7 @@ All work, fixes, and improvements belong in V9 only. No cross-contamination to V
 ```bash
 # Full router suite (CPU only, ~1min40s)
 cd ~/lucy-v10
-source ui-v9/.venv/bin/activate
+source ui-v10/.venv/bin/activate
 python -m pytest tools/router_py/ -q
 
 # StateWriter specifically
@@ -310,10 +310,10 @@ python -m pytest tools/router_py/test_execution_engine_state.py -q
 python -m pytest tools/router_py/test_e2e_hmi_voice.py -q
 
 # HMI comprehensive inspection (offscreen Qt)
-QT_QPA_PLATFORM=offscreen python3 ui-v9/tests/test_comprehensive_hmi_inspection.py
+QT_QPA_PLATFORM=offscreen python3 ui-v10/tests/test_comprehensive_hmi_inspection.py
 
 # HMI offscreen tests (non-GPU only)
-for f in ui-v9/tests/*offscreen*.py; do
+for f in ui-v10/tests/*offscreen*.py; do
   QT_QPA_PLATFORM=offscreen timeout 30 python3 "$f" && echo "PASS $f" || echo "FAIL $f"
 done
 
@@ -405,7 +405,7 @@ LUCY_STATE_DB=~/lucy-v10/state/lucy_state.db  # SQLite DB path
    
    They could diverge silently (e.g. model mismatch warnings). Fixed by adding `LUCY_RUNTIME_STATE_FILE` env var to START_LUCY.sh and making main.py respect it. Always use the env var when referring to current_state.json.
 
-8. **`ui-v9/app/backend/*.py` are RE-EXPORT WRAPPERS ONLY**: These files (classify.py, execution_engine.py, local_answer.py, policy.py) are 3–9 line wrappers that import from `tools/router_py/`. **Do not add logic to them.** Edit `tools/router_py/` and let the wrappers pick it up via `backend/__init__.py`. This has been a repeated footgun in past sessions.
+8. **`ui-v10/app/backend/*.py` are RE-EXPORT WRAPPERS ONLY**: These files (classify.py, execution_engine.py, local_answer.py, policy.py) are 3–9 line wrappers that import from `tools/router_py/`. **Do not add logic to them.** Edit `tools/router_py/` and let the wrappers pick it up via `backend/__init__.py`. This has been a repeated footgun in past sessions.
 
 9. **`StateWriter` uses `write_batch()` not `write_route()`/`write_outcome()`**: The Phase 2C optimization (May 23) batched SQLite writes into a single transaction. Tests that mock `state_manager.write_route` or `write_outcome` will fail — mock `write_batch` instead and unpack the two positional args.
 

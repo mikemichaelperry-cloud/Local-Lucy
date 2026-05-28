@@ -6,7 +6,7 @@ This script tests that each mode and runtime toggle routes as intended.
 It runs prompts and verifies routing decisions from state files.
 
 Usage:
-    cd ~/lucy-v10/ui-v9 && source .venv/bin/activate
+    cd ~/lucy-v10/ui-v10 && source .venv/bin/activate
     python3 test_routing_modes.py [--verbose]
 """
 

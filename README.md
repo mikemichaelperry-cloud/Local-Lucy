@@ -58,7 +58,7 @@ Unlike cloud-only assistants, Lucy learns from your corrections in natural langu
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  PySide6 HMI (ui-v9/app/)                                   │
+│  PySide6 HMI (ui-v10/app/)                                   │
 │  ├─ ControlPanel — mode toggles, voice PTT                  │
 │  ├─ ConversationPanel — draft input, history                │
 │  ├─ StatusPanel — runtime metrics                           │
@@ -108,11 +108,11 @@ git clone git@github.com:mikemichaelperry-cloud/Local-Lucy.git
 cd Local-Lucy
 
 # Create a virtual environment
-python3 -m venv ui-v9/.venv
-source ui-v9/.venv/bin/activate
+python3 -m venv ui-v10/.venv
+source ui-v10/.venv/bin/activate
 
 # Install dependencies
-pip install -r ui-v9/requirements.txt
+pip install -r ui-v10/requirements.txt
 
 # Download the base model (~9.8 GB) and create the custom variants
 ollama pull qwen3:14b
@@ -175,7 +175,7 @@ The background learner automatically rebuilds the embedding index from correctio
 
 ```bash
 # Full test suite (430+ tests)
-source ui-v9/.venv/bin/activate
+source ui-v10/.venv/bin/activate
 python3 -m pytest tools/router_py/ -q
 
 # Router-specific tests
@@ -189,7 +189,7 @@ python3 -m pytest tools/tests/test_end_to_end_comprehensive.py -q
 
 ```
 Local-Lucy/
-├── ui-v9/                  # PySide6 desktop application
+├── ui-v10/                  # PySide6 desktop application
 │   ├── app/                # HMI panels, backend bridge
 │   └── requirements.txt    # Python dependencies
 ├── tools/router_py/        # Core execution engine & router

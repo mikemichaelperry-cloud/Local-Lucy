@@ -129,9 +129,9 @@ def _analyze_pcm_levels(pcm_data: bytes, sample_rate: int = 22050, chunk_duratio
 
 
 def _get_ui_v8_python() -> str:
-    """Get path to ui-v9 Python which has Kokoro installed."""
+    """Get path to ui-v10 Python which has Kokoro installed."""
     root = Path(__file__).parent.parent.parent.parent.parent
-    return str(root / "ui-v9" / ".venv" / "bin" / "python3")
+    return str(root / "ui-v10" / ".venv" / "bin" / "python3")
 
 
 def _detect_kokoro_availability() -> bool:
@@ -163,7 +163,7 @@ class KokoroWorkerManager:
             if self.socket_path.exists():
                 self.socket_path.unlink()
             
-            # Start worker using ui-v9 Python which has Kokoro installed
+            # Start worker using ui-v10 Python which has Kokoro installed
             worker_script = Path(__file__).parent.parent / "voice" / "kokoro_session_worker.py"
             python_exe = _get_ui_v8_python()
             

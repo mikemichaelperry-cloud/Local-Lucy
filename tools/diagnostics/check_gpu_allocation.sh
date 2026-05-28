@@ -71,7 +71,7 @@ if [ -n "$KOKORO_PID" ]; then
     
     # Check socket
     # V8 ISOLATION: Use v8 socket path
-    SOCKET="${LUCY_VOICE_KOKORO_SOCKET:-/home/mike/lucy-v10/snapshots/opt-experimental-v9-dev/tmp/run/kokoro_tts_worker.sock}"
+    SOCKET="${LUCY_VOICE_KOKORO_SOCKET:-/home/mike/lucy-v10/tmp/run/kokoro_tts_worker.sock}"
     if [ -S "$SOCKET" ]; then
         echo -e "  ${GREEN}✓${NC} Socket available"
     else
@@ -101,7 +101,7 @@ echo ""
 
 # Check PyTorch CUDA (if venv available)
 echo "=== PYTORCH CUDA ==="
-VENV_PYTHON="/home/mike/lucy-v10/ui-v9/.venv/bin/python"
+VENV_PYTHON="/home/mike/lucy-v10/ui-v10/.venv/bin/python"
 if [ -x "$VENV_PYTHON" ]; then
     CUDA_CHECK=$($VENV_PYTHON -c "import torch; print(torch.cuda.is_available())" 2>/dev/null || echo "False")
     if [ "$CUDA_CHECK" = "True" ]; then

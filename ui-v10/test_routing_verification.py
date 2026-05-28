@@ -6,7 +6,7 @@ Tests routing modes and toggles, logging results to state files for verification
 Run with HMI active or standalone.
 
 Usage:
-    cd ~/lucy-v10/ui-v9 && source .venv/bin/activate
+    cd ~/lucy-v10/ui-v10 && source .venv/bin/activate
     python3 test_routing_verification.py [--quick|--full]
 
 Test Categories:
@@ -50,7 +50,7 @@ def _clear_python_caches():
                 pass
     
     # Clear UI cache
-    ui_path = lucy_base / "ui-v9"
+    ui_path = lucy_base / "ui-v10"
     if ui_path.exists():
         for pycache in ui_path.rglob("__pycache__"):
             try:
