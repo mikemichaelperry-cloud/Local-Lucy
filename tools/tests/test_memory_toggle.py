@@ -16,10 +16,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "router_py"))
 
-RUNTIME_V8 = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"
+RUNTIME_V8 = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"
 STATE_FILE = RUNTIME_V8 / "state" / "current_state.json"
 MEMORY_FILE = RUNTIME_V8 / "state" / "chat_session_memory.txt"
-LUCY_V8 = Path.home() / "lucy-v9"
+LUCY_V8 = Path.home() / "lucy-v10"
 RUNTIME_CONTROL = LUCY_V8 / "tools" / "runtime_control.py"
 
 
@@ -275,7 +275,7 @@ def main():
     
     # Set required env vars
     os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(LUCY_V8))
-    os.environ.setdefault("LUCY_UI_ROOT", str(Path.home() / "lucy-v9" / "ui-v9"))
+    os.environ.setdefault("LUCY_UI_ROOT", str(Path.home() / "lucy-v10" / "ui-v9"))
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(RUNTIME_V8))
     
     tests = [

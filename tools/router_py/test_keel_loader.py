@@ -17,7 +17,7 @@ class TestKeelLoader:
     def test_load_keel_status_valid(self):
         status = load_keel_status()
         # In the test environment, keel/keel.yaml should exist
-        if Path("/home/mike/lucy-v9/keel/keel.yaml").exists():
+        if Path("/home/mike/lucy-v10/keel/keel.yaml").exists():
             assert status["loaded"] is True
             assert status["path"].endswith("keel/keel.yaml")
             assert status["sha256"] is not None

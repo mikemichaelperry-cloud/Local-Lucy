@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Integration test: verify runtime_voice.py uses whisper worker fast-path.
 
-Run with: cd ~/lucy-v9/tools && python tests/test_whisper_worker_integration.py
+Run with: cd ~/lucy-v10/tools && python tests/test_whisper_worker_integration.py
 """
 
 from __future__ import annotations

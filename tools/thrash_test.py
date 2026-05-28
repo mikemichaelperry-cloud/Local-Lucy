@@ -264,7 +264,7 @@ shim_fail = 0
 for i in range(10):
     try:
         r = subprocess.run(
-            ["bash", "/home/mike/lucy-v9/tools/router/execute_plan.sh", "What time is it?"],
+            ["bash", "/home/mike/lucy-v10/tools/router/execute_plan.sh", "What time is it?"],
             capture_output=True, text=True, timeout=30
         )
         if r.returncode == 0 and "time" in r.stdout.lower():
@@ -283,7 +283,7 @@ print("\n" + "=" * 70)
 print("STAGE 10: State File Stress")
 print("=" * 70)
 
-state_dir = Path("/home/mike/lucy-v9/state/namespaces/default")
+state_dir = Path("/home/mike/lucy-v10/state/namespaces/default")
 outcome_file = state_dir / "last_outcome.env"
 
 if outcome_file.exists():

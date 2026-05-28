@@ -164,7 +164,7 @@ def _default_runtime_namespace_root() -> Path:
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
     # V8 ISOLATION: Use v8 runtime namespace
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v9"
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10"
 
 
 def _contract_required() -> bool:

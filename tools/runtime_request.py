@@ -213,13 +213,13 @@ def default_runtime_namespace_root() -> Path:
         return Path(explicit_root).expanduser()
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v9"
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10"
 
 
 def legacy_runtime_namespace_root() -> Path:
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / "lucy" / "runtime-v9"
+    return workspace_home / "lucy" / "runtime-v10"
 
 
 def legacy_runtime_namespace_status(

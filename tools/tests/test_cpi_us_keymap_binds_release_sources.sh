@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="${LUCY_ROOT:-/home/mike/lucy-v9}"
+ROOT="${LUCY_ROOT:-/home/mike/lucy-v10}"
 KEYMAP="${ROOT}/config/evidence_keymap.tsv"
 ALLOW_FETCH="${ROOT}/config/trust/generated/allowlist_fetch.txt"
 

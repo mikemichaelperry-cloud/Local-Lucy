@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local Lucy v8 Alpha - Desktop Launcher
+# Local Lucy v10 - Desktop Launcher
 # One path: ui-v9/app/ contains all backend code
 
 set -euo pipefail
@@ -26,9 +26,9 @@ export LUCY_ROOT="$SCRIPT_DIR"
 export LUCY_UI_ROOT="${SCRIPT_DIR}/ui-v9"
 # Unify all runtime state (JSON, SQLite, logs) to the user-local directory
 # where StateWriter and backend defaults already write. This eliminates the
-# split-brain where HMI reads from /home/mike/lucy-v9/state/ but router
-# writes to ~/.codex-api-home/lucy/runtime-v9/state/.
-export LUCY_RUNTIME_NAMESPACE_ROOT="$HOME/.codex-api-home/lucy/runtime-v9"
+# split-brain where HMI reads from /home/mike/lucy-v10/state/ but router
+# writes to ~/.codex-api-home/lucy/runtime-v10/state/.
+export LUCY_RUNTIME_NAMESPACE_ROOT="$HOME/.codex-api-home/lucy/runtime-v10"
 export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
 
 # Voice capture directory stays in project tree (temporary audio, not persistent state)

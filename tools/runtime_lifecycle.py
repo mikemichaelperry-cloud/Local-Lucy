@@ -114,7 +114,7 @@ def default_runtime_namespace_root() -> Path:
         return Path(explicit_root).expanduser()
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v9"
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10"
 
 
 DEFAULT_LIFECYCLE_FILE = str(default_runtime_namespace_root() / "state" / "runtime_lifecycle.json")

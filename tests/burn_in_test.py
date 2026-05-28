@@ -8,7 +8,7 @@ verify stability of the Python-only path (LUCY_LOCAL_ANSWER_PY=1).
 Goal: Simulate 30+ days of normal operation in a compressed timeframe.
 
 Usage:
-    cd /home/mike/lucy-v9
+    cd /home/mike/lucy-v10
     python tests/burn_in_test.py --duration-hours 2 --target-queries 5000
 """
 

@@ -49,7 +49,7 @@ ls ui-v9/.venv/bin/python3
 ```bash
 # From project root
 ui-v9/.venv/bin/python3 -c "import sys; print(sys.executable)"
-# Expected: /home/mike/lucy-v9/ui-v9/.venv/bin/python3
+# Expected: /home/mike/lucy-v10/ui-v9/.venv/bin/python3
 ```
 
 ### 3. Verify key imports

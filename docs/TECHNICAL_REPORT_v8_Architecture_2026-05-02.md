@@ -73,7 +73,7 @@ Key architectural principles:
 
 The snapshot at `~/lucy-v8/snapshots/opt-experimental-v9-dev/` is the runtime authority. All state mutations go through `runtime_control.py` with `fcntl.LOCK_EX` file locking. The UI root must be named `ui-v9` (V8 isolation — `ui-v7` is explicitly rejected).
 
-State files live under `~/.codex-api-home/lucy/runtime-v9/state/`:
+State files live under `~/.codex-api-home/lucy/runtime-v10/state/`:
 - `current_state.json` — profile, mode, model, status
 - `request_history.jsonl` — append-only query log
 - `last_route.json`, `last_preprocess.json` — routing telemetry

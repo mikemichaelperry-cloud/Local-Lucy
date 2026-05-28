@@ -7,11 +7,11 @@ import gc, json, os, sys, time
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path.home() / "lucy-v9" / "models" / "router"))
+sys.path.insert(0, str(Path.home() / "lucy-v10" / "models" / "router"))
 sys.path.insert(0, str(Path(__file__).parent / "app"))
 
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v9"))
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v10"))
+os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
 
 from hybrid_router_v2 import HybridRouterV2
 
@@ -163,7 +163,7 @@ def main():
         print(f"  {r:12s}: {c}")
 
     # Save report
-    report_dir = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "logs"
+    report_dir = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "logs"
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / f"routing_stress_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     with open(report_path, "w") as f:

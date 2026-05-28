@@ -101,7 +101,7 @@ class RuntimeBridge:
         threading.Thread(target=self._background_warmup_router, daemon=True).start()
 
     def _workspace_root(self) -> Path:
-        # When authority root is the project root (e.g., /home/mike/lucy-v9),
+        # When authority root is the project root (e.g., /home/mike/lucy-v10),
         # the workspace root is the same directory.
         return self.snapshot_root
 
@@ -133,7 +133,7 @@ class RuntimeBridge:
         bridge_file = Path(__file__).resolve()
         if ui_root.name not in ("ui-v7", "ui-v9") or not ui_root.exists() or not ui_root.is_dir():
             raise RuntimeError(f"invalid UI root in authority contract: {ui_root}")
-        if authority_root.name not in ("opt-experimental-v7-dev", "opt-experimental-v9-dev", "lucy-v9"):
+        if authority_root.name not in ("opt-experimental-v7-dev", "opt-experimental-v9-dev", "lucy-v10"):
             raise RuntimeError(f"invalid authority root in authority contract: {authority_root}")
         if not runtime_ns_root.is_absolute():
             raise RuntimeError(f"invalid runtime namespace root in authority contract: {runtime_ns_root}")
@@ -209,7 +209,7 @@ class RuntimeBridge:
         # Always fail loudly - no silent fallbacks allowed
         raise RuntimeError(
             f"missing required {self.authority_root_env}. "
-            f"Set it explicitly to the project root (e.g., /home/mike/lucy-v9)"
+            f"Set it explicitly to the project root (e.g., /home/mike/lucy-v10)"
         )
 
     def _discover_capabilities(self) -> dict[str, ActionCapability]:
@@ -1004,7 +1004,7 @@ class RuntimeBridge:
         # Default path matching runtime_request.py
         home = Path.home()
         workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "request_history.jsonl"
+        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "request_history.jsonl"
 
     def _run_lifecycle_action(self, action: str, requested_value: str) -> CommandResult:
         expected_value = "start" if action == "runtime_start" else "stop"

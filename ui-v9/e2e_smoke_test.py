@@ -12,10 +12,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent / "app"))
-sys.path.insert(0, str(Path.home() / "lucy-v9" / "models" / "router"))
+sys.path.insert(0, str(Path.home() / "lucy-v10" / "models" / "router"))
 
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v9"))
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v10"))
+os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")
 os.environ.setdefault("LUCY_EVIDENCE_ENABLED", "1")
@@ -202,7 +202,7 @@ def main():
         for r in failed:
             print(f"  [{r['route']}] {r['query']}: {r['error'][:80]}")
 
-    report_path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "logs" / f"e2e_smoke_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    report_path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "logs" / f"e2e_smoke_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "w") as f:
         json.dump({

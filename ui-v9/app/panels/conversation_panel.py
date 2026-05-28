@@ -262,7 +262,7 @@ class ConversationPanel(QFrame):
         """Write debug log to file."""
         import os
         from pathlib import Path
-        log_path = Path.home() / "lucy-v9" / "ui_debug.log"
+        log_path = Path.home() / "lucy-v10" / "ui_debug.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a") as f:
             from datetime import datetime

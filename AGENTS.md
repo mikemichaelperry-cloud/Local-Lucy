@@ -8,9 +8,9 @@
 ## Authority
 
 - The authoritative working root is:
-  /home/mike/lucy-v9
+  /home/mike/lucy-v10
 - Snapshot sync target:
-  /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev (mirror, not source)
+  /home/mike/lucy-v10/snapshots/opt-experimental-v9-dev (mirror, not source)
 
 - Do not modify:
   - launcher structure
@@ -22,9 +22,9 @@
 ## System Privileges
 
 - **Never use `sudo`.** The system blocks external sudo requests and the shell crashes.
-- Make changes only within `~/lucy-v9/` directories.
+- Make changes only within `~/lucy-v10/` directories.
 - **V8 is frozen.** Do not modify `/home/mike/lucy-v8/` under any circumstances.
-- V9 (`/home/mike/lucy-v9/`) is the sole active development branch.
+- V9 (`/home/mike/lucy-v10/`) is the sole active development branch.
 - For system-level changes (e.g., systemd, global env vars), use user-level alternatives:
   - Modify `START_LUCY.sh` to export env vars
   - Use per-user systemd overrides (`~/.config/systemd/user/`) if available
@@ -106,7 +106,7 @@ All entry points (CLI, HMI, voice) now call `main.run()`.
 ### Testing
 
 ```bash
-cd ~/lucy-v9/ui-v9
+cd ~/lucy-v10/ui-v9
 .venv/bin/python3 -m pytest tests/ -q
 ```
 
@@ -117,7 +117,7 @@ Also run the fast routing stress test:
 
 Router tests:
 ```bash
-cd ~/lucy-v9
+cd ~/lucy-v10
 # Route-only (fast, ~56s)
 LUCY_SYNTHETIC_ROUTER_ONLY=1 python3 -m pytest tools/router_py/test_synthetic_adversarial.py -x -q
 
@@ -152,7 +152,7 @@ LUCY_SYNTHETIC_FULL_ANSWER=1 python3 -m pytest tools/router_py/test_synthetic_ad
 
 Router tests:
 ```bash
-cd ~/lucy-v9
+cd ~/lucy-v10
 source ui-v9/.venv/bin/activate
 python -m pytest tools/router_py/ --ignore=tools/router_py/test_resource_leaks.py -q
 ```
@@ -299,7 +299,7 @@ All work, fixes, and improvements belong in V9 only. No cross-contamination to V
 
 ```bash
 # Full router suite (CPU only, ~1min40s)
-cd ~/lucy-v9
+cd ~/lucy-v10
 source ui-v9/.venv/bin/activate
 python -m pytest tools/router_py/ -q
 
@@ -330,7 +330,7 @@ LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 LUCY_AUGMENTATION_POLICY=fallback_only \
 
 **Unified location (canonical):**
 ```
-~/.codex-api-home/lucy/runtime-v9/state/
+~/.codex-api-home/lucy/runtime-v10/state/
 ├── current_state.json          # HMI control state (unified — see below)
 ├── last_request_result.json    # Full request payload (NEW — Stream 2)
 ├── last_route.json             # Route snapshot (NEW — Stream 2)
@@ -339,21 +339,21 @@ LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 LUCY_AUGMENTATION_POLICY=fallback_only \
 ├── health.json                 # System health
 ├── voice_runtime.json          # Voice backend status
 
-~/.codex-api-home/lucy/runtime-v9/
+~/.codex-api-home/lucy/runtime-v10/
 ├── lucy_state.db               # SQLite routes/outcomes
 └── memory.db                   # SQLite memory
 ```
 
 **Legacy location (project root):**
 ```
-/home/mike/lucy-v9/state/
+/home/mike/lucy-v10/state/
 ├── current_state.json          # Legacy fallback
 ```
 
-**Why two locations?** The project was created with state in the repo directory, but the HMI and `runtime_control.py` default to `~/.codex-api-home/lucy/runtime-v9/`. Before 2026-05-16, `START_LUCY.sh` and the HMI read/wrote different `current_state.json` files, causing silent drift (e.g. model mismatch warnings on startup).
+**Why two locations?** The project was created with state in the repo directory, but the HMI and `runtime_control.py` default to `~/.codex-api-home/lucy/runtime-v10/`. Before 2026-05-16, `START_LUCY.sh` and the HMI read/wrote different `current_state.json` files, causing silent drift (e.g. model mismatch warnings on startup).
 
 **Fix applied (2026-05-16):**
-- `START_LUCY.sh` now exports `LUCY_RUNTIME_STATE_FILE=~/.codex-api-home/lucy/runtime-v9/state/current_state.json`
+- `START_LUCY.sh` now exports `LUCY_RUNTIME_STATE_FILE=~/.codex-api-home/lucy/runtime-v10/state/current_state.json`
 - `router_py/main.py` `load_state_from_file()` checks `LUCY_RUNTIME_STATE_FILE` env var first
 - This ensures all entry points (launcher, HMI, runtime_control.py, main.py) use the SAME `current_state.json`
 
@@ -379,8 +379,8 @@ LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 LUCY_AUGMENTATION_POLICY=fallback_only \
 LUCY_ROUTER_PY=1          # Use Python router (active)
 LUCY_EXEC_PY=1            # Use Python execution engine (active)
 LUCY_AUGMENTATION_POLICY=fallback_only   # Current policy
-LUCY_UI_STATE_DIR=~/.codex-api-home/lucy/runtime-v9/state  # JSON state output
-LUCY_STATE_DB=~/lucy-v9/state/lucy_state.db  # SQLite DB path
+LUCY_UI_STATE_DIR=~/.codex-api-home/lucy/runtime-v10/state  # JSON state output
+LUCY_STATE_DB=~/lucy-v10/state/lucy_state.db  # SQLite DB path
 ```
 
 ---
@@ -400,8 +400,8 @@ LUCY_STATE_DB=~/lucy-v9/state/lucy_state.db  # SQLite DB path
 6. **No GPU in tests**: The user has low VRAM (~3.7GB used by whisper-server processes). Never run tests that load torch/transformers models. All router tests use mocks.
 
 7. **Two `current_state.json` files**: Before 2026-05-16 there were two independent files:
-   - `~/.codex-api-home/lucy/runtime-v9/state/current_state.json` — HMI default, runtime_control.py default
-   - `/home/mike/lucy-v9/state/current_state.json` — START_LUCY.sh, main.py legacy path
+   - `~/.codex-api-home/lucy/runtime-v10/state/current_state.json` — HMI default, runtime_control.py default
+   - `/home/mike/lucy-v10/state/current_state.json` — START_LUCY.sh, main.py legacy path
    
    They could diverge silently (e.g. model mismatch warnings). Fixed by adding `LUCY_RUNTIME_STATE_FILE` env var to START_LUCY.sh and making main.py respect it. Always use the env var when referring to current_state.json.
 

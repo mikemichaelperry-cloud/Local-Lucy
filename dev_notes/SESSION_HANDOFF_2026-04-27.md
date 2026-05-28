@@ -25,7 +25,7 @@ Today's session focused on two independent tracks:
 
 ### Build Configuration
 ```bash
-cd /home/mike/lucy-v9/runtime/voice/whisper.cpp
+cd /home/mike/lucy-v10/runtime/voice/whisper.cpp
 rm -rf build && mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DWHISPER_CUDA=OFF -DBUILD_SHARED_LIBS=ON
 make -j$(nproc) whisper-cli
@@ -37,7 +37,7 @@ make -j$(nproc) whisper-cli
 ### Verification
 ```bash
 # Binary works with library path
-LD_LIBRARY_PATH="/home/mike/lucy-v9/runtime/voice/whisper.cpp/build/src:/home/mike/lucy-v9/runtime/voice/whisper.cpp/build/ggml/src" \
+LD_LIBRARY_PATH="/home/mike/lucy-v10/runtime/voice/whisper.cpp/build/src:/home/mike/lucy-v10/runtime/voice/whisper.cpp/build/ggml/src" \
   runtime/voice/bin/whisper --help
 
 # Runtime check passes
@@ -119,7 +119,7 @@ CUDA 12.x does **not** support GCC 13 (system default). Need GCC 11 for CUDA com
 which g++-11 || sudo apt install g++-11
 
 # Configure with CUDA + GCC 11
-cd /home/mike/lucy-v9/runtime/voice/whisper.cpp
+cd /home/mike/lucy-v10/runtime/voice/whisper.cpp
 rm -rf build && mkdir build && cd build
 CC=gcc-11 CXX=g++-11 cmake .. \
   -DCMAKE_BUILD_TYPE=Release \

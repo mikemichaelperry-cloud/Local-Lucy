@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Project root candidates (tries repo first, then explicit fallback)
 _ROOT_CANDIDATES = [
     Path(__file__).resolve().parent.parent.parent,  # tools/router_py/../../
-    Path("/home/mike/lucy-v9"),
+    Path("/home/mike/lucy-v10"),
 ]
 
 

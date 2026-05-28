@@ -1020,7 +1020,7 @@ class VoicePipeline(BaseToolWrapper):
         
         # ISOLATION: V8 only uses ui-v9, NEVER falls back to ui-v7
         root = self._resolve_root()
-        workspace_root = root if root.name == "lucy-v9" else root.parent.parent
+        workspace_root = root if root.name == "lucy-v10" else root.parent.parent
         candidate = workspace_root / "ui-v9" / ".venv" / "bin" / "python3"
         
         if candidate.exists() and os.access(candidate, os.X_OK):
@@ -1116,7 +1116,7 @@ class VoicePipeline(BaseToolWrapper):
                     # Get levels file path from environment or use default
                     import os
                     runtime_dir = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", 
-                        Path.home() / ".codex-api-home/lucy/runtime-v9"))
+                        Path.home() / ".codex-api-home/lucy/runtime-v10"))
                     levels_file = runtime_dir / "state" / "voice_audio_levels.json"
                     
                     play_wav_file_with_levels(

@@ -12,10 +12,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Set test environment
 os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(
-    Path.home() / "lucy-v9"
+    Path.home() / "lucy-v10"
 )
 os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(
-    Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"
+    Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"
 )
 os.environ["LUCY_UI_ROOT"] = str(Path(__file__).parent.parent.parent)
 os.environ["LUCY_ROUTER_PY"] = "1"

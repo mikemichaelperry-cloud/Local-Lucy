@@ -12,8 +12,8 @@ import time
 from pathlib import Path
 
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
-REPO_TOOLS_ROOT = Path("/home/mike/lucy-v9/tools")
-AUTHORITY_ROOT = Path("/home/mike/lucy-v9")
+REPO_TOOLS_ROOT = Path("/home/mike/lucy-v10/tools")
+AUTHORITY_ROOT = Path("/home/mike/lucy-v10")
 
 
 def main() -> int:
@@ -73,8 +73,8 @@ class Sandbox:
         self.root = root
         self.home = root / "home"
         self.bin_dir = root / "bin"
-        self.tools_dir = self.home / "lucy" / "lucy-v9" / "tools"
-        self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v9" / "state"
+        self.tools_dir = self.home / "lucy" / "lucy-v10" / "tools"
+        self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v10" / "state"
         self.voice_runtime_path = self.state_dir / "voice_runtime.json"
         self.last_request_result_path = self.state_dir / "last_request_result.json"
         self.request_history_path = self.state_dir / "request_history.jsonl"
