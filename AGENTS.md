@@ -1,4 +1,4 @@
-# Local Lucy v9 — Codex Execution Rules
+# Local Lucy v10 — Codex Execution Rules
 
 ## Related Documents
 
@@ -173,7 +173,7 @@ snapshots/opt-experimental-v9-dev/models/router/
 **Final commit:** `dd9024a8` (pushed to `origin/main`)  
 **System state:** `main` is up to date with `origin/main`. Clean working tree.  
 **Active router:** Python-native (`LUCY_ROUTER_PY=1`, `LUCY_EXEC_PY=1`)  
-**Model:** ModernBERT hybrid + keyword guards, 645 examples  
+**Model:** MiniLM-L6-v2 hybrid router V2, ~899 examples  
 **GPU constraint:** LOW VRAM. No GPU tests. No model loading in tests.  
 
 ---
@@ -187,8 +187,8 @@ The user's rating for this session:
 - Ready for daily dogfood: **yes**
 - Ready for no-supervision production: **not yet**
 
-V8 is frozen at tag `local-lucy-v8-freeze-2026-05-17`. Do not modify V8.
-V9 is the active development branch. v10 is the target beta release.
+V9 is frozen at tag `local-lucy-v9-frozen-2026-05-28`. Do not modify V9.
+V10 is the active development branch.
 All work, fixes, and improvements belong in V9 only. No cross-contamination to V8.
 
 ---
