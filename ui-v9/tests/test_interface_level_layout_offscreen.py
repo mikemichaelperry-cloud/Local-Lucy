@@ -15,7 +15,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="interface_level_layout_") as tmp_dir:
         home = Path(tmp_dir) / "home"
         state_dir = home / "lucy" / "runtime" / "state"
-        tools_dir = home / "lucy-v9" / "tools"
+        tools_dir = home / "lucy-v10" / "tools"
         state_dir.mkdir(parents=True, exist_ok=True)
         tools_dir.mkdir(parents=True, exist_ok=True)
 
@@ -55,7 +55,7 @@ def main() -> int:
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(state_dir.parent)
         # Set required authority contract variables
         # Use real repo path so backend can import router_py
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(Path("/home/mike/lucy-v9"))
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(Path("/home/mike/lucy-v10"))
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))

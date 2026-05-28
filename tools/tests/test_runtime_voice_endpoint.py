@@ -24,12 +24,12 @@ def main() -> int:
         root = Path(tmp_dir)
         home = root / "home"
         bin_dir = root / "bin"
-        capture_dir = home / ".codex-api-home" / "lucy" / "runtime-v9" / "voice" / "ui_ptt"
-        runtime_namespace_root = home / ".codex-api-home" / "lucy" / "runtime-v9"
-        state_dir = home / ".codex-api-home" / "lucy" / "runtime-v9" / "state"
+        capture_dir = home / ".codex-api-home" / "lucy" / "runtime-v10" / "voice" / "ui_ptt"
+        runtime_namespace_root = home / ".codex-api-home" / "lucy" / "runtime-v10"
+        state_dir = home / ".codex-api-home" / "lucy" / "runtime-v10" / "state"
         ui_root = home / "lucy" / "ui-v9"
-        tools_dir = home / "lucy-v9" / "tools"
-        authority_root = home / "lucy-v9"
+        tools_dir = home / "lucy-v10" / "tools"
+        authority_root = home / "lucy-v10"
         runtime_file = state_dir / "voice_runtime.json"
         state_file = state_dir / "current_state.json"
         request_history = state_dir / "request_history.jsonl"
@@ -89,7 +89,7 @@ def main() -> int:
             from pathlib import Path
 
             transcript = sys.argv[-1]
-            state_dir = Path(os.path.expanduser("~/.codex-api-home/lucy/runtime-v9/state"))
+            state_dir = Path(os.path.expanduser("~/.codex-api-home/lucy/runtime-v10/state"))
             state_dir.mkdir(parents=True, exist_ok=True)
             payload = {
                 "accepted": True,

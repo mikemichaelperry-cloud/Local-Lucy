@@ -173,7 +173,7 @@ DEFAULT_TIMEOUT = 130
 DEFAULT_POLICY_CONFIDENCE_THRESHOLD = 0.60
 
 # Default chat memory file path (matches runtime_request.py)
-DEFAULT_CHAT_MEMORY_FILE = "~/.codex-api-home/lucy/runtime-v9/state/chat_session_memory.txt"
+DEFAULT_CHAT_MEMORY_FILE = "~/.codex-api-home/lucy/runtime-v10/state/chat_session_memory.txt"
 
 
 def _load_session_memory_context_with_telemetry(

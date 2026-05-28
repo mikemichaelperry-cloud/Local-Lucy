@@ -263,7 +263,7 @@ def default_runtime_namespace_root() -> Path:
         return Path(explicit_root).expanduser()
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v9"
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10"
 
 
 DEFAULT_VOICE_RUNTIME_FILE = str(default_runtime_namespace_root() / "state" / "voice_runtime.json")
@@ -297,7 +297,7 @@ def resolve_kokoro_worker_log_file() -> Path:
 
 def resolve_voice_python(requested_engine: str | None = None) -> str:
     root = resolve_root()
-    workspace_root = root if root.name == "lucy-v9" else root.parent.parent
+    workspace_root = root if root.name == "lucy-v10" else root.parent.parent
     preferred_engine = clean_text(requested_engine).lower()
     if preferred_engine in {"", "auto"}:
         preferred_engine = "kokoro"
@@ -2377,7 +2377,7 @@ class VoiceEngineLogger:
         if v8_logs:
             self.log_dir = Path(v8_logs)
         else:
-            self.log_dir = Path.home() / ".local" / "share" / "lucy-v9" / "logs"
+            self.log_dir = Path.home() / ".local" / "share" / "lucy-v10" / "logs"
         self.log_file = self.log_dir / "voice_engine.log"
         self._ensure_log_dir()
     

@@ -434,7 +434,7 @@ sequenceDiagram
 ## File Locations
 
 ```
-/home/mike/lucy-v9/
+/home/mike/lucy-v10/
 ├── runtime/
 │   └── lucy_core.py                    # Main orchestration
 │

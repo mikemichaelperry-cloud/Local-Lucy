@@ -15,13 +15,13 @@ PROMPTS = [
 ]
 
 RESULTS = []
-REQUEST_TOOL = "/home/mike/lucy-v9/tools/runtime_request.py"
+REQUEST_TOOL = "/home/mike/lucy-v10/tools/runtime_request.py"
 
 # Set required env vars
 env = os.environ.copy()
-env["LUCY_RUNTIME_AUTHORITY_ROOT"] = "/home/mike/lucy-v9"
-env["LUCY_UI_ROOT"] = "/home/mike/lucy-v9/ui-v9"
-env["LUCY_RUNTIME_NAMESPACE_ROOT"] = "/home/mike/.codex-api-home/lucy/runtime-v9"
+env["LUCY_RUNTIME_AUTHORITY_ROOT"] = "/home/mike/lucy-v10"
+env["LUCY_UI_ROOT"] = "/home/mike/lucy-v10/ui-v9"
+env["LUCY_RUNTIME_NAMESPACE_ROOT"] = "/home/mike/.codex-api-home/lucy/runtime-v10"
 env["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
 
 print("=" * 70)

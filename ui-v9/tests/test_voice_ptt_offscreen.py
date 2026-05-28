@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
-REPO_TOOLS_ROOT = Path("/home/mike/lucy-v9/tools")
+REPO_TOOLS_ROOT = Path("/home/mike/lucy-v10/tools")
 
 
 def main() -> int:
@@ -220,9 +220,9 @@ class Sandbox:
         self.root = root
         self.home = root / "home"
         self.bin_dir = root / "bin"
-        self.tools_dir = self.home / "lucy" / "lucy-v9" / "tools"
-        self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v9" / "state"
-        self.logs_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v9" / "logs"
+        self.tools_dir = self.home / "lucy" / "lucy-v10" / "tools"
+        self.state_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v10" / "state"
+        self.logs_dir = self.home / ".codex-api-home" / "lucy" / "runtime-v10" / "logs"
         self.voice_runtime_path = self.state_dir / "voice_runtime.json"
         self.last_request_result_path = self.state_dir / "last_request_result.json"
         self.request_history_path = self.state_dir / "request_history.jsonl"
@@ -244,7 +244,7 @@ class Sandbox:
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(self.state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = "/home/mike/lucy-v9"
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = "/home/mike/lucy-v10"
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
@@ -437,7 +437,7 @@ class Sandbox:
                 from pathlib import Path
 
                 transcript = sys.argv[-1]
-                state_dir = Path(os.path.expanduser("~/.codex-api-home/lucy/runtime-v9/state"))
+                state_dir = Path(os.path.expanduser("~/.codex-api-home/lucy/runtime-v10/state"))
                 state_dir.mkdir(parents=True, exist_ok=True)
                 payload = {{
                     "accepted": True,

@@ -8,7 +8,7 @@ Metrics tracked per prompt:
   4. error_crash_hang  — any exception, timeout, or empty response?
 
 Usage:
-    cd ~/lucy-v9
+    cd ~/lucy-v10
     source ui-v9/.venv/bin/activate
     LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 python3 tools/burn_in_v9_2026_05_18.py
 
@@ -368,7 +368,7 @@ def _is_acceptable(query: str, text: str, category: str) -> Tuple[bool, str]:
 def _check_hmi_truth(result: Any, expected_route: str) -> Tuple[bool, str]:
     """Check that HMI state files reflect actual execution."""
     # The runtime bridge writes to history. We check the last written entry.
-    runtime_dir = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"
+    runtime_dir = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"
     history_path = runtime_dir / "request_history.jsonl"
 
     if not history_path.exists():

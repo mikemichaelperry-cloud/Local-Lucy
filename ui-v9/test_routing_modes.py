@@ -6,7 +6,7 @@ This script tests that each mode and runtime toggle routes as intended.
 It runs prompts and verifies routing decisions from state files.
 
 Usage:
-    cd ~/lucy-v9/ui-v9 && source .venv/bin/activate
+    cd ~/lucy-v10/ui-v9 && source .venv/bin/activate
     python3 test_routing_modes.py [--verbose]
 """
 
@@ -27,8 +27,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent / "app"))
 
 # Set required env vars for testing
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v9"))
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v10"))
+os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")
 
@@ -106,7 +106,7 @@ class RoutingTestLogger:
 
 def get_last_route_info() -> dict[str, Any]:
     """Get last route information from state file."""
-    route_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "last_route.json"
+    route_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "last_route.json"
     try:
         if route_file.exists():
             with open(route_file, "r") as f:
@@ -118,7 +118,7 @@ def get_last_route_info() -> dict[str, Any]:
 
 def get_current_state() -> dict[str, Any]:
     """Get current state from state file."""
-    state_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "current_state.json"
+    state_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "current_state.json"
     try:
         if state_file.exists():
             with open(state_file, "r") as f:
@@ -163,7 +163,7 @@ def wait_for_state_update(timeout: int = 5) -> bool:
 def set_toggle(toggle_name: str, value: str) -> bool:
     """Set a runtime toggle via state file."""
     try:
-        state_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "current_state.json"
+        state_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "current_state.json"
         
         state = {}
         if state_file.exists():
@@ -272,7 +272,7 @@ def run_memory_toggle_tests(logger: RoutingTestLogger) -> None:
     print("MEMORY TOGGLE TESTS")
     print("=" * 60)
     
-    memory_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "chat_session_memory.txt"
+    memory_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "chat_session_memory.txt"
     
     # Clear memory file first
     if memory_file.exists():
@@ -434,7 +434,7 @@ def main():
     all_passed = logger.summary()
     
     # Save results to file
-    results_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "logs" / "routing_test_results.json"
+    results_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "logs" / "routing_test_results.json"
     results_file.parent.mkdir(parents=True, exist_ok=True)
     with open(results_file, "w") as f:
         json.dump({

@@ -3,7 +3,7 @@ Local Lucy v8 - Consolidated Backend (Single Source of Truth)
 
 This module provides a unified interface to the backend by importing
 from the authoritative local v8 location:
-  /home/mike/lucy-v9/tools/router_py/
+  /home/mike/lucy-v10/tools/router_py/
 
 This ensures both text and voice paths use the exact same code.
 
@@ -26,7 +26,7 @@ AUTHORITY_ROOT = os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", "").strip()
 if AUTHORITY_ROOT:
     SNAPSHOT_ROOT = Path(AUTHORITY_ROOT).expanduser()
 else:
-    # Fallback: derive local lucy-v9 root from ui-v9/app/backend/__init__.py.
+    # Fallback: derive local lucy-v10 root from ui-v9/app/backend/__init__.py.
     SNAPSHOT_ROOT = Path(__file__).resolve().parents[3]
 TOOLS_PATH = SNAPSHOT_ROOT / "tools"
 ROUTER_PY_PATH = TOOLS_PATH / "router_py"

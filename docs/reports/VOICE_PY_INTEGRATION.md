@@ -111,16 +111,16 @@ python3 voice_tool.py --test health
 
 ### Run Health Check
 ```bash
-cd /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
+cd /home/mike/lucy-v10/snapshots/opt-experimental-v9-dev
 cd tools/router_py
 python3 voice_tool.py --test health
 ```
 
 ### Test with Runtime
 ```bash
-cd /home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
-export LUCY_RUNTIME_AUTHORITY_ROOT=/home/mike/lucy-v9/snapshots/opt-experimental-v9-dev
-export LUCY_UI_ROOT=/home/mike/lucy-v9/ui-v9
+cd /home/mike/lucy-v10/snapshots/opt-experimental-v9-dev
+export LUCY_RUNTIME_AUTHORITY_ROOT=/home/mike/lucy-v10/snapshots/opt-experimental-v9-dev
+export LUCY_UI_ROOT=/home/mike/lucy-v10/ui-v9
 export LUCY_RUNTIME_NAMESPACE_ROOT=/home/mike/.codex-api-home/lucy/runtime-v7
 
 # Shell mode (default)

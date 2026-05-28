@@ -15,9 +15,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Set required environment before imports
 os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", 
-    str(Path.home() / "lucy-v9"))
+    str(Path.home() / "lucy-v10"))
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", 
-    str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
+    str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
 os.environ.setdefault("LUCY_UI_ROOT", 
     str(Path(__file__).parent.parent.parent))
 

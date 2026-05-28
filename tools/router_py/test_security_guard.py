@@ -3,7 +3,7 @@
 Tests for security_guard.py.
 
 Run with:
-    cd /home/mike/lucy-v9 && source ui-v9/.venv/bin/activate
+    cd /home/mike/lucy-v10 && source ui-v9/.venv/bin/activate
     python3 -m pytest tools/router_py/test_security_guard.py -v
 """
 

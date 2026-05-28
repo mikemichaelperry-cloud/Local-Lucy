@@ -48,7 +48,7 @@ learner for automatic index rebuild.
 ## How to Rebuild Index
 
 ```bash
-cd /home/mike/lucy-v9/models/router
+cd /home/mike/lucy-v10/models/router
 python3 background_learner.py --process
 ```
 

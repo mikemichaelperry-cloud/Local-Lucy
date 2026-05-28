@@ -552,7 +552,7 @@ def select_route(
                 # than main.py, creating separate singleton instances).
                 # Cached by mtime to avoid redundant reads (Phase 3D).
                 _ns = Path(
-                    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
+                    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
                 )
                 _buf_path = _ns / "feedback_buffer.json"
                 if _buf_path.exists():

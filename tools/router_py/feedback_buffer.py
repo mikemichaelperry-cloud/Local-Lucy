@@ -17,7 +17,7 @@ from typing import Optional
 
 # Persist in runtime namespace so it survives restarts
 RUNTIME_NS = Path(
-    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
+    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
 )
 BUFFER_PATH = RUNTIME_NS / "feedback_buffer.json"
 DEFAULT_MAX_TURNS = 5

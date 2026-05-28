@@ -165,8 +165,8 @@ jobs:
           # Clear shared state files between tests to prevent cross-test contamination
           # (some offscreen tests write to the runtime state directory)
           cleanup_state() {
-            rm -f ~/.codex-api-home/lucy/runtime-v9/state/request_history.jsonl
-            rm -f ~/.codex-api-home/lucy/runtime-v9/state/last_request_result.json
+            rm -f ~/.codex-api-home/lucy/runtime-v10/state/request_history.jsonl
+            rm -f ~/.codex-api-home/lucy/runtime-v10/state/last_request_result.json
           }
           # Standalone offscreen scripts (each exits 0 on success)
           # Decision trace must run before augmented_controls to avoid state pollution

@@ -6,7 +6,7 @@ Tests routing modes and toggles, logging results to state files for verification
 Run with HMI active or standalone.
 
 Usage:
-    cd ~/lucy-v9/ui-v9 && source .venv/bin/activate
+    cd ~/lucy-v10/ui-v9 && source .venv/bin/activate
     python3 test_routing_verification.py [--quick|--full]
 
 Test Categories:
@@ -31,7 +31,7 @@ from typing import Any
 # This ensures we test the latest code, not cached bytecode
 def _clear_python_caches():
     """Clear all Python __pycache__ directories and .pyc files."""
-    lucy_base = Path.home() / "lucy-v9"
+    lucy_base = Path.home() / "lucy-v10"
     codex_base = Path.home() / ".codex-api-home"
     
     # Clear router_py cache
@@ -73,8 +73,8 @@ sys.path.insert(0, str(Path(__file__).parent / "app"))
 
 # Set required environment BEFORE importing backend
 # (backend uses these at import time)
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v9"))
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v10"))
+os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")  # CRITICAL: Use Python execution path, not shell
 os.environ.setdefault("LUCY_SESSION_MEMORY", "1")
@@ -148,7 +148,7 @@ class TestReporter:
 def get_last_route() -> dict:
     """Read last route from state file."""
     try:
-        path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "last_route.json"
+        path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "last_route.json"
         if path.exists():
             with open(path) as f:
                 return json.load(f)
@@ -160,7 +160,7 @@ def get_last_route() -> dict:
 def get_current_state() -> dict:
     """Read current state from state file."""
     try:
-        path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "current_state.json"
+        path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "current_state.json"
         if path.exists():
             with open(path) as f:
                 return json.load(f)
@@ -176,7 +176,7 @@ def set_state_value(key: str, value: str) -> bool:
         state[key] = value
         state["last_updated"] = datetime.now().isoformat()
         
-        path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "current_state.json"
+        path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "current_state.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
             json.dump(state, f, indent=2)
@@ -266,7 +266,7 @@ def test_memory_toggle(r: TestReporter) -> None:
     """Test memory toggle functionality."""
     r.section("MEMORY TOGGLE TESTS")
     
-    memory_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "chat_session_memory.txt"
+    memory_file = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "chat_session_memory.txt"
     
     # Test 1: Memory ON
     r.info("Testing Memory ON...")
@@ -465,7 +465,7 @@ def main():
         traceback.print_exc()
     
     # Generate report
-    default_output = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "logs" / "routing_verification_report.json"
+    default_output = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "logs" / "routing_verification_report.json"
     output = args.output or default_output
     generate_report(reporter, output)
     

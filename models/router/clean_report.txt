@@ -2,9 +2,9 @@
 ROUTER TRAINING DATA CLEANING REPORT
 ======================================================================
 
-Input file:   /home/mike/lucy-v9/models/router/comprehensive_examples.json
-Output clean: /home/mike/lucy-v9/models/router/comprehensive_examples_clean.json
-Output flagged: /home/mike/lucy-v9/models/router/comprehensive_examples_flagged.json
+Input file:   /home/mike/lucy-v10/models/router/comprehensive_examples.json
+Output clean: /home/mike/lucy-v10/models/router/comprehensive_examples_clean.json
+Output flagged: /home/mike/lucy-v10/models/router/comprehensive_examples_flagged.json
 
 --- BEFORE vs AFTER ---
 Total examples (input):     689

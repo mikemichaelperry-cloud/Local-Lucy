@@ -710,7 +710,7 @@ class ConsolidatedRuntimeBridge:
         else:
             workspace_home = home
         
-        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "current_state.json"
+        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "current_state.json"
     
     def _write_history_entry(self, request_text: str, result: dict[str, Any]) -> None:
         """Write a history entry to the jsonl file for HMI display."""
@@ -725,7 +725,7 @@ class ConsolidatedRuntimeBridge:
         else:
             home = Path.home()
             workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-            history_file = workspace_home / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "request_history.jsonl"
+            history_file = workspace_home / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "request_history.jsonl"
         
         # Read ACTUAL current state from file (not hardcoded values)
         state_file = self._resolve_state_file()

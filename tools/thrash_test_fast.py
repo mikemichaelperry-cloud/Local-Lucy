@@ -270,7 +270,7 @@ print("STAGE 9: State File Integrity")
 print("=" * 70)
 
 ensure_control_env()
-state_file = Path("/home/mike/lucy-v9/state/state/current_state.json")
+state_file = Path("/home/mike/lucy-v10/state/state/current_state.json")
 log("StateFile", "current_state.json", state_file.exists(), f"size={state_file.stat().st_size if state_file.exists() else 0}")
 
 # ============================================================================

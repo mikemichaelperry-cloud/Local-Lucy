@@ -12,7 +12,7 @@ Measures:
   - Cold vs warm comparison (LOCAL only, 3 runs)
 
 Usage:
-    cd /home/mike/lucy-v9
+    cd /home/mike/lucy-v10
     source ui-v9/.venv/bin/activate
     LUCY_LATENCY_PROFILE=1 python tools/router_py/benchmark_e2e_latency.py
 

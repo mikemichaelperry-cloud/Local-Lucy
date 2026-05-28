@@ -12,7 +12,7 @@ This script:
   7. Restores production files
 
 Run with:
-    cd /home/mike/lucy-v9
+    cd /home/mike/lucy-v10
     source ui-v9/.venv/bin/activate
     python3 manual_feedback_loop_demo.py
 """
@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "tools" / "router_py"))
 sys.path.insert(0, str(Path(__file__).parent / "models" / "router"))
 
-ROUTER_DIR = Path("/home/mike/lucy-v9/models/router")
+ROUTER_DIR = Path("/home/mike/lucy-v10/models/router")
 BACKUP_DIR = Path("/tmp/lucy_router_backup_") / str(int(time.time()))
 
 FILES_TO_BACKUP = [

@@ -66,7 +66,7 @@ Added missing `sys.path.insert(0, str(REPO_UI_ROOT))` before importing app modul
 
 ### Run All Tests
 ```bash
-cd /home/mike/lucy-v9/ui-v9
+cd /home/mike/lucy-v10/ui-v9
 source .venv/bin/activate
 for test in tests/test_*_offscreen.py tests/test_state_store_last_request_provider_truth.py tests/test_changes_verification.py; do
   echo "=== $(basename $test) ==="

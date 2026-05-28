@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unit tests for the persistent whisper-server worker.
 
-Run with: cd ~/lucy-v9/tools && python tests/test_whisper_worker_direct.py
+Run with: cd ~/lucy-v10/tools && python tests/test_whisper_worker_direct.py
 """
 
 from __future__ import annotations

@@ -35,12 +35,12 @@ class RuntimeToggleTester:
     def __init__(self):
         self.root = Path(os.environ.get(
             "LUCY_RUNTIME_AUTHORITY_ROOT",
-            os.environ.get("LUCY_ROOT", str(Path.home() / "lucy-v9"))
+            os.environ.get("LUCY_ROOT", str(Path.home() / "lucy-v10"))
         ))
         self.runtime_control = self.root / "tools" / "runtime_control.py"
         self.state_file = Path(os.environ.get(
             "LUCY_RUNTIME_STATE_FILE",
-            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9" / "state" / "current_state.json")
+            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "current_state.json")
         ))
         self.results = []
         

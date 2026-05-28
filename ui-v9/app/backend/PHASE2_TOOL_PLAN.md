@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-12  
 **Status:** 📋 Planning Phase  
-**Target Location:** `/home/mike/lucy-v9/snapshots/opt-experimental-v9-dev/tools/router_py/tools/`  
+**Target Location:** `/home/mike/lucy-v10/snapshots/opt-experimental-v9-dev/tools/router_py/tools/`  
 
 ---
 

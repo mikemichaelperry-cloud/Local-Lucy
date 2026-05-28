@@ -57,7 +57,7 @@ def _truncate_at_turn_boundary(text: str, max_chars: int) -> str:
 # Paths
 # ---------------------------------------------------------------------------
 
-DEFAULT_MEMORY_DB = Path("~/.codex-api-home/lucy/runtime-v9/state/memory.db")
+DEFAULT_MEMORY_DB = Path("~/.codex-api-home/lucy/runtime-v10/state/memory.db")
 
 
 def _resolve_db_path() -> Path:

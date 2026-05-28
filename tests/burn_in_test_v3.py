@@ -3,7 +3,7 @@
 Burn-in Test V3: Working version with correct imports and attributes
 
 Usage:
-    cd /home/mike/lucy-v9
+    cd /home/mike/lucy-v10
     PYTHONPATH=tools python tests/burn_in_test_v3.py --duration-hours 1 --target-queries 1000
 """
 

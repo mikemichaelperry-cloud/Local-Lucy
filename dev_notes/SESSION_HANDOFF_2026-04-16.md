@@ -231,7 +231,7 @@ Before considering model upgrade:
 - Current model: local-lucy 7B (~4.9 GB)
 - Voice: Kokoro TTS (af_bella) + Whisper STT
 - Numpy: Now installed (required for audio resampling)
-- State DB: SQLite at `~/.codex-api-home/lucy/runtime-v9/state/lucy_state.db`
+- State DB: SQLite at `~/.codex-api-home/lucy/runtime-v10/state/lucy_state.db`
 
 ---
 
