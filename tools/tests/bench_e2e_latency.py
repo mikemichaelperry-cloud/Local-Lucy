@@ -8,7 +8,7 @@ Detects warm (cache hit) vs cold (model load/inference) runs.
 
 Usage:
     cd /home/mike/lucy-v10
-    source ui-v9/.venv/bin/activate
+    source ui-v10/.venv/bin/activate
     LUCY_LATENCY_PROFILE=1 python3 tools/tests/bench_e2e_latency.py
 
 Environment:

@@ -27,7 +27,7 @@ def main() -> int:
         capture_dir = home / ".codex-api-home" / "lucy" / "runtime-v10" / "voice" / "ui_ptt"
         runtime_namespace_root = home / ".codex-api-home" / "lucy" / "runtime-v10"
         state_dir = home / ".codex-api-home" / "lucy" / "runtime-v10" / "state"
-        ui_root = home / "lucy" / "ui-v9"
+        ui_root = home / "lucy" / "ui-v10"
         tools_dir = home / "lucy-v10" / "tools"
         authority_root = home / "lucy-v10"
         runtime_file = state_dir / "voice_runtime.json"

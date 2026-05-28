@@ -85,7 +85,7 @@ class ConsolidatedRuntimeBridge:
 
         os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(authority_root))
         os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(authority_root))
-        os.environ.setdefault("LUCY_UI_ROOT", str(authority_root / "ui-v9"))
+        os.environ.setdefault("LUCY_UI_ROOT", str(authority_root / "ui-v10"))
         os.environ.setdefault("LUCY_ROUTER_PY", "1")
         os.environ.setdefault("LUCY_EXEC_PY", "1")  # Use Python execution by default
 
@@ -753,7 +753,7 @@ class ConsolidatedRuntimeBridge:
                 "memory": current_state.get("memory", "off"),
                 "mode": current_state.get("mode", os.environ.get("LUCY_MODE", "auto")),
                 "model": current_state.get("model", "local-lucy"),
-                "profile": current_state.get("profile", "opt-experimental-v9-dev"),
+                "profile": current_state.get("profile", "lucy-v10"),
                 "status": current_state.get("status", "ready"),
                 "voice": current_state.get("voice", "off"),
             },

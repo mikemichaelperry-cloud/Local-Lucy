@@ -99,7 +99,7 @@ This script:
 3. Downloads the Whisper GGML model
 4. Installs Piper (Python package or legacy tarball)
 5. Downloads the Piper voice model
-6. Installs Kokoro Python dependencies into the `ui-v9` venv
+6. Installs Kokoro Python dependencies into the `ui-v10` venv
 
 After installation, verify with:
 

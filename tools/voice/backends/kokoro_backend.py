@@ -63,8 +63,8 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
             response = sock.recv(4096).decode()
             result = json.loads(response)
             if result.get("ok"):
-                # Return ui-v9 Python path since that's where Kokoro is installed
-                ui_v8_python = root.parent.parent / "ui-v9" / ".venv" / "bin" / "python3"
+                # Return ui-v10 Python path since that's where Kokoro is installed
+                ui_v8_python = root.parent.parent / "ui-v10" / ".venv" / "bin" / "python3"
                 if ui_v8_python.exists():
                     return ui_v8_python
         except Exception:

@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 TOOLS_DIR="${ROOT}/tools"
-UI_ROOT="/home/mike/lucy-v10/ui-v9"
+UI_ROOT="/home/mike/lucy-v10/ui-v10"
 
 ok(){ echo "OK: $*"; }
 die(){ echo "FAIL: $*" >&2; exit 1; }

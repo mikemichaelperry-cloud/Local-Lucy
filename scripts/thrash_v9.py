@@ -15,7 +15,7 @@ import wave
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-sys.path.insert(0, str(Path.home() / "lucy-v10" / "ui-v9" / "app"))
+sys.path.insert(0, str(Path.home() / "lucy-v10" / "ui-v10" / "app"))
 
 SNAPSHOT = Path.home() / "lucy-v10"
 TOOLS = SNAPSHOT / "tools"
@@ -23,7 +23,7 @@ TOOLS = SNAPSHOT / "tools"
 sys.path.insert(0, str(TOOLS))
 
 os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(SNAPSHOT)
-os.environ["LUCY_UI_ROOT"] = str(Path.home() / "lucy-v10" / "ui-v9")
+os.environ["LUCY_UI_ROOT"] = str(Path.home() / "lucy-v10" / "ui-v10")
 os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
 os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
 os.environ["LUCY_ROUTER_PY"] = "1"

@@ -13,7 +13,7 @@ Measures:
 
 Usage:
     cd /home/mike/lucy-v10
-    source ui-v9/.venv/bin/activate
+    source ui-v10/.venv/bin/activate
     LUCY_LATENCY_PROFILE=1 python tools/router_py/benchmark_e2e_latency.py
 
 Requirements:
@@ -37,7 +37,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools"))
 
 os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(PROJECT_ROOT))
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(PROJECT_ROOT))
-os.environ.setdefault("LUCY_UI_ROOT", str(PROJECT_ROOT / "ui-v9"))
+os.environ.setdefault("LUCY_UI_ROOT", str(PROJECT_ROOT / "ui-v10"))
 os.environ.setdefault("LUCY_LATENCY_PROFILE", "1")
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")

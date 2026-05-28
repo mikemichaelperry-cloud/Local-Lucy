@@ -15,14 +15,14 @@
 graph TB
     subgraph "User Interfaces"
         CLI["🖥️ CLI Terminal<br/>lucy_chat.sh"]
-        GUI["🖼️ Qt HMI (PySide6)<br/>ui-v9/"]
+        GUI["🖼️ Qt HMI (PySide6)<br/>ui-v10/"]
         VOICE["🎤 Voice Mode<br/>PTT + STT + TTS"]
     end
 
     subgraph "Orchestration Layer"
         CORE["⚙️ Lucy Core<br/>runtime/lucy_core.py"]
         ENGINE["🔧 Execution Engine<br/>tools/router_py/execution_engine.py"]
-        BRIDGE["🔗 Consolidated Bridge<br/>ui-v9/app/services/runtime_bridge_consolidated.py"]
+        BRIDGE["🔗 Consolidated Bridge<br/>ui-v10/app/services/runtime_bridge_consolidated.py"]
     end
 
     subgraph "Router V2 (3-Stage + Auto-Feedback)"
@@ -98,7 +98,7 @@ graph TB
 │                                    USER INTERFACES                                       │
 │  ┌──────────────┐  ┌──────────────────────────────┐  ┌────────────────────────────────┐ │
 │  │  CLI Shell   │  │     Qt HMI (PySide6)         │  │       Voice Mode (PTT)         │ │
-│  │ lucy_chat.sh │  │  ui-v9/app/ui/main_window.py │  │  Press-to-Talk + STT + TTS     │ │
+│  │ lucy_chat.sh │  │  ui-v10/app/ui/main_window.py │  │  Press-to-Talk + STT + TTS     │ │
 │  └──────┬───────┘  └──────────────┬───────────────┘  └───────────────┬────────────────┘ │
 └─────────┼─────────────────────────┼────────────────────────────────────┼──────────────────┘
           │                         │                                    │
@@ -110,7 +110,7 @@ graph TB
 │                                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────┐ │
 │  │                         CONSOLIDATED HMI BRIDGE                                      │ │
-│  │   ui-v9/app/services/runtime_bridge_consolidated.py                                   │ │
+│  │   ui-v10/app/services/runtime_bridge_consolidated.py                                   │ │
 │  │   • Atomic state writes (fcntl + tempfile + os.replace)                              │ │
 │  │   • Voice PTT state machine                                                          │ │
 │  │   • Model selector / augmented controls                                              │ │
@@ -371,7 +371,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant User
-    participant HMI as Qt HMI (ui-v9)
+    participant HMI as Qt HMI (ui-v10)
     participant Bridge as Consolidated Bridge
     participant Core as Lucy Core
     participant Router as Embedding Router
@@ -422,7 +422,7 @@ sequenceDiagram
 | **Background Learner** | `models/router/background_learner.py` | Index rebuild from feedback | Active |
 | **Data Cleaner** | `models/router/clean_training_data.py` | Training data quality control | Active |
 | **Synthetic Generator** | `models/router/generate_synthetic_examples.py` | Fill route gaps | Active |
-| **Consolidated Bridge** | `ui-v9/app/services/runtime_bridge_consolidated.py` | HMI ↔ Core communication | Fixed |
+| **Consolidated Bridge** | `ui-v10/app/services/runtime_bridge_consolidated.py` | HMI ↔ Core communication | Fixed |
 | **Voice Runtime** | `tools/runtime_voice.py` | PTT, TTS, STT state management | Fixed |
 | **Whisper Worker** | `tools/voice/whisper_worker.py` | STT server management | Fixed |
 | **Kokoro Backend** | `tools/voice/kokoro_backend.py` | TTS synthesis | Fixed |
@@ -469,7 +469,7 @@ sequenceDiagram
 │       ├── comprehensive_embeddings.npy# MiniLM vectors (978, 384)
 │       └── checkpoints/                # Fine-tuned model (deployed)
 │
-├── ui-v9/
+├── ui-v10/
 │   └── app/
 │       ├── ui/
 │       │   └── main_window.py          # Qt HMI

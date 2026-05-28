@@ -12,7 +12,7 @@ Tests:
 
 Usage:
     cd /home/mike/lucy-v10
-    source ui-v9/.venv/bin/activate
+    source ui-v10/.venv/bin/activate
     python3 tools/tests/test_evidence_augmented_modes.py
 """
 

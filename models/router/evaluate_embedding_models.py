@@ -10,7 +10,7 @@ cross-validation (or a held-out split) to compare:
 
 Usage:
     cd /home/mike/lucy-v10
-    source ui-v9/.venv/bin/activate
+    source ui-v10/.venv/bin/activate
     python models/router/evaluate_embedding_models.py
 """
 
