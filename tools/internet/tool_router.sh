@@ -50,15 +50,6 @@ case "$TOOL" in
     fi
     ;;
 
-  fetch_url_v1)
-    if [[ "$is_json" == "1" ]]; then
-      url="$(json_get url "$ARGS_JSON")"
-      exec "$LUCY_ROOT/tools/internet/run_fetch_with_gate_v1.sh" "$url"
-    else
-      exec "$LUCY_ROOT/tools/internet/run_fetch_with_gate_v1.sh" "$@"
-    fi
-    ;;
-
   *)
     echo "{\"error\":\"unknown_tool\",\"tool\":\"$TOOL\"}"
     exit 2

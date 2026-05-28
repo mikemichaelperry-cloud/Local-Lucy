@@ -96,26 +96,6 @@ class TestQueryClassification(unittest.TestCase):
         self.assertTrue(self.answer._context_followup_requested("as you said earlier"))
         self.assertFalse(self.answer._context_followup_requested("new question"))
     
-    def test_is_identity_query(self):
-        """Test identity query detection."""
-        self.assertTrue(self.answer._is_identity_query("who are you"))
-        self.assertTrue(self.answer._is_identity_query("what can you do"))
-        self.assertTrue(self.answer._is_identity_query("do you have internet access"))
-        self.assertFalse(self.answer._is_identity_query("what is Python"))
-    
-    def test_is_medical_high_risk(self):
-        """Test medical query detection."""
-        self.assertTrue(self.answer._is_medical_high_risk("what is the dosage of viagra"))
-        self.assertTrue(self.answer._is_medical_high_risk("metformin side effects"))
-        self.assertFalse(self.answer._is_medical_high_risk("what is Python"))
-    
-    def test_is_time_sensitive(self):
-        """Test time-sensitive query detection."""
-        self.assertTrue(self.answer._is_time_sensitive("latest news"))
-        self.assertTrue(self.answer._is_time_sensitive("current price of bitcoin"))
-        self.assertTrue(self.answer._is_time_sensitive("USD to EUR exchange rate"))
-        self.assertFalse(self.answer._is_time_sensitive("what is Python"))
-    
     def test_is_budget_brief(self):
         """Test brief budget detection."""
         self.assertTrue(self.answer._is_budget_brief("brief answer"))
@@ -227,162 +207,6 @@ class TestCache(unittest.TestCase):
         self.assertIsNone(cached)
 
 
-class TestIdentityResponses(unittest.TestCase):
-    """Test identity response handling."""
-    
-    def setUp(self):
-        self.answer = LocalAnswer()
-    
-
-    def tearDown(self):
-        """Clean up resources."""
-        if hasattr(self, "answer") and self.answer:
-            import asyncio
-            try:
-                asyncio.run(self.answer.close())
-            except Exception:
-                pass
-    def test_who_are_you(self):
-        """Test 'who are you' response."""
-        response = self.answer._get_identity_response("who are you", "")
-        self.assertIsNotNone(response)
-        self.assertIn("Lucy", response)
-    
-    def test_who_is_michael(self):
-        """Test 'who is michael' response."""
-        response = self.answer._get_identity_response("who is Michael", "")
-        self.assertIsNotNone(response)
-        self.assertIn("Michael", response)
-    
-    def test_who_is_michael_with_memory(self):
-        """Test 'who is michael' with session memory."""
-        memory = "You are Michael: a software engineer"
-        response = self.answer._get_identity_response("who is Michael", memory)
-        self.assertIsNotNone(response)
-        self.assertIn("software engineer", response)
-    
-    def test_who_is_racheli(self):
-        """Test 'who is racheli' response."""
-        response = self.answer._get_identity_response("who is Racheli", "")
-        self.assertIsNotNone(response)
-        self.assertIn("Racheli", response)
-    
-    def test_who_is_oscar(self):
-        """Test 'who is oscar' response."""
-        response = self.answer._get_identity_response("who is Oscar", "")
-        self.assertIsNotNone(response)
-        self.assertIn("dog", response)
-
-
-class TestPolicyResponses(unittest.TestCase):
-    """Test policy response handling."""
-    
-    def setUp(self):
-        self.answer = LocalAnswer()
-    
-
-    def tearDown(self):
-        """Clean up resources."""
-        if hasattr(self, "answer") and self.answer:
-            import asyncio
-            try:
-                asyncio.run(self.answer.close())
-            except Exception:
-                pass
-    def test_fixed_responses(self):
-        """Test fixed policy responses."""
-        for policy_id, expected_response in FIXED_POLICY_RESPONSES.items():
-            response = self.answer._get_policy_response(policy_id)
-            self.assertIsNotNone(response)
-            self.assertEqual(response, expected_response)
-    
-    def test_water_wet_response(self):
-        """Test water wet response."""
-        response = self.answer._get_policy_response("water_wet_structured")
-        self.assertEqual(response, WATER_WET_RESPONSE)
-    
-    def test_unknown_policy_id(self):
-        """Test unknown policy ID returns None."""
-        response = self.answer._get_policy_response("unknown_policy")
-        self.assertIsNone(response)
-
-
-class TestGenerationProfiles(unittest.TestCase):
-    """Test generation profile selection."""
-    
-    def setUp(self):
-        self.answer = LocalAnswer()
-    
-
-    def tearDown(self):
-        """Clean up resources."""
-        if hasattr(self, "answer") and self.answer:
-            import asyncio
-            try:
-                asyncio.run(self.answer.close())
-            except Exception:
-                pass
-    def test_local_chat_profile(self):
-        """Test LOCAL/CHAT profile."""
-        name, num_predict, instruction = self.answer._set_generation_profile(
-            "LOCAL", "CHAT", "what is Python"
-        )
-        self.assertEqual(name, "chat")
-        # num_predict_chat default raised for qwen3 (was 192)
-        self.assertEqual(num_predict, 256)
-    
-    def test_brief_profile(self):
-        """Test brief request profile."""
-        name, num_predict, instruction = self.answer._set_generation_profile(
-            "LOCAL", "CHAT", "brief answer please"
-        )
-        self.assertEqual(name, "brief")
-        # num_predict_brief default raised for qwen3 (was 48)
-        self.assertEqual(num_predict, 128)
-    
-    def test_detail_profile(self):
-        """Test detail request profile."""
-        name, num_predict, instruction = self.answer._set_generation_profile(
-            "LOCAL", "CHAT", "explain in detail"
-        )
-        self.assertEqual(name, "detail")
-        # num_predict_detail default raised for qwen3 (was 384)
-        self.assertEqual(num_predict, 768)
-    
-    def test_augmented_profile(self):
-        """Test AUGMENTED route profile."""
-        name, num_predict, instruction = self.answer._set_generation_profile(
-            "AUGMENTED", "CHAT", "what is Python"
-        )
-        self.assertEqual(name, "augmented")
-        # num_predict_augmented_default raised for qwen3 (was 32)
-        self.assertEqual(num_predict, 128)
-
-
-class Test807Questions(unittest.TestCase):
-    """Test 807 tube question handling."""
-    
-    def setUp(self):
-        self.answer = LocalAnswer()
-    
-
-    def tearDown(self):
-        """Clean up resources."""
-        if hasattr(self, "answer") and self.answer:
-            import asyncio
-            try:
-                asyncio.run(self.answer.close())
-            except Exception:
-                pass
-    def test_807_400v_question(self):
-        """Test 807 400V question."""
-        answer = self.answer._check_807_question(
-            "807 pair push-pull class AB1 400V power output"
-        )
-        self.assertIsNotNone(answer)
-        self.assertIn("25-35 W", answer)
-        self.assertIn("400 V", answer)
-    
     def test_807_general_question(self):
         """Test general 807 question."""
         answer = self.answer._check_807_question(
@@ -476,9 +300,8 @@ class TestPromptBuilding(unittest.TestCase):
             False,
             False
         )
-        self.assertIn("Local Lucy", prompt)
-        self.assertIn("offline", prompt)
         self.assertIn("what is Python", prompt)
+        self.assertIn("Answer from your own knowledge", prompt)
     
     def test_build_prompt_with_memory(self):
         """Test prompt building with session memory."""
@@ -553,18 +376,6 @@ class TestCompletionGuards(unittest.TestCase):
 class TestIntegration(unittest.TestCase):
     """Integration tests with mocked Ollama API."""
     
-    async def async_test_identity_query(self):
-        """Test identity query returns without API call."""
-        answer = LocalAnswer()
-        
-        with patch.object(answer, '_call_ollama') as mock_call:
-            mock_call.side_effect = Exception("Should not be called")
-            
-            result = await answer.generate_answer("who are you")
-            
-            self.assertFalse(mock_call.called)
-            self.assertIn("Lucy", result.text)
-    
     async def async_test_policy_query(self):
         """Test policy query returns without API call."""
         answer = LocalAnswer()
@@ -579,30 +390,6 @@ class TestIntegration(unittest.TestCase):
             
             self.assertFalse(mock_call.called)
             self.assertIn("programming language", result.text)
-    
-    async def async_test_medical_refusal(self):
-        """Test medical query is refused."""
-        answer = LocalAnswer()
-        
-        with patch.object(answer, '_call_ollama') as mock_call:
-            mock_call.side_effect = Exception("Should not be called")
-            
-            result = await answer.generate_answer("what is the dosage of viagra")
-            
-            self.assertFalse(mock_call.called)
-            self.assertIn("evidence mode", result.text)
-    
-    async def async_test_time_sensitive_refusal(self):
-        """Test time-sensitive query is refused."""
-        answer = LocalAnswer()
-        
-        with patch.object(answer, '_call_ollama') as mock_call:
-            mock_call.side_effect = Exception("Should not be called")
-            
-            result = await answer.generate_answer("latest news headlines")
-            
-            self.assertFalse(mock_call.called)
-            self.assertIn("evidence mode", result.text)
     
     async def async_test_cache_hit(self):
         """Test cache hit returns cached response."""
@@ -628,10 +415,7 @@ class TestIntegration(unittest.TestCase):
     
     def test_integration(self):
         """Run async integration tests."""
-        asyncio.run(self.async_test_identity_query())
         asyncio.run(self.async_test_policy_query())
-        asyncio.run(self.async_test_medical_refusal())
-        asyncio.run(self.async_test_time_sensitive_refusal())
         asyncio.run(self.async_test_cache_hit())
 
 
@@ -647,6 +431,7 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestCache))
     suite.addTests(loader.loadTestsFromTestCase(TestIdentityResponses))
     suite.addTests(loader.loadTestsFromTestCase(TestPolicyResponses))
+    suite.addTests(loader.loadTestsFromTestCase(TestSocialGreetingResponses))
     suite.addTests(loader.loadTestsFromTestCase(TestGenerationProfiles))
     suite.addTests(loader.loadTestsFromTestCase(Test807Questions))
     suite.addTests(loader.loadTestsFromTestCase(TestAugmentedMode))

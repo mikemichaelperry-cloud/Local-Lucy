@@ -17,7 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path.home() / "lucy-v9" / "ui-v9" / "app"))
 
-SNAPSHOT = Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev"
+SNAPSHOT = Path.home() / "lucy-v9"
+TOOLS = SNAPSHOT / "tools"
 TOOLS = SNAPSHOT / "tools"
 sys.path.insert(0, str(TOOLS))
 

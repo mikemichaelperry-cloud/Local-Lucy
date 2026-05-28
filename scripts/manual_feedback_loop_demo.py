@@ -63,7 +63,7 @@ def restore():
 
 
 def run_demo():
-    from hybrid_router import HybridRouter
+    from hybrid_router_v2 import HybridRouterV2
     from feedback_buffer import get_buffer
     from feedback_parser import FeedbackResult, FeedbackType, log_user_feedback
     import background_learner as bl
@@ -82,7 +82,7 @@ def run_demo():
     print("\n" + "=" * 60)
     print("STEP 2: Pre-learning prediction")
     print("=" * 60)
-    router_pre = HybridRouter()
+    router_pre = HybridRouterV2()
     pre = router_pre.predict(query)
     print(f"[PRE]  '{query}' → {pre['route']} (confidence: {pre.get('confidence', 0):.3f})")
 
@@ -153,7 +153,7 @@ def run_demo():
     print("\n" + "=" * 60)
     print("STEP 5: Post-learning prediction")
     print("=" * 60)
-    router_post = HybridRouter()
+    router_post = HybridRouterV2()
     post = router_post.predict(query)
     print(f"[POST] '{query}' → {post['route']} (confidence: {post.get('confidence', 0):.3f})")
 

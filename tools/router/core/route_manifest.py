@@ -12,7 +12,7 @@ narrow conceptual band. Provider selection remains downstream and manifest-led.
 from typing import Any, Dict, List, Tuple
 
 
-MANIFEST_VERSION = "v1"
+MANIFEST_VERSION = "current"
 KNOWN_ROUTES: Tuple[str, ...] = ("LOCAL", "NEWS", "EVIDENCE", "AUGMENTED", "CLARIFY")
 KNOWN_INTENT_FAMILIES = {"", "self_review", "current_evidence", "background_overview", "synthesis_explanation", "local_answer"}
 EVIDENCE_ROUTES = {"NEWS", "EVIDENCE"}

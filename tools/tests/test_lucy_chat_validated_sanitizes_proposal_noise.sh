@@ -19,7 +19,7 @@ cat > "${FAKE_ROOT}/config/evidence_keys_allowlist.txt" <<'EOF'
 medical_amoxicillin_1
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 amoxicillin	EVIDENCE	medical_amoxicillin_1
 EOF
 

@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 from local_policy import match_local_response_id
 
 
-CONTRACT_VERSION = "v1"
+CONTRACT_VERSION = "current"
 
 
 def _text(value: Any) -> str:

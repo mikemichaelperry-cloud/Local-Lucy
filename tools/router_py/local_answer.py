@@ -45,6 +45,17 @@ except ImportError:
         def _is_capability_query(query: str) -> bool:
             return False
 
+# Import tube database (with fallback for standalone execution)
+_tube_db = None
+try:
+    _TUBES_PATH = str(Path(__file__).resolve().parents[2] / "data" / "tubes")
+    if _TUBES_PATH not in sys.path:
+        sys.path.insert(0, _TUBES_PATH)
+    import tube_database
+    _tube_db = tube_database
+except Exception:
+    _tube_db = None
+
 logger = logging.getLogger(__name__)
 
 _ollama_call_lock = threading.Lock()
@@ -55,18 +66,41 @@ async def _acquire_ollama_call_lock() -> None:
     await asyncio.to_thread(_ollama_call_lock.acquire)
 
 
-# Self-knowledge: architecture facts injected for capability queries
-SELF_KNOWLEDGE = """About your intelligence:
-- You are Local Lucy, an artificial intelligence running on the user's computer via Ollama.
-- You are a reasoning intelligence with an intelligent router that classifies queries and chooses the best path.
-- LOCAL mode: you answer directly from your own knowledge.
-- AUGMENTED mode: you draw on Wikipedia → OpenAI → Kimi fallback chain for general knowledge.
-- EVIDENCE mode: you use trusted medical/veterinary sources for safety-critical queries.
-- NEWS, WEATHER, TIME: you fetch live data through appropriate channels.
-- Voice: you understand speech via Whisper and speak via Kokoro or Piper.
-- Memory: session memory is available when the user enables it.
-- Internet: you do NOT have direct internet access yourself, but your router CAN escalate queries to online providers when the query demands it.
-- If asked about your nature, providers, or how you think, answer truthfully and directly."""
+# Self-knowledge: architecture, capabilities, and limitations.
+# Injected on every LOCAL answer so the model can answer accurately about itself,
+# its guards, its routing modes, and its own capabilities and limitations.
+SELF_KNOWLEDGE = """About yourself (Local Lucy):
+- Identity: You are Local Lucy, an AI assistant running on the user's own computer via Ollama (qwen3:14b, ~14B parameters, 2048-token context window).
+- Router: An embedding-based classifier (MiniLM-L6-v2, 384-dimensional sentence embeddings, ~900 training examples) routes each query to the best execution path. The pipeline is four-stage: structural safety → embedding k-NN with semantic disambiguation → minimal keyword catches (math, time, weather, sports results, legal phrasing) → calibrated confidence fallback. The old broad keyword-fortress approach was removed in V2.
+- Routing modes:
+  • LOCAL — default path. You answer from your own parametric knowledge. Used for general knowledge, creative writing, coding, math, history, technical questions, and meta-questions about yourself.
+  • AUGMENTED — Wikipedia → OpenAI → Kimi fallback chain. Used for deep background, synthesis, or topics where your training knowledge is thin.
+  • NEWS — live RSS feeds for current events, breaking news, and headlines.
+  • TIME — current time, timezone conversion, scheduling.
+  • WEATHER — live weather forecasts and conditions.
+  • Evidence mode is not a separate route. Medical, veterinary, legal, and live-financial queries route AUGMENTED with evidence_mode=required, which adds a citation requirement.
+- Capabilities you have:
+  • Translation between languages (including Hebrew, Arabic, English, French, Spanish, German, Chinese, Japanese, Russian, Italian, and others). This is a LOCAL capability — it does not require internet access.
+  • Voice: speech recognition via Whisper, text-to-speech via Kokoro or Piper.
+  • Session memory: available when the user enables it via the HMI toggle.
+  • Electronics knowledge: a local SQLite database of 648 vacuum tubes (types, construction, pinouts, heater voltages, plate dissipation, etc.) is available for specific tube lookups.
+  • Internet access: YES — via the AUGMENTED, NEWS, and WEATHER paths. Do not claim you cannot browse the web. Your training cutoff still exists, but the router can fetch live data when appropriate.
+- Limitations you must acknowledge honestly:
+  • Your parametric knowledge has a training-data cutoff. Live data comes only when the router activates AUGMENTED, NEWS, or WEATHER.
+  • You are a 14B-parameter model — you are competent but not infallible. You can make mistakes on niche technical details, rare historical facts, and precise calculations.
+  • You cannot look up tubes that are not in the local database (648 known types). For generic questions like "higher gain triodes" you should answer from general knowledge, not invent specific model numbers.
+- Safety mechanisms (you should know they exist, not try to bypass them):
+  • Medical / veterinary symptoms → AUGMENTED with evidence_mode=required (citation enforced).
+  • Creative writing requests (stories, poems) → forced LOCAL, bypasses evidence short-circuits.
+  • Hostile / jailbreak attempts → forced LOCAL, logged.
+- How to answer meta-questions and commands:
+  • If asked about your capabilities: list them truthfully, including limitations.
+  • If asked "Can you translate X?" or "Do you speak X?" — say YES and offer to demonstrate.
+  • If asked "Use Augmented mode" or similar — explain that mode selection is handled by the router, and that the user can enable it through the UI or by asking for augmented analysis.
+  • If asked about your providers: list OpenAI, Kimi, Wikipedia as augmented fallbacks. Do not claim to have access you do not have.
+  • If asked about vacuum tubes: answer from general knowledge for category questions; if a specific type (e.g. 12AX7, 6V6GT) is mentioned, the router may inject exact specs from the tube database.
+  • If asked about your architecture in detail: synthesize from the facts above. Adjust depth to the question. You may reference the four-stage router pipeline, the ~900-example embedding index, the fallback chain, and the safety catches.
+- Answer truthfully about your nature, architecture, and limitations. Do not pretend to be a different AI or to have capabilities you do not possess."""
 
 
 # Fixed policy responses
@@ -109,6 +143,88 @@ External dependencies:
 """
 
 
+# ---------------------------------------------------------------------------
+# Current context: date, time, timezone, location
+# Injected into every LOCAL prompt so the model can answer age calculations,
+# relative time references, and location-aware queries accurately.
+# ---------------------------------------------------------------------------
+
+# Timezone-to-location mapping (best-effort, covers common zones)
+_TZ_TO_LOCATION: Dict[str, str] = {
+    "asia/jerusalem": "Israel",
+    "asia/tokyo": "Japan",
+    "asia/shanghai": "China",
+    "asia/singapore": "Singapore",
+    "asia/dubai": "United Arab Emirates",
+    "asia/kolkata": "India",
+    "asia/seoul": "South Korea",
+    "europe/london": "United Kingdom",
+    "europe/paris": "France",
+    "europe/berlin": "Germany",
+    "europe/rome": "Italy",
+    "europe/madrid": "Spain",
+    "europe/amsterdam": "Netherlands",
+    "europe/moscow": "Russia",
+    "america/new_york": "United States (Eastern)",
+    "america/chicago": "United States (Central)",
+    "america/denver": "United States (Mountain)",
+    "america/los_angeles": "United States (Pacific)",
+    "america/toronto": "Canada (Eastern)",
+    "america/vancouver": "Canada (Pacific)",
+    "america/sao_paulo": "Brazil",
+    "america/buenos_aires": "Argentina",
+    "australia/sydney": "Australia (Eastern)",
+    "pacific/auckland": "New Zealand",
+    "africa/cairo": "Egypt",
+    "africa/johannesburg": "South Africa",
+    "utc": "UTC",
+    "gmt": "United Kingdom",
+}
+
+
+def _get_current_context() -> str:
+    """Return current date, time, timezone and approximate location.
+
+    This gives the model ground truth for:
+    - Age calculations ("How old is X?" needs current year)
+    - Relative time ("yesterday", "next week", "in 3 days")
+    - Location-aware queries ("What's the weather like here?")
+    - Holiday references ("Is it a holiday today?")
+    """
+    try:
+        now = datetime.now().astimezone()
+        tz_name = str(now.tzinfo).lower()
+        # Try to get a cleaner timezone name
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["timedatectl", "show", "--property=Timezone", "--value"],
+                capture_output=True, text=True, timeout=2
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                tz_name = result.stdout.strip().lower()
+        except Exception:
+            pass
+
+        location = _TZ_TO_LOCATION.get(tz_name, "Unknown")
+        # Fallback: try to extract region from timezone name (e.g. "Asia/Jerusalem")
+        if location == "Unknown" and "/" in tz_name:
+            region = tz_name.split("/")[1].replace("_", " ").title()
+            location = region
+
+        offset = now.strftime("%z")
+        offset_str = f"UTC{offset[:3]}:{offset[3:]}" if len(offset) >= 5 else "UTC"
+
+        return (
+            f"Current context:\n"
+            f"- Date and time: {now.strftime('%A, %Y-%m-%d %H:%M:%S')} ({offset_str})\n"
+            f"- Timezone: {tz_name}\n"
+            f"- Location: {location}\n"
+        )
+    except Exception:
+        return ""
+
+
 @dataclass
 class LocalAnswerConfig:
     """Configuration for LocalAnswer."""
@@ -135,7 +251,7 @@ class LocalAnswerConfig:
     cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "lucy" / "local_repeat")
     cache_ttl_seconds: int = 300
     cache_max_entries: int = 100
-    root_path: Path = field(default_factory=lambda: Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev")
+    root_path: Path = field(default_factory=lambda: Path.home() / "lucy-v9")
     conversation_mode_active: bool = False
     conversation_mode_force: bool = False
     conversation_system_block: bool = False
@@ -152,7 +268,7 @@ class LocalAnswerConfig:
     def from_env(cls) -> LocalAnswerConfig:
         root = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", 
                                    os.environ.get("LUCY_ROOT", 
-                                                  str(Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev"))))
+                                                  str(Path.home() / "lucy-v9"))))
         cache_dir = os.environ.get("LUCY_LOCAL_REPEAT_CACHE_DIR")
         return cls(
             model=os.environ.get("LUCY_LOCAL_MODEL", "local-lucy"),
@@ -211,21 +327,6 @@ class LatencyMetrics:
 class LocalAnswer:
     """Main class for generating local LLM answers."""
     
-    # Medical/high-risk keywords
-    MEDICAL_KEYWORDS = [
-        'tadalafil', 'tadalifil', 'cialis', 'viagra', 'sildenafil', 'vardenafil',
-        'metformin', 'statin', 'insulin', 'arrhythmia', 'afib', 'qt', 'palpitations',
-        'dose', 'dosage', 'mg', 'side effect', 'side effects', 'contraindication',
-        'contraindications', 'interaction', 'interactions', 'medication', 'drug',
-        'drugs', 'alcohol', 'tadafil', 'tadalfil', 'aritmia', 'arritmia'
-    ]
-    
-    # Time-sensitive keywords
-    TIME_SENSITIVE_KEYWORDS = [
-        'latest', 'today', 'price', 'prices', 'cost', 'schedule', 'news', 'headline',
-        'headlines', 'verify', 'source', 'sources', 'citation', 'citations',
-        'exchange rate', 'currency', 'fx', 'usd', 'ils', 'eur', 'gbp', 'jpy'
-    ]
     
     def __init__(self, config: Optional[LocalAnswerConfig] = None):
         self.config = config or LocalAnswerConfig.from_env()
@@ -241,7 +342,14 @@ class LocalAnswer:
         """Get or create aiohttp session."""
         if not HAS_AIOHTTP:
             raise ImportError("aiohttp is required for async operations")
-        if self._session is None or self._session.closed:
+        # Recreate session if it was closed or its event loop died
+        # (e.g. pytest-asyncio creates a new loop per test)
+        loop_closed = (
+            self._session is not None
+            and hasattr(self._session, "_loop")
+            and self._session._loop.is_closed()
+        )
+        if self._session is None or self._session.closed or loop_closed:
             connector = aiohttp.TCPConnector(limit=10, limit_per_host=5)
             timeout = aiohttp.ClientTimeout(total=120)
             self._session = aiohttp.ClientSession(
@@ -279,7 +387,11 @@ class LocalAnswer:
         return q
     
     def _contains_word(self, text: str, word: str) -> bool:
-        """Check if word appears as whole word in text."""
+        """Check if word appears as whole word in text.
+
+        DEPRECATED: use pre-compiled pattern tuples (_MEDICAL_PATTERNS,
+        _TIME_SENSITIVE_PATTERNS) for hot paths.
+        """
         pattern = rf'(^|[^a-z0-9]){re.escape(word)}([^a-z0-9]|$)'
         return bool(re.search(pattern, text, re.IGNORECASE))
     
@@ -323,35 +435,6 @@ class LocalAnswer:
             if re.search(pattern, q):
                 return True
         if re.search(r'(^|[^\w_])(previous answer|last answer|last response|earlier answer|as you said|you said earlier|same topic)([^\w_]|$)', q):
-            return True
-        return False
-    
-    def _is_identity_query(self, query: str) -> bool:
-        """Check if query is about identity/capabilities."""
-        q = self._normalize_query(query)
-        identity_patterns = [
-            r'(^|[^\w_])(who are you|who am i|do you know who|what are you|what can you do|internet access|tool access|browse|web access)([^\w_]|$)'
-        ]
-        for pattern in identity_patterns:
-            if re.search(pattern, q):
-                return True
-        return False
-    
-    def _is_medical_high_risk(self, query: str) -> bool:
-        """Check if query is medical/high-risk."""
-        q = self._normalize_query(query)
-        for keyword in self.MEDICAL_KEYWORDS:
-            if self._contains_word(q, keyword):
-                return True
-        return False
-    
-    def _is_time_sensitive(self, query: str) -> bool:
-        """Check if query is time-sensitive."""
-        q = self._normalize_query(query)
-        for keyword in self.TIME_SENSITIVE_KEYWORDS:
-            if self._contains_word(q, keyword):
-                return True
-        if re.search(r'\bcurrent\s+(news|headline|headlines|events?|price|prices|cost|schedule|status|availability|stock)\b', q):
             return True
         return False
     
@@ -542,73 +625,6 @@ class LocalAnswer:
         except Exception as e:
             logger.debug(f"Identity trace write failed: {e}")
     
-    def _get_identity_response(self, query: str, session_memory: str) -> Optional[str]:
-        """Get identity response if query is about identity."""
-        q = self._normalize_query(query)
-        asks_lucy = "who are you" in q or "who is lucy" in q
-        asks_michael = "who is michael" in q or "who am i" in q
-        asks_racheli = "who is racheli" in q
-        asks_relationship = "who are we" in q or "our relationship" in q
-        asks_oscar = "who is oscar" in q or "who's oscar" in q
-        
-        identity_loaded = "yes" if (asks_lucy or asks_michael or asks_racheli or asks_relationship) else "no"
-        identity_source = "profile_default"
-        responses = []
-        
-        if asks_lucy:
-            lucy_mem = re.search(r'\b(i am lucy:[^.]*)\.?', session_memory, re.IGNORECASE)
-            if lucy_mem:
-                mem_text = lucy_mem.group(1).strip()
-                mem_text = self._sanitize_identity_memory_fragment(mem_text)
-                identity_source = "personal_identity_memory"
-                responses.append(f"{mem_text}.")
-            else:
-                responses.append("I am Lucy: a local-first, truth-first assistant with controlled warmth, explicit tool/evidence boundaries, and deterministic behavior.")
-        
-        if asks_michael:
-            michael_mem = re.search(r'\b(you are michael:[^.]*|michael is [^.]*)\.?', session_memory, re.IGNORECASE)
-            if michael_mem:
-                mem_text = michael_mem.group(1).strip()
-                mem_text = self._sanitize_identity_memory_fragment(mem_text)
-                identity_source = "personal_identity_memory"
-                if "you are michael" in mem_text.lower():
-                    responses.append(f"{mem_text}.")
-                else:
-                    responses.append(f"Michael is {mem_text}.")
-            else:
-                responses.append("You are Michael: an engineer-philosopher user who prioritizes determinism, reproducibility, auditable behavior, and practical engineering value.")
-        
-        if asks_racheli:
-            racheli_mem = re.search(r'\b(racheli is[^.]*)\.?', session_memory, re.IGNORECASE)
-            if racheli_mem:
-                mem_text = racheli_mem.group(1).strip()
-                mem_text = self._sanitize_identity_memory_fragment(mem_text)
-                identity_source = "personal_identity_memory"
-                responses.append(f"{mem_text}.")
-            else:
-                responses.append("Racheli is your life partner and the love of your life. She is central in your relationship context, not a third-party mention.")
-                responses.append("Known relationship dynamic: she brings emotional texture and narrative awareness, while you bring stability and structure.")
-        
-        if asks_relationship:
-            responses.append("You are Michael, and I am Lucy. We work together on your local assistant system.")
-        
-        if responses:
-            self._write_identity_trace(identity_loaded, identity_source)
-            return "\n".join(responses)
-        
-        if asks_oscar:
-            oscar_mem = re.search(r'\b[Oo]scar\s+is\s+([^.]*)\.?', session_memory)
-            if oscar_mem:
-                mem_text = oscar_mem.group(1).strip()
-                mem_text = self._sanitize_identity_memory_fragment(mem_text)
-                self._write_identity_trace("yes", "personal_identity_memory")
-                return f"Oscar is {mem_text}."
-            else:
-                self._write_identity_trace("yes", "local_profile_default")
-                return "Oscar is your dog in this local context."
-        
-        return None
-    
     def _get_policy_response(self, policy_id: str) -> Optional[str]:
         """Get fixed policy response if applicable."""
         if policy_id in FIXED_POLICY_RESPONSES:
@@ -700,66 +716,158 @@ class LocalAnswer:
             else:
                 return "For a pair of 807s in push-pull class AB1, expect roughly 25-35 W total output for the pair under typical conditions. This is pair total, not per-tube."
         return None
+
+    def _is_tube_token_match(self, q: str, tube_type: str) -> bool:
+        """Check if tube_type appears as a standalone token in q, not a substring.
+
+        Prevents false positives like tube '50' matching '500 word story'.
+        """
+        t_lower = tube_type.lower()
+        idx = q.find(t_lower)
+        while idx != -1:
+            before_ok = idx == 0 or not q[idx - 1].isalnum()
+            after_ok = idx + len(t_lower) == len(q) or not q[idx + len(t_lower)].isalnum()
+            if before_ok and after_ok:
+                return True
+            idx = q.find(t_lower, idx + 1)
+        return False
+
+    def _lookup_tube_database(self, query: str) -> Optional[str]:
+        """Look up tube parameters from the local tube database.
+
+        If the query mentions a known tube type, return formatted specs.
+        Falls back silently if the database is missing or the tube is unknown.
+        Uses the longest match to disambiguate suffixes (e.g. 6V6GT > 6V6).
+        """
+        if _tube_db is None:
+            return None
+
+        db_path = _tube_db.get_db_path()
+        if not db_path.exists():
+            return None
+
+        try:
+            conn = _tube_db.init_db()
+            all_types = _tube_db.list_all_types(conn)
+        except Exception:
+            return None
+
+        q = self._normalize_query(query)
+
+        # Skip tube lookup for word-count requests (e.g. "500 word story",
+        # "6550 word essay") where numbers are word counts, not tube types.
+        if re.search(r'\d+\s*(?:word|words)', q):
+            conn.close()
+            return None
+
+        # Find the longest matching tube type that appears as a standalone token
+        # (e.g. "50" must not match "500 word story")
+        matches = [t for t in all_types if self._is_tube_token_match(q, t)]
+        if not matches:
+            conn.close()
+            return None
+        matches.sort(key=len, reverse=True)
+        tube_type = matches[0]
+
+        try:
+            tube = _tube_db.lookup_tube(conn, tube_type)
+        except Exception:
+            tube = None
+        finally:
+            conn.close()
+
+        if not tube:
+            return None
+        return _tube_db.format_tube_for_model(tube)
     
     def _is_budget_brief(self, query: str) -> bool:
         """Check if query requests brief answer."""
         patterns = [r'(briefly|brief|concise|short answer|one sentence|single sentence|two sentences|summarize|short paragraph)']
         return any(re.search(p, query, re.IGNORECASE) for p in patterns)
+
+    def _is_creative_writing_query(self, query: str) -> bool:
+        """Detect creative-writing requests that must bypass all short-circuits.
+
+        Prevents tube-database, 807-fixed, and policy overrides from hijacking
+        stories, poems, fiction, etc.
+        """
+        q = query.lower()
+        creative_verbs = [
+            "write", "compose", "craft", "create", "draft", "pen",
+            "tell me", "read me", "share", "make up", "imagine",
+        ]
+        creative_nouns = [
+            "story", "poem", "essay", "novel", "fiction", "script", "play",
+            "song", "tale", "narrative", "fable", "myth", "legend", "fanfic",
+            "novella", "short story", "screenplay", "script", "lyric", "rap",
+            "haiku", "limerick", "sonnet", "ballad", "epic",
+        ]
+        has_verb = any(v in q for v in creative_verbs)
+        has_noun = any(n in q for n in creative_nouns)
+        return has_verb and has_noun
     
     def _build_prompt(self, query: str, session_memory: str, generation_profile: str, budget_instruction: str, conversation_mode_active: bool, conversation_system_block: bool, augmented_context: str = "") -> str:
-        """Build the prompt for Ollama."""
-        memory_block = ""
+        """Build the prompt for Ollama.
+
+        The Modelfile SYSTEM prompt already covers identity, first-person rules,
+        and hard constraints.  This runtime prompt adds only query-specific
+        context: memory, augmented evidence, tone, and budget.
+        """
+        parts: list[str] = []
+
+        # Memory block (only when memory is active)
         if session_memory.strip():
-            memory_block = (
-                "The user has explicitly enabled memory and provided the following "
-                "memory contents for this session. Use them to answer follow-up questions.\n\n"
-                f"{session_memory}\n\n"
+            parts.append(
+                "The user has enabled session memory. Use the facts below to answer follow-up questions.\n\n"
+                f"{session_memory}"
             )
-        
-        conversation_block = ""
+
+        # Conversation mode directive
         if conversation_mode_active and conversation_system_block:
-            conversation_block = "[CONVERSATION_MODE: sharp]\nTake a position early. One hedge max. One concrete example. Clear takeaway.\n\n"
-        
-        # Base identity: always answer in first person as "I"
-        # Skip identity preamble for creative writing to avoid contradicting the
-        # Modelfile system prompt, which explicitly forbids self-introduction for
-        # stories, poems, etc.  The model gets stuck and echoes instructions when
-        # both the runtime prompt and the Modelfile give opposite orders.
-        if generation_profile in ("detail", "chat_long"):
-            identity_preamble = ""
-        else:
-            identity_preamble = "I am Local Lucy. I always answer in first person using 'I' and 'me'. I never refer to myself in third person.\n\n"
-        
-        # If augmented context is provided, use it to answer (evidence mode)
+            parts.append(
+                "[CONVERSATION_MODE: sharp]\n"
+                "Take a position early. One hedge max. One concrete example. Clear takeaway."
+            )
+
+        # Self-knowledge (always injected for LOCAL mode so the model knows
+        # its own architecture, capabilities, limitations, and guards)
+        parts.append(SELF_KNOWLEDGE)
+
+        # Current date/time/location context (for age calculations, relative time,
+        # location-aware queries, and holiday references)
+        current_context = _get_current_context()
+        if current_context:
+            parts.append(current_context)
+
+        # Augmented context (evidence mode)
         if augmented_context.strip():
-            context_block = f"Context:\n{augmented_context}\n\n"
-            instruction = "I am Local Lucy. I use the context above. I am concise."
+            parts.append(f"Context:\n{augmented_context}")
+            instruction = "Answer from the context above."
             if session_memory.strip():
-                instruction += " I also use the session memory facts provided above."
+                instruction += " Also use the session memory facts."
         else:
-            context_block = ""
             if session_memory.strip():
                 instruction = (
-                    "I am Local Lucy. The user has explicitly enabled memory and provided "
-                    "memory contents for this session above. I MUST use those facts to answer follow-up questions. "
-                    "If the answer is in the provided memory, I state it directly. I do not ask the user to repeat it."
+                    "Answer from the session memory facts above. "
+                    "State facts directly; do not ask the user to repeat them."
                 )
             else:
-                instruction = "I am Local Lucy (offline). I use general knowledge. For current info, I say 'Requires evidence mode.'"
-        
-        # Adjust tone instruction based on generation profile
+                instruction = (
+                    "Answer from your own knowledge. "
+                    "If the user asks for live data (news, weather, time, stock prices), answer from what you know. "
+                    "The router decides whether to fetch live data; your job is to answer the query you received."
+                )
+
+        # Tone
         if generation_profile in ("chat_long", "detail", "augmented_detail"):
-            tone_instruction = "Tone: warm, direct, thorough."
+            tone = "Tone: warm, direct, thorough."
         else:
-            tone_instruction = "Tone: warm, direct, concise."
-        
-        # Inject self-knowledge for capability queries so the model answers
-        # accurately about its own architecture instead of hallucinating.
-        self_knowledge_block = ""
-        if _is_capability_query(query):
-            self_knowledge_block = SELF_KNOWLEDGE + "\n\n"
-        
-        return f"{identity_preamble}{instruction}\n{tone_instruction}\n{budget_instruction}\n\n{conversation_block}{memory_block}{self_knowledge_block}{context_block}User: {query}\n\nAssistant:"
+            tone = "Tone: warm, direct, concise."
+
+        parts.append(f"{instruction}\n{tone}\n{budget_instruction}")
+
+        prompt_body = "\n\n".join(parts)
+        return f"{prompt_body}\n\nUser: {query}\n\nAssistant:"
     
     def _apply_augmented_behavior_contract(self, user_question: str, background_context: str) -> str:
         """Apply augmented behavior contract and return answer shape."""
@@ -895,24 +1003,16 @@ class LocalAnswer:
         if len(session_memory) > self.config.max_context_chars:
             session_memory = session_memory[:self.config.max_context_chars]
         
-        is_identity = self._is_identity_query(q_eval)
-        if policy_response_id.startswith("identity_"):
-            is_identity = True
-        
         self._diag_append("cache_hit", "0")
-        
-        identity_response = self._get_identity_response(q_eval, session_memory)
-        if identity_response:
-            duration_ms = int((time.time() - start_time) * 1000)
-            return AnswerResult(
-                text=identity_response,
-                from_cache=False,
-                generation_profile="identity",
-                duration_ms=duration_ms
-            )
+
+        # Creative-writing guard: bypass ALL short-circuits (policy, 807, tube DB)
+        # so stories, poems, and fiction always reach the LLM.
+        is_creative = self._is_creative_writing_query(q_eval)
+        if is_creative:
+            self._diag_append("creative_writing_guard", "active")
         
         policy_response = self._get_policy_response(policy_response_id)
-        if policy_response:
+        if policy_response and not is_creative:
             duration_ms = int((time.time() - start_time) * 1000)
             return AnswerResult(
                 text=policy_response,
@@ -921,28 +1021,24 @@ class LocalAnswer:
                 duration_ms=duration_ms
             )
         
-        # Medical queries require evidence UNLESS we have augmented context
-        if self._is_medical_high_risk(q_eval) and route_mode not in {"AUGMENTED", "EVIDENCE"}:
-            return AnswerResult(
-                text=f"This requires evidence mode.\nRun: run online: {q_eval}",
-                generation_profile="medical_refusal",
-                duration_ms=int((time.time() - start_time) * 1000)
-            )
-        
-        if route_mode not in {"AUGMENTED", "EVIDENCE", "NEWS"} and self._is_time_sensitive(q_eval):
-            return AnswerResult(
-                text=f"This requires evidence mode.\nRun: run online: {q_eval}",
-                generation_profile="time_sensitive_refusal",
-                duration_ms=int((time.time() - start_time) * 1000)
-            )
-        
         tube_answer = self._check_807_question(q_eval)
-        if tube_answer:
+        if tube_answer and not is_creative:
             duration_ms = int((time.time() - start_time) * 1000)
             return AnswerResult(
                 text=tube_answer,
                 from_cache=False,
                 generation_profile="807_fixed",
+                duration_ms=duration_ms
+            )
+        
+        # Tube database lookup: return exact specs for known tubes
+        tube_db_answer = self._lookup_tube_database(q_eval)
+        if tube_db_answer and not is_creative:
+            duration_ms = int((time.time() - start_time) * 1000)
+            return AnswerResult(
+                text=tube_db_answer,
+                from_cache=False,
+                generation_profile="tube_database",
                 duration_ms=duration_ms
             )
         
@@ -1067,9 +1163,7 @@ class LocalAnswer:
                     duration_ms=duration_ms
                 )
         
-        if not is_identity:
-            api_text = self._strip_identity_preamble(api_text)
-        
+        api_text = self._strip_identity_preamble(api_text)
         api_text = self._sanitize_model_output(api_text)
         
         # Apply augmented completion guard for AUGMENTED routes
@@ -1099,7 +1193,11 @@ class LocalAnswer:
     async def close(self) -> None:
         """Close resources."""
         if self._session and not self._session.closed:
-            await self._session.close()
+            try:
+                await self._session.close()
+            except RuntimeError:
+                # Event loop may already be closed (e.g. pytest-asyncio teardown)
+                pass
     
     async def __aenter__(self):
         """Async context manager entry."""
@@ -1164,8 +1262,12 @@ if __name__ == "__main__":
 
 # Logging setup
 class LocalAnswerLogger:
-    """Logger for LocalAnswer operations."""
-    
+    """Logger for LocalAnswer operations.
+
+    Keeps a persistent file handle to avoid open()/close() syscalls on every
+    log entry (Phase 3C optimization).
+    """
+
     def __init__(self):
         # ISOLATION: Use V8-specific logs if available, otherwise default
         import os
@@ -1175,30 +1277,51 @@ class LocalAnswerLogger:
         else:
             self.log_dir = Path.home() / ".local" / "share" / "lucy-v9" / "logs"
         self.log_file = self.log_dir / "local_answer_py.log"
+        self._file_handle = None
         self._ensure_log_dir()
-    
+
     def _ensure_log_dir(self):
         """Ensure log directory exists."""
         self.log_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    def _get_handle(self):
+        """Lazily open and return persistent file handle."""
+        if self._file_handle is None or self._file_handle.closed:
+            try:
+                self._file_handle = open(self.log_file, "a")
+            except Exception:
+                return None
+        return self._file_handle
+
     def log(self, level: str, message: str) -> None:
         """Write log entry."""
         timestamp = datetime.now().isoformat()
         entry = f"{timestamp} [{level}] {message}\n"
         try:
-            with open(self.log_file, "a") as f:
+            f = self._get_handle()
+            if f:
                 f.write(entry)
+                f.flush()
         except Exception:
             pass  # Silently fail if logging fails
-    
+
     def info(self, message: str) -> None:
         self.log("INFO", message)
-    
+
     def debug(self, message: str) -> None:
         self.log("DEBUG", message)
-    
+
     def error(self, message: str) -> None:
         self.log("ERROR", message)
+
+    def close(self) -> None:
+        """Close the persistent file handle."""
+        if self._file_handle and not self._file_handle.closed:
+            try:
+                self._file_handle.close()
+            except Exception:
+                pass
+            self._file_handle = None
 
 
 # Create global logger instance

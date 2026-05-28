@@ -45,6 +45,39 @@ except ImportError:
 
 # Add parent to path for imports
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Medical domains cache (Phase 3E) — file changes rarely, avoid per-query I/O
+_MEDICAL_DOMAINS_CACHE: list[str] | None = None
+_MEDICAL_DOMAINS_MTIME: float = 0.0
+_MEDICAL_DEFAULT_DOMAINS = [
+    "pubmed.ncbi.nlm.nih.gov",
+    "medlineplus.gov",
+    "dailymed.nlm.nih.gov",
+    "cochranelibrary.com",
+]
+
+
+def _load_medical_domains(path: Path) -> list[str]:
+    """Load medical domains with mtime-based caching."""
+    global _MEDICAL_DOMAINS_CACHE, _MEDICAL_DOMAINS_MTIME
+    try:
+        mtime = path.stat().st_mtime
+    except Exception:
+        _MEDICAL_DOMAINS_CACHE = None
+        _MEDICAL_DOMAINS_MTIME = 0.0
+        return list(_MEDICAL_DEFAULT_DOMAINS)
+    if _MEDICAL_DOMAINS_CACHE is not None and mtime == _MEDICAL_DOMAINS_MTIME:
+        return _MEDICAL_DOMAINS_CACHE
+    try:
+        with open(path) as f:
+            domains = [line.strip() for line in f if line.strip()]
+        _MEDICAL_DOMAINS_CACHE = domains if domains else list(_MEDICAL_DEFAULT_DOMAINS)
+        _MEDICAL_DOMAINS_MTIME = mtime
+        return _MEDICAL_DOMAINS_CACHE
+    except Exception:
+        return list(_MEDICAL_DEFAULT_DOMAINS)
+
+
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from router_py.classify import ClassificationResult, RoutingDecision
@@ -181,7 +214,7 @@ def _load_session_memory_context_with_telemetry(
         if context:
             return context, telemetry
     except Exception:
-        pass  # Fall through to legacy text-file logic
+        logging.warning("SQLite memory read failed, falling back to text file", exc_info=True)
 
     # Get memory file path (check both runtime and standard env vars)
     mem_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
@@ -279,8 +312,8 @@ them according to the route type (bypass, provisional, or full). It handles:
     # =========================================================================
     # FILE PATHS - Configuration files
     # =========================================================================
-    UNVERIFIED_CONTEXT_CATALOG: Path = ROOT_DIR / "config" / "unverified_context_sources_v1.tsv"
-    UNVERIFIED_CONTEXT_PROVIDER_DEFAULTS: Path = ROOT_DIR / "config" / "unverified_context_provider_defaults_v1.env"
+    UNVERIFIED_CONTEXT_CATALOG: Path = ROOT_DIR / "config" / "unverified_context_sources.tsv"
+    UNVERIFIED_CONTEXT_PROVIDER_DEFAULTS: Path = ROOT_DIR / "config" / "unverified_context_provider_defaults.env"
     CONV_PROFILE_FILE: Path = ROOT_DIR / "config" / "conversation_profile.json"
     
     # =========================================================================
@@ -587,6 +620,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             f"ExecutionEngine initialized with namespace: {self._execution_namespace}, "
             f"state_dir: {self._state_dir}, sqlite_state: {self.use_sqlite_state}"
         )
+        
     
     def _resolve_state_dir(self) -> Path:
         """
@@ -1029,23 +1063,9 @@ them according to the route type (bypass, provisional, or full). It handles:
         This ensures medical queries show both the informative answer AND
         the authoritative sources used, matching user expectations.
         """
-        # Load medical domains from the allowlist file
+        # Load medical domains from the allowlist file (cached by mtime)
         medical_domains_file = ROOT_DIR / "config" / "trust" / "generated" / "medical_runtime.txt"
-        domains = []
-        try:
-            if medical_domains_file.exists():
-                with open(medical_domains_file) as f:
-                    domains = [line.strip() for line in f if line.strip()]
-        except Exception:
-            pass
-        
-        if not domains:
-            domains = [
-                "pubmed.ncbi.nlm.nih.gov",
-                "medlineplus.gov",
-                "dailymed.nlm.nih.gov",
-                "cochranelibrary.com",
-            ]
+        domains = _load_medical_domains(medical_domains_file)
         
         # Deduplicate and limit to top sources
         seen = set()
@@ -1211,7 +1231,9 @@ them according to the route type (bypass, provisional, or full). It handles:
             return False
         
         # Check if needs web
-        if intent.needs_web:
+        # Trust the router's final decision. Guards (e.g. social_greeting_override)
+        # may have overridden an intent that incorrectly flagged needs_web.
+        if intent.needs_web and route.route != "LOCAL":
             return False
         
         # Check output mode
@@ -2047,31 +2069,38 @@ them according to the route type (bypass, provisional, or full). It handles:
         # Step 2: Build augmented prompt with evidence
         prompt = response_formatter.build_augmented_prompt(question, evidence, route)
         
-        # Load session memory with telemetry before calling provider
-        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(question, session_id=session_id)
-        if session_memory:
-            self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
-        
         # Step 3: Call appropriate provider
-        if route.provider == "local":
-            response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
-        elif route.provider in ("openai", "kimi"):
-            # Prepend session memory to the prompt so API providers also see it
-            api_prompt = prompt
-            if session_memory.strip():
-                api_prompt = f"Session memory:\n{session_memory}\n\n{prompt}"
-            response = await self._call_api_provider_async(route.provider, api_prompt, context)
-            # Fallback to local model if paid provider returns an error
-            if isinstance(response, str) and response.strip().lower().startswith("error"):
-                self._logger.warning(
-                    f"{route.provider} returned error: {response[:120]}. Falling back to local model."
-                )
-                response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
-        elif route.provider == "wikipedia":
+        session_memory = ""
+        memory_telemetry: dict[str, Any] = {}
+        if route.provider == "wikipedia":
+            # Wikipedia routes do not consume session memory; skip the load
+            # to avoid throwing away embedding/DB work.
             response = await self._call_wikipedia_provider_async(prompt, evidence, context)
         else:
-            # Default to local model
-            response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
+            # Load session memory for providers that actually use it
+            session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(
+                question, session_id=session_id
+            )
+            if session_memory:
+                self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
+
+            if route.provider == "local":
+                response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
+            elif route.provider in ("openai", "kimi"):
+                # Prepend session memory to the prompt so API providers also see it
+                api_prompt = prompt
+                if session_memory.strip():
+                    api_prompt = f"Session memory:\n{session_memory}\n\n{prompt}"
+                response = await self._call_api_provider_async(route.provider, api_prompt, context)
+                # Fallback to local model if paid provider returns an error
+                if isinstance(response, str) and response.strip().lower().startswith("error"):
+                    self._logger.warning(
+                        f"{route.provider} returned error: {response[:120]}. Falling back to local model."
+                    )
+                    response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
+            else:
+                # Default to local model
+                response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
         
         # Step 4: Validate response
         validated = response_formatter.validate_response(response, route)
@@ -2962,8 +2991,14 @@ them according to the route type (bypass, provisional, or full). It handles:
         insufficient_patterns = [
             "i could not generate a reply locally",
             "i don't have enough information",
+            "i don't have the specific",
+            "i don't have information",
+            "i cannot provide",
             "this requires evidence mode",
             "insufficient evidence",
+            "you may need to consult",
+            "outside my training",
+            "simulation tools",
             "error",
         ]
         

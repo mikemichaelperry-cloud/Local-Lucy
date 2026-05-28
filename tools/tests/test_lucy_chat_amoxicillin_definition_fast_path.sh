@@ -21,7 +21,7 @@ medical_amoxicillin_1
 medical_amoxicillin_2
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 amoxicillin	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
 what is amoxicillin	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
 EOF

@@ -85,8 +85,8 @@ class RouterClassifier(nn.Module):
 class ModernBertRouter:
     """Production inference wrapper.
     
-    Dynamically detects label dimensions from checkpoint to support
-    both v1 (8 intent classes) and v2+ (9 intent classes) models.
+    Dynamically detects label dimensions from checkpoint to match
+    the model's output dimension.
     """
     
     # Full label vocabularies — truncated to match model output dimension

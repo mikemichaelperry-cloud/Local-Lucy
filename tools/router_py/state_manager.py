@@ -460,6 +460,62 @@ class StateManager:
             logger.error(f"Failed to write outcome: {e}")
             return False
     
+    def write_batch(self, route_data: dict, outcome_data: dict) -> bool:
+        """
+        Atomically write both route and outcome in a single transaction.
+        
+        Halves WAL fsyncs compared to calling write_route() + write_outcome()
+        separately. Use this when both records are available at the same time.
+        
+        Args:
+            route_data: Same as write_route()
+            outcome_data: Same as write_outcome()
+            
+        Returns:
+            bool: True if both writes succeeded, False otherwise
+        """
+        try:
+            with self._transaction() as conn:
+                # Route insert
+                metadata = json.dumps(route_data.get("metadata", {}))
+                conn.execute(
+                    """
+                    INSERT INTO routes (namespace_id, intent, confidence, strategy, metadata)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self._namespace_id,
+                        route_data["intent"],
+                        route_data["confidence"],
+                        route_data.get("strategy"),
+                        metadata
+                    )
+                )
+                # Outcome insert
+                result_json = json.dumps(outcome_data.get("result", {}))
+                conn.execute(
+                    """
+                    INSERT INTO outcomes (namespace_id, route_id, success, duration_ms, result, error_message)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self._namespace_id,
+                        outcome_data.get("route_id"),
+                        outcome_data["success"],
+                        outcome_data.get("duration_ms"),
+                        result_json,
+                        outcome_data.get("error_message")
+                    )
+                )
+                logger.info(
+                    f"Batch written: route={route_data['intent']} "
+                    f"outcome={outcome_data['success']}"
+                )
+                return True
+        except Exception as e:
+            logger.error(f"Failed to write batch: {e}")
+            return False
+    
     def read_last_outcome(self) -> Optional[dict]:
         """
         Read the most recent outcome for this namespace.

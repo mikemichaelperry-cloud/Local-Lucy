@@ -1,0 +1,295 @@
+#!/usr/bin/env python3
+"""
+Local Lucy V9 — Vacuum Tube Database
+
+Comprehensive database of ~648 audio/amplifier vacuum tubes with operating
+parameters.  Built from a seed set transcribed from public-domain RCA Receiving
+Tube Manual and GE Essential Characteristics, then bulk-expanded via OpenAI
+GPT-4o-mini extraction from Frank Philipse's tube index.
+
+Fields:
+  - type: tube designation (e.g. "6V6GT")
+  - construction: beam tetrode, triode, pentode, dual triode, etc.
+  - vplate_max: max plate voltage (V)
+  - vscreen_max: max screen voltage (V)
+  - pplate_max: max plate dissipation (W)
+  - transconductance_ma_v: transconductance (mA/V)
+  - typical_push_pull_watts: typical output in push-pull AB1
+  - recommended_load_ohms: typical primary impedance for push-pull
+  - heater_volts: heater voltage
+  - heater_amps: heater current
+  - notes: applications, famous amps, remarks
+"""
+
+import sqlite3
+import json
+from pathlib import Path
+
+DB_PATH = Path(__file__).with_suffix(".db")
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS tubes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    type        TEXT UNIQUE NOT NULL,
+    construction TEXT NOT NULL,
+    vplate_max   INTEGER,
+    vscreen_max  INTEGER,
+    pplate_max   REAL,
+    transconductance_ma_v REAL,
+    typical_push_pull_watts TEXT,
+    recommended_load_ohms INTEGER,
+    heater_volts REAL,
+    heater_amps  REAL,
+    notes        TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_type ON tubes(type);
+"""
+
+# Seed data — common audio/power tubes transcribed from RCA/GE manuals.
+# Units: Vplate/Vscreen in volts, Pplate in watts, gm in mA/V,
+# load in ohms, heater V/A as marked.
+SEED_TUBES = [
+    # Audio power tubes — beam tetrodes
+    ("6V6GT", "beam power tetrode", 315, 285, 12.0, 3.7, "10–14W @ 315V plate, 250V screen, 8kΩ primary", 8000, 6.3, 0.45, "Classic Fender Champ/Princeton/Deluxe output tube. Very popular in guitar amps. Push-pull AB1: ~12W typical."),
+    ("6V6GTA", "beam power tetrode", 315, 285, 12.0, 3.8, "10–14W @ 315V plate, 250V screen, 8kΩ primary", 8000, 6.3, 0.45, "Compact version of 6V6GT. Same electrical characteristics."),
+    ("6L6GC", "beam power tetrode", 500, 450, 30.0, 5.2, "35–50W @ 450V plate, 8kΩ primary", 8000, 6.3, 0.9, "Standard American power tube. Fender Bassman, Twin Reverb, Marshall JTM45. Very robust."),
+    ("6L6GB", "beam power tetrode", 360, 270, 19.0, 4.6, "20–26W @ 360V plate, 6.6kΩ primary", 6600, 6.3, 0.9, "Earlier 6L6 variant, lower ratings than GC."),
+    ("6L6G", "beam power tetrode", 360, 270, 19.0, 4.6, "20–26W @ 360V plate, 6.6kΩ primary", 6600, 6.3, 0.9, "Original 6L6 with glass envelope. Same specs as 6L6GB."),
+    ("5881", "beam power tetrode", 400, 350, 23.0, 5.2, "25–30W @ 400V plate, 6.6kΩ primary", 6600, 6.3, 0.9, "Military/industrial 6L6GB equivalent. Tweed Bassman, early Marshall."),
+    ("6L6WGB", "beam power tetrode", 400, 350, 23.0, 5.2, "25–30W @ 400V plate, 6.6kΩ primary", 6600, 6.3, 0.9, "Industrial/ruggedized 6L6 variant."),
+    ("KT66", "beam power tetrode", 450, 400, 25.0, 5.8, "25–30W @ 450V plate, 8kΩ primary", 8000, 6.3, 1.27, "British kinkless tetrode. Similar to 6L6 but with different character. Quad II amplifier."),
+    ("EL34", "pentode", 800, 500, 25.0, 11.0, "35–50W @ 450V plate, 3.4kΩ primary", 3400, 6.3, 1.5, "Classic British power tube. Marshall Plexi, Hiwatt, Orange. Higher distortion character than 6L6."),
+    ("EL34B", "pentode", 800, 500, 25.0, 11.0, "35–50W @ 450V plate, 3.4kΩ primary", 3400, 6.3, 1.5, "Soviet/Chinese EL34 variant."),
+    ("6CA7", "beam power tetrode", 800, 500, 25.0, 11.0, "35–50W @ 450V plate, 3.4kΩ primary", 3400, 6.3, 1.5, "American beam-tetrode equivalent to EL34. Slightly softer breakup."),
+    ("KT77", "pentode", 800, 500, 25.0, 11.0, "35–50W @ 450V plate, 3.4kΩ primary", 3400, 6.3, 1.5, "Higher-quality EL34 variant by MOV. Rare but prized."),
+    ("KT88", "beam power tetrode", 800, 600, 35.0, 12.5, "50–75W @ 600V plate, 4kΩ primary", 4000, 6.3, 1.6, "Large British power tube. Hiwatt DR103, Audio Research, McIntosh MC275. Very clean, high headroom."),
+    ("6550", "beam power tetrode", 600, 440, 35.0, 11.0, "50–75W @ 500V plate, 6.6kΩ primary", 6600, 6.3, 1.6, "American KT88 equivalent. Sunn, Ampeg SVT, Fender Super Twin. Very robust."),
+    ("KT90", "beam power tetrode", 800, 600, 50.0, 12.5, "60–80W @ 600V plate, 4kΩ primary", 4000, 6.3, 1.6, "Higher-power KT88 variant. Modern production."),
+    ("KT120", "beam power tetrode", 800, 600, 60.0, 14.0, "80–100W @ 600V plate, 4kΩ primary", 4000, 6.3, 1.6, "Very high-power beam tetrode. McIntosh MC152."),
+    ("KT150", "beam power tetrode", 850, 650, 70.0, 14.0, "100–140W @ 650V plate, 4kΩ primary", 4000, 6.3, 1.6, "Highest-power current-production beam tetrode."),
+    ("807", "beam power tetrode", 750, 300, 25.0, 5.5, "25–35W @ 400V plate, 6.6kΩ primary", 6600, 6.3, 0.9, "Classic RF/audio beam tetrode. Very popular in 1950s hi-fi and transmitters."),
+    ("6BG6G", "beam power tetrode", 400, 310, 19.0, 4.5, "20–25W @ 400V plate", 8000, 6.3, 1.2, "6L6 variant with top cap for plate."),
+    ("6CL6", "pentode", 300, 300, 9.0, 5.0, "7–9W @ 250V plate", 10000, 6.3, 0.45, "Compact pentode."),
+    ("EL84", "pentode", 300, 300, 12.0, 11.0, "10–17W @ 250V plate, 8kΩ primary", 8000, 6.3, 0.76, "Classic small power pentode. Vox AC30, Fender Champ (export), Dynaco ST-35. Great crunch."),
+    ("6GK6", "pentode", 300, 300, 8.5, 5.5, "8–10W @ 250V plate", 10000, 6.3, 0.4, "Compact pentode for small audio outputs."),
+    ("6AQ5", "beam power tetrode", 275, 250, 12.0, 4.5, "8–10W @ 250V plate, 10kΩ primary", 10000, 6.3, 0.45, "Miniature 6V6 equivalent."),
+    ("6AR5", "beam power tetrode", 275, 250, 12.0, 4.5, "8–10W @ 250V plate", 10000, 6.3, 0.45, "Similar to 6AQ5."),
+    ("6BM8", "triode-pentode", 300, 300, 7.0, 5.0, "5–7W @ 250V plate", 10000, 6.3, 0.8, "Triode-pentode compound. Compact hi-fi designs."),
+    ("6EM7", "triode-pentode", 300, 300, 8.5, 5.0, "6–8W @ 250V plate", 10000, 6.3, 0.9, "Vertical output/compact audio triode-pentode."),
+    ("6GW8", "triode-pentode", 300, 300, 7.0, 5.0, "5–7W @ 250V plate", 10000, 6.3, 0.8, "ECF80 equivalent. Compact audio applications."),
+    ("6F6", "power pentode", 315, 285, 10.5, 3.0, "8–10W @ 250V plate", 10000, 6.3, 0.7, "Predecessor to 6V6. RCA used in early radios."),
+    ("42", "power pentode", 250, 250, 5.8, 2.5, "4–5W @ 200V plate", 10000, 2.5, 1.75, "Battery/AC pentode. Very early audio output."),
+    ("50L6GT", "beam power tetrode", 200, 200, 8.5, 4.0, "5–7W @ 150V plate", 10000, 50.0, 0.15, "Line-output beam tetrode. Low-voltage heater."),
+    ("35L6GT", "beam power tetrode", 200, 200, 8.5, 4.0, "5–7W @ 150V plate", 10000, 35.0, 0.15, "35V heater version of 50L6."),
+
+    # Directly heated triodes (DHT)
+    ("2A3", "directly heated triode", 300, None, 15.0, 5.25, "10–15W @ 250V plate, 2.5kΩ primary", 2500, 2.5, 2.5, "Classic DHT power triode. Very linear, beloved in single-ended hi-fi. No feedback needed."),
+    ("2A3S", "directly heated triode", 300, None, 15.0, 5.25, "10–15W @ 250V plate, 2.5kΩ primary", 2500, 2.5, 2.5, "ST-shape 2A3. Same specs."),
+    ("45", "directly heated triode", 275, None, 10.0, 3.8, "6–8W @ 250V plate, 5kΩ primary", 5000, 2.5, 1.5, "Small DHT triode. Sweet midrange, lower power than 2A3."),
+    ("50", "directly heated triode", 450, None, 20.0, 3.5, "15–20W @ 400V plate, 3.5kΩ primary", 3500, 7.5, 1.25, "Higher-voltage DHT. Rare in audio."),
+    ("300B", "directly heated triode", 450, None, 40.0, 5.5, "8–10W SE @ 350V plate, 3kΩ primary", 3000, 5.0, 1.2, "Western Electric famous DHT. The gold standard for single-ended triode amps. Very linear."),
+    ("300BXLS", "directly heated triode", 500, None, 50.0, 6.0, "15–20W SE @ 400V plate", 3000, 5.0, 1.2, "Extended-linearity 300B variant. Modern production."),
+    ("845", "directly heated triode", 1250, None, 100.0, 3.5, "20–24W SE @ 1000V plate, 7kΩ primary", 7000, 10.0, 3.25, "Very high-voltage DHT. Huge plate dissipation. Single-ended hi-fi monster amps."),
+    ("211", "directly heated triode", 1250, None, 100.0, 4.0, "20–25W SE @ 1000V plate, 7kΩ primary", 7000, 10.0, 3.25, "845 competitor. RCA/original hi-fi giant."),
+    ("805", "directly heated triode", 1500, None, 125.0, 3.5, "25–30W SE @ 1250V plate", 7000, 10.0, 3.25, "Extreme high-voltage DHT. Rare."),
+    ("GM70", "directly heated triode", 1000, None, 125.0, 5.0, "20–25W SE @ 800V plate", 5000, 20.0, 3.0, "Russian DHT equivalent to 845/211. Very popular in DIY hi-fi."),
+    ("SV811-10", "directly heated triode", 1000, None, 100.0, 5.0, "15–20W SE @ 800V plate", 5000, 10.0, 3.25, "Compact DHT similar to 211. Modern Chinese production."),
+    ("SV572-10", "directly heated triode", 1000, None, 125.0, 5.0, "20–25W SE @ 800V plate", 5000, 10.0, 3.25, "Higher-dissipation DHT. Popular in SET amps."),
+
+    # Preamp / small-signal dual triodes
+    ("12AX7", "dual triode", 330, None, 1.2, 1.6, "Preamp/gain stage only", None, 6.3, 0.3, "Highest-gain common preamp tube. mu=100. Fender/Marshall/Vox input and gain stages. Very popular."),
+    ("12AX7A", "dual triode", 330, None, 1.2, 1.6, "Preamp/gain stage only", None, 6.3, 0.3, "Improved 12AX7. Same specs, better quality control."),
+    ("ECC83", "dual triode", 330, None, 1.2, 1.6, "Preamp/gain stage only", None, 6.3, 0.3, "European equivalent of 12AX7. Mullard, Telefunken, Amperex versions prized."),
+    ("7025", "dual triode", 330, None, 1.2, 1.6, "Preamp/gain stage only", None, 6.3, 0.3, "Low-microphony 12AX7 variant for hi-fi."),
+    ("5751", "dual triode", 330, None, 1.2, 1.1, "Preamp/gain stage only", None, 6.3, 0.3, "Lower-gain 12AX7 (mu=70). Smoother breakup, used in some Fender circuits."),
+    ("12AT7", "dual triode", 330, None, 2.5, 3.5, "Preamp/reverb driver/phase inverter", None, 6.3, 0.3, "Medium-gain dual triode. mu=60. Fender reverb driver, phase inverters."),
+    ("ECC81", "dual triode", 330, None, 2.5, 3.5, "Preamp/reverb driver/phase inverter", None, 6.3, 0.3, "European 12AT7 equivalent."),
+    ("12AU7", "dual triode", 330, None, 2.75, 1.8, "Cathode follower/line stage/driver", None, 6.3, 0.3, "Low-gain dual triode. mu=17. Phase inverters, cathode followers, line stages."),
+    ("ECC82", "dual triode", 330, None, 2.75, 1.8, "Cathode follower/line stage/driver", None, 6.3, 0.3, "European 12AU7 equivalent."),
+    ("12AY7", "dual triode", 300, None, 1.5, 1.7, "Preamp/gain stage", None, 6.3, 0.3, "Lower-gain preamp tube. mu=44. Original Fender Bassman input stage."),
+    ("6072A", "dual triode", 300, None, 1.5, 1.7, "Preamp/gain stage", None, 6.3, 0.3, "Low-microphony 12AY7. Popular in boutique amps."),
+    ("6SN7GT", "dual triode", 450, None, 5.0, 2.6, "Line stage/phase inverter/driver", None, 6.3, 0.6, "Classic medium-mu dual triode. mu=20. Fender tweed phase inverter, vintage hi-fi."),
+    ("6SN7GTA", "dual triode", 450, None, 5.0, 2.6, "Line stage/phase inverter/driver", None, 6.3, 0.6, "Improved 6SN7. Same specs."),
+    ("6SN7GTB", "dual triode", 450, None, 7.5, 2.9, "Line stage/phase inverter/driver", None, 6.3, 0.6, "Higher-dissipation 6SN7 variant."),
+    ("6SL7GT", "dual triode", 450, None, 2.5, 1.6, "Preamp/gain stage", None, 6.3, 0.3, "High-mu dual triode. mu=70. Vintage preamp applications."),
+    ("6CG7", "dual triode", 330, None, 2.5, 3.0, "Line stage/driver", None, 6.3, 0.6, "Compact 6SN7 equivalent in 9-pin envelope."),
+    ("6FQ7", "dual triode", 330, None, 2.5, 3.0, "Line stage/driver", None, 6.3, 0.6, "Same as 6CG7, different heater current."),
+    ("6DJ8", "dual triode", 130, None, 1.8, 12.5, "Preamp/line stage", None, 6.3, 0.365, "High-transconductance frame-grid dual triode. mu=33. Popular in modern hi-fi."),
+    ("ECC88", "dual triode", 130, None, 1.8, 12.5, "Preamp/line stage", None, 6.3, 0.365, "European 6DJ8 equivalent."),
+    ("6922", "dual triode", 220, None, 1.8, 12.5, "Preamp/line stage", None, 6.3, 0.3, "Premium 6DJ8/ECC88 variant. Longer life, better specs."),
+    ("E88CC", "dual triode", 130, None, 1.8, 12.5, "Preamp/line stage", None, 6.3, 0.365, "Premium European ECC88. Telefunken and Amperex versions highly prized."),
+    ("7308", "dual triode", 130, None, 1.8, 12.5, "Preamp/line stage", None, 6.3, 0.365, "Premium 6922 variant. Very low noise."),
+    ("6N1P", "dual triode", 250, None, 2.2, 4.35, "Preamp/driver", None, 6.3, 0.6, "Russian dual triode. Similar to 6DJ8 but different pinout."),
+    ("6N2P", "dual triode", 250, None, 1.0, 1.6, "Preamp/gain stage", None, 6.3, 0.34, "Russian high-mu dual triode. Similar to 12AX7."),
+    ("6N23P", "dual triode", 130, None, 1.8, 12.5, "Preamp/line stage", None, 6.3, 0.365, "Russian 6DJ8 equivalent."),
+    ("6N3P", "dual triode", 150, None, 1.5, 4.0, "Preamp/driver", None, 6.3, 0.35, "Russian compact dual triode."),
+    ("6N6P", "dual triode", 250, None, 4.0, 4.5, "Driver/cathode follower", None, 6.3, 0.75, "Russian medium-mu dual triode. Similar to 6SN7."),
+    ("6N7G", "dual triode", 300, None, 5.0, 2.4, "Driver/phase inverter", None, 6.3, 0.8, "Medium-mu dual triode with common cathode."),
+    ("6SC7", "dual triode", 330, None, 2.5, 1.6, "Preamp/gain stage", None, 6.3, 0.3, "High-mu dual triode. Similar to 6SL7."),
+
+    # Rectifiers
+    ("5U4G", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 3.0, "Classic full-wave rectifier. Fender, Marshall, many guitar amps. Voltage drop ~50V."),
+    ("5U4GB", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 3.0, "Improved 5U4G. Higher current capacity."),
+    ("5U4WG", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 3.0, "Ruggedized 5U4."),
+    ("5Y3GT", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 2.0, "Small full-wave rectifier. Fender Champ, Princeton. Voltage drop ~60V."),
+    ("5Y3WGTA", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 2.0, "Ruggedized 5Y3."),
+    ("5V4G", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 2.0, "Medium-duty rectifier. Lower drop than 5U4."),
+    ("5V4GA", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 2.0, "Improved 5V4G."),
+    ("5AR4", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 1.9, "Indirectly heated rectifier (GZ34). Fast warm-up, lower drop (~17V). Marshall, Vox, hi-fi."),
+    ("GZ34", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 1.9, "European 5AR4. Same specs. Mullard/Amperex versions popular."),
+    ("5Z3", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 3.0, "Early large rectifier. Predecessor to 5U4."),
+    ("5Z4G", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 2.0, "Medium rectifier."),
+    ("5R4GY", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 2.0, "High-voltage rectifier. Ampeg, some Fenders."),
+    ("5R4GB", "full-wave rectifier", None, None, None, None, "N/A", None, 5.0, 2.0, "Higher-current 5R4 variant."),
+    ("6X4", "full-wave rectifier", None, None, None, None, "N/A", None, 6.3, 0.6, "Miniature full-wave rectifier. Compact amps."),
+    ("6X5GT", "full-wave rectifier", None, None, None, None, "N/A", None, 6.3, 0.6, "Small full-wave rectifier in GT envelope."),
+    ("EZ81", "full-wave rectifier", None, None, None, None, "N/A", None, 6.3, 1.0, "European miniature rectifier."),
+    ("EZ80", "full-wave rectifier", None, None, None, None, "N/A", None, 6.3, 0.6, "Compact European rectifier."),
+    ("6CA4", "full-wave rectifier", None, None, None, None, "N/A", None, 6.3, 1.0, "EZ81 equivalent."),
+
+    # Compact/miniature power tubes
+    ("6AQ5A", "beam power tetrode", 275, 250, 12.0, 4.5, "8–10W @ 250V plate, 10kΩ primary", 10000, 6.3, 0.45, "Improved 6AQ5."),
+    ("6M5", "beam power tetrode", 250, 250, 10.5, 4.5, "7–9W @ 250V plate", 10000, 6.3, 0.45, "Compact beam tetrode."),
+    ("50C5", "beam power tetrode", 250, 250, 7.0, 4.0, "5–6W @ 200V plate", 10000, 50.0, 0.15, "Line-series output tube."),
+    ("35C5", "beam power tetrode", 250, 250, 7.0, 4.0, "5–6W @ 200V plate", 10000, 35.0, 0.15, "35V heater version."),
+
+    # Specialty audio / RF useful
+    ("7591", "beam power tetrode", 550, 440, 30.0, 5.5, "30–40W @ 450V plate, 6.6kΩ primary", 6600, 6.3, 1.35, "Compact high-power beam tetrode. Fisher, Scott, Harman-Kardon hi-fi."),
+    ("7868", "beam power tetrode", 550, 440, 30.0, 5.5, "30–40W @ 450V plate, 6.6kΩ primary", 6600, 6.3, 1.35, "Compact 7591 with different pinout. Fisher receivers."),
+    ("7408", "beam power tetrode", 500, 450, 30.0, 5.5, "30–35W @ 450V plate", 6600, 6.3, 0.9, "Compact 6L6 variant."),
+    ("6973", "beam power tetrode", 450, 400, 18.0, 5.0, "15–20W @ 400V plate", 8000, 6.3, 0.9, "Compact beam tetrode. Hammond organs, some guitar amps."),
+    ("6L6WXT", "beam power tetrode", 500, 450, 30.0, 5.2, "35–50W @ 450V plate, 8kΩ primary", 8000, 6.3, 0.9, "Ruggedized 6L6GC."),
+    ("6CA7S", "beam power tetrode", 800, 500, 25.0, 11.0, "35–50W @ 450V plate, 3.4kΩ primary", 3400, 6.3, 1.5, "Sovtek 6CA7."),
+    ("EL37", "pentode", 800, 500, 25.0, 9.0, "30–35W @ 450V plate", 3400, 6.3, 1.5, "Predecessor to EL34. Mullard."),
+    ("EL38", "pentode", 800, 500, 25.0, 10.0, "30–35W @ 450V plate", 3400, 6.3, 1.5, "Similar to EL37."),
+    ("KT61", "beam power tetrode", 450, 400, 20.0, 5.5, "18–22W @ 400V plate", 8000, 6.3, 1.27, "British beam tetrode."),
+    ("KT63", "beam power tetrode", 450, 400, 20.0, 5.5, "18–22W @ 400V plate", 8000, 6.3, 1.27, "KT61 variant."),
+    ("6V6GTX", "beam power tetrode", 350, 300, 15.0, 4.0, "12–15W @ 315V plate", 8000, 6.3, 0.45, "Extended-ratings 6V6."),
+
+    # Compact 9-pin power tubes
+    ("6BQ5", "pentode", 300, 300, 12.0, 6.7, "10–14W @ 250V plate, 8kΩ primary", 8000, 6.3, 0.76, "American EL84."),
+    ("6CM6", "pentode", 300, 300, 9.0, 5.0, "7–9W @ 250V plate", 10000, 6.3, 0.45, "Compact pentode."),
+    ("6CU5", "pentode", 300, 300, 9.0, 5.0, "7–9W @ 250V plate", 10000, 6.3, 0.45, "Similar to 6CM6."),
+    ("6BM8EH", "triode-pentode", 300, 300, 7.0, 5.0, "5–7W @ 250V plate", 10000, 6.3, 0.8, "Electro-Harmonix 6BM8."),
+
+    # More European types
+    ("E34L", "pentode", 800, 500, 30.0, 12.0, "40–50W @ 450V plate", 3400, 6.3, 1.5, "Higher-dissipation EL34 variant. JJ/Tesla production."),
+    ("6CA7EH", "beam power tetrode", 800, 500, 25.0, 11.0, "35–50W @ 450V plate, 3.4kΩ primary", 3400, 6.3, 1.5, "Electro-Harmonix 6CA7."),
+    ("KT77EH", "pentode", 800, 500, 25.0, 11.0, "35–50W @ 450V plate", 3400, 6.3, 1.5, "Electro-Harmonix KT77. Rare."),
+
+    # Rare but notable
+    ("1619", "beam power tetrode", 400, 310, 19.0, 4.5, "20–25W @ 360V plate", 8000, 2.5, 3.0, "2.5V heater 6L6 equivalent. Vintage battery radios."),
+    ("6Y6G", "beam power tetrode", 360, 270, 19.0, 4.5, "20–25W @ 360V plate", 8000, 6.3, 0.9, "6L6 variant."),
+    ("25L6GT", "beam power tetrode", 200, 200, 8.5, 4.0, "5–7W @ 150V plate", 10000, 25.0, 0.3, "25V heater compact beam tetrode."),
+    ("50B5", "beam power tetrode", 200, 200, 7.0, 4.0, "5–6W @ 150V plate", 10000, 50.0, 0.15, "Line-series output."),
+]
+
+
+def init_db(path: Path | None = None) -> sqlite3.Connection:
+    """Create or open the tube database and return a connection."""
+    db_path = path or DB_PATH
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    conn.executescript(SCHEMA)
+    return conn
+
+
+def seed_database(conn: sqlite3.Connection) -> int:
+    """Insert seed data. Returns number of tubes inserted."""
+    inserted = 0
+    for row in SEED_TUBES:
+        try:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO tubes
+                (type, construction, vplate_max, vscreen_max, pplate_max,
+                 transconductance_ma_v, typical_push_pull_watts,
+                 recommended_load_ohms, heater_volts, heater_amps, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                row,
+            )
+            inserted += 1
+        except sqlite3.IntegrityError:
+            pass
+    conn.commit()
+    return inserted
+
+
+def lookup_tube(conn: sqlite3.Connection, tube_type: str) -> dict | None:
+    """Look up a tube by type. Case-insensitive."""
+    cur = conn.execute("SELECT * FROM tubes WHERE type = ? COLLATE NOCASE", (tube_type,))
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def search_tubes(conn: sqlite3.Connection, query: str) -> list[dict]:
+    """Search tube type or notes. Returns list of matching dicts."""
+    q = f"%{query}%"
+    cur = conn.execute(
+        "SELECT * FROM tubes WHERE type LIKE ? COLLATE NOCASE OR notes LIKE ? COLLATE NOCASE",
+        (q, q),
+    )
+    return [dict(row) for row in cur.fetchall()]
+
+
+def count_tubes(conn: sqlite3.Connection) -> int:
+    cur = conn.execute("SELECT COUNT(*) FROM tubes")
+    return cur.fetchone()[0]
+
+
+def get_db_path() -> Path:
+    """Return the canonical path to the SQLite tube database."""
+    return DB_PATH
+
+
+def list_all_types(conn: sqlite3.Connection) -> list[str]:
+    """Return all tube type designations in the database, sorted."""
+    cur = conn.execute("SELECT type FROM tubes ORDER BY type")
+    return [row["type"] for row in cur.fetchall()]
+
+
+def get_all_tubes(conn: sqlite3.Connection) -> list[dict]:
+    """Return every tube record as a list of dicts."""
+    cur = conn.execute("SELECT * FROM tubes ORDER BY type")
+    return [dict(row) for row in cur.fetchall()]
+
+
+def format_tube_for_model(tube: dict) -> str:
+    """Format a tube record as a concise string for prompt injection."""
+    lines = [f"Tube: {tube['type']} ({tube['construction']})"]
+    if tube["vplate_max"]:
+        lines.append(f"  Max plate voltage: {tube['vplate_max']}V")
+    if tube["vscreen_max"]:
+        lines.append(f"  Max screen voltage: {tube['vscreen_max']}V")
+    if tube["pplate_max"]:
+        lines.append(f"  Max plate dissipation: {tube['pplate_max']}W")
+    if tube["transconductance_ma_v"]:
+        lines.append(f"  Transconductance: {tube['transconductance_ma_v']} mA/V")
+    if tube["typical_push_pull_watts"]:
+        lines.append(f"  Typical push-pull output: {tube['typical_push_pull_watts']}")
+    if tube["recommended_load_ohms"]:
+        lines.append(f"  Recommended load: {tube['recommended_load_ohms']}Ω primary")
+    if tube["heater_volts"]:
+        lines.append(f"  Heater: {tube['heater_volts']}V @ {tube['heater_amps']}A")
+    if tube["notes"]:
+        lines.append(f"  Notes: {tube['notes']}")
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    conn = init_db()
+    n = seed_database(conn)
+    total = count_tubes(conn)
+    print(f"Inserted {n} new tubes. Total in database: {total}")
+
+    # Quick sanity lookups
+    for t in ("6V6GT", "EL34", "300B", "12AX7", "5U4G"):
+        tube = lookup_tube(conn, t)
+        if tube:
+            print(f"\n{tube['type']}: {tube['construction']}, {tube['pplate_max']}W, {tube['typical_push_pull_watts']}")
+        else:
+            print(f"\n{t}: NOT FOUND")
+
+    conn.close()

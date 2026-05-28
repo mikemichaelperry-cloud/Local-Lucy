@@ -30,7 +30,7 @@ import numpy as np
 
 # Import hybrid router components
 sys.path.insert(0, str(Path(__file__).parent))
-from embedding_router import EmbeddingRouter
+from hybrid_router_v2 import HybridRouterV2
 
 
 # Paths
@@ -41,12 +41,25 @@ EXAMPLES_PATH = ROUTER_DIR / "comprehensive_examples.json"
 EXAMPLES_METADATA_PATH = ROUTER_DIR / "examples_metadata.json"
 FEEDBACK_PATH = ROUTER_DIR / "user_feedback.jsonl"
 LEARNED_PATH = ROUTER_DIR / "learned_examples.jsonl"
+LOG_PROGRESS_PATH = ROUTER_DIR / ".router_log_progress"
 
 # Lock file for atomic updates
 LOCK_PATH = ROUTER_DIR / ".learner_lock"
 
 # Kill-switch: if this file exists, auto-learning is paused
 DISABLE_FLAG = ROUTER_DIR / ".learner_disable"
+
+# Old keyword-guard markers from the pre-V2 era.  Router log entries that
+# were decided by these guards must NOT be learned, or the classifier will
+# re-learn the keyword-fortress behaviour we just removed.
+OLD_GUARD_MARKERS = {
+    "news_keyword", "news_guard_respects_local", "weather_keyword_override",
+    "clear_news_override", "historical_context_override", "capital_city_guard",
+    "astronomy_guard", "literary_context_guard", "creative_content_guard",
+    "financial_ephemeral", "current_event_synthesis_override",
+    "capability_query_override", "language_translation_override",
+    "technical_knowledge_override", "personal_finance_reasoning_override",
+}
 
 # Versioning directory
 VERSIONS_DIR = ROUTER_DIR / "versions"
@@ -251,7 +264,7 @@ def _strip_example_timestamps(examples: list[dict]) -> list[dict]:
 def rebuild_embeddings(examples: list[dict]):
     """Rebuild embedding matrix from examples."""
     print(f"  Rebuilding embeddings for {len(examples)} examples...")
-    router = EmbeddingRouter()
+    router = HybridRouterV2()
     router.fit(examples)
     np.save(EMBEDDINGS_PATH, router.embeddings)
 
@@ -281,19 +294,88 @@ def deduplicate(examples: list[dict]) -> list[dict]:
     return list(seen.values())
 
 
+def _load_log_progress() -> int:
+    """Return the number of router-log lines already processed."""
+    if LOG_PROGRESS_PATH.exists():
+        try:
+            return int(LOG_PROGRESS_PATH.read_text().strip())
+        except ValueError:
+            pass
+    return 0
+
+
+def _save_log_progress(count: int) -> None:
+    """Persist how many router-log lines have been processed."""
+    LOG_PROGRESS_PATH.write_text(str(count))
+
+
+def _count_new_router_entries(log_path: Path | None) -> int:
+    """Count how many router-log entries are new since last learn.
+
+    Mirrors the filters in process_router_logs so the count is accurate.
+    """
+    if not log_path or not log_path.exists():
+        return 0
+
+    already_processed = _load_log_progress()
+    count = 0
+    line_no = 0
+
+    with open(log_path) as f:
+        for line in f:
+            line_no += 1
+            if line_no <= already_processed:
+                continue
+
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            query = entry.get("query", "").strip()
+            if not query or len(query) < 3:
+                continue
+            if any(j in query.lower() for j in ["test query", "2+2 2+2"]):
+                continue
+            if len(query) > 150 or query.count("?") > 1:
+                continue
+
+            confidence = entry.get("confidence", 0)
+            if confidence < 0.7:
+                continue
+
+            guards = set(entry.get("guards_fired", []))
+            if guards & OLD_GUARD_MARKERS:
+                continue
+
+            count += 1
+
+    return count
+
+
 def process_router_logs(log_path: Path, min_confidence: float = 0.7) -> list[dict]:
     """Process single-path router decision logs and extract learning examples.
 
-    Reads router_decisions.jsonl and adds each unique query with its final
-    route as a labeled example. Only high-confidence decisions are used to
-    avoid polluting the index with uncertain predictions.
+    Reads router_decisions.jsonl starting from the last processed position.
+    Only high-confidence decisions without old keyword-guard involvement are
+    used, to avoid re-learning the keyword-fortress behaviour.
     """
     if not log_path.exists():
         return []
 
+    already_processed = _load_log_progress()
     new_examples = []
+    line_no = 0
+
     with open(log_path) as f:
         for line in f:
+            line_no += 1
+            if line_no <= already_processed:
+                continue
+
             line = line.strip()
             if not line:
                 continue
@@ -310,10 +392,19 @@ def process_router_logs(log_path: Path, min_confidence: float = 0.7) -> list[dic
             if any(j in query.lower() for j in ["test query", "2+2 2+2"]):
                 continue
 
+            # Skip multi-turn concatenated queries
+            if len(query) > 150 or query.count("?") > 1:
+                continue
+
             route = entry.get("route", "")
             confidence = entry.get("confidence", 0)
             intent = entry.get("intent", "local_answer")
             evidence_reason = entry.get("evidence_reason", "")
+            guards = set(entry.get("guards_fired", []))
+
+            # Skip entries decided by old keyword guards
+            if guards & OLD_GUARD_MARKERS:
+                continue
 
             # Only learn from confident decisions
             if confidence < min_confidence:
@@ -332,11 +423,12 @@ def process_router_logs(log_path: Path, min_confidence: float = 0.7) -> list[dic
                 "metadata": {
                     "source": "router_log",
                     "confidence": confidence,
-                    "guards_fired": entry.get("guards_fired", []),
+                    "guards_fired": list(guards),
                     "embedding_route": entry.get("embedding_route", ""),
                 },
             })
 
+    _save_log_progress(line_no)
     return new_examples
 
 
@@ -575,17 +667,22 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
         with open(FEEDBACK_PATH) as f:
             user_count = sum(1 for line in f if line.strip())
 
+    # Count new router-decision log entries since last learn
+    log_count = _count_new_router_entries(log_path)
+    log_threshold = int(os.environ.get("LUCY_AUTO_LEARN_LOG_THRESHOLD", "5"))
+
     # Combined threshold as a fallback (e.g. 3 user + 2 auto = 5)
     combined_threshold = int(
         os.environ.get("LUCY_AUTO_LEARN_THRESHOLD", str(max(user_threshold, auto_threshold)))
     ) if min_entries is None else user_threshold
 
-    # Trigger learning if any threshold is met.
-    # User feedback is higher-trust, so it triggers at a lower count.
+    # Trigger learning if ANY threshold is met.
+    # User feedback is highest-trust, auto-feedback medium, router logs lowest.
     if (
         user_count < user_threshold
         and auto_count < auto_threshold
-        and (user_count + auto_count) < combined_threshold
+        and log_count < log_threshold
+        and (user_count + auto_count + log_count) < combined_threshold
     ):
         return False
 

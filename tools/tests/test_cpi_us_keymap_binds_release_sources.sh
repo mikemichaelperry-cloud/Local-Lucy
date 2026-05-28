@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="${LUCY_ROOT:-/home/mike/lucy-v9}"
-KEYMAP="${ROOT}/config/evidence_keymap_v1.tsv"
+KEYMAP="${ROOT}/config/evidence_keymap.tsv"
 ALLOW_FETCH="${ROOT}/config/trust/generated/allowlist_fetch.txt"
 
 ok(){ echo "OK: $*"; }

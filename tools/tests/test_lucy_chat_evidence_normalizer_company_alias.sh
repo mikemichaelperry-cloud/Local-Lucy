@@ -20,11 +20,11 @@ cat > "${FAKE_ROOT}/config/evidence_keys_allowlist.txt" <<'EOF'
 company_alphabet_1
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 alphabet stock	EVIDENCE	company_alphabet_1
 EOF
 
-cat > "${FAKE_ROOT}/config/evidence_normalization_aliases_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/evidence_normalization_aliases.tsv" <<'EOF'
 finance	EVIDENCE	high	\bgoogle stock\b	alphabet stock
 EOF
 

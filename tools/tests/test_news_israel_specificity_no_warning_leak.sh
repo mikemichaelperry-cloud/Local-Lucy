@@ -29,7 +29,7 @@ news_world_1
 news_world_2
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 latest israel news	NEWS	news_israel_1 news_israel_2
 latest news from only israeli sources	NEWS	news_israel_only_1 news_israel_only_2
 news	NEWS	news_world_1 news_world_2

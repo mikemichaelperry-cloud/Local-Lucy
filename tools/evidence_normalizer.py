@@ -163,7 +163,7 @@ def main() -> int:
     args = parser.parse_args()
 
     conf_dir = Path(os.environ.get("LUCY_CONF_DIR") or str(Path(__file__).resolve().parents[1] / "config"))
-    aliases_file = Path(args.aliases_file or str(conf_dir / "evidence_normalization_aliases_v1.tsv"))
+    aliases_file = Path(args.aliases_file or str(conf_dir / "evidence_normalization_aliases.tsv"))
     rules_by_adapter = load_rules(aliases_file)
     mode = (args.mode or "").upper()
     candidates = build_candidates(args.query, mode, rules_by_adapter)

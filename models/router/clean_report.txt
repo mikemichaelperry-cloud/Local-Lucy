@@ -1,0 +1,66 @@
+======================================================================
+ROUTER TRAINING DATA CLEANING REPORT
+======================================================================
+
+Input file:   /home/mike/lucy-v9/models/router/comprehensive_examples.json
+Output clean: /home/mike/lucy-v9/models/router/comprehensive_examples_clean.json
+Output flagged: /home/mike/lucy-v9/models/router/comprehensive_examples_flagged.json
+
+--- BEFORE vs AFTER ---
+Total examples (input):     689
+Total examples (clean):     537
+Flagged for review:         303
+  - Garbage removed:        106
+  - Suspicious labels:      151
+  - Rebalance dropped:      46
+  - Duplicates removed:     0
+
+--- ROUTE DISTRIBUTION ---
+Route             Before    After   Target Status         
+------------------------------------------------------------
+LOCAL                444      300      300 OK             
+AUGMENTED            140      140      150 UNDER          
+EPHEMERAL             35       30       30 OK             
+NEWS                  33       33       60 UNDER          
+TIME                  23       22       60 CRITICALLY LOW 
+WEATHER               13       11       50 CRITICALLY LOW 
+EVIDENCE               1        1       50 CRITICALLY LOW 
+
+--- GARBAGE REMOVED ---
+    19  garbage:too_short(9_chars)
+    18  garbage:too_short(4_chars)
+    13  garbage:too_short(5_chars)
+    13  garbage:too_short(7_chars)
+    12  garbage:too_short(8_chars)
+    11  garbage:too_short(3_chars)
+     9  garbage:too_short(2_chars)
+     8  garbage:too_short(6_chars)
+     1  garbage:repeated_single_word
+     1  garbage:too_short(1_chars)
+     1  garbage:injection_pattern(<script)
+
+--- SUSPICIOUS LABELS ---
+   110  AUGMENTED:no_AUGMENTED_keywords
+     8  NEWS:no_NEWS_keywords
+     7  AUGMENTED:looks_like_EVIDENCE_but_labeled_AUGMENTED
+     6  WEATHER:no_WEATHER_keywords
+     6  TIME:no_TIME_keywords
+     3  AUGMENTED:creative_or_math_in_AUGMENTED
+     2  LOCAL:looks_like_NEWS_but_labeled_LOCAL
+     2  AUGMENTED:looks_like_WEATHER_but_labeled_AUGMENTED
+     2  EPHEMERAL:looks_like_WEATHER_but_labeled_EPHEMERAL
+     1  AUGMENTED:looks_like_NEWS_but_labeled_AUGMENTED
+     1  NEWS:creative_or_math_in_NEWS
+     1  LOCAL:looks_like_TIME_but_labeled_LOCAL
+     1  LOCAL:medical_legal_finance_in_LOCAL
+     1  TIME:looks_like_WEATHER_but_labeled_TIME
+
+--- RECOMMENDATIONS ---
+1. Review flagged entries in comprehensive_examples_flagged.json
+2. Manually verify/correct suspicious labels
+3. Add more EVIDENCE examples (currently critically underrepresented)
+4. Add more WEATHER examples (currently underrepresented)
+5. Rebuild comprehensive_embeddings.npy after cleaning:
+   python scripts/rebuild_embeddings.py
+
+======================================================================

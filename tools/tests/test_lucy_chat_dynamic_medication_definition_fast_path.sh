@@ -22,9 +22,9 @@ mkdir -p \
   "${FAKE_ROOT}/cache/evidence"
 
 : > "${FAKE_ROOT}/config/evidence_keys_allowlist.txt"
-: > "${FAKE_ROOT}/config/query_to_keys_v1.tsv"
-: > "${FAKE_ROOT}/config/evidence_keymap_v1.tsv"
-cp "${REAL_ROOT}/config/evidence_normalization_aliases_v1.tsv" "${FAKE_ROOT}/config/evidence_normalization_aliases_v1.tsv"
+: > "${FAKE_ROOT}/config/query_to_keys.tsv"
+: > "${FAKE_ROOT}/config/evidence_keymap.tsv"
+cp "${REAL_ROOT}/config/evidence_normalization_aliases.tsv" "${FAKE_ROOT}/config/evidence_normalization_aliases.tsv"
 cat > "${FAKE_ROOT}/config/trust/generated/medical_runtime.txt" <<'EOF'
 medlineplus.gov
 dailymed.nlm.nih.gov

@@ -14,7 +14,7 @@ REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 def main() -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
-    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v9/snapshots/opt-experimental-v9-dev")
+    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v9")
     os.environ.setdefault("LUCY_UI_ROOT", str(REPO_UI_ROOT))
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "0")
     sys.path.insert(0, str(REPO_UI_ROOT))

@@ -21,7 +21,7 @@ medical_aspirin_1
 medical_aspirin_2
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 aspirin	EVIDENCE	medical_aspirin_1 medical_aspirin_2
 what is aspirin	EVIDENCE	medical_aspirin_1 medical_aspirin_2
 EOF

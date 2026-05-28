@@ -17,7 +17,7 @@ FAKE_ROOT="${TMPD}/root"
 mkdir -p "${FAKE_ROOT}/tools" "${FAKE_ROOT}/config" "${FAKE_ROOT}/state" "${FAKE_ROOT}/evidence" "${FAKE_ROOT}/cache/evidence"
 
 cp "${REAL_ROOT}/config/evidence_keys_allowlist.txt" "${FAKE_ROOT}/config/evidence_keys_allowlist.txt"
-cp "${REAL_ROOT}/config/query_to_keys_v1.tsv" "${FAKE_ROOT}/config/query_to_keys_v1.tsv"
+cp "${REAL_ROOT}/config/query_to_keys.tsv" "${FAKE_ROOT}/config/query_to_keys.tsv"
 
 cat > "${FAKE_ROOT}/tools/evidence_session.sh" <<'SH'
 #!/usr/bin/env bash

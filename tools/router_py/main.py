@@ -18,9 +18,7 @@ Architecture (post Stage 9):
     └─ ExecutionEngine.execute() ─────────────┘
 
 All shell/parity fallback paths have been removed. Python-native is
-authoritative. Legacy entry points (`execute_plan_shell`,
-`execute_plan_parity`) delegate to `execute_plan_python` with a
-deprecation warning.
+authoritative.
 
 State is loaded from `current_state.json` via `ensure_control_env()`
 before classification. Memory persistence, feedback detection, and
@@ -131,6 +129,7 @@ def _write_outcome_telemetry(
     outcome: RouterOutcome,
     question: str,
     execution_time_ms: int,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Write outcome telemetry to last_outcome.env (mirror shell path)."""
     try:
@@ -147,6 +146,14 @@ def _write_outcome_telemetry(
             f"QUESTION={question}",
             f"TRUST_CLASS={'unverified' if outcome.route in ('AUGMENTED', 'NEWS', 'WEATHER', 'TIME') else 'local'}",
         ]
+        # Keel visibility
+        meta = metadata or {}
+        if "keel_status" in meta:
+            lines.append(f"KEEL_STATUS={meta['keel_status']}")
+            lines.append(f"KEEL_PATH={meta.get('keel_path', '')}")
+            lines.append(f"KEEL_VERSION={meta.get('keel_version', '')}")
+            lines.append(f"KEEL_SHA256={meta.get('keel_sha256', '')}")
+            lines.append(f"KEEL_ERROR={meta.get('keel_error', '')}")
         LAST_OUTCOME_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
     except Exception:
         pass
@@ -236,9 +243,9 @@ def _persist_memory_turn(question: str, response_text: str, session_id: str = "d
         from memory.memory_service import store_turn, maybe_summarize_session
         store_turn("user", question, session_id=session_id)
         store_turn("assistant", response_text, session_id=session_id)
-        maybe_summarize_session()
+        maybe_summarize_session(session_id=session_id)
     except Exception:
-        pass  # Text-file write below still happens
+        logging.warning("SQLite memory write failed, falling back to text file", exc_info=True)
 
     try:
         mem_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
@@ -452,6 +459,7 @@ def execute_plan_python(
                 outcome=result,
                 question=question,
                 execution_time_ms=execution_time,
+                metadata=result.metadata,
             )
         except Exception:
             pass
@@ -500,29 +508,6 @@ def execute_plan_python(
                 lock_fd.close()
             except Exception:
                 pass
-
-
-def execute_plan_shell(
-    question: str,
-    policy: str = "fallback_only",
-    timeout: int = DEFAULT_TIMEOUT,
-) -> RouterOutcome:
-    """DEPRECATED: Shell path removed. Delegates to Python-native execution."""
-    logging.warning("execute_plan_shell is deprecated; using Python-native path")
-    return execute_plan_python(question, policy, timeout)
-
-
-def execute_plan_parity(
-    question: str,
-    policy: str = "fallback_only",
-    timeout: int = DEFAULT_TIMEOUT,
-) -> RouterOutcome:
-    """DEPRECATED: Parity mode removed. Delegates to Python-native execution."""
-    logging.warning("execute_plan_parity is deprecated; using Python-native path")
-    return execute_plan_python(question, policy, timeout)
-
-
-# Backwards-compatibility alias — deprecated.
 
 
 def main() -> int:

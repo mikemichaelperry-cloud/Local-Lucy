@@ -19,11 +19,13 @@ Design goals:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 import re
 import sqlite3
+import threading
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -496,9 +498,20 @@ def get_other_session_summaries(
 # Embeddings & semantic search
 # ---------------------------------------------------------------------------
 
+# Thread-safe in-process cache for Ollama embeddings.
+# Eliminates redundant POSTs when the same text is embedded multiple times
+# within a single request (e.g. semantic recall + topic-shift check).
+_EMBEDDING_CACHE: dict[str, list[float]] = {}
+_EMBEDDING_CACHE_LOCK = threading.Lock()
+_EMBEDDING_CACHE_MAXSIZE = 256
+
+
 def _get_embedding(text: str, timeout: float = 15.0) -> list[float] | None:
     """
     Call Ollama /api/embeddings to get a vector for the given text.
+
+    Results are cached in a bounded thread-safe dict keyed by SHA-256 of
+    the text to avoid redundant network calls for identical prompts.
 
     Args:
         text: Text to embed.
@@ -510,8 +523,17 @@ def _get_embedding(text: str, timeout: float = 15.0) -> list[float] | None:
     if not text:
         return None
 
+    model = os.environ.get("LUCY_OLLAMA_MODEL", "local-lucy")
+    key = hashlib.sha256(f"{text.strip()}:{model}".encode("utf-8")).hexdigest()
+    with _EMBEDDING_CACHE_LOCK:
+        cached = _EMBEDDING_CACHE.pop(key, None)
+        if cached is not None:
+            # Move to end (LRU) and return
+            _EMBEDDING_CACHE[key] = cached
+            return cached
+
     payload = {
-        "model": os.environ.get("LUCY_OLLAMA_MODEL", "local-lucy"),
+        "model": model,
         "prompt": text.strip(),
     }
     url = os.environ.get("LUCY_OLLAMA_EMBED_URL", "http://127.0.0.1:11434/api/embeddings")
@@ -527,11 +549,33 @@ def _get_embedding(text: str, timeout: float = 15.0) -> list[float] | None:
             data = json.loads(resp.read().decode("utf-8"))
             embedding = data.get("embedding")
             if isinstance(embedding, list) and len(embedding) > 0:
+                with _EMBEDDING_CACHE_LOCK:
+                    _EMBEDDING_CACHE[key] = embedding
+                    while len(_EMBEDDING_CACHE) > _EMBEDDING_CACHE_MAXSIZE:
+                        _EMBEDDING_CACHE.pop(next(iter(_EMBEDDING_CACHE)))
                 return embedding
             return None
     except Exception as exc:
         logger.debug(f"Embedding call failed: {exc}")
         return None
+
+
+def get_embedding_cached(text: str) -> list[float] | None:
+    """Return a cached embedding for *text*, computing it via Ollama if necessary."""
+    return _get_embedding(text)
+
+
+def _clear_embedding_cache() -> None:
+    """Clear the in-process embedding cache. Useful for tests."""
+    with _EMBEDDING_CACHE_LOCK:
+        _EMBEDDING_CACHE.clear()
+
+
+def _get_embedding_cached(text: str, embedding: list[float] | None = None) -> list[float] | None:
+    """Return *embedding* if provided, otherwise compute via _get_embedding()."""
+    if embedding is not None:
+        return embedding
+    return _get_embedding(text)
 
 
 def _store_summary_embedding(session_id: str, embedding: list[float]) -> None:
@@ -591,19 +635,13 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
         return dot / (norm_a * norm_b)
 
 
-def find_relevant_sessions_with_diagnostics(
+def _find_relevant_sessions_with_diagnostics_impl(
     query: str,
+    query_embedding: list[float] | None = None,
     top_k: int | None = None,
     similarity_threshold: float | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """
-    Find past sessions whose summaries are semantically similar to the query.
-
-    Returns both the filtered results and diagnostic telemetry about the
-    semantic search (top score, gap, whether gap blocked, etc.).
-
-    Uses environment-configured thresholds if parameters are not provided.
-    """
+    """Internal implementation with optional pre-computed query embedding."""
     diagnostics: dict[str, Any] = {
         "threshold_applied": 0.0,
         "gap_applied": None,
@@ -625,7 +663,7 @@ def find_relevant_sessions_with_diagnostics(
     diagnostics["threshold_applied"] = threshold
     diagnostics["gap_applied"] = gap
 
-    query_vector = _get_embedding(query)
+    query_vector = _get_embedding_cached(query.strip(), query_embedding)
     if query_vector is None:
         return [], diagnostics
 
@@ -670,6 +708,22 @@ def find_relevant_sessions_with_diagnostics(
                 return [], diagnostics
 
     return scored[:limit], diagnostics
+
+
+def find_relevant_sessions_with_diagnostics(
+    query: str,
+    top_k: int | None = None,
+    similarity_threshold: float | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """
+    Find past sessions whose summaries are semantically similar to the query.
+
+    Returns both the filtered results and diagnostic telemetry about the
+    semantic search (top score, gap, whether gap blocked, etc.).
+
+    Uses environment-configured thresholds if parameters are not provided.
+    """
+    return _find_relevant_sessions_with_diagnostics_impl(query, None, top_k, similarity_threshold)
 
 
 def find_relevant_sessions(
@@ -777,6 +831,44 @@ def _top_gap_threshold() -> float | None:
     return max(0.0, min(1.0, v))
 
 
+def _topic_shift_threshold() -> float:
+    """Return configured topic-shift cosine-similarity threshold (default 0.50)."""
+    raw = os.environ.get("LUCY_MEMORY_TOPIC_SHIFT_THRESHOLD", "0.50").strip()
+    try:
+        v = float(raw)
+        return max(0.0, min(1.0, v))
+    except ValueError:
+        return 0.50
+
+
+def _is_topic_shift_impl(current_query: str, previous_text: str, current_embedding: list[float] | None = None) -> bool:
+    """Internal implementation with optional pre-computed current query embedding."""
+    if not current_query.strip() or not previous_text.strip():
+        return False
+    try:
+        current_emb = _get_embedding_cached(current_query.strip(), current_embedding)
+        previous_emb = _get_embedding(previous_text.strip())
+        if current_emb is None or previous_emb is None:
+            return False
+        sim = _cosine_similarity(current_emb, previous_emb)
+        return sim < _topic_shift_threshold()
+    except Exception:
+        return False
+
+
+def _is_topic_shift(current_query: str, previous_text: str) -> bool:
+    """
+    Detect a topic shift by comparing embeddings of the current query
+    and the previous user turn.
+
+    Returns:
+        True if the cosine similarity is below the topic-shift threshold
+        (meaning the topics are dissimilar and context should not be injected).
+        False on any error or when similarity is above threshold.
+    """
+    return _is_topic_shift_impl(current_query, previous_text)
+
+
 # ---------------------------------------------------------------------------
 # Context assembly
 # ---------------------------------------------------------------------------
@@ -830,6 +922,16 @@ def assemble_context_with_telemetry(
     if depth == "shallow":
         recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
         if recent_turns:
+            # Topic-shift gate: don't inject stale context for radically different queries
+            if query.strip():
+                last_user_text = next(
+                    (t["text"] for t in reversed(recent_turns) if t["role"] == "user"), ""
+                )
+                if last_user_text:
+                    query_embedding = _get_embedding(query.strip())
+                    if _is_topic_shift_impl(query, last_user_text, query_embedding):
+                        telemetry["memory_topic_shift_detected"] = "true"
+                        return "", telemetry
             context = _truncate_at_turn_boundary(format_turns_for_prompt(recent_turns), max_chars)
             telemetry["memory_context_used"] = "true"
             telemetry["memory_mode_used"] = mode
@@ -839,10 +941,20 @@ def assemble_context_with_telemetry(
 
     # DEEP — LOCAL: current session only. No cross-session recall.
     if mode == "local":
+        recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
+        # Topic-shift gate: don't inject stale context for radically different queries
+        if query.strip() and recent_turns:
+            last_user_text = next(
+                (t["text"] for t in reversed(recent_turns) if t["role"] == "user"), ""
+            )
+            if last_user_text:
+                query_embedding = _get_embedding(query.strip())
+                if _is_topic_shift_impl(query, last_user_text, query_embedding):
+                    telemetry["memory_topic_shift_detected"] = "true"
+                    return "", telemetry
         current_summary = get_session_summary(current_session_id)
         if current_summary:
             parts.append(f"Session summary: {current_summary}")
-        recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
         if recent_turns:
             parts.append(format_turns_for_prompt(recent_turns))
         if not parts:
@@ -858,10 +970,12 @@ def assemble_context_with_telemetry(
     included_session_ids: set[str] = set()
     top_session: str | None = None
 
+    query_embedding = _get_embedding(query.strip()) if query.strip() else None
+
     # 1. Semantic recall (uses env-configured thresholds)
     if query.strip():
         try:
-            relevant, diag = find_relevant_sessions_with_diagnostics(query)
+            relevant, diag = _find_relevant_sessions_with_diagnostics_impl(query, query_embedding)
             if diag.get("top_score") is not None:
                 telemetry["memory_top_score"] = f"{diag['top_score']:.3f}"
             if diag.get("top_gap") is not None:
@@ -890,15 +1004,22 @@ def assemble_context_with_telemetry(
             if len(parts) >= other_summary_limit:
                 break
 
-    # 3. Current session summary
-    current_summary = get_session_summary(current_session_id)
-    if current_summary:
-        parts.append(f"Session summary: {current_summary}")
-
-    # 4. Recent turns
+    # 3. Current session summary and recent turns (topic-shift gated)
     recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
-    if recent_turns:
-        parts.append(format_turns_for_prompt(recent_turns))
+    topic_shift = False
+    if query.strip() and recent_turns:
+        last_user_text = next(
+            (t["text"] for t in reversed(recent_turns) if t["role"] == "user"), ""
+        )
+        if last_user_text and _is_topic_shift_impl(query, last_user_text, query_embedding):
+            topic_shift = True
+            telemetry["memory_topic_shift_detected"] = "true"
+    if not topic_shift:
+        current_summary = get_session_summary(current_session_id)
+        if current_summary:
+            parts.append(f"Session summary: {current_summary}")
+        if recent_turns:
+            parts.append(format_turns_for_prompt(recent_turns))
 
     if not parts:
         return "", telemetry

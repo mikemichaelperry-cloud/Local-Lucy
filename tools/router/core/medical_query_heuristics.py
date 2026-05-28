@@ -143,7 +143,7 @@ def _extract_exact_word_pattern(pattern: str) -> str:
 def _load_medical_alias_data() -> Tuple[List[Tuple[re.Pattern[str], str]], Dict[str, str]]:
     rules: List[Tuple[re.Pattern[str], str]] = []
     token_aliases: Dict[str, str] = {}
-    path = _config_dir() / "evidence_normalization_aliases_v1.tsv"
+    path = _config_dir() / "evidence_normalization_aliases.tsv"
     if not path.is_file():
         return rules, token_aliases
     for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines():

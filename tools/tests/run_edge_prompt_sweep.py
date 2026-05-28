@@ -224,7 +224,7 @@ def _manifest_field_issues(fields: Dict[str, str], observed_route: str, source: 
             reasons.append(f"{source}_{field.lower()}_missing")
 
     manifest_version = (fields.get("MANIFEST_VERSION") or "").strip()
-    if manifest_version and manifest_version != "v1":
+    if manifest_version and manifest_version != "current":
         reasons.append(f"{source}_manifest_version_invalid:{manifest_version}")
 
     selected_route = (fields.get("MANIFEST_SELECTED_ROUTE") or "").strip().upper()

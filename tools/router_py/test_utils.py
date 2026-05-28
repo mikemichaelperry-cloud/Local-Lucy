@@ -24,6 +24,8 @@ class TestSha256Text(unittest.TestCase):
     
     def run_shell_sha256(self, text: str) -> str:
         """Run shell version for comparison."""
+        if not Path(SHELL_FUNCS).exists():
+            self.skipTest(f"Shell fixture missing: {SHELL_FUNCS}")
         cmd = [SHELL_FUNCS, "sha256_text", text]
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout.strip()
@@ -65,6 +67,8 @@ class TestGuardNormalize(unittest.TestCase):
     
     def run_shell_normalize(self, text: str) -> str:
         """Run shell version for comparison."""
+        if not Path(SHELL_FUNCS).exists():
+            self.skipTest(f"Shell fixture missing: {SHELL_FUNCS}")
         cmd = [SHELL_FUNCS, "guard_normalize", text]
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout.strip()
@@ -112,6 +116,8 @@ class TestDeterministicPickIndex(unittest.TestCase):
     
     def run_shell_pick(self, seed: str, mod: int) -> int:
         """Run shell version for comparison."""
+        if not Path(SHELL_FUNCS).exists():
+            self.skipTest(f"Shell fixture missing: {SHELL_FUNCS}")
         cmd = [SHELL_FUNCS, "deterministic_pick_index", seed, str(mod)]
         result = subprocess.run(cmd, capture_output=True, text=True)
         return int(result.stdout.strip())

@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -19,12 +20,69 @@ logger = logging.getLogger(__name__)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
+# Idempotent sys.path helper to avoid O(n) duplicate inserts
+_TOOLS_PATH_STR = str(ROOT_DIR / "tools")
+
+
+def _ensure_tools_path() -> None:
+    if _TOOLS_PATH_STR not in sys.path:
+        sys.path.insert(0, _TOOLS_PATH_STR)
+
+
 # Optional imports
 try:
     from router_py.news_provider import NewsProvider
     HAS_NEWS_PROVIDER = True
 except ImportError:
     HAS_NEWS_PROVIDER = False
+
+# ── Evidence TTL cache (Phase 2D) ──────────────────────────────────────────────
+# Caches successful evidence fetches to avoid redundant external calls.
+#   wikipedia: 1 hour (deterministic, mostly static)
+#   time:      60 seconds (time changes continuously)
+#   weather:   5 minutes (weather changes)
+# News, API (Kimi/OpenAI), and trusted (medical/veterinary) are NOT cached
+# for freshness / safety reasons.
+_EVIDENCE_CACHE: dict[str, tuple[Any, float]] = {}
+_EVIDENCE_CACHE_MAXSIZE = 256
+_EVIDENCE_CACHE_TTL: dict[str, float] = {
+    "wikipedia": 3600.0,
+    "time": 60.0,
+    "weather": 300.0,
+}
+
+
+def _evidence_cache_key(provider: str, question: str) -> str:
+    return f"{provider}:{question.strip().lower()}"
+
+
+def _get_cached_evidence(provider: str, question: str) -> Any:
+    key = _evidence_cache_key(provider, question)
+    entry = _EVIDENCE_CACHE.get(key)
+    if entry is None:
+        return None
+    result, expiry = entry
+    if time.time() > expiry:
+        _EVIDENCE_CACHE.pop(key, None)
+        return None
+    return result
+
+
+def _set_cached_evidence(provider: str, question: str, result: Any) -> None:
+    if result is None:
+        return
+    ttl = _EVIDENCE_CACHE_TTL.get(provider, 0.0)
+    if ttl <= 0.0:
+        return
+    key = _evidence_cache_key(provider, question)
+    _EVIDENCE_CACHE[key] = (result, time.time() + ttl)
+    # Simple LRU trim per provider prefix
+    prefix = provider + ":"
+    provider_keys = [k for k in _EVIDENCE_CACHE if k.startswith(prefix)]
+    overage = len(provider_keys) - _EVIDENCE_CACHE_MAXSIZE
+    if overage > 0:
+        for k in provider_keys[:overage]:
+            _EVIDENCE_CACHE.pop(k, None)
 
 
 def _prepare_subprocess_env(extra: dict[str, str] | None = None) -> dict[str, str]:
@@ -39,24 +97,31 @@ def _prepare_subprocess_env(extra: dict[str, str] | None = None) -> dict[str, st
 
 async def fetch_wikipedia_evidence(question: str) -> dict[str, Any] | None:
     """Fetch evidence from Wikipedia."""
+    cached = _get_cached_evidence("wikipedia", question)
+    if cached is not None:
+        logger.debug("Wikipedia evidence cache hit")
+        return cached
+
     logger.debug(f"Fetching Wikipedia evidence for: {question[:50]}...")
+    result = None
     try:
-        sys.path.insert(0, str(ROOT_DIR / "tools"))
+        _ensure_tools_path()
         import unverified_context_wikipedia as wiki_provider
         loop = asyncio.get_event_loop()
         payload = await loop.run_in_executor(None, wiki_provider.fetch_context, question)
         if payload and payload.get("ok"):
-            return {
+            result = {
                 "context": payload.get("text", ""),
                 "title": payload.get("title", ""),
                 "url": payload.get("url", ""),
                 "provider": "wikipedia",
                 "class": payload.get("class", "wikipedia_general"),
             }
-        return None
     except Exception as e:
         logger.warning(f"Wikipedia evidence fetch failed: {e}")
-        return None
+
+    _set_cached_evidence("wikipedia", question, result)
+    return result
 
 
 async def fetch_news_evidence(question: str, for_voice: bool = False) -> dict[str, Any] | None:
@@ -98,6 +163,11 @@ async def fetch_news_evidence(question: str, for_voice: bool = False) -> dict[st
 
 async def fetch_time_evidence(question: str) -> dict[str, Any] | None:
     """Fetch current time from TimeAPI.io."""
+    cached = _get_cached_evidence("time", question)
+    if cached is not None:
+        logger.debug("Time evidence cache hit")
+        return cached
+
     import re
 
     # Extract location from question
@@ -154,11 +224,12 @@ async def fetch_time_evidence(question: str) -> dict[str, Any] | None:
             logger.warning("Time tool timed out")
             return None
 
+        result = None
         if proc.returncode == 0:
             data = json.loads(stdout.decode('utf-8'))
             if data.get("ok"):
                 formatted = format_time_response(data)
-                return {
+                result = {
                     "ok": True,
                     "timezone": data.get("timezone"),
                     "datetime": data.get("datetime"),
@@ -167,10 +238,10 @@ async def fetch_time_evidence(question: str) -> dict[str, Any] | None:
                 }
             else:
                 logger.warning(f"Time API error: {data.get('error')}")
-                return None
         else:
             logger.warning(f"Time tool failed: {stderr.decode()}")
-            return None
+        _set_cached_evidence("time", question, result)
+        return result
     except Exception as e:
         logger.warning(f"Time evidence fetch failed: {e}")
         return None
@@ -207,9 +278,16 @@ def format_time_response(data: dict) -> str:
 
 async def fetch_weather_evidence(question: str) -> dict[str, Any] | None:
     """Fetch weather data from wttr.in."""
+    cached = _get_cached_evidence("weather", question)
+    if cached is not None:
+        logger.debug("Weather evidence cache hit")
+        return cached
+
     try:
         from weather_provider import fetch_weather
-        return await fetch_weather(question)
+        result = await fetch_weather(question)
+        _set_cached_evidence("weather", question, result)
+        return result
     except Exception as e:
         logger.warning(f"Weather evidence fetch failed: {e}")
         return None
@@ -223,7 +301,7 @@ async def fetch_api_evidence(
     """Fetch evidence from API provider (Kimi or OpenAI)."""
     logger.debug(f"Fetching {provider} evidence for: {question[:50]}...")
     try:
-        sys.path.insert(0, str(ROOT_DIR / "tools"))
+        _ensure_tools_path()
         if provider == "kimi":
             result = call_kimi_subprocess(question, timeout)
             return result
@@ -307,7 +385,7 @@ async def fetch_trusted_evidence(
     """
     logger.debug(f"Fetching trusted evidence for: {question[:50]}...")
     try:
-        sys.path.insert(0, str(ROOT_DIR / "tools"))
+        _ensure_tools_path()
         import unverified_context_trusted as trusted_provider
         loop = asyncio.get_event_loop()
         intent_family = route.intent_family if route else ""

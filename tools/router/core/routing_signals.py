@@ -10,7 +10,7 @@ scope unless they fix a demonstrated bug.
 import re
 from typing import Dict
 
-ROUTING_PRECEDENCE_VERSION = "v1"
+ROUTING_PRECEDENCE_VERSION = "current"
 ROUTING_PRECEDENCE_LADDER = (
     "doc_source",
     "medical_high_stakes",

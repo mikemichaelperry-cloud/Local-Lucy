@@ -21,7 +21,7 @@ medical_hypertension_1
 medical_hypertension_2
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 medication for high blood pressure	EVIDENCE	medical_hypertension_1 medical_hypertension_2
 what is the correct medication for high blood pressure	EVIDENCE	medical_hypertension_1 medical_hypertension_2
 EOF

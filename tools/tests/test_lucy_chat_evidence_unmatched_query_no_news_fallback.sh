@@ -23,7 +23,7 @@ medical_cialis_1
 medical_cialis_2
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 tadalafil	EVIDENCE	medical_cialis_1 medical_cialis_2
 latest world news	NEWS	news_world_1
 EOF

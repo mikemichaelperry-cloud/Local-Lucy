@@ -64,6 +64,9 @@ class StateWriter:
         self.state_manager = state_manager
         self._logger = logger
         self.use_sqlite_state = use_sqlite_state
+        # In-memory cache of request IDs we've seen in this process.
+        # Eliminates O(n) full-file scans for history dedup after warmup.
+        self._history_id_cache: set[str] = set()
 
     # ------------------------------------------------------------------
     # File locking
@@ -154,7 +157,7 @@ class StateWriter:
     ) -> None:
         try:
             question = _redact_pii(context.get("question", "")[:200])
-            self.state_manager.write_route({
+            route_data = {
                 "intent": context.get("intent", ""),
                 "confidence": route.confidence,
                 "strategy": route.route,
@@ -167,7 +170,7 @@ class StateWriter:
                     "requested_mode": route.route,
                     "request_id": context.get("request_id", ""),
                 },
-            })
+            }
 
             outcome_meta: dict[str, Any] = {
                 "route": result.route,
@@ -185,12 +188,20 @@ class StateWriter:
                 if key in result.metadata:
                     outcome_meta[key] = result.metadata[key]
 
-            self.state_manager.write_outcome({
+            outcome_data = {
                 "success": result.status == "completed",
                 "duration_ms": result.execution_time_ms,
                 "result": outcome_meta,
                 "error_message": _redact_pii(result.error_message or ""),
-            })
+            }
+
+            # Use atomic batch write to halve WAL fsyncs vs separate transactions
+            if hasattr(self.state_manager, "write_batch"):
+                self.state_manager.write_batch(route_data, outcome_data)
+            else:
+                # Fallback for older StateManager versions
+                self.state_manager.write_route(route_data)
+                self.state_manager.write_outcome(outcome_data)
             self._logger.info("State written to SQLite")
         except Exception as e:
             self._logger.error(f"SQLite state write failed: {e}")
@@ -261,6 +272,9 @@ class StateWriter:
         # Control state: best-effort from context + env fallback
         control_state = self._build_control_state(context)
 
+        # Compute UTC timestamp once per payload (Phase 3E)
+        utc_now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
         # Route block
         route_block: dict[str, Any] = {
             "mode": result.route or route.route,
@@ -276,7 +290,7 @@ class StateWriter:
             "query": question,
             "reason": route.policy_reason or "router_classifier_mapper",
             "session_id": session_id,
-            "utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "utc": utc_now,
         }
 
         # Outcome block
@@ -332,7 +346,7 @@ class StateWriter:
             "evidence_created": "",
             "outcome_code": result.outcome_code,
             "rc": 0,
-            "utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "utc": utc_now,
         }
 
         # Authority block
@@ -341,7 +355,7 @@ class StateWriter:
         return {
             "accepted": True,
             "authority": authority_block,
-            "completed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "completed_at": utc_now,
             "control_state": control_state,
             "error": result.error_message or "",
             "outcome": outcome_block,
@@ -465,13 +479,32 @@ class StateWriter:
             with history_file.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(entry, sort_keys=True))
                 handle.write("\n")
+            # Cache the ID we just wrote so future checks are O(1)
+            self._history_id_cache.add(request_id)
+            # Prevent unbounded growth: trim to 2000 entries
+            if len(self._history_id_cache) > 2000:
+                # Simple eviction: keep ~1000 by clearing and re-adding last 1000
+                # (approximation; exact LRU not needed for dedup)
+                self._history_id_cache = set(list(self._history_id_cache)[-1000:])
 
     def _history_contains_request_id(self, history_file: Path, request_id: str) -> bool:
-        """Check if request_id already exists in history file."""
+        """Check if request_id already exists in history file.
+
+        Fast path: in-memory set of IDs written by this process (O(1)).
+        Fallback: tail-scan the last 50 lines of the file (catches IDs
+        written by other processes without loading the entire file).
+        """
+        if request_id in self._history_id_cache:
+            return True
         if not history_file.exists():
             return False
         try:
-            for raw_line in history_file.read_text(encoding="utf-8").splitlines():
+            # Tail-scan: only check the last 50 lines. If the file is
+            # small, read it all; otherwise seek near the end.
+            raw = history_file.read_text(encoding="utf-8")
+            lines = raw.splitlines()
+            # Check last 50 lines (or all if fewer)
+            for raw_line in lines[-50:]:
                 line = raw_line.strip()
                 if not line:
                     continue
@@ -480,6 +513,8 @@ class StateWriter:
                 except json.JSONDecodeError:
                     continue
                 if isinstance(parsed, dict) and str(parsed.get("request_id", "")).strip() == request_id:
+                    # Populate cache so next check is instant
+                    self._history_id_cache.add(request_id)
                     return True
         except OSError:
             pass

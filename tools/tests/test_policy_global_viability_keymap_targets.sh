@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
-KEYMAP="${ROOT}/config/evidence_keymap_v1.tsv"
+KEYMAP="${ROOT}/config/evidence_keymap.tsv"
 
 die() {
   echo "FAIL: $*" >&2

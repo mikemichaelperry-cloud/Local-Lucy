@@ -1,9 +1,10 @@
-# Local Lucy V8 — Complete System Architecture
+# Local Lucy V9 — Complete System Architecture
 
-**Generated:** 2026-05-08  
-**Version:** opt-experimental-v9-dev  
+**Generated:** 2026-05-26  
+**Version:** v9-stable-router-v2  
 **Hardware:** RTX 3060 12GB, 31GB RAM, CPU+GPU hybrid  
-**Test Suite:** 161 passed, 19 skipped, 0 failed  
+**Test Suite:** 1,566 passed, 19 skipped, 17 pre-existing (model non-determinism)  
+**Router:** HybridRouterV2 (MiniLM embedding k-NN + semantic disambiguation)  
 **Philosophy:** *Correct answer > locality. The end justifies the means.*
 
 ---
@@ -24,17 +25,19 @@ graph TB
         BRIDGE["🔗 Consolidated Bridge<br/>ui-v9/app/services/runtime_bridge_consolidated.py"]
     end
 
-    subgraph "Router (Single-Path + Auto-Feedback)"
-        EMBED["🧠 Embedding Router<br/>ModernBERT k-NN (PRIMARY)"]
-        LEGACY["📋 Legacy Router<br/>Keyword-based (ROLLBACK ONLY)"]
+    subgraph "Router V2 (3-Stage + Auto-Feedback)"
+        EMBED["🧠 Embedding Router V2<br/>Fine-tuned MiniLM k-NN (PRIMARY)"]
+        STRUCT["🛡️ Structural Guards<br/>Creative / Math / Fringe / Empty"]
+        DISAMBIG["🔍 Semantic Disambiguation<br/>Reference embedding comparison"]
+        AUTO_FB["🔄 Auto-Feedback<br/>Answer Quality Analysis"]
         AUTO_FB["🔄 Auto-Feedback<br/>Answer Quality Analysis"]
         LEARNER["📈 Background Learner<br/>Rebuilds index from feedback"]
     end
 
     subgraph "AI Models"
         LLM["🤖 Qwen3 14B<br/>local-lucy (~9.8GB)"]
-        ROUTER_MODEL["📊 ModernBERT-base<br/>768d embeddings"]
-        WHISPER["👂 Whisper large-v3-turbo<br/>CPU:18181"]
+        ROUTER_MODEL["📊 Fine-tuned MiniLM-L6-v2<br/>384d embeddings (CPU)"]
+        WHISPER["👂 Whisper small.en<br/>CPU:18181"]
         KOKORO["🗣️ Kokoro TTS<br/>CPU"]
     end
 
@@ -64,7 +67,6 @@ graph TB
     CORE --> HISTORY
 
     ENGINE --> EMBED
-    EMBED -.->|"LUCY_ROUTER_LEGACY_PRIMARY=1"| LEGACY
     ENGINE -.->|"post-execution"| AUTO_FB
     AUTO_FB -.->|"auto_feedback.jsonl"| LEARNER
     LEARNER -.->|"rebuild"| EMBED
@@ -161,18 +163,8 @@ graph TB
 │   │  Inference: 30–80ms/query on CPU                                                 │   │
 │   └────────────────────────────────────────┬─────────────────────────────────────────┘   │
 │                                            │                                             │
-│   ┌────────────────────────────────────────┴─────────────────────────────────────────┐   │
-│   │  LEGACY ROUTER (ROLLBACK ONLY)                                                   │   │
-│   │  tools/router_py/classify.py::_select_route_legacy()                             │   │
-│   │                                                                                  │   │
-│   │  • Env: LUCY_ROUTER_LEGACY_PRIMARY=1                                             │   │
-│   │  • Keyword-based evidence + intent mapping                                       │   │
-│   │  • Preserved for emergency rollback                                              │   │
-│   │  • Legacy audit computed on every call (~1μs) but never returned                 │   │
-│   └────────────────────────────────────────┬─────────────────────────────────────────┘   │
-│                                            │                                             │
-│   ┌────────────────────────────────────────┴─────────────────────────────────────────┐   │
-│   │  AUTO-FEEDBACK (NEW)                                                             │   │
+│   ┌──────────────────────────────────────────────────────────────────────────────────┐   │
+│   │  AUTO-FEEDBACK                                                                   │   │
 │   │  models/router/auto_feedback.py                                                  │   │
 │   │                                                                                  │   │
 │   │  Trigger: ExecutionEngine detects poor answer quality                            │   │
@@ -201,18 +193,18 @@ graph TB
 │                                    AI MODELS LAYER                                       │
 │                                                                                          │
 │  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐  │
-│  │     Qwen3 14B           │  │   ModernBERT-base       │  │  Whisper large-v3-turbo │  │
-│  │     local-lucy          │  │   768d embeddings       │  │  STT Server (CPU)       │  │
-│  │     ~9.8GB VRAM         │  │   Router classifier     │  │  Port 18181             │  │
-│  │     Flash Attention     │  │   ~149M params          │  │  Auto GPU→CPU fallback  │  │
-│  │     Context: 2048       │  │   Zero training needed  │  │  Orphan process kill    │  │
+│  │     Qwen3 14B           │  │   MiniLM-L6-v2          │  │  Whisper small.en       │  │
+│  │     local-lucy          │  │   384d embeddings       │  │  STT Server (CPU)       │  │
+│  │     ~9.8GB VRAM         │  │   ~22M params           │  │  Port 18181             │  │
+│  │     Flash Attention     │  │   k-NN classifier       │  │  Auto GPU→CPU fallback  │  │
+│  │     Context: 2048       │  │   ~900 examples         │  │  Orphan process kill    │  │
 │  └───────────┬─────────────┘  └───────────┬─────────────┘  └───────────┬─────────────┘  │
 │              │                            │                            │              │
 │  ┌───────────┴─────────────┐  ┌───────────┴─────────────┐  ┌───────────┴─────────────┐  │
-│  │     Kimi / OpenAI       │  │  Trained Model (V2)     │  │     Kokoro TTS          │  │
-│  │     Augmented mode      │  │  NOT DEPLOYED           │  │     CPU-based           │  │
-│  │     Fallback provider   │  │  92% synthetic acc      │  │     Socket→finally      │  │
-│  │     Evidence mode       │  │  0% real query acc      │  │     Temp file cleanup   │  │
+│  │     Kimi / OpenAI       │  │  Background Learner     │  │     Kokoro TTS          │  │
+│  │     Augmented mode      │  │  Auto-learn from logs   │  │     CPU-based           │  │
+│  │     Fallback provider   │  │  + feedback pipeline    │  │     Socket→finally      │  │
+│  │     Evidence mode       │  │  899 examples, 384-dim  │  │     Temp file cleanup   │  │
 │  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -279,14 +271,14 @@ User Query
 │    classify.py          │
 │                         │
 │  ┌───────────────────┐  │
-│  │ Embedding Router  │  │  ← PRIMARY: ModernBERT k-NN + guards
-│  │ (Single-path)     │  │     Returns route + provider + diagnostics
+│  │ Router V2         │  │  ← PRIMARY: Fine-tuned MiniLM k-NN
+│  │ (3-Stage Pipeline)│  │     Stage 1: Structural guards
+│  │                   │  │     Stage 2: Embedding k-NN + disambiguation
+│  │                   │  │     Stage 3: Low-confidence fallback
+│  │                   │  │     Returns route + provider + diagnostics
 │  └─────────┬─────────┘  │
 │            │            │
-│  ┌─────────┴─────────┐  │
-│  │ Legacy Audit      │  │  ← Always computed, logged, never returned
-│  │ (~1μs)            │  │     For rollback validation only
-│  └───────────────────┘  │
+│  │ (Legacy V1 removed — embedding-only since V2)                                    │  │
 └──────────┬──────────────┘
            │
            ▼
@@ -326,32 +318,36 @@ User Query
 
 ---
 
-## Mermaid: Router Detail View
+## Mermaid: Router V2 Detail View
 
 ```mermaid
 flowchart TD
-    subgraph "Router Decision Flow"
+    subgraph "Router V2 Decision Flow"
         direction TB
-        Q["User Query"] --> EMPTY{"Empty?"}
-        EMPTY -->|yes| LOC["LOCAL<br/>confidence=1.0"]
-        EMPTY -->|no| CREATIVE{"Creative?"}
+        Q["User Query"] --> EMPTY{"Empty / Math?"}
+        EMPTY -->|yes| LOC["LOCAL<br/>confidence=1.0<br/>guards_fired: structural"]
+        EMPTY -->|no| CREATIVE{"Creative / Fringe?"}
 
-        CREATIVE -->|write+story/poem| LOC
-        CREATIVE -->|no| EVID{"Evidence Required?"}
+        CREATIVE -->|write+story/poem<br/>OR conspiracy| LOC
+        CREATIVE -->|no| EVID{"Evidence Required?<br/>policy.py"}
 
-        EVID -->|Medical/Financial/Legal| AUG["AUGMENTED<br/>prefer_paid=True<br/>Provider: OpenAI"]
-        EVID -->|No evidence| EMBED["Embedding k-NN<br/>k=3 neighbors"]
+        EVID -->|Medical/Financial/Legal| DISAMBIG["Semantic Disambiguation<br/>Reference embeddings"]
+        EVID -->|No evidence| DISAMBIG
 
-        EMBED -->|top match| PRED["Predicted Route"]
-        PRED --> OVERRIDE{"Override?"}
+        DISAMBIG -->|anatomy vs symptoms| EMBED["Embedding k-NN<br/>Fine-tuned MiniLM<br/>k=3 neighbors"]
+        DISAMBIG -->|historical vs news| EMBED
+        DISAMBIG -->|conspiracy vs evidence| EMBED
+        DISAMBIG -->|programming vs pet| EMBED
 
-        OVERRIDE -->|time→TIME| TIME["TIME<br/>TimeAPI.io"]
-        OVERRIDE -->|news→NEWS| NEWS["NEWS<br/>RSS Provider"]
-        OVERRIDE -->|evidence→AUG| AUG2["AUGMENTED<br/>prefer_paid=False"]
-        OVERRIDE -->|none| FINAL["Final Route"]
+        EMBED -->|confidence < threshold| FALL["Fallback<br/>LOCAL"]
+        EMBED -->|top match| PRED["Predicted Route<br/>Per-route thresholds"]
 
-        FINAL -->|LOCAL| LOC2["LOCAL<br/>qwen3 14B"]
-        FINAL -->|AUGMENTED| AUG3["AUGMENTED<br/>OpenAI/Kimi"]
+        PRED -->|TIME| TIME["TIME<br/>TimeAPI.io"]
+        PRED -->|NEWS| NEWS["NEWS<br/>RSS Provider"]
+        PRED -->|WEATHER| WEATHER["WEATHER<br/>OpenWeatherMap"]
+        PRED -->|EVIDENCE| EVID2["EVIDENCE<br/>Trusted sources + citations"]
+        PRED -->|AUGMENTED| AUG["AUGMENTED<br/>OpenAI/Kimi/Wikipedia"]
+        PRED -->|LOCAL| LOC2["LOCAL<br/>qwen3 14B"]
     end
 
     subgraph "Auto-Feedback Loop"
@@ -364,7 +360,7 @@ flowchart TD
         FB1 --> LEARN["Background Learner<br/>--process"]
         FB2 --> LEARN
         FB3 --> LEARN
-        LEARN --> IDX["Rebuild Index<br/>comprehensive_index.jsonl"]
+        LEARN --> IDX["Rebuild Index<br/>comprehensive_embeddings.npy"]
     end
 ```
 
@@ -420,10 +416,12 @@ sequenceDiagram
 |-----------|------|---------|--------|
 | **Core Engine** | `runtime/lucy_core.py` | Query ingestion, dispatch, response streaming | Stable |
 | **Execution Engine** | `tools/router_py/execution_engine.py` | Tool loading, execution paths, auto-feedback | **Enhanced** |
-| **Embedding Router** | `models/router/hybrid_router.py` + `tools/router_py/classify.py` | ModernBERT k-NN primary routing | **PRIMARY** |
+| **Router V2** | `models/router/hybrid_router_v2.py` + `tools/router_py/classify.py` | Fine-tuned MiniLM k-NN + semantic disambiguation | **PRIMARY** |
 | **Policy Engine** | `tools/router_py/policy.py` | Evidence detection, provider selection | Expanded |
-| **Auto-Feedback** | `models/router/auto_feedback.py` | Answer quality misroute detection | **NEW** |
-| **Background Learner** | `models/router/background_learner.py` | Index rebuild from feedback | **Active** |
+| **Auto-Feedback** | `models/router/auto_feedback.py` | Answer quality misroute detection | Active |
+| **Background Learner** | `models/router/background_learner.py` | Index rebuild from feedback | Active |
+| **Data Cleaner** | `models/router/clean_training_data.py` | Training data quality control | Active |
+| **Synthetic Generator** | `models/router/generate_synthetic_examples.py` | Fill route gaps | Active |
 | **Consolidated Bridge** | `ui-v9/app/services/runtime_bridge_consolidated.py` | HMI ↔ Core communication | Fixed |
 | **Voice Runtime** | `tools/runtime_voice.py` | PTT, TTS, STT state management | Fixed |
 | **Whisper Worker** | `tools/voice/whisper_worker.py` | STT server management | Fixed |
@@ -460,13 +458,16 @@ sequenceDiagram
 │
 ├── models/
 │   └── router/
-│       ├── hybrid_router.py            # Embedding k-NN + guards
+│       ├── hybrid_router_v2.py         # V2: MiniLM k-NN + semantic disambiguation (PRIMARY)
+│       ├── hybrid_router.py            # V1: ModernBERT + keyword guards (DEPRECATED)
 │       ├── background_learner.py       # Continuous learning from feedback
-│       ├── auto_feedback.py            # Answer quality analysis (NEW)
-│       ├── embedding_router.py         # Base k-NN
-│       ├── comprehensive_index.jsonl   # 346 examples
-│       ├── comprehensive_embeddings.npy# ModernBERT vectors
-│       └── checkpoints/              # Trained model (not deployed)
+│       ├── auto_feedback.py            # Answer quality analysis
+│       ├── clean_training_data.py      # Data quality control
+│       ├── generate_synthetic_examples.py # Synthetic example generation
+│       ├── augment_from_clinc150.py    # External dataset augmentation
+│       ├── comprehensive_examples.json # 978 examples (cleaned + augmented)
+│       ├── comprehensive_embeddings.npy# MiniLM vectors (978, 384)
+│       └── checkpoints/                # Fine-tuned model (deployed)
 │
 ├── ui-v9/
 │   └── app/
@@ -476,8 +477,8 @@ sequenceDiagram
 │           └── runtime_bridge_consolidated.py  # HMI bridge
 │
 ├── state/
-│   ├── lucy_state.db                   # SQLite routes (1302)
-│   ├── request_history.jsonl           # Query history (144)
+│   ├── lucy_state.db                   # SQLite routes (~1300)
+│   ├── request_history.jsonl           # Query history
 │   └── voice_runtime.json              # Voice state
 │
 ├── memory/
@@ -494,8 +495,7 @@ sequenceDiagram
 
 | Mechanism | How | When |
 |-----------|-----|------|
-| **Legacy rollback** | `LUCY_ROUTER_LEGACY_PRIMARY=1` | Embedding router malfunction |
-| **Legacy audit** | Computed on every call, logged | Continuous validation |
+| **Shadow logging** | `router_decisions.jsonl` — embedding decisions + diagnostics logged | Post-hoc analysis |
 | **Safety net** | `embedding_route`, `guards_fired`, `top_k_neighbours` in every log entry | Post-hoc analysis |
 | **Auto-feedback** | Heuristic misroute detection | After every execution |
 | **Log dir** | `LUCY_ROUTER_LOG_DIR=logs/router/` (set by runtime bridge) | Always |

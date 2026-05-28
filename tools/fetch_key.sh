@@ -13,7 +13,7 @@ else
   latprof_append(){ return 0; }
 fi
 CONF_DIR="${LUCY_CONF_DIR:-$ROOT/config}"
-KEYMAP="$CONF_DIR/evidence_keymap_v1.tsv"
+KEYMAP="$CONF_DIR/evidence_keymap.tsv"
 
 FETCH_URL_TOOL="${LUCY_FETCH_URL_TOOL:-$ROOT/tools/fetch_url_allowlisted.sh}"
 
