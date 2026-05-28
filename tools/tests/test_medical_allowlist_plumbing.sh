@@ -172,7 +172,7 @@ PY
 [[ "${vet_allow_file}" == "config/trust/generated/vet_runtime.txt" ]] || die "unexpected general vet allow_domains_file: ${vet_allow_file}"
 ok "general vet query routes to MEDICAL_INFO + VALIDATED + vet runtime allowlist"
 
-if ! grep -Eq '^medical_cialis_2[[:space:]]+https://cochranelibrary.com/search\?text=tadalafil[[:space:]]+cochranelibrary\.com$' "${ROOT}/config/evidence_keymap_v1.tsv"; then
+if ! grep -Eq '^medical_cialis_2[[:space:]]+https://cochranelibrary.com/search\?text=tadalafil[[:space:]]+cochranelibrary\.com$' "${ROOT}/config/evidence_keymap.tsv"; then
   die "expected tadalafil secondary key to map to cochranelibrary.com"
 fi
 ok "tadalafil secondary evidence key maps to cochranelibrary.com"

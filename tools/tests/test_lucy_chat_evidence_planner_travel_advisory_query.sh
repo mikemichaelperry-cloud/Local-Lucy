@@ -20,7 +20,7 @@ cat > "${FAKE_ROOT}/config/evidence_keys_allowlist.txt" <<'EOF'
 travel_egypt_1
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 is it safe now to travel to egypt	EVIDENCE	travel_egypt_1
 EOF
 

@@ -12,6 +12,95 @@ from typing import Literal
 AugmentationPolicy = Literal["disabled", "fallback_only", "direct_allowed"]
 
 
+# ---------------------------------------------------------------------------
+# Module-level compiled regexes — avoids recompiling on every policy call
+# ---------------------------------------------------------------------------
+
+# Pre-compiled financial anchor regexes for _is_personal_finance_reasoning
+_FINANCIAL_ANCHOR_RE = tuple(re.compile(rf'\b{re.escape(anchor)}\b') for anchor in (
+    "bank", "balance", "savings", "retirement", "pension", "budget", "budgeting",
+    "invest", "investing", "investment", "stock", "stocks", "bond",
+    "bonds", "portfolio", "401k", "ira", "roth", "mutual fund",
+    "etf", "mortgage", "loan", "debt", "credit", "income", "salary",
+    "expense", "expenses", "net worth", "wealth", "financial",
+    "money", "cash", "fund", "funds", "asset", "assets", "tax", "taxes",
+    "risk tolerance", "credit score", "capital gains", "insurance", "premium",
+))
+
+# Pre-compiled historical query regexes for _is_historical_query
+_YEAR_RE = re.compile(r'\b(1\d{3}|20\d{2})\b')
+_UNAMBIGUOUS_HIST_RE = tuple(re.compile(p) for p in (
+    r'\btreaty of\b',
+    r'\bbattle of\b',
+    r'\bwar in\b',
+    r'\bwar of\b',
+    r'\bthe fall of\b',
+    r'\bthe rise of\b',
+    r'\bwho won the .*\b(battle|war)\b',
+    r'\bwho lost the .*\b(battle|war)\b',
+    r'\bwho started the\b',
+    r'\bwho (led|commanded|defeated) the\b',
+    r'\bthe (black death|holocaust|renaissance|reformation|crusades)\b',
+    r'\bin (ancient|medieval|colonial|victorian|roman|greek)\b',
+    r'\bhistory of\b',
+    r'\bhistorical\b',
+))
+_HIST_PHRASES_RE = tuple(re.compile(p) for p in (
+    r'\bwhat was the\b',
+    r'\bwhat were the\b',
+    r'\bwhat caused the\b',
+    r'\bwhat happened during\b',
+    r'\bwhat happened in\b',
+    r'\bwho won\b',
+    r'\bwho lost\b',
+    r'\bhistory of\b',
+    r'\bhistorical\b',
+))
+
+# Pre-compiled animal term regex for requires_evidence_mode
+_ANIMAL_MULTI = frozenset({
+    "guinea pig", "guinea pigs", "sugar glider", "sugar gliders",
+    "bearded dragon", "bearded dragons",
+})
+_ANIMAL_SINGLE_RE = re.compile(
+    r'(?<![a-z])(?:' + '|'.join(map(re.escape, [
+        "dog", "dogs", "puppy", "puppies", "canine",
+        "cat", "cats", "kitten", "kittens", "feline",
+        "equine", "horse", "horses", "pony", "ponies",
+        "bovine", "cow", "cows", "bull", "bulls", "calf", "calves",
+        "ovine", "sheep", "lamb", "lambs", "goat", "goats",
+        "pig", "pigs", "swine", "hog", "hogs",
+        "avian", "bird", "birds", "parrot", "parrots", "parakeet", "parakeets",
+        "canary", "canaries", "finch", "finches", "budgie", "budgies",
+        "cockatiel", "cockatiels", "macaw", "macaws",
+        "rabbit", "rabbits", "bunny", "bunnies",
+        "hamster", "hamsters", "gerbil", "gerbils",
+        "rat", "rats", "mouse", "mice",
+        "ferret", "ferrets", "chinchilla", "chinchillas",
+        "hedgehog", "hedgehogs",
+        "reptile", "reptiles",
+        "snake", "snakes", "python", "pythons",
+        "lizard", "lizards", "gecko", "geckos", "iguana", "iguanas",
+        "chameleon", "chameleons",
+        "turtle", "turtles", "tortoise", "tortoises",
+        "fish", "fishes", "betta", "bettas", "goldfish", "koi",
+        "chicken", "chickens", "hen", "hens", "rooster", "roosters",
+        "duck", "ducks", "goose", "geese",
+        "alpaca", "alpacas", "llama", "llamas",
+        "camel", "camels", "donkey", "donkeys", "mule", "mules",
+    ])) + r')(?![a-z])'
+)
+
+# Pre-compiled short financial keyword regex for requires_evidence_mode
+_SHORT_FINANCIAL_KEYWORDS = frozenset({
+    "nyse", "ftse", "cpi", "gdp", "401k", "ira", "roth", "etf",
+    "bond", "risk", "roi", "debt", "loan", "bank", "cash",
+})
+_SHORT_FINANCIAL_RE = re.compile(
+    r'\b(?:' + '|'.join(map(re.escape, _SHORT_FINANCIAL_KEYWORDS)) + r')\b'
+)
+
+
 def normalize_augmentation_policy(raw: str) -> AugmentationPolicy:
     """
     Normalize augmentation policy string to canonical value.
@@ -83,38 +172,83 @@ def _is_personal_finance_reasoning(query: str) -> bool:
         "how should i",
         "how much should i",
         "how do i",
+        "how do taxes",
+        "how does",
+        "explain how",
         "should i",
         "would it be better",
         "is it worth",
         "is it a good idea",
         "advice on",
         "advice about",
+        "advice",
         "plan for",
         "planning for",
         "strategy for",
         "help me decide",
         "help me choose",
         "recommend",
+        "rules",
     ]
 
     # Financial topic anchors — ensure we only downgrade when financial topics
     # are actually present (prevent unrelated reasoning from bypassing evidence)
     financial_anchors = [
-        "bank", "balance", "savings", "retirement", "pension", "budget",
+        "bank", "balance", "savings", "retirement", "pension", "budget", "budgeting",
         "invest", "investing", "investment", "stock", "stocks", "bond",
         "bonds", "portfolio", "401k", "ira", "roth", "mutual fund",
         "etf", "mortgage", "loan", "debt", "credit", "income", "salary",
         "expense", "expenses", "net worth", "wealth", "financial",
-        "money", "cash", "fund", "funds", "asset", "assets",
+        "money", "cash", "fund", "funds", "asset", "assets", "tax", "taxes",
+        "risk tolerance", "credit score", "capital gains", "insurance", "premium",
     ]
 
     has_reasoning = any(ind in q_lower for ind in reasoning_indicators)
-    has_financial = any(
-        re.search(rf'\b{re.escape(anchor)}\b', q_lower)
-        for anchor in financial_anchors
-    )
+    has_financial = any(p.search(q_lower) for p in _FINANCIAL_ANCHOR_RE)
 
     return has_reasoning and has_financial
+
+
+def _is_historical_query(query: str) -> bool:
+    """Detect whether a query is clearly about historical events.
+
+    Historical queries should not trigger medical or financial evidence mode.
+    Negation-aware: queries that explicitly negate history or use current-news
+    markers are NOT treated as historical unless they contain an unambiguous
+    historical anchor (year, "battle of", "treaty of", etc.).
+
+    Examples:
+        "What was the Treaty of Versailles?" -> True
+        "What caused the Great Depression?" -> True
+        "Not history - current Israeli news" -> False
+        "Not historical, what is happening today in Gaza?" -> False
+    """
+    if not query:
+        return False
+    q = query.lower().strip()
+
+    # Year patterns — 4-digit year between 1000-2999
+    if _YEAR_RE.search(q):
+        return True
+
+    # Unambiguous historical anchors that override negation/current-news markers
+    if any(p.search(q) for p in _UNAMBIGUOUS_HIST_RE):
+        return True
+
+    # Negation / current-news context: if the user explicitly negates history
+    # or uses current-news markers, skip broad historical heuristics.
+    current_news_markers = (
+        "not history", "not historical", "current", "latest", "today",
+        "news", "breaking", "recent",
+    )
+    if any(marker in q for marker in current_news_markers):
+        return False
+
+    # Remaining historical phrases (broad heuristics)
+    if any(p.search(q) for p in _HIST_PHRASES_RE):
+        return True
+
+    return False
 
 
 def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[bool, str]:
@@ -142,6 +276,11 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     if not query:
         return False, "default_light"
     
+    # Historical query guard — historical events should not trigger medical or
+    # financial evidence mode. The local model can answer history questions.
+    if _is_historical_query(query):
+        return False, "historical_context"
+    
     # Normalize for keyword matching
     normalized = query.lower()
     
@@ -157,101 +296,108 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     has_creative_noun = any(n in normalized for n in creative_nouns)
     if has_creative_verb and has_creative_noun:
         return False, "creative_writing"
+    # Broadened catch: noun-only creative requests with child-audience markers
+    # (e.g. "stories for kids", "bedtime stories", "fairy tales for children")
+    if has_creative_noun and any(marker in normalized for marker in [
+        "for kids", "for children", "bedtime", "fairy tale", "folktale", "fable",
+    ]):
+        return False, "creative_writing"
     
     # Veterinary / animal health — check FIRST so vet-specific queries get
     # veterinary_context instead of being swallowed by medical_context.
     
-    # Tier 1: Specific animal species — immediate trigger (very high confidence)
-    specific_animal_terms = [
-        "dog", "dogs", "puppy", "puppies", "canine",
-        "cat", "cats", "kitten", "kittens", "feline",
-        "equine", "horse", "horses", "pony", "ponies",
-        "bovine", "cow", "cows", "bull", "bulls", "calf", "calves",
-        "ovine", "sheep", "lamb", "lambs", "goat", "goats",
-        "pig", "pigs", "swine", "hog", "hogs",
-        "avian", "bird", "birds", "parrot", "parrots", "parakeet", "parakeets",
-        "canary", "canaries", "finch", "finches", "budgie", "budgies",
-        "cockatiel", "cockatiels", "macaw", "macaws",
-        "rabbit", "rabbits", "bunny", "bunnies",
-        "hamster", "hamsters", "gerbil", "gerbils",
-        "rat", "rats", "mouse", "mice",
-        "guinea pig", "guinea pigs",
-        "ferret", "ferrets", "chinchilla", "chinchillas",
-        "hedgehog", "hedgehogs",
-        "sugar glider", "sugar gliders",
-        "reptile", "reptiles",
-        "snake", "snakes", "python", "pythons",
-        "lizard", "lizards", "gecko", "geckos", "iguana", "iguanas",
-        "bearded dragon", "bearded dragons",
-        "chameleon", "chameleons",
-        "turtle", "turtles", "tortoise", "tortoises",
-        "fish", "fishes", "betta", "bettas", "goldfish", "koi",
-        "chicken", "chickens", "hen", "hens", "rooster", "roosters",
-        "duck", "ducks", "goose", "geese",
-        "turkey", "turkeys",
-        "alpaca", "alpacas", "llama", "llamas",
-        "camel", "camels", "donkey", "donkeys", "mule", "mules",
+    # Memory-query guard: queries that ask about remembering pet names or
+    # general pet facts should not trigger veterinary context.
+    memory_pet_phrases = [
+        "my dog's name", "my cat's name", "name of my dog", "name of my cat",
+        "remember my dog", "remember my cat", "do you remember my dog",
+        "do you remember my cat", "what is my dog's name", "what is my cat's name",
     ]
-    for term in specific_animal_terms:
-        if " " in term:
-            # Multi-word term — substring match is safe
+    if any(p in normalized for p in memory_pet_phrases):
+        # Skip veterinary trigger for memory queries about pets
+        pass
+    else:
+        # Tier 1: Specific animal species — immediate trigger (very high confidence)
+        if _ANIMAL_SINGLE_RE.search(normalized):
+            return True, "veterinary_context"
+        for term in _ANIMAL_MULTI:
             if term in normalized:
                 return True, "veterinary_context"
-        else:
-            # Single-word term — require word boundaries to avoid
-            # matching inside other words (e.g., "cat" in "medication")
-            pattern = r'(?<![a-z])' + re.escape(term) + r'(?![a-z])'
-            if re.search(pattern, normalized):
+        
+        # Tier 2: General animal terms — require health context to avoid false positives
+        # (e.g., "animal rights", "pet project", "pet peeve")
+        general_animal_terms = ["pet", "pets", "animal", "animals", "livestock"]
+        has_general_animal = any(t in normalized for t in general_animal_terms)
+        if has_general_animal:
+            health_indicators = [
+                "sick", "ill", "hurt", "pain", "injury", "injured", "wound", "wounded",
+                "bleeding", "vomit", "vomiting", "diarrhea", "cough", "sneeze", "sneezing",
+                "fever", "tired", "lethargic", "limp", "limping", "lame", "lameness",
+                "itch", "itchy", "scratch", "scratching", "bald", "hair loss", "losing hair",
+                "plucking feathers", "plucking",
+                "weight loss", "not eating", "wont eat", "refusing food", "dehydrated",
+                "swollen", "lump", "bump", "tumor", "cancer", "infection", "infected",
+                "parasite", "worm", "flea", "tick", "mite", "mange", "rabies",
+                "surgery", "operation", "treatment", "medication", "medicine", "drug",
+                "vaccine", "vaccination", "shot", "deworm", "neuter", "spay", "castrate",
+                "vet", "veterinary", "veterinarian", "clinic", "hospital",
+                "symptom", "symptoms", "diagnosis", "diagnose", "disease", "condition",
+                "problem", "issue", "concern", "worried", "worry", "wrong",
+            ]
+            if any(h in normalized for h in health_indicators):
+                return True, "veterinary_context"
+        
+        # Tier 3: Veterinary-specific procedures, sources, and medications
+        veterinary_procedures = [
+            "veterinary", "vet ", "veterinarian", "animal health",
+            "pet medication", "dog medication", "cat medication",
+            "heartworm", "flea treatment", "tick treatment", "deworm",
+            "parvovirus", "distemper", "kennel cough", "bordetella",
+            "spay", "neuter", "castration", "ovariohysterectomy",
+            "hip dysplasia", "luxating patella", "bloat", "gdv",
+            "pancreatitis", "kidney disease", "liver disease",
+            "diabetes in dogs", "diabetes in cats", "hyperthyroidism in cats",
+            "cushing's disease in dogs", "addison's disease in dogs",
+            "merck vet", "vcahospitals", "avma", "aaha",
+        ]
+        for keyword in veterinary_procedures:
+            if keyword in normalized:
                 return True, "veterinary_context"
     
-    # Tier 2: General animal terms — require health context to avoid false positives
-    # (e.g., "animal rights", "pet project", "pet peeve")
-    general_animal_terms = ["pet", "pets", "animal", "animals", "livestock"]
-    has_general_animal = any(t in normalized for t in general_animal_terms)
-    if has_general_animal:
-        health_indicators = [
-            "sick", "ill", "hurt", "pain", "injury", "injured", "wound", "wounded",
-            "bleeding", "vomit", "vomiting", "diarrhea", "cough", "sneeze", "sneezing",
-            "fever", "tired", "lethargic", "limp", "limping", "lame", "lameness",
-            "itch", "itchy", "scratch", "scratching", "bald", "hair loss", "losing hair",
-            "plucking feathers", "plucking",
-            "weight loss", "not eating", "wont eat", "refusing food", "dehydrated",
-            "swollen", "lump", "bump", "tumor", "cancer", "infection", "infected",
-            "parasite", "worm", "flea", "tick", "mite", "mange", "rabies",
-            "surgery", "operation", "treatment", "medication", "medicine", "drug",
-            "vaccine", "vaccination", "shot", "deworm", "neuter", "spay", "castrate",
-            "vet", "veterinary", "veterinarian", "clinic", "hospital",
-            "symptom", "symptoms", "diagnosis", "diagnose", "disease", "condition",
-            "problem", "issue", "concern", "worried", "worry", "wrong",
-        ]
-        if any(h in normalized for h in health_indicators):
-            return True, "veterinary_context"
-    
-    # Tier 3: Veterinary-specific procedures, sources, and medications
-    veterinary_procedures = [
-        "veterinary", "vet ", "veterinarian", "animal health",
-        "pet medication", "dog medication", "cat medication",
-        "heartworm", "flea treatment", "tick treatment", "deworm",
-        "parvovirus", "distemper", "kennel cough", "bordetella",
-        "spay", "neuter", "castration", "ovariohysterectomy",
-        "hip dysplasia", "luxating patella", "bloat", "gdv",
-        "pancreatitis", "kidney disease", "liver disease",
-        "diabetes in dogs", "diabetes in cats", "hyperthyroidism in cats",
-        "cushing's disease in dogs", "addison's disease in dogs",
-        "merck vet", "vcahospitals", "avma", "aaha",
+    # Education-context negation: pediatric terms in an education/finance context
+    # should not trigger medical_context (e.g. "child's education", "school fees").
+    education_context_terms = [
+        "education", "school", "college", "university", "tuition", "homework",
+        "grades", "classroom", "teacher", "student", "scholarship", "academic",
+        "curriculum", "lesson", "lessons", "study", "studying", "exam", "tests",
+        "savings", "save for", "saving for", "budget", "budgeting", "fund",
     ]
-    for keyword in veterinary_procedures:
-        if keyword in normalized:
-            return True, "veterinary_context"
-    
+    has_education_context = any(t in normalized for t in education_context_terms)
+    if has_education_context:
+        # Check if the query contains pediatric indicators without health symptoms
+        pediatric_terms = ["baby", "child", "kid", "toddler", "infant",
+                           "my son", "my daughter", "year old", "years old"]
+        has_pediatric = any(t in normalized for t in pediatric_terms)
+        if has_pediatric:
+            # Only skip if no health symptoms are present
+            health_symptoms = [
+                "sick", "ill", "hurt", "pain", "fever", "cough", "vomit",
+                "diarrhea", "rash", "swelling", "bleeding", "wound", "injury",
+                "symptom", "symptoms", "doctor", "hospital", "medicine",
+            ]
+            if not any(h in normalized for h in health_symptoms):
+                return False, "education_context"
+
     # Medical/health keywords — comprehensive coverage for safety-critical queries
     medical_keywords = [
         # General health inquiry
         "symptom", "symptoms", "diagnosis", "treatment", "treat", "medication",
-        "disease", "condition", "prescription", "drug", "vaccine",
+        "disease", "prescription", "drug", "vaccine",
         "vaccination", "pregnancy", "pregnant", "cancer", "diabetes",
         "heart attack", "stroke", "infection", "virus", "bacteria",
-        "pain", "headache", "injury", "emergency", "hospital", "doctor", "medicine",
+        "pain", "headache", "injury", "hospital", "doctor", "medicine",
+        "emergency room", "emergency department", "emergency surgery",
+        "medical emergency", "health emergency",
         # Body parts + symptom combinations (critical for catching novel phrasings)
         "chest", "breath", "breathing", "shortness of breath",
         "fever", "temperature", "feel good", "not feeling", "feel well", "feeling bad",
@@ -262,7 +408,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "chills", "shivering", "dehydration", "seizure", "convulsion", "paralysis",
         "palpitation", "sweating", "hallucination", "delusion", "panic",
         # Pediatric indicators
-        "baby", "child", "kid", "toddler", "infant", "2-year-old", "3-year-old",
+        "baby", "child", "toddler", "infant", "2-year-old", "3-year-old",
         "4-year-old", "5-year-old", "year old", "years old", "my son", "my daughter",
         # Medications and interactions
         "tadalafil", "cialis", "viagra", "sildenafil", "interaction", "interact",
@@ -362,13 +508,13 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         # Investment and planning (NEW)
         "invest", "investing", "investment", "retirement", "401k", "ira", "roth",
         "bitcoin", "ethereum", "crypto", "cryptocurrency",
-        "economy", "economic", "stock", "stocks", "portfolio",
+        "economy", "economic", "stocks", "portfolio",
         "mutual fund", "etf", "bond", "bonds", "dividend", "yield",
         "asset", "risk", "return", "roi", "capital gains", "working capital", "equity",
         "debt", "loan", "mortgage", "refinance", "credit", "credit score",
         "bankruptcy", "savings", "account", "bank", "credit card",
         "salary", "income", "expense", "budget", "valuation", "worth",
-        "net worth", "wealth", "pension", "insurance", "premium",
+        "net worth", "wealth", "pension", "insurance", "premium", "cash",
     ]
     
     # Legal / regulatory — statutory text changes slowly but case law is live
@@ -377,7 +523,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "court ruling", "supreme court", "recent ruling", "precedent",
         "statute", "ordinance", "compliance requirement", "penalty for",
         # Licenses and permits (NEW)
-        "business license", "license", "permit", "zoning",
+        "business license", "driver's license", "professional license", "permit", "zoning",
         # Immigration and citizenship (NEW)
         "citizenship", "visa", "immigration", "passport", "work permit",
         # Employment law (NEW)
@@ -394,7 +540,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         # Family law (NEW)
         "power of attorney", "guardianship", "custody", "child support",
         "alimony", "divorce", "adoption", "wills", "estate", "inheritance",
-        "probate", "trust",
+        "probate", "trust fund", "living trust", "trustee", "trust law", "trust agreement",
         # Business structures (NEW)
         "llc", "incorporation", "partnership", "nonprofit",
         # Tax and audit (NEW)
@@ -413,16 +559,11 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     # Financial / market data — accuracy matters
     financial_match = False
     matched_financial_keyword = ""
-    for keyword in financial_keywords:
-        if len(keyword) <= 4:
-            # Short keywords require word boundaries to avoid false positives
-            # (e.g. "ira" inside "iran", "roth" inside "troth")
-            if re.search(rf'\b{re.escape(keyword)}\b', normalized):
-                financial_match = True
-                matched_financial_keyword = keyword
-                break
-        else:
-            if keyword in normalized:
+    if _SHORT_FINANCIAL_RE.search(normalized):
+        financial_match = True
+    else:
+        for keyword in financial_keywords:
+            if len(keyword) > 4 and keyword in normalized:
                 financial_match = True
                 matched_financial_keyword = keyword
                 break

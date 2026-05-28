@@ -5,8 +5,8 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
 ALLOW="${ROOT}/config/evidence_keys_allowlist.txt"
-KEYMAP="${ROOT}/config/evidence_keymap_v1.tsv"
-QMAP="${ROOT}/config/query_to_keys_v1.tsv"
+KEYMAP="${ROOT}/config/evidence_keymap.tsv"
+QMAP="${ROOT}/config/query_to_keys.tsv"
 VET_RUNTIME="${ROOT}/config/trust/generated/vet_runtime.txt"
 
 ok(){ echo "OK: $*"; }

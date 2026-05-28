@@ -33,16 +33,18 @@ async def stream_kokoro_tts(
     """
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent / "voice" / "backends"))
-    from kokoro_backend import get_pipeline, load_runtime_dependencies, DEFAULT_SAMPLE_RATE
-    
+    from kokoro_backend import get_pipeline, load_runtime_dependencies, DEFAULT_SAMPLE_RATE, resolve_device
+
     # Load dependencies
     _, np_module, _ = load_runtime_dependencies()
-    
+
     # Get or create pipeline (this is cached)
+    # Respect LUCY_VOICE_KOKORO_DEVICE env var if caller didn't override
+    effective_device = device if device != "cuda" else resolve_device(os.environ)
     pipeline = get_pipeline(
         lang_code=lang_code,
         repo_id="hexgrad/Kokoro-82M",
-        device=device,
+        device=effective_device,
     )
     
     # Start aplay process with stdin input for streaming

@@ -4,8 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 ALLOW="${ROOT}/config/evidence_keys_allowlist.txt"
-KMAP="${ROOT}/config/evidence_keymap_v1.tsv"
-QMAP="${ROOT}/config/query_to_keys_v1.tsv"
+KMAP="${ROOT}/config/evidence_keymap.tsv"
+QMAP="${ROOT}/config/query_to_keys.tsv"
 MED_ALLOW="${ROOT}/config/trust/generated/medical_runtime.txt"
 
 ok(){ echo "OK: $*"; }

@@ -1,11 +1,21 @@
-version: 0
+version: 1
 name: local-lucy-keel
-updated: null
+updated: "2026-05-23T17:52:30+03:00"
 
 capabilities:
   tool_access: disabled
   internet_access: disabled
   filesystem_write: disabled
+
+provider_policy:
+  medical: EVIDENCE with trusted sources only
+  veterinary: EVIDENCE with trusted sources only
+  financial_ephemeral: AUGMENTED (live data required)
+  legal: AUGMENTED (evidence mode)
+  translation: LOCAL (multilingual capability is built-in)
+  weather: WEATHER
+  time: TIME
+  news: NEWS
 
 session_policy:
   memory:
@@ -15,7 +25,6 @@ session_policy:
     missing_response_exact: "not in memory"
 
   live_time_sensitive:
-    # prices/news/weather/stocks/latest/current/today/now
     without_tools_response_exact: "Not provided in this session's user messages."
 
   speculation:
@@ -24,3 +33,20 @@ session_policy:
 
 refusals:
   evidence_only_refusal_exact: "Not provided in this session's user messages."
+
+hmi_authority:
+  backend_is_authoritative: true
+  ui_must_not_fabricate_state: true
+  state_pipeline_source_of_truth: backend
+
+multilingual_capability:
+  can_translate: true
+  can_understand_multiple_languages: true
+  does_not_require_internet: true
+  do_not_deny_translation_ability: true
+
+auto_learn:
+  default: off
+  enable_env: LUCY_AUTO_LEARN
+  enabled_value: "1"
+  note: Disabled during development unless explicitly testing learner behavior

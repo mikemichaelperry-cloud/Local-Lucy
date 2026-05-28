@@ -62,6 +62,12 @@ export LUCY_SESSION_MEMORY=1
 # Reduces VRAM usage for transformer attention without accuracy loss
 export OLLAMA_FLASH_ATTENTION=1
 
+# Quantize KV cache to q8_0: cuts KV-cache VRAM ~50% with no perceptible
+# quality loss. Requires Flash Attention (enabled above).
+# For qwen3:14b @ 2048 ctx, this frees ~1 GB, allowing Whisper GPU + LLM
+# to coexist on RTX 3060 12GB without OOM.
+export OLLAMA_KV_CACHE_TYPE=q8_0
+
 # Force TTS (Kokoro) to CPU.
 # With 1024 context (local-lucy-fast) + Whisper large-v3-turbo on GPU,
 # VRAM is fully utilized (~11.2 GB / 12 GB).  Kokoro (~0.2 GB) does not fit

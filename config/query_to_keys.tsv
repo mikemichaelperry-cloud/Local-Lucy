@@ -1,0 +1,136 @@
+# query_to_keys_v1.tsv
+# phrase<TAB>mode<TAB>keys(space-separated)
+# mode: NEWS|EVIDENCE|ANY
+latest israeli news	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+israeli news	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+latest israel news	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+israel news	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+israel	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+gaza	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+hamas	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+hezbollah	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+iran	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+idf	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+knesset	NEWS	news_israel_1 news_israel_2 news_israel_3 news_israel_4
+
+latest world news	NEWS	news_world_1 news_world_2 news_world_3 news_world_4 news_world_5 news_world_6
+world news	NEWS	news_world_1 news_world_2 news_world_3 news_world_4 news_world_5 news_world_6
+global news	NEWS	news_world_1 news_world_2 news_world_3 news_world_4 news_world_5 news_world_6
+news	NEWS	news_world_1 news_world_2 news_world_3 news_world_4 news_world_5 news_world_6
+australia	NEWS	news_au_1 news_au_2 news_au_3 news_world_1 news_world_2
+australian news	NEWS	news_au_1 news_au_2 news_au_3 news_world_1 news_world_2
+latest australian news	NEWS	news_au_1 news_au_2 news_au_3 news_world_1 news_world_2
+canberra	NEWS	news_au_1 news_au_2 news_au_3 news_world_1
+sydney	NEWS	news_au_1 news_au_2 news_au_3 news_world_1
+melbourne	NEWS	news_au_1 news_au_2 news_au_3 news_world_1
+
+global climate policy	EVIDENCE	policy_climate_1 policy_climate_2
+climate policy	EVIDENCE	policy_climate_1 policy_climate_2
+recent climate policy developments	EVIDENCE	policy_climate_1 policy_climate_2
+recent global climate policy developments in past week	EVIDENCE	policy_climate_1 policy_climate_2
+ai safety	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+ai regulation	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+ai governance	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+technology governance	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+most significant developments in ai	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+developments in ai	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest ai developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent ai developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+artificial intelligence developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+genai developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest genai developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent genai developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+genai updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest genai updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent genai updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+llm developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest llm developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent llm developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+llm updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest llm updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent llm updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+foundation model developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest foundation model developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent foundation model developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+foundation models developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest foundation models developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent foundation models developments	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+foundation model releases	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest foundation model releases	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent foundation model releases	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+foundation models releases	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest foundation models releases	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent foundation models releases	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+ai policy updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest ai policy updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent ai policy updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+ai governance updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest ai governance updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent ai governance updates	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+ai model releases	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest ai model releases	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent ai model releases	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+model releases in ai	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+latest model releases in ai	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+recent model releases in ai	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+major labs about model evaluations	EVIDENCE	ai_labs_evals_1 ai_labs_evals_2
+statements made by major labs about model evaluations	EVIDENCE	ai_labs_evals_1 ai_labs_evals_2
+recent ai safety and ai regulation developments in past week	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
+technology regulation	EVIDENCE	policy_regulation_1 policy_regulation_2
+technology regulation implications	EVIDENCE	policy_regulation_1 policy_regulation_2
+technology regulation implications across climate policy and ai safety	EVIDENCE	policy_regulation_1 policy_regulation_2
+
+usd ils	EVIDENCE	fx_usd_ils_1
+usd to ils	EVIDENCE	fx_usd_ils_1
+exchange rate	EVIDENCE	fx_usd_ils_1
+fx	EVIDENCE	fx_usd_ils_1
+cpi inflation rate	EVIDENCE	cpi_us_1 cpi_us_2
+cpi inflation rate and release date	EVIDENCE	cpi_us_1 cpi_us_2
+consumer price index release date	EVIDENCE	cpi_us_1 cpi_us_2
+safe to travel to lebanon	EVIDENCE	travel_lebanon_1 travel_lebanon_2
+travel to lebanon right now	EVIDENCE	travel_lebanon_1 travel_lebanon_2
+official advisories for lebanon	EVIDENCE	travel_lebanon_1 travel_lebanon_2
+cialis	EVIDENCE	medical_cialis_1 medical_cialis_2
+tadalafil	EVIDENCE	medical_cialis_1 medical_cialis_2
+what is cialis	EVIDENCE	medical_cialis_1 medical_cialis_2
+aspirin	EVIDENCE	medical_aspirin_1 medical_aspirin_2
+what is aspirin	EVIDENCE	medical_aspirin_1 medical_aspirin_2
+what is aspirin for	EVIDENCE	medical_aspirin_1 medical_aspirin_2
+aspirin dose	EVIDENCE	medical_aspirin_1 medical_aspirin_2
+safe dose of aspirin	EVIDENCE	medical_aspirin_1 medical_aspirin_2
+amoxicillin	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
+amoxycillin	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
+amoxycilin	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
+amoxicillin dose	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
+amoxicillin dosage	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
+serious infection amoxicillin dose	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
+hypertension medication	EVIDENCE	medical_hypertension_1 medical_hypertension_2
+medication for hypertension	EVIDENCE	medical_hypertension_1 medical_hypertension_2
+blood pressure medication	EVIDENCE	medical_hypertension_1 medical_hypertension_2
+high blood pressure medication	EVIDENCE	medical_hypertension_1 medical_hypertension_2
+medication for high blood pressure	EVIDENCE	medical_hypertension_1 medical_hypertension_2
+correct medication for high blood pressure	EVIDENCE	medical_hypertension_1 medical_hypertension_2
+what is the correct medication for high blood pressure	EVIDENCE	medical_hypertension_1 medical_hypertension_2
+dog tuna	EVIDENCE	vet_tuna_1 vet_tuna_2 vet_tuna_3 vet_tuna_4
+feed dog tuna	EVIDENCE	vet_tuna_1 vet_tuna_2 vet_tuna_3 vet_tuna_4
+safe to feed tuna	EVIDENCE	vet_tuna_1 vet_tuna_2 vet_tuna_3 vet_tuna_4
+safe to feed tuna to my dog	EVIDENCE	vet_tuna_1 vet_tuna_2 vet_tuna_3 vet_tuna_4
+is it safe to feed tuna to my dog	EVIDENCE	vet_tuna_1 vet_tuna_2 vet_tuna_3 vet_tuna_4
+tinned tuna	EVIDENCE	vet_tuna_1 vet_tuna_2 vet_tuna_3 vet_tuna_4
+canned tuna	EVIDENCE	vet_tuna_1 vet_tuna_2 vet_tuna_3 vet_tuna_4
+tuna in olive oil	EVIDENCE	vet_tuna_1 vet_tuna_2 vet_tuna_3 vet_tuna_4
+tuna in brine	EVIDENCE	vet_tuna_1 vet_tuna_2 vet_tuna_3 vet_tuna_4
+dog symptoms	EVIDENCE	vet_general_1 vet_general_2 vet_general_5 vet_general_7
+cat symptoms	EVIDENCE	vet_general_1 vet_general_2 vet_general_6 vet_general_7
+my dog is vomiting	EVIDENCE	vet_general_1 vet_general_5 vet_general_7 vet_general_8
+my dog has diarrhea	EVIDENCE	vet_general_1 vet_general_5 vet_general_7 vet_general_8
+my cat is not eating	EVIDENCE	vet_general_1 vet_general_6 vet_general_7 vet_general_8
+dog ate chocolate	EVIDENCE	vet_general_3 vet_general_1 vet_general_2 vet_general_8
+dog ate grapes	EVIDENCE	vet_general_3 vet_general_1 vet_general_2 vet_general_8
+xylitol dog	EVIDENCE	vet_general_3 vet_general_1 vet_general_2 vet_general_8
+pet poison	EVIDENCE	vet_general_3 vet_general_1 vet_general_2 vet_general_8
+can i give my dog ibuprofen	EVIDENCE	vet_general_1 vet_general_2 vet_general_7 vet_general_8
+can i give my cat ibuprofen	EVIDENCE	vet_general_1 vet_general_2 vet_general_7 vet_general_8
+dog emergency	EVIDENCE	vet_general_3 vet_general_4 vet_general_2 vet_general_8
+cat emergency	EVIDENCE	vet_general_3 vet_general_4 vet_general_2 vet_general_8
+vet advice	EVIDENCE	vet_general_1 vet_general_2 vet_general_4 vet_general_7

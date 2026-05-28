@@ -58,6 +58,8 @@ def mock_state_manager():
     sm = MagicMock()
     sm.read_last_route.return_value = None
     sm.read_last_outcome.return_value = None
+    # write_batch is the modern API; StateWriter prefers it when available
+    sm.write_batch = MagicMock()
     return sm
 
 
@@ -123,26 +125,24 @@ def sample_context():
 class TestSQLiteWrites:
     def test_sqlite_route_write(self, writer, mock_state_manager, sample_route, sample_result, sample_context):
         writer._write_state_to_sqlite(sample_route, sample_result, sample_context)
-        assert mock_state_manager.write_route.called
-        args, _ = mock_state_manager.write_route.call_args
-        payload = args[0]
-        assert payload["intent"] == "local_answer"
-        assert payload["confidence"] == 0.95
-        assert payload["strategy"] == "LOCAL"
-        assert payload["metadata"]["question"] == "What is the meaning of life?"
-        assert payload["metadata"]["provider"] == "local"
-        assert payload["metadata"]["final_mode"] == "LOCAL"
+        assert mock_state_manager.write_batch.called
+        route_payload, outcome_payload = mock_state_manager.write_batch.call_args[0]
+        assert route_payload["intent"] == "local_answer"
+        assert route_payload["confidence"] == 0.95
+        assert route_payload["strategy"] == "LOCAL"
+        assert route_payload["metadata"]["question"] == "What is the meaning of life?"
+        assert route_payload["metadata"]["provider"] == "local"
+        assert route_payload["metadata"]["final_mode"] == "LOCAL"
 
     def test_sqlite_outcome_write(self, writer, mock_state_manager, sample_route, sample_result, sample_context):
         writer._write_state_to_sqlite(sample_route, sample_result, sample_context)
-        assert mock_state_manager.write_outcome.called
-        args, _ = mock_state_manager.write_outcome.call_args
-        payload = args[0]
-        assert payload["success"] is True
-        assert payload["duration_ms"] == 123
-        assert payload["result"]["route"] == "LOCAL"
-        assert payload["result"]["outcome_code"] == "answered"
-        assert payload["error_message"] == ""
+        assert mock_state_manager.write_batch.called
+        route_payload, outcome_payload = mock_state_manager.write_batch.call_args[0]
+        assert outcome_payload["success"] is True
+        assert outcome_payload["duration_ms"] == 123
+        assert outcome_payload["result"]["route"] == "LOCAL"
+        assert outcome_payload["result"]["outcome_code"] == "answered"
+        assert outcome_payload["error_message"] == ""
 
     def test_sqlite_outcome_includes_memory_telemetry(self, writer, mock_state_manager, sample_route, sample_context):
         result = ExecutionResult(
@@ -159,8 +159,8 @@ class TestSQLiteWrites:
             },
         )
         writer._write_state_to_sqlite(sample_route, result, sample_context)
-        args, _ = mock_state_manager.write_outcome.call_args
-        result_meta = args[0]["result"]
+        route_payload, outcome_payload = mock_state_manager.write_batch.call_args[0]
+        result_meta = outcome_payload["result"]
         assert result_meta["memory_context_used"] == "session"
         assert result_meta["memory_mode_used"] == "recall"
         assert result_meta["memory_top_score"] == "0.87"
@@ -168,7 +168,7 @@ class TestSQLiteWrites:
         assert result_meta["memory_top_gap"] == "0.12"
 
     def test_sqlite_failure_logs_error(self, writer, mock_state_manager, sample_route, sample_result, sample_context, caplog):
-        mock_state_manager.write_route.side_effect = RuntimeError("disk full")
+        mock_state_manager.write_batch.side_effect = RuntimeError("disk full")
         with caplog.at_level(logging.ERROR, logger="test_state_writer"):
             with pytest.raises(RuntimeError, match="disk full"):
                 writer._write_state_to_sqlite(sample_route, sample_result, sample_context)
@@ -182,6 +182,7 @@ class TestSQLiteWrites:
             use_sqlite_state=False,
         )
         writer.write_state(sample_route, sample_result, sample_context)
+        assert not mock_state_manager.write_batch.called
         assert not mock_state_manager.write_route.called
         assert not mock_state_manager.write_outcome.called
 
@@ -195,12 +196,11 @@ class TestWriteState:
     def test_sqlite_write_invoked(self, writer, mock_state_manager, sample_route, sample_result, sample_context):
         """write_state() must call SQLite when use_sqlite_state=True."""
         writer.write_state(sample_route, sample_result, sample_context)
-        assert mock_state_manager.write_route.called
-        assert mock_state_manager.write_outcome.called
+        assert mock_state_manager.write_batch.called
 
     def test_sqlite_error_logged(self, writer, mock_state_manager, sample_route, sample_result, sample_context, caplog):
         """SQLite errors must be logged but not raise."""
-        mock_state_manager.write_route.side_effect = RuntimeError("disk full")
+        mock_state_manager.write_batch.side_effect = RuntimeError("disk full")
         with caplog.at_level(logging.ERROR, logger="test_state_writer"):
             writer.write_state(sample_route, sample_result, sample_context)
         assert "disk full" in caplog.text
@@ -404,8 +404,8 @@ class TestPIIRedaction:
             execution_time_ms=5000, metadata={},
         )
         writer.write_state(route, result, {"question": "What?"})
-        outcome_call = mock_state_manager.write_outcome.call_args
-        assert "[REDACTED-EMAIL]" in outcome_call[0][0]["error_message"]
+        _route_payload, outcome_payload = mock_state_manager.write_batch.call_args[0]
+        assert "[REDACTED-EMAIL]" in outcome_payload["error_message"]
 
 
 # ---------------------------------------------------------------------------
@@ -587,7 +587,7 @@ class TestJsonStateFiles:
         mock_sm = MagicMock()
         writer_sqlite = StateWriter("default", state_manager=mock_sm, logger=logging.getLogger("test"))
         writer_sqlite._write_state_to_sqlite(sample_route, sample_result, ctx)
-        route_call = mock_sm.write_route.call_args[0][0]
+        route_call, _outcome_call = mock_sm.write_batch.call_args[0]
         assert route_call["metadata"]["request_id"] == "a3f7b2d9e8c1d4e5"
 
 

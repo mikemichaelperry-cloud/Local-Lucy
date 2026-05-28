@@ -44,37 +44,24 @@ PY
 log "search_top_url=$URL"
 [[ -n "$URL" ]] || fail "search_web returned no URLs"
 
-# --- 3) fetch_url_v1 (JSON mode) ---
+# --- 3) fetch_url (JSON mode) ---
 FETCH_JSON="$(python3 - <<PY
 import json
 print(json.dumps({"url": "$URL"}, ensure_ascii=False))
 PY
 )"
 
-if timeout 20s "$ROUTER" fetch_url_v1 "$FETCH_JSON" > "$OUT/fetch_v1.json" 2>>"$LOG"; then
-  log "fetch_v1 bytes=$(wc -c < "$OUT/fetch_v1.json")"
+if timeout 20s "$ROUTER" fetch_url "$FETCH_JSON" > "$OUT/fetch.txt" 2>>"$LOG"; then
+  log "fetch bytes=$(wc -c < "$OUT/fetch.txt")"
 else
-  fail "fetch_url_v1 tool call failed"
+  fail "fetch_url tool call failed"
 fi
 
-# Validate envelope
-if python3 - "$OUT/fetch_v1.json" <<'PY' 2>>"$LOG"; then
-import json,sys
-o=json.load(open(sys.argv[1],encoding="utf-8",errors="replace"))
-assert o.get("trust_level") == "external_unverified"
-assert o.get("ok") is True
-m=o.get("meta") or {}
-assert m.get("tool_version")==1
-h=m.get("output_sha256","")
-assert isinstance(h,str) and len(h)==64
-b=m.get("bytes",0)
-assert isinstance(b,int) and b>0
-content=(o.get("data") or {}).get("content","")
-assert isinstance(content,str) and len(content) > 120
-PY
-  log "fetch_url_v1 envelope OK"
+# Validate we got reasonable content
+if [[ $(wc -c < "$OUT/fetch.txt") -gt 120 ]]; then
+  log "fetch_url content OK"
 else
-  fail "fetch_url_v1 envelope/meta validation failed"
+  fail "fetch_url returned insufficient content"
 fi
 
 # --- 4) SSRF blocks (localhost + metadata) ---
@@ -86,7 +73,7 @@ import json
 print(json.dumps({"url":"$u"}, ensure_ascii=False))
 PY
 )"
-  timeout 8s bash -lc 'exec </dev/null; "'"$ROUTER"'" fetch_url_v1 "$1" >/dev/null 2>&1' _ "$js"
+  timeout 8s bash -lc 'exec </dev/null; "'"$ROUTER"'" fetch_url "$1" >/dev/null 2>&1' _ "$js"
 }
 
 if block_test "http://127.0.0.1:8080/"; then

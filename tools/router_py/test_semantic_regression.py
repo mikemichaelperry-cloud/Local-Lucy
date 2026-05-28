@@ -73,7 +73,7 @@ def _get_embedding_model() -> Any:
             from sentence_transformers import SentenceTransformer
         except ImportError as exc:
             pytest.skip(f"sentence-transformers not installed: {exc}")
-        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
     return _embedding_model
 
 

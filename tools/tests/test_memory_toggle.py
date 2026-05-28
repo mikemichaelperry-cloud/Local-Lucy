@@ -19,13 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "router_py"))
 RUNTIME_V8 = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"
 STATE_FILE = RUNTIME_V8 / "state" / "current_state.json"
 MEMORY_FILE = RUNTIME_V8 / "state" / "chat_session_memory.txt"
-# Try snapshot path first, fall back to repo root
-LUCY_V8_SNAPSHOT = Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev"
-LUCY_V8_REPO = Path.home() / "lucy-v9"
-if (LUCY_V8_SNAPSHOT / "tools" / "runtime_control.py").exists():
-    LUCY_V8 = LUCY_V8_SNAPSHOT
-else:
-    LUCY_V8 = LUCY_V8_REPO
+LUCY_V8 = Path.home() / "lucy-v9"
 RUNTIME_CONTROL = LUCY_V8 / "tools" / "runtime_control.py"
 
 

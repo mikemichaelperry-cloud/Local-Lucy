@@ -47,8 +47,6 @@ try:
     # Main entry points
     from router_py.main import (
         execute_plan_python,
-        execute_plan_shell,
-        execute_plan_parity,
         ensure_control_env,
         RouterOutcome,
         DEFAULT_TIMEOUT,
@@ -106,8 +104,6 @@ except ImportError as e:
 __all__ = [
     # Main entry points
     "execute_plan_python",
-    "execute_plan_shell",
-    "execute_plan_parity",
     "ensure_control_env",
     "RouterOutcome",
     "DEFAULT_TIMEOUT",

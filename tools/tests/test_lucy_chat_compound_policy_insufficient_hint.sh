@@ -25,7 +25,7 @@ policy_regulation_1
 policy_regulation_2
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 recent global climate policy developments in past week	EVIDENCE	policy_climate_1 policy_climate_2
 recent ai safety and ai regulation developments in past week	EVIDENCE	policy_ai_gov_1 policy_ai_gov_2
 technology regulation implications across climate policy and ai safety	EVIDENCE	policy_regulation_1 policy_regulation_2

@@ -10,7 +10,7 @@ import urllib.request
 
 DISPATCH = os.path.expanduser("~/lucy/tools/internet/tool_router.sh")
 
-ALLOWED_TOOLS = {"search_web", "fetch_url", "fetch_url_v1"}
+ALLOWED_TOOLS = {"search_web", "fetch_url"}
 
 def post_chat(payload: dict) -> dict:
     # Ollama chat endpoint
@@ -136,7 +136,7 @@ def sanitize_args(tool: str, args: Dict[str, Any], fallback_query: str) -> Dict[
             if not (isinstance(dom, list) and all(isinstance(x, str) for x in dom)):
                 out.pop("domains", None)
 
-    elif tool == "fetch_url_v1":
+    elif tool == "fetch_url":
         url = out.get("url")
         if not isinstance(url, str) or not url.strip():
             out["url"] = fallback_query.strip()
@@ -149,10 +149,6 @@ def sanitize_args(tool: str, args: Dict[str, Any], fallback_query: str) -> Dict[
     return out
 
 def run_tool(tool: str, args: Dict[str, Any]) -> str:
-    # Backward-compat alias: force v1 fetch envelope
-    if tool == "fetch_url":
-        tool = "fetch_url_v1"
-
     if tool not in ALLOWED_TOOLS:
         return json.dumps({"error": "tool_not_allowed", "name": tool})
     args_json = json.dumps(args, ensure_ascii=False)

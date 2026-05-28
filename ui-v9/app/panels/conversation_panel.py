@@ -326,6 +326,7 @@ class ConversationPanel(QFrame):
 
     def _emit_submit_requested(self) -> None:
         self.submit_requested.emit(self.draft_text())
+        self._draft.clear()
 
     def _sync_submit_state(self) -> None:
         self._submit_button.setEnabled(self._operator_submit_enabled)
@@ -716,6 +717,8 @@ class ConversationPanel(QFrame):
         if widget.toPlainText() == text:
             self._debug_log("text unchanged, skipping")
             return
+        # Clear the document to prevent style/resource leakage from previous HTML
+        widget.clear()
         if self._looks_like_html(text):
             widget.setHtml(text)
         elif self._contains_url(text):

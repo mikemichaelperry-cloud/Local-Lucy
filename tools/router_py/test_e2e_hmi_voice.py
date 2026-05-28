@@ -145,10 +145,9 @@ class TestVoiceLocalRoute:
             ctx = {"question": "What is 2+2?", "surface": "voice"}
             engine.execute(intent, route, context=ctx, use_python_path=True)
 
-        assert engine.state_manager.write_route.called
-        assert engine.state_manager.write_outcome.called
-        args, _ = engine.state_manager.write_route.call_args
-        assert args[0]["metadata"]["question"] == "What is 2+2?"
+        assert engine.state_manager.write_batch.called
+        route_args, outcome_args = engine.state_manager.write_batch.call_args[0]
+        assert route_args["metadata"]["question"] == "What is 2+2?"
 
     def test_voice_surface_propagated_to_metadata(self, engine, tmp_state_dir):
         """Voice surface should be available in execution context."""
@@ -195,8 +194,8 @@ class TestHmiTimeRoute:
             route = _make_route("TIME", "time", "free", confidence=0.99)
             engine.execute(intent, route, context={"question": "What time is it?", "surface": "hmi"}, use_python_path=True)
 
-        args, _ = engine.state_manager.write_outcome.call_args
-        payload = args[0]
+        route_args, outcome_args = engine.state_manager.write_batch.call_args[0]
+        payload = outcome_args
         assert payload["success"] is True
         assert payload["result"]["route"] == "TIME"
         assert payload["result"]["provider"] == "timeapi"
@@ -243,8 +242,8 @@ class TestVoiceAugmentedTelemetry:
         engine.state_writer.write_state(route, result_with_mem, ctx)
 
         # Memory telemetry is in SQLite (env deprecated in Stream 3)
-        args, _ = engine.state_manager.write_outcome.call_args
-        outcome_meta = args[0]["result"]
+        route_args, outcome_args = engine.state_manager.write_batch.call_args[0]
+        outcome_meta = outcome_args["result"]
         assert outcome_meta["memory_context_used"] == "session"
         assert outcome_meta["memory_mode_used"] == "recall"
         assert outcome_meta["route"] == "AUGMENTED"
@@ -271,8 +270,8 @@ class TestVoiceAugmentedTelemetry:
         ctx = {"question": "Explain quantum computing.", "surface": "voice"}
         engine.state_writer._write_state_to_sqlite(route, result, ctx)
 
-        args, _ = engine.state_manager.write_outcome.call_args
-        result_meta = args[0]["result"]
+        route_args, outcome_args = engine.state_manager.write_batch.call_args[0]
+        result_meta = outcome_args["result"]
         assert result_meta["memory_context_used"] == "session"
         assert result_meta["memory_top_score"] == "0.91"
         assert result_meta["memory_session_injected"] == "true"
@@ -431,8 +430,7 @@ class TestFullVoiceTurn:
         assert route_json.exists()
 
         # Verify SQLite was invoked
-        assert engine.state_manager.write_route.called
-        assert engine.state_manager.write_outcome.called
+        assert engine.state_manager.write_batch.called
 
         # Verify consistency would pass
         engine.state_manager.read_last_route.return_value = {"strategy": "LOCAL"}

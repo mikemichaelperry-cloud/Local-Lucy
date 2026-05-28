@@ -20,7 +20,7 @@ cp "${REAL_ROOT}/tools/router/plan_to_pipeline.py" "${FAKE_ROOT}/tools/router/pl
 cp "${REAL_ROOT}/tools/router/policy_engine.py" "${FAKE_ROOT}/tools/router/policy_engine.py"
 cp "${REAL_ROOT}/tools/router/core/"*.py "${FAKE_ROOT}/tools/router/core/"
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 news	NEWS	news_world_1 news_world_2
 news about australia	NEWS	news_au_1 news_au_2 news_world_1 news_world_2
 australian news	NEWS	news_au_1 news_au_2 news_world_1 news_world_2

@@ -21,12 +21,12 @@ medical_amoxicillin_1
 medical_amoxicillin_2
 EOF
 
-cat > "${FAKE_ROOT}/config/query_to_keys_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
 amoxicillin	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
 amoxycilin	EVIDENCE	medical_amoxicillin_1 medical_amoxicillin_2
 EOF
 
-cat > "${FAKE_ROOT}/config/evidence_normalization_aliases_v1.tsv" <<'EOF'
+cat > "${FAKE_ROOT}/config/evidence_normalization_aliases.tsv" <<'EOF'
 medical	EVIDENCE	high	\bamoxycilin\b	amoxicillin
 medical	EVIDENCE	medium	\bdosage\b	dose
 EOF

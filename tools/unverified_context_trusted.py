@@ -54,7 +54,7 @@ def _load_domain_allowlist(category: str) -> list[str]:
 def _load_keymap() -> dict[str, tuple[str, str]]:
     """Load evidence keymap. Returns dict of key -> (url, domain)."""
     root = _get_root()
-    keymap_path = root / "config" / "evidence_keymap_v1.tsv"
+    keymap_path = root / "config" / "evidence_keymap.tsv"
     keys = {}
     if keymap_path.exists():
         with open(keymap_path, "r", encoding="utf-8", errors="ignore") as f:

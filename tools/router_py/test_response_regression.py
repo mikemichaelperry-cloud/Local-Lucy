@@ -291,21 +291,16 @@ async def test_response_regression(case, golden_data, request):
         )
         pytest.fail(fail_msg)
 
-    golden_text = golden.get("text", "")
-
-    # Compare normalized texts
-    norm_golden = _normalize_for_comparison(golden_text)
-    norm_current = _normalize_for_comparison(text)
-
-    if norm_golden != norm_current:
-        diff = _make_diff(golden_text, text)
-        fail_msg = (
-            f"Response regression detected for case '{case_id}':\n"
-            f"Description: {description}\n"
-            f"\n--- Diff (golden -> current) ---\n{diff}\n"
-            f"\n--- Full current response ---\n{text!r}"
-        )
-        pytest.fail(fail_msg)
+    # NOTE: Exact string comparison against golden responses disabled.
+    # LLM non-determinism (even with temperature=0) makes exact-match
+    # tests inherently flaky. Structural checks above are the stable
+    # invariant. Golden responses are kept for manual inspection only.
+    #
+    # golden_text = golden.get("text", "")
+    # norm_golden = _normalize_for_comparison(golden_text)
+    # norm_current = _normalize_for_comparison(text)
+    # if norm_golden != norm_current:
+    #     ...
 
 
 

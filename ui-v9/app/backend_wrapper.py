@@ -12,8 +12,6 @@ This ensures both text and voice paths use IDENTICAL code.
 from backend import (
     # Main entry points
     execute_plan_python,
-    execute_plan_shell,
-    execute_plan_parity,
     ensure_control_env,
     RouterOutcome,
     DEFAULT_TIMEOUT,
@@ -58,8 +56,6 @@ from backend import (
 
 __all__ = [
     'execute_plan_python',
-    'execute_plan_shell',
-    'execute_plan_parity',
     'ensure_control_env',
     'RouterOutcome',
     'DEFAULT_TIMEOUT',

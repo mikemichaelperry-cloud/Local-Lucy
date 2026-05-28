@@ -272,7 +272,7 @@ def _extract_json_object(text: str) -> Dict[str, Any]:
 
 def _load_prompt_template() -> str:
     conf_dir = Path(os.environ.get("LUCY_CONF_DIR") or str(Path(__file__).resolve().parents[3] / "config"))
-    template_path = conf_dir / "local_semantic_interpreter_prompt_v1.txt"
+    template_path = conf_dir / "local_semantic_interpreter_prompt.txt"
     try:
         return template_path.read_text(encoding="utf-8")
     except OSError:

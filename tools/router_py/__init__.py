@@ -58,7 +58,7 @@ from .classify import (
 # when executing `python3 -m router_py.main`. Import directly from
 # `router_py.main` when these symbols are needed.
 # from .main import (
-#     RouterOutcome, execute_plan_python, execute_plan_shell, execute_plan_parity
+#     RouterOutcome, execute_plan_python
 # )
 
 # Tool Wrappers (Phase 5)
@@ -112,7 +112,7 @@ __all__ = [
     "classify_intent",
     "select_route",
     # Phase 4: Main Orchestration (import from router_py.main directly)
-    # "RouterOutcome", "execute_plan_python", "execute_plan_shell", "execute_plan_parity",
+    # "RouterOutcome", "execute_plan_python",
     # Phase 5: Tool Wrappers
     "ToolConfig",
     "ToolResult",

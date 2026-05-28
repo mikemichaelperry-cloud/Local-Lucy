@@ -124,7 +124,7 @@ def test_gpu_detection():
 def test_direct_request_ids_are_unique():
     """Direct HMI submits should not reuse request IDs for identical prompts."""
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
-    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v9/snapshots/opt-experimental-v9-dev")
+    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v9")
     os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v9/ui-v9")
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
 
@@ -165,7 +165,7 @@ def test_operator_response_preserves_blank_line_separators():
     """Operator rendering should preserve intentional blank lines in the answer body."""
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
-    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v9/snapshots/opt-experimental-v9-dev")
+    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v9")
     os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v9/ui-v9")
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
 

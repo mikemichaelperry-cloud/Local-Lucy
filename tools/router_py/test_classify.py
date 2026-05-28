@@ -17,6 +17,7 @@ from router_py.classify import (
     _make_local_decision,
     _make_augmented_decision,
     select_route,
+    classify_intent,
 )
 
 
@@ -312,16 +313,48 @@ class TestDataClasses(unittest.TestCase):
         self.assertEqual(decision.provider, "wikipedia")
 
 
+
+
+class TestSocialGreetingRouting(unittest.TestCase):
+    """Test that the embedding router handles greetings without guards."""
+
+    def setUp(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "models" / "router"))
+        from hybrid_router_v2 import HybridRouterV2
+        self.router = HybridRouterV2()
+
+    def test_how_are_you_today_lucy(self):
+        """Greeting with temporal keyword routes LOCAL via embedding router."""
+        result = self.router.predict("How are you today Lucy?")
+        self.assertEqual(result["route"], "LOCAL")
+
+    def test_whats_up(self):
+        """Short greeting routes LOCAL via embedding router."""
+        result = self.router.predict("What's up?")
+        self.assertEqual(result["route"], "LOCAL")
+
+    def test_good_morning_lucy(self):
+        """Morning greeting routes LOCAL via embedding router."""
+        result = self.router.predict("Good morning Lucy")
+        self.assertEqual(result["route"], "LOCAL")
+
+    def test_how_are_you_different_not_greeting(self):
+        """Non-greeting routes according to embedding router, not forced LOCAL."""
+        result = self.router.predict("How are you going to fix the economy?")
+        self.assertEqual(result["route"], "AUGMENTED")
+
+
 def run_tests():
     """Run all tests."""
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
     
-    suite.addTests(loader.loadTestsFromTestCase(TestIntentFamilyMapping))
-    suite.addTests(loader.loadTestsFromTestCase(TestLocalDecision))
-    suite.addTests(loader.loadTestsFromTestCase(TestAugmentedDecision))
-    suite.addTests(loader.loadTestsFromTestCase(TestRouteSelection))
+    # Add all test classes
+    suite.addTests(loader.loadTestsFromTestCase(TestClassification))
+    suite.addTests(loader.loadTestsFromTestCase(TestRouting))
     suite.addTests(loader.loadTestsFromTestCase(TestDataClasses))
+    suite.addTests(loader.loadTestsFromTestCase(TestSocialGreetingRouting))
     
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

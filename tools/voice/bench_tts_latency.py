@@ -101,7 +101,7 @@ def select_variants() -> list[BackendVariant]:
         # Check for running session worker as fallback
         # V8 ISOLATION: Use v8 path only
         socket_path = Path(os.environ.get("LUCY_VOICE_KOKORO_SOCKET", 
-                                         "/home/mike/lucy-v9/snapshots/opt-experimental-v9-dev/tmp/run/kokoro_tts_worker.sock"))
+                                         str(Path(__file__).resolve().parents[2] / "tmp" / "run" / "kokoro_tts_worker.sock")))
         if socket_path.exists():
             kokoro_available = True
     

@@ -73,12 +73,12 @@ class TestMemoryTogglePropagation:
         result = _memory_routing_gate("What did I say about him?", "WEATHER")
         assert result == "LOCAL", "Memory gate should override when memory enabled"
 
-    def test_memory_disabled_no_prefetch(self, monkeypatch):
-        """When memory disabled, no prefetch should happen."""
+    def test_memory_disabled_explicit_recall_routes_local(self, monkeypatch):
+        """Explicit recall queries route LOCAL even when memory disabled."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "0")
         from router_py.classify import _memory_routing_gate
         result = _memory_routing_gate("What did I say about him?", "WEATHER")
-        assert result is None, "Memory gate should not fire when memory disabled"
+        assert result == "LOCAL", "Explicit recall should route LOCAL so model can explain memory is disabled"
 
     def test_memory_disabled_no_injection(self, monkeypatch):
         """When memory disabled, no memory should be injected into prompts."""

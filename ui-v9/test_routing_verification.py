@@ -35,7 +35,7 @@ def _clear_python_caches():
     codex_base = Path.home() / ".codex-api-home"
     
     # Clear router_py cache
-    router_py_path = lucy_base / "snapshots" / "opt-experimental-v9-dev" / "tools" / "router_py"
+    router_py_path = lucy_base / "tools" / "router_py"
     if router_py_path.exists():
         for pycache in router_py_path.rglob("__pycache__"):
             try:
@@ -73,7 +73,7 @@ sys.path.insert(0, str(Path(__file__).parent / "app"))
 
 # Set required environment BEFORE importing backend
 # (backend uses these at import time)
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev"))
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v9"))
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"))
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")  # CRITICAL: Use Python execution path, not shell

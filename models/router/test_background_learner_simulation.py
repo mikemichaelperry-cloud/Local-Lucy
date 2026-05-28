@@ -13,7 +13,7 @@ What it tests:
   6. maybe_auto_learn() triggers when threshold is met
   7. Kill-switch (.learner_disable) pauses learning
 
-Safety: Every file path is patched to tmp_path. EmbeddingRouter is mocked.
+Safety: Every file path is patched to tmp_path. HybridRouterV2 is mocked.
 """
 
 from __future__ import annotations
@@ -55,6 +55,7 @@ def isolated_learner(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(bl, "LOCK_PATH", tmp_path / ".learner_lock")
     monkeypatch.setattr(bl, "DISABLE_FLAG", tmp_path / ".learner_disable")
     monkeypatch.setattr(bl, "VERSIONS_DIR", tmp_path / "versions")
+    monkeypatch.setattr(bl, "LOG_PROGRESS_PATH", tmp_path / ".router_log_progress")
 
     monkeypatch.setattr(af, "AUTO_FEEDBACK_PATH", tmp_path / "auto_feedback.jsonl")
 
@@ -71,9 +72,9 @@ def isolated_learner(tmp_path: Path, monkeypatch):
 
 @pytest.fixture
 def mock_embedding_router(monkeypatch):
-    """Replace EmbeddingRouter with a dummy that returns deterministic embeddings."""
+    """Replace HybridRouterV2 with a dummy that returns deterministic embeddings."""
 
-    class DummyEmbeddingRouter:
+    class DummyHybridRouterV2:
         def __init__(self, base_model: str = "") -> None:
             self.embeddings = np.array([])
             self.examples: list[dict] = []
@@ -81,15 +82,15 @@ def mock_embedding_router(monkeypatch):
         def fit(self, examples: list[dict]) -> None:
             self.examples = examples
             n = len(examples)
-            # Deterministic dummy embeddings — shape (n, 768)
+            # Deterministic dummy embeddings — shape (n, 384)
             rng = np.random.default_rng(42)
-            self.embeddings = rng.random((n, 768)).astype(np.float32)
+            self.embeddings = rng.random((n, 384)).astype(np.float32)
 
     monkeypatch.setattr(
-        "background_learner.EmbeddingRouter",
-        DummyEmbeddingRouter,
+        "background_learner.HybridRouterV2",
+        DummyHybridRouterV2,
     )
-    return DummyEmbeddingRouter
+    return DummyHybridRouterV2
 
 
 @pytest.fixture
@@ -161,7 +162,7 @@ class TestLearnOnce:
         # Verify embeddings exist
         assert bl.EMBEDDINGS_PATH.exists()
         embeddings = np.load(bl.EMBEDDINGS_PATH)
-        assert embeddings.shape == (3, 768)
+        assert embeddings.shape == (3, 384)
 
         # Verify examples JSON
         assert bl.EXAMPLES_PATH.exists()
@@ -458,7 +459,7 @@ class TestEndToEnd:
 
         # Verify embeddings shape
         embeddings = np.load(bl.EMBEDDINGS_PATH)
-        assert embeddings.shape == (5, 768)
+        assert embeddings.shape == (5, 384)
         assert embeddings.dtype == np.float32
 
         # Verify version snapshot
@@ -494,10 +495,10 @@ class TestTimestampStripping:
         ]
         bl.save_index(seed)
 
-        with patch.object(bl, "EmbeddingRouter", return_value=MagicMock(
+        with patch.object(bl, "HybridRouterV2", return_value=MagicMock(
             fit=lambda ex: None,
             examples=seed,
-            embeddings=np.zeros((2, 768), dtype=np.float32),
+            embeddings=np.zeros((2, 384), dtype=np.float32),
         )):
             bl.rebuild_embeddings(seed)
 
@@ -526,10 +527,10 @@ class TestTimestampStripping:
         ]
         bl.save_index(seed)
 
-        with patch.object(bl, "EmbeddingRouter", return_value=MagicMock(
+        with patch.object(bl, "HybridRouterV2", return_value=MagicMock(
             fit=lambda ex: None,
             examples=seed,
-            embeddings=np.zeros((1, 768), dtype=np.float32),
+            embeddings=np.zeros((1, 384), dtype=np.float32),
         )):
             bl.rebuild_embeddings(seed)
 
@@ -538,10 +539,10 @@ class TestTimestampStripping:
             first = f.read()
 
         # Rebuild again with identical data
-        with patch.object(bl, "EmbeddingRouter", return_value=MagicMock(
+        with patch.object(bl, "HybridRouterV2", return_value=MagicMock(
             fit=lambda ex: None,
             examples=seed,
-            embeddings=np.zeros((1, 768), dtype=np.float32),
+            embeddings=np.zeros((1, 384), dtype=np.float32),
         )):
             bl.rebuild_embeddings(seed)
 

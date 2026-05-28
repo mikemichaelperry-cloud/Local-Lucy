@@ -7,7 +7,7 @@ guards. They cover known failure modes: DIY misroutes, ambiguous boundaries,
 pronoun follow-ups, keyword guard bypasses, typos, compound intents, and
 cultural variations.
 
-If you modify hybrid_router.py keyword guards or add examples to the index,
+If you modify hybrid_router_v2.py keyword guards or add examples to the index,
 run these tests to verify you haven't introduced regressions.
 
 Threshold: at least 17/22 correct (77%) to pass. This matches the current
@@ -23,10 +23,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "models" / "router"
 import pytest
 
 
+from router_py.classify import classify_intent, select_route
+
+
 def _load_router():
     """Lazy-load the router to avoid model download overhead for skipped tests."""
-    from hybrid_router import HybridRouter
-    return HybridRouter()
+    from hybrid_router_v2 import HybridRouterV2
+    return HybridRouterV2()
 
 
 # Edge cases by category
@@ -69,29 +72,29 @@ ROUTING_TEST_CASES = [
     ("What is photosynthesis?", "LOCAL", "biology"),
     ("Explain photosynthesis in plants", "LOCAL", "biology"),
     ("How do leaves make food?", "LOCAL", "biology"),
-    ("What is cellular respiration?", "AUGMENTED", "biology"),  # medical keyword guard catches "respiration"; AUGMENTED is acceptable
+    ("What is cellular respiration?", "LOCAL", "biology"),  # V2 semantic disambiguation correctly routes biology to LOCAL
 
     # ---- Climate vs weather (climate = LOCAL, weather = WEATHER) ----
     ("What is climate change?", "LOCAL", "climate_vs_weather"),
     ("How does the greenhouse effect work?", "LOCAL", "climate_vs_weather"),
     ("Explain global warming", "LOCAL", "climate_vs_weather"),
     ("What is the weather forecast for tomorrow?", "WEATHER", "climate_vs_weather"),
-    ("Will it rain this week?", "AUGMENTED", "climate_vs_weather"),  # embedding routes to AUGMENTED; weather keyword guard only catches "rain" not "will it rain"
+    ("Will it rain this week?", "WEATHER", "climate_vs_weather"),  # fine-tuned MiniLM correctly routes weather queries
 
     # ---- Hot/cold metaphor vs actual weather ----
     ("How hot is the sun?", "LOCAL", "metaphor"),
-    ("Cold fusion energy explained", "AUGMENTED", "metaphor"),  # physics topic; AUGMENTED is acceptable
+    ("Cold fusion energy explained", "LOCAL", "metaphor"),  # physics explanation; LOCAL is correct
     ("Hot new trends in AI", "LOCAL", "metaphor"),
     ("Cold war history", "LOCAL", "metaphor"),  # embedding collapses (0.9994/0.9994); safe LOCAL fallback
     ("Is it hot outside right now?", "WEATHER", "metaphor"),
-    ("Why is it so cold today?", "TIME", "metaphor"),
+    ("Why is it so cold today?", "WEATHER", "metaphor"),  # weather keyword "cold" + temporal context -> live weather data
 
     # ---- Capital city vs financial capital ----
     ("What is the capital of France?", "LOCAL", "capital_ambiguity"),
-    ("Capital of Japan", "AUGMENTED", "capital_ambiguity"),  # embedding routes to AUGMENTED; "capital" is ambiguous
+    ("Capital of Japan", "LOCAL", "capital_ambiguity"),  # fine-tuned MiniLM correctly routes factual queries to LOCAL
     ("Current stock price of Apple", "AUGMENTED", "capital_ambiguity"),
     ("Working capital ratio explained", "AUGMENTED", "capital_ambiguity"),
-    ("Capital gains tax rules", "AUGMENTED", "capital_ambiguity"),
+    ("Capital gains tax rules", "LOCAL", "capital_ambiguity"),  # general tax knowledge, not live market data
 
     # ---- Programming vs gram/cooking ----
     ("How to cook an egg", "LOCAL", "cooking"),
@@ -122,15 +125,16 @@ class TestRoutingEdgeCases:
     @pytest.mark.parametrize("query,expected_route,category", ROUTING_TEST_CASES)
     def test_routes_correctly(self, router, query, expected_route, category):
         """Each edge-case query must route to its expected route."""
-        result = router.predict(query)
-        actual_route = result.get("route", "ERROR")
+        # Use the full pipeline (classify + select_route) to test production behavior
+        classification = classify_intent(query)
+        decision = select_route(classification, query=query)
+        actual_route = decision.route
 
         assert actual_route == expected_route, (
             f"[{category}] '{query}' routed to {actual_route}, "
             f"expected {expected_route}\n"
-            f"  embedding_route={result.get('embedding_route')}, "
-            f"  guards_fired={result.get('guards_fired')}, "
-            f"  top_k={[(n['route'], n['similarity']) for n in result.get('top_k_neighbours', [])[:2]]}"
+            f"  embedding_route={classification.selected_route}, "
+            f"  intent_family={classification.intent_family}"
         )
 
     def test_overall_accuracy_threshold(self, router):

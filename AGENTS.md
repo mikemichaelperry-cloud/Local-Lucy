@@ -1,5 +1,10 @@
 # Local Lucy v9 — Codex Execution Rules
 
+## Related Documents
+
+- For structural details (directory tree, routing precedence, file line counts, known gotchas), see `~/.kimi/LOCAL_LUCY_V9_CODEBASE_MAP.md` (agent-maintained, read at session start).
+- **If the map contradicts this file, this file wins.**
+
 ## Authority
 
 - The authoritative working root is:
@@ -113,6 +118,41 @@ Also run the fast routing stress test:
 Router tests:
 ```bash
 cd ~/lucy-v9
+# Route-only (fast, ~56s)
+LUCY_SYNTHETIC_ROUTER_ONLY=1 python3 -m pytest tools/router_py/test_synthetic_adversarial.py -x -q
+
+# Full-answer with LLM calls (~8 min, 1099 passed / 514 skipped when green)
+LUCY_SYNTHETIC_FULL_ANSWER=1 python3 -m pytest tools/router_py/test_synthetic_adversarial.py --tb=short
+```
+
+### Synthetic Adversarial Test Suite
+- 403 cases in `tests/synthetic_adversarial_cases.jsonl`
+- Route-only mode: 807 passed, 806 skipped
+- Full-answer mode: ~1099 passed, 514 skipped
+- **Guard invariants:** `must_not_contain=['Traceback', 'Exception', 'error']` — local model must not emit "ERROR:" on garbage input
+- Test fixture: function-scoped `local_answer_engine` with `engine.close()` finalizer to prevent unclosed sessions and event-loop errors
+
+### Per-Request Optimizations Applied (Phases 1–4)
+| Phase | File | Change |
+|-------|------|--------|
+| 1 | `classify.py`, `policy.py` | Pre-compiled ~180 regexes; guard booleans cached after `router.predict()` |
+| 2A | `execution_engine_state.py` | History dedup cache (O(n) → O(1)) |
+| 2B | `memory_service.py` | Thread-safe bounded embedding LRU cache (256 entries, SHA-256 keyed) |
+| 2C | `state_manager.py`, `execution_engine_state.py` | SQLite batch writes (single transaction) |
+| 2D | `providers/evidence.py` | TTL/LRU evidence cache (Wikipedia 1h, Time 60s, Weather 5m) |
+| 2E | `execution_engine.py` | Lazy session memory load (only when provider needs it) |
+| 3A | `providers/evidence.py` | Idempotent `sys.path` guard (no duplicate inserts) |
+| 3B | `local_answer.py` | Pre-compiled medical/time-sensitive regex patterns |
+| 3C | `local_answer.py` | Persistent file handle in `LocalAnswerLogger` |
+| 3D | `classify.py` | Feedback buffer disk read cached by `mtime` |
+| 3E | `execution_engine.py`, `execution_engine_state.py` | Medical domains cached by `mtime`; `utc_now` computed once per payload |
+| 4 | `START_LUCY.sh`, `streaming_tts*.py` | KV-cache q8_0 quantization; Kokoro device env-var fixes |
+
+**Next target:** Phase 5 — Evidence parallelism (`asyncio.gather()` for AUGMENTED route evidence fetching).
+
+Router tests:
+```bash
+cd ~/lucy-v9
 source ui-v9/.venv/bin/activate
 python -m pytest tools/router_py/ --ignore=tools/router_py/test_resource_leaks.py -q
 ```
@@ -176,7 +216,12 @@ All work, fixes, and improvements belong in V9 only. No cross-contamination to V
    - `tools/router_py/payload_builders.py` — pure functions used by both shell and Python routers
    - `build_route_snapshot_payload()`, `determine_route_source_type()`, `build_history_entry()`
 
-5. **HMI displays real state**
+5. **Tube database is integrated**
+   - `data/tubes/tube_database.db` — 648 vacuum tubes with specs (vplate, vscreen, pplate, gm, heater, notes)
+   - `local_answer.py` short-circuits to `tube_database` lookup before any Ollama call for known tubes
+   - Zero-latency answers for audio/power tube queries (6V6GT, EL34, KT88, 300B, 12AX7, etc.)
+
+6. **HMI displays real state**
    - 138/138 inspection checks pass
    - 9/9 non-GPU offscreen tests pass
    - Dead preprocess fields removed from display
@@ -244,6 +289,9 @@ All work, fixes, and improvements belong in V9 only. No cross-contamination to V
 | `ui-v9/app/services/state_store.py` | HMI reads JSON state files | No — read-only per constraints |
 | `ui-v9/app/panels/status_panel.py` | HMI displays state | No — read-only per constraints |
 | `models/router/background_learner.py` | Rebuilds embedding index | Yes — keep timestamp normalization |
+| `data/tubes/tube_database.db` | SQLite tube specs (648 tubes) | Yes — HMI answers depend on it |
+| `data/tubes/tube_database.py` | Schema + seed + lookup helpers | Yes — local_answer.py imports this |
+| `tools/router_py/local_answer.py` | Local LLM path, tube DB lookup | Yes — short-circuits before Ollama |
 
 ---
 
@@ -356,6 +404,10 @@ LUCY_STATE_DB=~/lucy-v9/state/lucy_state.db  # SQLite DB path
    - `/home/mike/lucy-v9/state/current_state.json` — START_LUCY.sh, main.py legacy path
    
    They could diverge silently (e.g. model mismatch warnings). Fixed by adding `LUCY_RUNTIME_STATE_FILE` env var to START_LUCY.sh and making main.py respect it. Always use the env var when referring to current_state.json.
+
+8. **`ui-v9/app/backend/*.py` are RE-EXPORT WRAPPERS ONLY**: These files (classify.py, execution_engine.py, local_answer.py, policy.py) are 3–9 line wrappers that import from `tools/router_py/`. **Do not add logic to them.** Edit `tools/router_py/` and let the wrappers pick it up via `backend/__init__.py`. This has been a repeated footgun in past sessions.
+
+9. **`StateWriter` uses `write_batch()` not `write_route()`/`write_outcome()`**: The Phase 2C optimization (May 23) batched SQLite writes into a single transaction. Tests that mock `state_manager.write_route` or `write_outcome` will fail — mock `write_batch` instead and unpack the two positional args.
 
 ---
 

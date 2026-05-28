@@ -4,10 +4,13 @@ import json
 import sys
 from pathlib import Path
 
-ROUTER_DIR = Path(__file__).resolve().parent / "models" / "router"
+ROUTER_DIR = Path(__file__).resolve().parent.parent / "models" / "router"
 sys.path.insert(0, str(ROUTER_DIR))
 
-from embedding_router import EmbeddingRouter
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent / "models" / "router"))
+from hybrid_router_v2 import HybridRouterV2
 
 
 def main():
@@ -39,7 +42,7 @@ def main():
 
     # Build embeddings
     print("\nBuilding embeddings...")
-    router = EmbeddingRouter()
+    router = HybridRouterV2()
     router.fit(examples)
 
     # Save

@@ -41,9 +41,9 @@ class TestMemoryRoutingGate(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_gate_disabled_when_memory_off(self):
-        """Gate returns None when LUCY_SESSION_MEMORY is not set."""
+        """Gate returns None when LUCY_SESSION_MEMORY is not set and query is not explicit recall."""
         os.environ["LUCY_SESSION_MEMORY"] = "0"
-        result = _memory_routing_gate("What about that?", "WEATHER")
+        result = _memory_routing_gate("Should I keep it?", "WEATHER")
         self.assertIsNone(result)
 
     def test_gate_disabled_by_kill_switch(self):
@@ -94,11 +94,18 @@ class TestMemoryRoutingGate(unittest.TestCase):
 
     @patch("memory.memory_service.get_recent_turns")
     def test_gate_noop_when_memory_empty(self, mock_get_turns):
-        """Gate returns None when SQLite is empty."""
+        """Gate returns None when SQLite is empty and query is not explicit recall."""
         os.environ["LUCY_SESSION_MEMORY"] = "1"
         mock_get_turns.return_value = []
-        result = _memory_routing_gate("What about that?", "WEATHER")
+        result = _memory_routing_gate("Should I keep it?", "WEATHER")
         self.assertIsNone(result)
+
+    @patch("memory.memory_service.get_recent_turns")
+    def test_gate_explicit_recall_when_memory_disabled(self, mock_get_turns):
+        """Explicit recall queries route LOCAL even when memory is disabled."""
+        os.environ["LUCY_SESSION_MEMORY"] = "0"
+        result = _memory_routing_gate("What did I say about him?", "WEATHER")
+        self.assertEqual(result, "LOCAL")
 
     @patch("memory.memory_service.get_recent_turns")
     def test_gate_explicit_recall(self, mock_get_turns):

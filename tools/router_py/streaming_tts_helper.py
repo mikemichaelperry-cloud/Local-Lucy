@@ -24,7 +24,7 @@ logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 sys.path.insert(0, str(Path(__file__).parent.parent / "voice" / "backends"))
 
 import numpy as np
-from kokoro_backend import get_pipeline, load_runtime_dependencies, DEFAULT_SAMPLE_RATE
+from kokoro_backend import get_pipeline, load_runtime_dependencies, DEFAULT_SAMPLE_RATE, resolve_device
 
 
 def resample_audio(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
@@ -54,9 +54,10 @@ def synthesize_chunk(text: str, voice: str = "af_nicole", speed: float = 1.0):
     
     Data format: 16-bit signed PCM, mono, 22050 Hz (Piper-compatible)
     """
-    # Load Kokoro
+    # Load Kokoro (respect LUCY_VOICE_KOKORO_DEVICE env var)
     _, np_module, _ = load_runtime_dependencies()
-    pipeline = get_pipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M", device="cuda")
+    device = resolve_device(os.environ)
+    pipeline = get_pipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M", device=device)
     
     # Generate audio chunks
     for result in pipeline(text, voice=voice, speed=speed, split_pattern=r'\n+'):

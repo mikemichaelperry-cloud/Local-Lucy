@@ -31,7 +31,7 @@ from typing import Optional
 RUNTIME_V8 = Path.home() / ".codex-api-home" / "lucy" / "runtime-v9"
 STATE_FILE = RUNTIME_V8 / "state" / "current_state.json"
 VOICE_RUNTIME_FILE = RUNTIME_V8 / "state" / "voice_runtime.json"
-LUCY_V8 = Path.home() / "lucy-v9" / "snapshots" / "opt-experimental-v9-dev"
+LUCY_V8 = Path.home() / "lucy-v9"
 RUNTIME_CONTROL = LUCY_V8 / "tools" / "runtime_control.py"
 
 

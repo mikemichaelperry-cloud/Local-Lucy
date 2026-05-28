@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
-KEYMAP="${ROOT}/config/evidence_keymap_v1.tsv"
-QUERYMAP="${ROOT}/config/query_to_keys_v1.tsv"
+KEYMAP="${ROOT}/config/evidence_keymap.tsv"
+QUERYMAP="${ROOT}/config/query_to_keys.tsv"
 
 ok(){ echo "OK: $*"; }
 die(){ echo "FAIL: $*" >&2; exit 1; }
