@@ -197,6 +197,9 @@ class RuntimeBridge:
         env.setdefault("LUCY_CONVERSATION_MODE_FORCE", os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0"))
         env.setdefault("LUCY_SESSION_MEMORY", os.environ.get("LUCY_SESSION_MEMORY", "0"))
         env.setdefault("LUCY_AUGMENTED_PROVIDER", self._resolve_augmented_provider())
+        # Propagate model selection so subprocess paths match direct-Python path
+        env.setdefault("LUCY_MODEL", os.environ.get("LUCY_MODEL", "local-lucy-fast"))
+        env.setdefault("LUCY_LOCAL_MODEL", os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-fast"))
         # Router decision logging — default to project logs directory
         default_log_dir = str(Path(__file__).resolve().parents[3] / "logs" / "router")
         env.setdefault("LUCY_ROUTER_LOG_DIR", os.environ.get("LUCY_ROUTER_LOG_DIR", default_log_dir))

@@ -310,7 +310,7 @@ def default_state() -> dict[str, Any]:
         "voice": "on",
         "augmentation_policy": clean_text(os.environ.get("LUCY_AUGMENTATION_POLICY")) or "fallback_only",
         "augmented_provider": "wikipedia",
-        "model": os.environ.get("LUCY_RUNTIME_MODEL") or os.environ.get("LUCY_LOCAL_MODEL") or "local-lucy",
+        "model": os.environ.get("LUCY_RUNTIME_MODEL") or os.environ.get("LUCY_LOCAL_MODEL") or "local-lucy-fast",
         "learner": _resolve_initial_learner_state(),
         "approval_required": False,
         "status": "ready",
