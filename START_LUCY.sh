@@ -77,7 +77,7 @@ export LUCY_VOICE_KOKORO_SPEED=1.2
 export LUCY_VOICE_TTS_CHUNK_MAX_CHARS=400
 
 # Voice STT (Whisper) library path
-export LD_LIBRARY_PATH="${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src:${LD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src/ggml-cuda:${LD_LIBRARY_PATH:-}"
 
 V9_PYTHON="${SCRIPT_DIR}/ui-v10/.venv/bin/python3"
 if [ -x "$V9_PYTHON" ]; then
