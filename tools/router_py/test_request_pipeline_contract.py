@@ -210,7 +210,9 @@ class TestProviderFailureIsNotRouteCorrection:
 
         engine = ExecutionEngine(config={"timeout": 30})
         # Force weather provider to return no evidence (simulating failure)
-        engine._fetch_weather_evidence = lambda *a, **k: None
+        async def _noop(*a, **k):
+            return None
+        engine._fetch_weather_evidence = _noop
 
         classification = ClassificationResult(
             intent="weather", intent_family="current_evidence", confidence=0.9,
@@ -234,7 +236,9 @@ class TestProviderFailureIsNotRouteCorrection:
 
         engine = ExecutionEngine(config={"timeout": 30})
         # Force news provider to return no evidence (simulating failure)
-        engine._fetch_news_evidence = lambda *a, **k: None
+        async def _noop(*a, **k):
+            return None
+        engine._fetch_news_evidence = _noop
 
         classification = ClassificationResult(
             intent="news", intent_family="current_evidence", confidence=0.9,

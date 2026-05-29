@@ -1382,6 +1382,107 @@ class VoicePipeline(BaseToolWrapper):
             duration_ms=int((time.time() - start_time) * 1000),
         )
     
+    async def voice_interaction(
+        self,
+        max_duration: float = 30.0,
+        use_tts: bool = True,
+    ) -> VoiceResult:
+        """Run a complete voice interaction: record → transcribe → respond → speak.
+
+        Args:
+            max_duration: Max recording duration in seconds
+            use_tts: Whether to synthesize and play the response
+
+        Returns:
+            VoiceResult with transcript, response text, and status
+        """
+        import time
+        start_time = time.time()
+
+        try:
+            # 1. Record audio
+            audio = await self.record_audio(duration=max_duration)
+
+            # 2. Transcribe
+            tx_result = await self.transcribe(audio)
+            transcript = tx_result.text.strip()
+
+            if not transcript:
+                return VoiceResult(
+                    success=False,
+                    status="no_transcript",
+                    transcript="",
+                    response_text="",
+                    error_message="No speech detected",
+                    audio_duration_ms=audio.duration_ms if hasattr(audio, "duration_ms") else 0,
+                )
+
+            # 3. Get response from Lucy
+            from router_py.main import run
+            result = run(transcript)
+            if hasattr(result, "response_text"):
+                response_text = result.response_text
+            elif isinstance(result, dict):
+                response_text = result.get("response_text", "")
+            else:
+                response_text = str(result)
+
+            # 4. TTS + playback
+            if use_tts and response_text:
+                # Use kokoro via subprocess for simplicity
+                kokoro_script = Path(__file__).parent.parent / "router_py" / "streaming_tts_helper.py"
+                voice = os.environ.get("LUCY_VOICE_KOKORO_VOICE", "af_bella")
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable, str(kokoro_script), response_text,
+                    "--voice", voice,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                pcm_data, stderr = await proc.communicate()
+                if proc.returncode == 0 and pcm_data:
+                    # Wrap in WAV header for play_audio
+                    import wave, io
+                    wav_buffer = io.BytesIO()
+                    with wave.open(wav_buffer, "wb") as wf:
+                        wf.setnchannels(1)
+                        wf.setsampwidth(2)
+                        wf.setframerate(22050)
+                        wf.writeframes(pcm_data)
+                    audio_buf = AudioBuffer(
+                        data=wav_buffer.getvalue(),
+                        sample_rate=22050,
+                        channels=1,
+                        sample_width=2,
+                        duration_ms=int(len(pcm_data) / 2 / 22050 * 1000),
+                    )
+                    await self.play_audio(audio_buf)
+
+            return VoiceResult(
+                success=True,
+                status="completed",
+                transcript=transcript,
+                response_text=response_text,
+                error_message="",
+                audio_duration_ms=audio.duration_ms if hasattr(audio, "duration_ms") else 0,
+            )
+
+        except VoicePipelineError as e:
+            return VoiceResult(
+                success=False,
+                status="error",
+                transcript="",
+                response_text="",
+                error_message=str(e),
+            )
+        except Exception as e:
+            return VoiceResult(
+                success=False,
+                status="error",
+                transcript="",
+                response_text="",
+                error_message=f"Unexpected error: {e}",
+            )
+
     async def health_check(self) -> bool:
         """Check if voice pipeline is available."""
         recorder_ok = self._detect_recorder()[0] is not None

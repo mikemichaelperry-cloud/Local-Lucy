@@ -115,6 +115,15 @@ CREATE TABLE IF NOT EXISTS session_metadata (
     first_query TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS persistent_facts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fact_text TEXT NOT NULL,
+    category TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_facts_category ON persistent_facts(category);
 """
 
 
@@ -247,6 +256,46 @@ def format_turns_for_prompt(turns: list[dict[str, Any]]) -> str:
         role_label = "User" if turn["role"] == "user" else "Assistant"
         lines.append(f"{role_label}: {turn['text']}")
     return "\n\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Persistent facts (human-curated, read-only to Lucy)
+# ---------------------------------------------------------------------------
+
+def store_persistent_fact(fact_text: str, category: str | None = None) -> int:
+    """Store a persistent fact. Returns the new row id."""
+    fact_text = fact_text.strip()
+    if not fact_text:
+        raise ValueError("fact_text must be non-empty")
+    conn = _get_connection()
+    cur = conn.execute(
+        "INSERT INTO persistent_facts (fact_text, category) VALUES (?, ?)",
+        (fact_text, category),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_persistent_facts(category: str | None = None) -> list[str]:
+    """Return all persistent facts, optionally filtered by category."""
+    conn = _get_connection()
+    if category:
+        cursor = conn.execute(
+            "SELECT fact_text FROM persistent_facts WHERE category = ? ORDER BY id",
+            (category,),
+        )
+    else:
+        cursor = conn.execute(
+            "SELECT fact_text FROM persistent_facts ORDER BY id"
+        )
+    return [row[0] for row in cursor.fetchall()]
+
+
+def delete_persistent_fact(fact_id: int) -> None:
+    """Delete a persistent fact by its id."""
+    conn = _get_connection()
+    conn.execute("DELETE FROM persistent_facts WHERE id = ?", (fact_id,))
+    conn.commit()
 
 
 def clear_session(session_id: str = "default") -> None:

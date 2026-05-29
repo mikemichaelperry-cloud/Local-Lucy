@@ -20,7 +20,7 @@ Oscar: reduce fixation on cats; use leave-it + distance + reward
 type: entity
 subject: Oscar
 
-Oscar is Mike’s dog. He has a fixation on cats; training approach uses leave-it, distance, and reward.
+Oscar is Mike's dog. He has a fixation on cats; training approach uses leave-it, distance, and reward.
 
 [PROVENANCE]
 committed_by: human
@@ -29,6 +29,24 @@ source: stdin proposal
 [MEMORY PROPOSAL]
 type: entity
 subject: Oscar
-summary: Oscar is Mike’s dog. He has a fixation on cats; training approach uses leave-it, distance, and reward.
+summary: Oscar is Mike's dog. He has a fixation on cats; training approach uses leave-it, distance, and reward.
+confidence: high
+---- END PROPOSAL ----
+
+----
+[MEMORY ITEM] id=20260529-220000-00001 approved_at=2026-05-29T22:00:00+03:00
+type: entity
+subject: Family
+
+Netta is Rachel's daughter. Tom and Sahar are Mike's sons. Kim is Mike's daughter. Oscar is Mike's dog.
+
+[PROVENANCE]
+committed_by: human
+source: direct instruction
+---- BEGIN PROPOSAL ----
+[MEMORY PROPOSAL]
+type: entity
+subject: Family
+summary: Netta is Rachel's daughter. Tom and Sahar are Mike's sons. Kim is Mike's daughter. Oscar is Mike's dog.
 confidence: high
 ---- END PROPOSAL ----

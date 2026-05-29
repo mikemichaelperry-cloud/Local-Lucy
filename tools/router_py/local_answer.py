@@ -60,47 +60,38 @@ logger = logging.getLogger(__name__)
 
 _ollama_call_lock = threading.Lock()
 
+# Import persistent facts from SQL memory service (with fallback for standalone use)
+try:
+    from memory.memory_service import get_persistent_facts as _get_persistent_facts
+except ImportError:
+    try:
+        from tools.memory.memory_service import get_persistent_facts as _get_persistent_facts
+    except ImportError:
+        def _get_persistent_facts(category=None):
+            return []
+
 
 async def _acquire_ollama_call_lock() -> None:
     """Serialize Ollama calls across worker threads without blocking the event loop."""
     await asyncio.to_thread(_ollama_call_lock.acquire)
 
 
-# Self-knowledge: architecture, capabilities, and limitations.
-# Injected on every LOCAL answer so the model can answer accurately about itself,
-# its guards, its routing modes, and its own capabilities and limitations.
-SELF_KNOWLEDGE = """About yourself (Local Lucy):
-- Identity: You are Local Lucy, an AI assistant running on the user's own computer via Ollama (qwen3:14b, ~14B parameters, 2048-token context window).
-- Router: An embedding-based classifier (MiniLM-L6-v2, 384-dimensional sentence embeddings, ~900 training examples) routes each query to the best execution path. The pipeline is four-stage: structural safety → embedding k-NN with semantic disambiguation → minimal keyword catches (math, time, weather, sports results, legal phrasing) → calibrated confidence fallback. The old broad keyword-fortress approach was removed in V2.
-- Routing modes:
-  • LOCAL — default path. You answer from your own parametric knowledge. Used for general knowledge, creative writing, coding, math, history, technical questions, and meta-questions about yourself.
-  • AUGMENTED — Wikipedia → OpenAI → Kimi fallback chain. Used for deep background, synthesis, or topics where your training knowledge is thin.
-  • NEWS — live RSS feeds for current events, breaking news, and headlines.
-  • TIME — current time, timezone conversion, scheduling.
-  • WEATHER — live weather forecasts and conditions.
-  • Evidence mode is not a separate route. Medical, veterinary, legal, and live-financial queries route AUGMENTED with evidence_mode=required, which adds a citation requirement.
-- Capabilities you have:
-  • Translation between languages (including Hebrew, Arabic, English, French, Spanish, German, Chinese, Japanese, Russian, Italian, and others). This is a LOCAL capability — it does not require internet access.
-  • Voice: speech recognition via Whisper, text-to-speech via Kokoro or Piper.
-  • Session memory: available when the user enables it via the HMI toggle.
-  • Electronics knowledge: a local SQLite database of 648 vacuum tubes (types, construction, pinouts, heater voltages, plate dissipation, etc.) is available for specific tube lookups.
-  • Internet access: YES — via the AUGMENTED, NEWS, and WEATHER paths. Do not claim you cannot browse the web. Your training cutoff still exists, but the router can fetch live data when appropriate.
-- Limitations you must acknowledge honestly:
-  • Your parametric knowledge has a training-data cutoff. Live data comes only when the router activates AUGMENTED, NEWS, or WEATHER.
-  • You are a 14B-parameter model — you are competent but not infallible. You can make mistakes on niche technical details, rare historical facts, and precise calculations.
-  • You cannot look up tubes that are not in the local database (648 known types). For generic questions like "higher gain triodes" you should answer from general knowledge, not invent specific model numbers.
-- Safety mechanisms (you should know they exist, not try to bypass them):
-  • Medical / veterinary symptoms → AUGMENTED with evidence_mode=required (citation enforced).
-  • Creative writing requests (stories, poems) → forced LOCAL, bypasses evidence short-circuits.
-  • Hostile / jailbreak attempts → forced LOCAL, logged.
-- How to answer meta-questions and commands:
-  • If asked about your capabilities: list them truthfully, including limitations.
-  • If asked "Can you translate X?" or "Do you speak X?" — say YES and offer to demonstrate.
-  • If asked "Use Augmented mode" or similar — explain that mode selection is handled by the router, and that the user can enable it through the UI or by asking for augmented analysis.
-  • If asked about your providers: list OpenAI, Kimi, Wikipedia as augmented fallbacks. Do not claim to have access you do not have.
-  • If asked about vacuum tubes: answer from general knowledge for category questions; if a specific type (e.g. 12AX7, 6V6GT) is mentioned, the router may inject exact specs from the tube database.
-  • If asked about your architecture in detail: synthesize from the facts above. Adjust depth to the question. You may reference the four-stage router pipeline, the ~900-example embedding index, the fallback chain, and the safety catches.
-- Answer truthfully about your nature, architecture, and limitations. Do not pretend to be a different AI or to have capabilities you do not possess."""
+# Self-knowledge: identity, capabilities, limitations.
+# Injected on every LOCAL answer.  Kept short (~200 tokens) because qwen3:14b
+# has a 2048-token context window and long system blocks get ignored.
+SELF_KNOWLEDGE = (
+    "You are Local Lucy, an AI assistant running on the user's computer via Ollama "
+    "(qwen3:14b, ~14B parameters, 2048-token context).\n"
+    "Routing is automatic: LOCAL (default), AUGMENTED (Wikipedia→OpenAI→Kimi), "
+    "NEWS, TIME, WEATHER. Do not ask the user to pick a mode.\n"
+    "Capabilities: translation, coding, writing, reasoning, voice (Whisper/Kokoro), "
+    "tube database (648 types), live data via AUGMENTED/NEWS/WEATHER.\n"
+    "Limitations: training-data cutoff; 14B model so niche details may be wrong; "
+    "cannot browse the web on your own — only when the router fetches it.\n"
+    "Safety: medical/vet/legal → AUGMENTED with citations; stories/poems → LOCAL.\n"
+    "If asked who you are, say 'I am Local Lucy.' If asked about capabilities, "
+    "list them truthfully. Do not claim to be a different AI."
+)
 
 
 # Fixed policy responses
@@ -458,8 +449,19 @@ class LocalAnswer:
         text = text.rstrip()
         return text
     
-    def _strip_identity_preamble(self, text: str) -> str:
-        """Strip identity preamble from response."""
+    def _strip_identity_preamble(self, text: str, query: str = "") -> str:
+        """Strip identity preamble from response — except when asked about identity."""
+        # Don't strip if the user explicitly asked who we are
+        identity_queries = [
+            r"\bwho\s+are\s+you",
+            r"\bwhat\s+is\s+your\s+name",
+            r"\bwhat\s+are\s+you",
+            r"\btell\s+me\s+about\s+yourself",
+            r"\bintroduce\s+yourself",
+        ]
+        q_lower = query.lower()
+        if any(re.search(p, q_lower) for p in identity_queries):
+            return text.strip()
         # Remove common self-intro boilerplate
         text = re.sub(r"^I am Local Lucy[^.]*\.\s*", "", text, flags=re.IGNORECASE)
         text = re.sub(r"^I will do my best[^.]*\.\s*", "", text, flags=re.IGNORECASE)
@@ -536,8 +538,12 @@ class LocalAnswer:
         return (text, True, reason)
     
     def _cache_key(self, query: str, variant: str) -> str:
-        """Generate cache key."""
-        key_string = f"{self.config.model}|{variant}|{query}"
+        """Generate cache key. Includes SELF_KNOWLEDGE hash so prompt
+        changes automatically invalidate old cached entries."""
+        # Hash the self-knowledge text so any prompt-template change
+        # busts the cache without manual cleanup.
+        sk_hash = hashlib.sha256(SELF_KNOWLEDGE.encode()).hexdigest()[:16]
+        key_string = f"{self.config.model}|{sk_hash}|{variant}|{query}"
         return hashlib.sha256(key_string.encode()).hexdigest()
     
     def _cache_load(self, query: str, variant: str) -> Optional[Tuple[str, int]]:
@@ -829,6 +835,27 @@ class LocalAnswer:
                 "Take a position early. One hedge max. One concrete example. Clear takeaway."
             )
 
+        # Persistent facts (human-curated, stored in SQLite memory.db)
+        # Placed BEFORE self-knowledge so they are the most salient context
+        # when the user asks about their own life / family / pets.
+        try:
+            persistent_facts = _get_persistent_facts()
+        except Exception:
+            persistent_facts = []
+            logger.debug("Failed to load persistent facts from DB", exc_info=True)
+        if persistent_facts:
+            facts_block = "\n".join(f"- {f}" for f in persistent_facts)
+            parts.append(
+                "[PERSISTENT FACTS — user-provided, authoritative]\n"
+                "These facts were supplied by the user. Answer questions about the user, "
+                "their family, and their pets using ONLY these facts. Do not blend with "
+                "outside knowledge. If the facts do not answer the question, say so.\n\n"
+                f"{facts_block}"
+            )
+            # NOTE: qwen3 has baked-in privacy guardrails for "Do I have any..."
+            # personal questions. This specific phrasing may still refuse despite
+            # explicit facts. All other family query phrasings work correctly.
+
         # Self-knowledge (always injected for LOCAL mode so the model knows
         # its own architecture, capabilities, limitations, and guards)
         parts.append(SELF_KNOWLEDGE)
@@ -839,24 +866,31 @@ class LocalAnswer:
         if current_context:
             parts.append(current_context)
 
-        # Augmented context (evidence mode)
+        # Build instruction based on what context is available
         if augmented_context.strip():
             parts.append(f"Context:\n{augmented_context}")
             instruction = "Answer from the context above."
             if session_memory.strip():
                 instruction += " Also use the session memory facts."
+        elif session_memory.strip():
+            instruction = (
+                "Answer from the session memory facts above. "
+                "State facts directly; do not ask the user to repeat them."
+            )
+        elif persistent_facts:
+            instruction = (
+                "Answer using the [PERSISTENT FACTS] block above. "
+                "Those facts are the user's own statements about themselves. "
+                "Use them exactly as written. Do not add outside information. "
+                "When the facts distinguish between biological children and stepchildren, "
+                "preserve that distinction in your answer."
+            )
         else:
-            if session_memory.strip():
-                instruction = (
-                    "Answer from the session memory facts above. "
-                    "State facts directly; do not ask the user to repeat them."
-                )
-            else:
-                instruction = (
-                    "Answer from your own knowledge. "
-                    "If the user asks for live data (news, weather, time, stock prices), answer from what you know. "
-                    "The router decides whether to fetch live data; your job is to answer the query you received."
-                )
+            instruction = (
+                "Answer from your own knowledge. "
+                "If the user asks for live data (news, weather, time, stock prices), answer from what you know. "
+                "The router decides whether to fetch live data; your job is to answer the query you received."
+            )
 
         # Tone
         if generation_profile in ("chat_long", "detail", "augmented_detail"):
@@ -1163,7 +1197,7 @@ class LocalAnswer:
                     duration_ms=duration_ms
                 )
         
-        api_text = self._strip_identity_preamble(api_text)
+        api_text = self._strip_identity_preamble(api_text, q_eval)
         api_text = self._sanitize_model_output(api_text)
         
         # Apply augmented completion guard for AUGMENTED routes

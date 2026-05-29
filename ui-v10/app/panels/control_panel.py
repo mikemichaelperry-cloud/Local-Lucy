@@ -438,6 +438,10 @@ class ControlPanel(QFrame):
         open_state_button.clicked.connect(self.open_state_requested.emit)
         self._open_state_button = open_state_button
 
+        memory_button = QPushButton("Manage Memory Facts")
+        memory_button.clicked.connect(self._open_memory_manager)
+        self._memory_button = memory_button
+
         shutdown_button = QPushButton("Shutdown Local Lucy")
         shutdown_button.setObjectName("shutdownButton")
         shutdown_button.clicked.connect(self.shutdown_requested.emit)
@@ -447,6 +451,7 @@ class ControlPanel(QFrame):
         layout.addWidget(copy_button)
         layout.addWidget(open_logs_button)
         layout.addWidget(open_state_button)
+        layout.addWidget(memory_button)
         layout.addWidget(shutdown_button)
 
         note = QLabel("UI-local actions. Shutdown closes the console.")
@@ -454,6 +459,11 @@ class ControlPanel(QFrame):
         layout.addWidget(note)
         self._safe_actions_note = note
         return group
+
+    def _open_memory_manager(self) -> None:
+        from app.widgets.memory_manager_dialog import MemoryManagerDialog
+        dialog = MemoryManagerDialog(self)
+        dialog.exec()
 
     def apply_backend_capabilities(self, capability_notes: dict[str, str], backend_available: bool) -> None:
         if self._mode_note is not None:

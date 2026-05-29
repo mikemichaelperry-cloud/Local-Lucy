@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# ROLE: LEGACY / DEPRECATED — DO NOT USE
+# Persistent facts are now stored in SQLite (memory.db).
+# Use tools/memory_cli.py or the HMI to manage facts.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

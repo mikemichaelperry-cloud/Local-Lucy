@@ -6,6 +6,7 @@ Streams audio chunks as they're generated instead of waiting for full synthesis.
 
 import asyncio
 import io
+import os
 import subprocess
 import wave
 from pathlib import Path
