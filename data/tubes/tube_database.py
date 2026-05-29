@@ -217,9 +217,16 @@ def seed_database(conn: sqlite3.Connection) -> int:
     return inserted
 
 
-def lookup_tube(conn: sqlite3.Connection, tube_type: str) -> dict | None:
-    """Look up a tube by type. Case-insensitive."""
-    cur = conn.execute("SELECT * FROM tubes WHERE type = ? COLLATE NOCASE", (tube_type,))
+def lookup_tube(conn: sqlite3.Connection, tube_type: str, verified_only: bool = False) -> dict | None:
+    """Look up a tube by type. Case-insensitive.
+
+    If verified_only is True, only return tubes marked as verified
+    (i.e. transcribed from manufacturer datasheets, not LLM-extracted).
+    """
+    if verified_only:
+        cur = conn.execute("SELECT * FROM tubes WHERE type = ? COLLATE NOCASE AND verified = 1", (tube_type,))
+    else:
+        cur = conn.execute("SELECT * FROM tubes WHERE type = ? COLLATE NOCASE", (tube_type,))
     row = cur.fetchone()
     return dict(row) if row else None
 
@@ -244,9 +251,12 @@ def get_db_path() -> Path:
     return DB_PATH
 
 
-def list_all_types(conn: sqlite3.Connection) -> list[str]:
+def list_all_types(conn: sqlite3.Connection, verified_only: bool = False) -> list[str]:
     """Return all tube type designations in the database, sorted."""
-    cur = conn.execute("SELECT type FROM tubes ORDER BY type")
+    if verified_only:
+        cur = conn.execute("SELECT type FROM tubes WHERE verified = 1 ORDER BY type")
+    else:
+        cur = conn.execute("SELECT type FROM tubes ORDER BY type")
     return [row["type"] for row in cur.fetchall()]
 
 
