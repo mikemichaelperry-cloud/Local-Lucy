@@ -748,7 +748,7 @@ class LocalAnswer:
 
         try:
             conn = _tube_db.init_db()
-            all_types = _tube_db.list_all_types(conn)
+            all_types = _tube_db.list_all_types(conn, verified_only=True)
         except Exception:
             return None
 
@@ -770,7 +770,7 @@ class LocalAnswer:
         tube_type = matches[0]
 
         try:
-            tube = _tube_db.lookup_tube(conn, tube_type)
+            tube = _tube_db.lookup_tube(conn, tube_type, verified_only=True)
         except Exception:
             tube = None
         finally:
