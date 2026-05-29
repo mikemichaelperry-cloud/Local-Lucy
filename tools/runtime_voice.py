@@ -38,11 +38,13 @@ except ImportError:
 try:
     from voice.whisper_worker import (
         ensure_whisper_worker,
+        stop_whisper_worker,
         transcribe_with_worker,
         WhisperWorkerError,
     )
 except ImportError:
     ensure_whisper_worker = None  # type: ignore[assignment]
+    stop_whisper_worker = None  # type: ignore[assignment]
     transcribe_with_worker = None  # type: ignore[assignment]
     WhisperWorkerError = RuntimeError  # type: ignore[misc,assignment]
 
@@ -715,6 +717,7 @@ def bundled_whisper_library_dirs(root: Path) -> list[Path]:
     return [
         root / "runtime" / "voice" / "whisper.cpp" / "build" / "src",
         root / "runtime" / "voice" / "whisper.cpp" / "build" / "ggml" / "src",
+        root / "runtime" / "voice" / "whisper.cpp" / "build" / "ggml" / "src" / "ggml-cuda",
     ]
 
 
@@ -1351,19 +1354,24 @@ def resolve_whisper_model_path() -> Path:
 def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionResult:
     if not stt_bin or not Path(stt_bin).is_file():
         raise RuntimeVoiceError("whisper binary not found or not executable")
-    # Fast-path: persistent whisper-server worker (GPU already warm)
-    if ensure_whisper_worker is not None:
+    # On-demand GPU worker: start whisper-server, transcribe, then stop to free VRAM
+    if ensure_whisper_worker is not None and stop_whisper_worker is not None:
         try:
             model_path = resolve_whisper_model_path()
             port = ensure_whisper_worker(model_path)
             if port:
-                result = transcribe_with_worker(capture_path, port, timeout=30.0)
-                return TranscriptionResult(
-                    text=result["text"],
-                    backend=result["backend"],
-                    fallback_used=result["fallback_used"],
-                    fallback_reason=result["fallback_reason"],
-                )
+                try:
+                    result = transcribe_with_worker(capture_path, port, timeout=30.0)
+                    return TranscriptionResult(
+                        text=result["text"],
+                        backend=result["backend"],
+                        fallback_used=result["fallback_used"],
+                        fallback_reason=result["fallback_reason"],
+                    )
+                finally:
+                    # Always stop the worker after transcription to free GPU VRAM
+                    # for the LLM and other GPU workloads.
+                    stop_whisper_worker()
         except WhisperWorkerError:
             pass  # Fall through to whisper-cli subprocess path
         except Exception:
