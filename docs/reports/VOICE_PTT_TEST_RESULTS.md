@@ -30,7 +30,7 @@ The voice path components exist and have the correct structure, but the new Pyth
 
 ### ❌ What is MISSING
 
-- `ui-v9/app/services/runtime_voice.py` - Referenced in test plan but doesn't exist in this snapshot
+- `tools/runtime_voice.py` - Voice runtime orchestrator
 - Voice-specific handling in ExecutionEngine for `LUCY_SURFACE=voice`
 
 ---

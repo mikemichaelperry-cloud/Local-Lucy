@@ -1,10 +1,11 @@
-# Local Lucy V9 — Complete System Architecture
+# Local Lucy V10 — Complete System Architecture
 
-**Generated:** 2026-05-26  
-**Version:** v9-stable-router-v2  
+**Generated:** 2026-05-29  
+**Version:** v10-stable-router-v2  
 **Hardware:** RTX 3060 12GB, 31GB RAM, CPU+GPU hybrid  
 **Test Suite:** 1,566 passed, 19 skipped, 17 pre-existing (model non-determinism)  
 **Router:** HybridRouterV2 (MiniLM embedding k-NN + semantic disambiguation)  
+**Models:** qwen3:14b via Ollama (local-lucy-fast default), Whisper GPU on-demand, Kokoro TTS CPU  
 **Philosophy:** *Correct answer > locality. The end justifies the means.*
 
 ---

@@ -3,7 +3,7 @@
 ## Pre-Test Setup
 1. Ensure Ollama is running: `ollama serve`
 2. Ensure local-lucy model exists: `ollama list | grep local-lucy`
-3. Clear previous logs: `rm -f ~/lucy-v8/logs/*.log`
+3. Clear previous logs: `rm -f ~/.codex-api-home/lucy/runtime-v10/logs/*.log`
 
 ## Test Categories
 
