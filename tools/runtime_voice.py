@@ -662,11 +662,9 @@ def detect_stt() -> tuple[str, str]:
             return "whisper", str(whisper_path)
     for candidate in (
         bundled_whisper_binary(root),
-        Path(shutil.which("whisper") or ""),
-        Path(shutil.which("whisper-cli") or ""),
-        Path(shutil.which("whisper-cpp") or ""),
+        *(Path(p) for p in (shutil.which("whisper"), shutil.which("whisper-cli"), shutil.which("whisper-cpp")) if p),
     ):
-        if not str(candidate) or not candidate.exists():
+        if not candidate.exists() or not candidate.is_file():
             continue
         if candidate == bundled_whisper_binary(root) and not bundled_whisper_runtime_ready(root):
             continue
@@ -1350,6 +1348,8 @@ def resolve_whisper_model_path() -> Path:
 
 
 def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionResult:
+    if not stt_bin or not Path(stt_bin).is_file():
+        raise RuntimeVoiceError("whisper binary not found or not executable")
     # Fast-path: persistent whisper-server worker (GPU already warm)
     if ensure_whisper_worker is not None:
         try:
