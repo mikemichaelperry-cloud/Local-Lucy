@@ -72,6 +72,7 @@ def run(
     augmented_direct_once: bool = False,
     self_review: bool = False,
     context: dict[str, Any] | None = None,
+    model: str | None = None,
 ) -> RouterOutcome:
     """
     Unified entry point for all execution surfaces (HMI, CLI, voice).
@@ -88,6 +89,7 @@ def run(
         augmented_direct_once: Force augmented route for this query
         self_review: Whether this is a self-review request
         context: Extra execution context (merged into engine context)
+        model: Override LLM model (e.g., "local-lucy-fast" for voice safety)
 
     Returns:
         RouterOutcome with status, route, provider, response_text, etc.
@@ -100,6 +102,7 @@ def run(
         augmented_direct_once=augmented_direct_once,
         self_review=self_review,
         context=context,
+        model=model,
     )
 
 
@@ -231,8 +234,14 @@ def ensure_control_env() -> None:
     if "LUCY_VOICE_ENABLED" not in os.environ:
         voice = state.get("voice", "off")
         os.environ["LUCY_VOICE_ENABLED"] = "1" if voice in ("on", "true", "1") else "0"
-
-
+    
+    if "LUCY_MODEL" not in os.environ:
+        model = state.get("model", "local-lucy-fast")
+        os.environ["LUCY_MODEL"] = model
+    
+    if "LUCY_LOCAL_MODEL" not in os.environ:
+        model = state.get("model", "local-lucy-fast")
+        os.environ["LUCY_LOCAL_MODEL"] = model
 
 
 
@@ -309,6 +318,7 @@ def execute_plan_python(
     augmented_direct_once: bool = False,
     self_review: bool = False,
     context: dict[str, Any] | None = None,
+    model: str | None = None,
 ) -> RouterOutcome:
     """
     Execute routing plan using Python implementation.
@@ -428,6 +438,7 @@ def execute_plan_python(
             augmented_direct_once=augmented_direct_once,
             route_prefix=route_prefix,
             context=pipeline_context,
+            model=model,
         )
 
         # --- Memory persistence ---

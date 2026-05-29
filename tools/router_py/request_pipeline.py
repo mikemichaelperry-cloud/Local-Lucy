@@ -78,6 +78,7 @@ def process(
     context: dict[str, Any] | None = None,
     classification: ClassificationResult | None = None,
     decision: RoutingDecision | None = None,
+    model: str | None = None,
 ) -> tuple[RouterOutcome, ClassificationResult | None, RoutingDecision | None]:
     """
     Execute the full request pipeline: classify → route → execute.
@@ -231,7 +232,7 @@ def process(
     try:
         engine = ExecutionEngine(config={
             "timeout": timeout,
-            "model": os.environ.get("LUCY_MODEL", "local-lucy"),
+            "model": model or os.environ.get("LUCY_MODEL", "local-lucy-fast"),
             "use_sqlite_state": True,
         })
 

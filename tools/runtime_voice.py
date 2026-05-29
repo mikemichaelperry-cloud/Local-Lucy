@@ -1612,7 +1612,9 @@ def submit_transcript(transcript: str) -> dict[str, Any]:
     
     from router_py.main import run
     
-    outcome = run(transcript, surface="voice", timeout=125)
+    # Voice safety rule: always use fast model to avoid GPU OOM
+    # when whisper + full qwen3:14b + TTS compete for VRAM.
+    outcome = run(transcript, surface="voice", timeout=125, model="local-lucy-fast")
     
     request_id = f"voice_{int(time.time() * 1000)}"
     status = "completed" if outcome.status == "completed" else outcome.status

@@ -511,6 +511,7 @@ class StreamingVoicePipeline:
                 query,
                 surface="voice",
                 timeout=300,
+                model="local-lucy-fast",  # Voice safety: fast model only
             )
             outcome = await asyncio.wrap_future(future)
         

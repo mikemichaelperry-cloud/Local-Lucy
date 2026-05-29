@@ -31,6 +31,8 @@ class TestModelSwap:
 
     def test_uses_finetuned_minilm(self, router):
         """Default router should load the fine-tuned MiniLM model."""
+        # Force lazy init so model attribute is populated
+        router._lazy_init()
         # The model object is a SentenceTransformer; its underlying transformer
         # config should reveal the base architecture (MiniLM).
         base_name = getattr(router.model, "model_card_data", None)
