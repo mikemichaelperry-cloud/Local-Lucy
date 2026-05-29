@@ -13,6 +13,7 @@ class PiperBackendError(RuntimeError):
 
 
 def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | None:
+    root = Path(root) if not isinstance(root, Path) else root
     values = env or os.environ
     explicit = str(values.get("LUCY_VOICE_PIPER_BIN", "")).strip()
     if explicit:
@@ -53,6 +54,8 @@ def synthesize(
     env: Mapping[str, str] | None = None,
     timeout_seconds: int = 90,
 ) -> str:
+    root = Path(root) if not isinstance(root, Path) else root
+    output_path = Path(output_path) if not isinstance(output_path, Path) else output_path
     values = env or os.environ
     backend_bin = detect_binary(root, values)
     if backend_bin is None:
