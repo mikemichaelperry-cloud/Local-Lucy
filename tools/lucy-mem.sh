@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# ROLE: LEGACY / DEPRECATED SURFACE
-# Retained for compatibility/history; do not use for new workflows.
-# Preferred replacement: tools/start_local_lucy_opt_experimental_v6_dev.sh
+# ROLE: LEGACY / DEPRECATED — DO NOT USE
+# Persistent facts are now stored in SQLite (memory.db) and injected
+# automatically by tools/router_py/local_answer.py.  Use the HMI or
+# tools/memory_cli.py to manage facts.  This script is kept for
+# historical reference only.
 set -euo pipefail
 
 BASE_MODEL="${1:-llama3.1:8b}"

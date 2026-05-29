@@ -579,6 +579,18 @@ def select_route(
         if len(q_stripped) >= 5 and q_stripped.isupper() and q_stripped.isalpha():
             return _make_local_decision(classification, query=query)
 
+    # Personal / family guard: queries about the user's own relations must
+    # stay LOCAL so persistent facts from memory.db can be injected.
+    if query and _is_personal_family_query(query):
+        decision = _make_local_decision(classification, query=query)
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="PERSONAL_FAMILY_OVERRIDE",
+            guards_fired=["personal_family_override"],
+        )
+        return decision
+
     # Fallback when no query provided
     if not query:
         if classification.evidence_mode == "required":
@@ -1197,6 +1209,29 @@ def _is_synthesis_request(query: str) -> bool:
     if any(p.search(q) for p in _SYNTHESIS_IDENTITY_RE):
         return False
     return True
+
+
+def _is_personal_family_query(query: str) -> bool:
+    """Detect queries about the user's own family, pets, or close relations.
+
+    These should route LOCAL so persistent facts (from memory.db) can be
+    injected into the prompt.  The embedding router often misroutes them
+    to EVIDENCE (e.g. 'All My Children' soap opera).
+    """
+    if not query:
+        return False
+    q = query.lower()
+    # Personal pronoun + family/pet relationship word
+    personal_relations = [
+        r'\bmy\s+(children?|kids?|son|sons|daughter|daughters|wife|husband|spouse|partner|family|dog|cat|pet|pets|mother|father|mom|dad|brother|sister|uncle|aunt|grandmother|grandfather)',
+        r'\bwho\s+(is|are)\s+my\s+',
+        r'\btell\s+me\s+about\s+my\s+',
+        r'\bwhat\s+is\s+my\s+',
+        r'\b(how many|do I have|have I got|did I have)\s+(children|kids|sons|daughters|pets)',
+        r'\b(children|kids|sons|daughters)\s+do\s+I\s+have',
+        r'\bI\s+have\s+(a|any|no)\s+(children|kids|sons|daughters|pets)',
+    ]
+    return any(re.search(p, q) for p in personal_relations)
 
 
 def _is_creative_writing(query: str) -> bool:

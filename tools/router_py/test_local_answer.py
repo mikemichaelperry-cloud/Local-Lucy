@@ -142,6 +142,13 @@ class TestSanitization(unittest.TestCase):
         result = self.answer._strip_identity_preamble(text)
         self.assertNotIn("I am Local Lucy", result)
         self.assertIn("Here is the answer", result)
+
+    def test_strip_identity_preamble_preserves_when_asked(self):
+        """Identity preamble is kept when user explicitly asks who we are."""
+        text = "I am Local Lucy. I can help with many things."
+        result = self.answer._strip_identity_preamble(text, "Who are you?")
+        self.assertIn("I am Local Lucy", result)
+        self.assertIn("I can help with many things", result)
     
     def test_sanitize_identity_memory_fragment(self):
         """Test identity memory fragment sanitization."""
@@ -292,14 +299,16 @@ class TestPromptBuilding(unittest.TestCase):
                 pass
     def test_build_basic_prompt(self):
         """Test basic prompt building."""
-        prompt = self.answer._build_prompt(
-            "what is Python",
-            "",
-            "chat",
-            "- Be concise.",
-            False,
-            False
-        )
+        # Mock away persistent facts so the test is deterministic
+        with patch("local_answer._get_persistent_facts", return_value=[]):
+            prompt = self.answer._build_prompt(
+                "what is Python",
+                "",
+                "chat",
+                "- Be concise.",
+                False,
+                False
+            )
         self.assertIn("what is Python", prompt)
         self.assertIn("Answer from your own knowledge", prompt)
     

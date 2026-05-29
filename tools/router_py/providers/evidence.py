@@ -284,7 +284,11 @@ async def fetch_weather_evidence(question: str) -> dict[str, Any] | None:
         return cached
 
     try:
-        from weather_provider import fetch_weather
+        # Robust import: works regardless of sys.path configuration
+        try:
+            from router_py.weather_provider import fetch_weather
+        except ImportError:
+            from weather_provider import fetch_weather
         result = await fetch_weather(question)
         _set_cached_evidence("weather", question, result)
         return result
@@ -302,12 +306,15 @@ async def fetch_api_evidence(
     logger.debug(f"Fetching {provider} evidence for: {question[:50]}...")
     try:
         _ensure_tools_path()
+        loop = asyncio.get_event_loop()
         if provider == "kimi":
-            result = call_kimi_subprocess(question, timeout)
-            return result
+            return await loop.run_in_executor(
+                None, call_kimi_subprocess, question, timeout
+            )
         elif provider == "openai":
-            result = call_openai_subprocess(question, timeout)
-            return result
+            return await loop.run_in_executor(
+                None, call_openai_subprocess, question, timeout
+            )
         return None
     except Exception as e:
         logger.warning(f"{provider} evidence fetch failed: {e}")
