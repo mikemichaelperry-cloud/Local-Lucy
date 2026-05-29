@@ -771,9 +771,10 @@ def sync_voice_runtime(runtime_file: Path, state_file: Path) -> dict[str, Any]:
     with locked_state_file(runtime_file):
         current_state = load_or_create_state(state_file, refresh_timestamp=False)
         runtime_state = load_voice_runtime_locked(runtime_file)
+        tts_hint = clean_text(runtime_state.get("tts"))
         backend = detect_backend(
-            include_tts=False,
-            tts_engine_hint=clean_text(runtime_state.get("tts")),
+            include_tts=tts_hint in {"", "none"},
+            tts_engine_hint=tts_hint,
             tts_device_hint=clean_text(runtime_state.get("tts_device")),
             stt_device_hint=clean_text(runtime_state.get("stt_device")),
         )
