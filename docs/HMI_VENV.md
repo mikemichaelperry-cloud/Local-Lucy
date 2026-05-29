@@ -1,6 +1,6 @@
 # HMI Virtual Environment (`ui-v10/.venv`)
 
-Local Lucy v8 uses a single Python virtual environment located at **`ui-v10/.venv`**. This document explains why it lives inside `ui-v10/`, what it contains, and how to verify it.
+Local Lucy V10 uses a single Python virtual environment located at **`ui-v10/.venv`**. This document explains why it lives inside `ui-v10/`, what it contains, and how to verify it.
 
 ---
 
@@ -61,7 +61,7 @@ ui-v10/.venv/bin/python3 -c "import torch; import transformers; import kokoro; p
 ### 4. Run the test suite
 
 ```bash
-cd ~/lucy-v8
+cd ~/lucy-v10
 source ui-v10/.venv/bin/activate
 python -m pytest tools/router_py/ --ignore=tools/router_py/test_resource_leaks.py -q
 ```

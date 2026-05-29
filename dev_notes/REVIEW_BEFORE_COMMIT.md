@@ -1,4 +1,4 @@
-# Review Before Commit — Local Lucy V8
+# Review Before Commit — Local Lucy V10
 
 **Date:** 2026-05-13  
 **Branch:** `kimi/schema-migrations-safe-pass-20260513`  
@@ -32,7 +32,7 @@
  tools/router_py/voice_tool.py                 |   5 +
  tools/tests/test_end_to_end_comprehensive.py  |  43 +-
  tools/tests/test_memory_toggle.py             |  12 +-
- ui-v9/app/backend/router/classify_intent.py  |  (modified)
+ ui-v10/app/backend/router/classify_intent.py  |  (modified)
 ```
 
 ### New files (untracked)

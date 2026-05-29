@@ -198,7 +198,7 @@ result = await engine.execute_async(intent, route, context, use_python_path=True
 
 ```bash
 # Required for all operations
-export LUCY_ROOT=/path/to/lucy-v8
+export LUCY_ROOT=/home/mike/lucy-v10
 
 # Optional - Evidence cache TTL (seconds)
 export LUCY_UNVERIFIED_CONTEXT_WIKIPEDIA_CACHE_TTL=900

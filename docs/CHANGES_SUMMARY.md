@@ -90,7 +90,7 @@ Test the voice pipeline:
 # 1. The worker will auto-start when voice pipeline initializes
 # 2. Test TTS synthesis:
 echo '{"cmd":"synthesize","text":"Hello world","voice":"af_nicole"}' | \
-  nc -U ~/lucy-v8/snapshots/opt-experimental-v9-dev/tmp/run/kokoro_tts_worker.sock
+  nc -U ~/.codex-api-home/lucy/runtime-v10/tmp/run/kokoro_tts_worker.sock
 
 # 3. Full voice interaction:
 # Press PTT button in HMI - pipeline will handle worker automatically

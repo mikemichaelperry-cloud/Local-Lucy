@@ -178,7 +178,7 @@ AGENTS.md                                        |  +7  (tube DB in "What Is Wor
 - Router classification (`classify.py`, `hybrid_router.py`)
 - Execution engine dispatch logic (`execution_engine.py`)
 - State persistence (`execution_engine_state.py`)
-- HMI code (`ui-v9/app/panels/`)
+- HMI code (`ui-v10/app/panels/`)
 - Model weights or embedding index
 
 ---

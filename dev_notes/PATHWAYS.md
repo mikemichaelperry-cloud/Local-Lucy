@@ -2,11 +2,11 @@
 
 ## Python Environments
 - System Python: `/usr/bin/python3`
-- UI Venv (has Kokoro): `/home/mike/lucy-v10/ui-v9/.venv/bin/python3`
+- UI Venv (has Kokoro): `/home/mike/lucy-v10/ui-v10/.venv/bin/python3`
 
 ## Critical Paths
 - Project Root: `/home/mike/lucy-v10`
-- Snapshot Mirror: `/home/mike/lucy-v10/snapshots/opt-experimental-v9-dev`
+- Runtime State: `~/.codex-api-home/lucy/runtime-v10/state/`
 - Kokoro Socket: `tmp/run/kokoro_tts_worker.sock`
 - Logs: `~/.local/share/lucy/logs/`
 
@@ -27,10 +27,10 @@
 ## Architecture Notes
 
 ### Kokoro TTS Resolution (FIXED)
-**Problem:** Kokoro is installed in ui-v9 venv but voice_tool.py runs in system Python.
+**Problem:** Kokoro is installed in ui-v10 venv but voice_tool.py runs in system Python.
 Direct import fails because Kokoro is not in system Python's site-packages.
 
-**Solution:** voice_tool.py always uses subprocess with ui-v9 Python for TTS synthesis.
+**Solution:** voice_tool.py always uses subprocess with ui-v10 Python for TTS synthesis.
 The `_synthesize_with_subprocess()` method calls tts_adapter.py via subprocess,
 avoiding Python environment issues.
 
@@ -39,7 +39,7 @@ avoiding Python environment issues.
 # In voice_tool.py::synthesize()
 voice_python = self._resolve_voice_python()
 if not voice_python:
-    raise SynthesisError("No voice Python available. Ensure ui-v9 venv exists.")
+    raise SynthesisError("No voice Python available. Ensure ui-v10 venv exists.")
 
 result = self._synthesize_with_subprocess(
     text=text.strip(),
@@ -55,7 +55,7 @@ The socket worker is started by streaming_voice.py and handles synthesis request
 
 ### Two-Python Environment Strategy
 1. System Python runs: router, voice_tool, local_answer, execution_engine
-2. UI-v8 Python provides: Kokoro TTS, other UI-specific packages
+2. UI-v10 Python provides: Kokoro TTS, other UI-specific packages
 3. Communication via: Subprocess calls (tts_adapter.py CLI interface)
 
 ### Voice Tool
@@ -112,7 +112,7 @@ await aplay_proc.stdin.drain()
 **Change Voice:**
 ```bash
 export LUCY_VOICE_KOKORO_VOICE=af_nicole
-./start_v8_hmi_python.sh
+./START_LUCY.sh
 ```
 
 **Files Modified:**

@@ -2,15 +2,14 @@
 
 ## Related Documents
 
-- For structural details (directory tree, routing precedence, file line counts, known gotchas), see `~/.kimi/LOCAL_LUCY_V9_CODEBASE_MAP.md` (agent-maintained, read at session start).
+- For structural details (directory tree, routing precedence, file line counts, known gotchas), see `~/.kimi/LOCAL_LUCY_V9_CODEBASE_MAP.md` (agent-maintained, read at session start).  
+  **Note:** The map filename still says V9 for historical reasons; it describes the V10 codebase.
 - **If the map contradicts this file, this file wins.**
 
 ## Authority
 
 - The authoritative working root is:
   /home/mike/lucy-v10
-- Snapshot sync target:
-  /home/mike/lucy-v10/snapshots/opt-experimental-v9-dev (mirror, not source)
 
 - Do not modify:
   - launcher structure
@@ -21,14 +20,12 @@
 
 ## System Privileges
 
-- **Never use `sudo`.** The system blocks external sudo requests and the shell crashes.
 - Make changes only within `~/lucy-v10/` directories.
-- **V8 is frozen.** Do not modify `/home/mike/lucy-v8/` under any circumstances.
-- V9 (`/home/mike/lucy-v10/`) is the sole active development branch.
+- **V9 is frozen** at tag `local-lucy-v9-frozen-2026-05-28`. Do not modify V9.
+- V10 (`/home/mike/lucy-v10/`) is the sole active development branch.
 - For system-level changes (e.g., systemd, global env vars), use user-level alternatives:
   - Modify `START_LUCY.sh` to export env vars
   - Use per-user systemd overrides (`~/.config/systemd/user/`) if available
-  - Never edit `/etc/systemd/system/` or other root-owned paths
 
 ## Operating Principles
 
@@ -38,7 +35,6 @@
 - Test every change
 - Prefer Python over shell for logic
 - Prefer `StrReplaceFile` over `WriteFile` for edits
-- Sync all backend changes to `snapshots/opt-experimental-v9-dev/`
 
 ## Feedback Learning System (Conversational)
 
@@ -159,11 +155,8 @@ python -m pytest tools/router_py/ --ignore=tools/router_py/test_resource_leaks.p
 
 ### Sync rule
 
-Any change to `tools/router_py/` or `models/router/` must be copied to:
-```
-snapshots/opt-experimental-v9-dev/tools/router_py/
-snapshots/opt-experimental-v9-dev/models/router/
-```
+`snapshots/opt-experimental-v9-dev/` is a historical mirror. Do not sync to it.
+All changes stay in the V10 root (`/home/mike/lucy-v10/`).
 
 ---
 
@@ -189,7 +182,7 @@ The user's rating for this session:
 
 V9 is frozen at tag `local-lucy-v9-frozen-2026-05-28`. Do not modify V9.
 V10 is the active development branch.
-All work, fixes, and improvements belong in V9 only. No cross-contamination to V8.
+All work, fixes, and improvements belong in V10 only.
 
 ---
 

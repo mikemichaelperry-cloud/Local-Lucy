@@ -1,4 +1,7 @@
-# ModernBERT Router Design — Local Lucy V8
+# ModernBERT Router Design — Local Lucy V10
+
+**Historical Note:** This document describes the original ModernBERT-based router design (V8 era).  
+The current production router (V10) uses **HybridRouterV2** with fine-tuned MiniLM-L6-v2 embeddings (384-dim) and semantic disambiguation. ModernBERT was evaluated but not adopted due to similarity-collapse issues. This document is retained for reference.
 
 **Status:** Design Complete — Ready for Implementation  
 **Model:** ModernBERT-base (110M params, CPU-friendly)  
@@ -196,7 +199,7 @@ def compute_loss(logits, labels):
 ### 5.1 Directory Structure
 
 ```
-lucy-v8/
+lucy-v10/
 ├── models/
 │   └── router/
 │       ├── train.py              # Training script
