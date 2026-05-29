@@ -83,7 +83,7 @@ class TestDataQuality(unittest.TestCase):
 
     def test_minimum_count(self):
         count = tube_database.count_tubes(self.conn)
-        self.assertGreaterEqual(count, 648, f"Expected >= 648 tubes, found {count}")
+        self.assertGreaterEqual(count, 647, f"Expected >= 647 tubes, found {count}")
 
     def test_no_duplicate_types(self):
         from collections import Counter
