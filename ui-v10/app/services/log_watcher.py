@@ -35,6 +35,10 @@ class LogWatcher:
             runtime_log_dir / "runtime.log",
             runtime_log_dir / "chat.log",
             runtime_log_dir / "stable_desktop.log",
+            # V10: also tail actively-written debug and worker logs
+            Path.home() / "lucy-v10" / "ui_debug.log",
+            Path.home() / "lucy-v10" / "tmp" / "logs" / "whisper_worker.log",
+            Path.home() / "lucy-v10" / "tmp" / "logs" / "kokoro_tts_worker.log",
         ]
         self._cursors: dict[Path, _FileCursor] = {path: _FileCursor() for path in self.candidate_paths}
         self._recent_lines_by_path: dict[Path, list[str]] = {}
