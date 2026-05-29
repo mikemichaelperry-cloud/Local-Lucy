@@ -49,6 +49,7 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
         return Path(sys.executable)
     
     # Check for socket-based worker (runs in separate Python process)
+    root = Path(root) if not isinstance(root, Path) else root
     socket_path = root / "tmp" / "run" / "kokoro_tts_worker.sock"
     if socket_path.exists():
         # Verify socket is responsive
@@ -96,6 +97,8 @@ def synthesize(
     timeout_seconds: int = 90,
 ) -> str:
     del timeout_seconds
+    root = Path(root) if not isinstance(root, Path) else root
+    output_path = Path(output_path) if not isinstance(output_path, Path) else output_path
     values = env or os.environ
     if detect_binary(root, values) is None:
         raise KokoroBackendError("kokoro backend is not installed or configured")
@@ -244,6 +247,7 @@ def resolve_split_pattern(env: Mapping[str, str]) -> str:
 
 
 def configure_runtime_environment(root: Path, env: Mapping[str, str]) -> None:
+    root = Path(root) if not isinstance(root, Path) else root
     hf_home_raw = str(env.get("HF_HOME", "")).strip() or str(env.get("LUCY_VOICE_KOKORO_CACHE_HOME", "")).strip()
     hf_home = Path(hf_home_raw).expanduser() if hf_home_raw else root / "runtime" / "voice" / "cache" / "huggingface"
     hub_cache_raw = str(env.get("HF_HUB_CACHE", "")).strip()
