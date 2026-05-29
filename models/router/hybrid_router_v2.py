@@ -115,7 +115,9 @@ class HybridRouterV2:
                  examples_path: str | None = None,
                  base_model: str | None = None):
         self.device = "cpu"
+        self._initialized = False
 
+        # Store params for lazy init
         if base_model is None:
             here = Path(__file__).parent.resolve()
             finetuned_path = here / "finetuned_minilm"
@@ -123,78 +125,21 @@ class HybridRouterV2:
                 base_model = str(finetuned_path)
             else:
                 base_model = "sentence-transformers/all-MiniLM-L6-v2"
-
-        _debug = os.environ.get("LUCY_DEBUG_TRANSFORMERS", "").lower() in {"1", "true", "yes"}
-        _tf_logger = logging.getLogger("transformers")
-        _hf_logger = logging.getLogger("huggingface_hub")
-        _orig_level = _tf_logger.level
-        _orig_hf_level = _hf_logger.level
-        if not _debug:
-            _tf_logger.setLevel(logging.ERROR)
-            _hf_logger.setLevel(logging.ERROR)
-
-        try:
-            with contextlib.redirect_stdout(io.StringIO() if not _debug else sys.stdout):
-                self.model = SentenceTransformer(base_model, device="cpu")
-        finally:
-            _tf_logger.setLevel(_orig_level)
-            _hf_logger.setLevel(_orig_hf_level)
-
-        self.model.eval()
+        self._base_model = base_model
 
         here = Path(__file__).parent.resolve()
-        examples_path = examples_path or str(here / "comprehensive_examples.json")
-        embeddings_path = embeddings_path or str(here / "comprehensive_embeddings.npy")
+        self._examples_path = examples_path or str(here / "comprehensive_examples.json")
+        self._embeddings_path = embeddings_path or str(here / "comprehensive_embeddings.npy")
 
-        logger = logging.getLogger(__name__)
-
-        with open(examples_path) as f:
-            self.examples = json.load(f)
-
-        try:
-            self.embeddings = np.load(embeddings_path)
-        except FileNotFoundError:
-            logger.warning(
-                "Embeddings file not found (%s). Building from %d examples — "
-                "this will take ~30-60s on first run.",
-                embeddings_path, len(self.examples),
-            )
-            self.embeddings = self._build_embeddings_from_examples()
-            np.save(embeddings_path, self.embeddings)
-            logger.info("Saved rebuilt embeddings to %s (%s)", embeddings_path, self.embeddings.shape)
-
-        expected_dim = self.model.get_embedding_dimension()
-        if self.embeddings.shape[1] != expected_dim:
-            logger.warning(
-                "Embeddings dimension mismatch: file has %s but model expects %d. "
-                "Rebuilding from %d examples...",
-                self.embeddings.shape, expected_dim, len(self.examples),
-            )
-            self.embeddings = self._build_embeddings_from_examples()
-            np.save(embeddings_path, self.embeddings)
-            logger.info(
-                "Rebuilt and saved embeddings to %s (%s)",
-                embeddings_path, self.embeddings.shape,
-            )
-
-        # Build semantic disambiguation reference embeddings
-        self.disambiguation_refs = {}
-        for category, texts in _DISAMBIGUATION_REFS.items():
-            embs = self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
-            self.disambiguation_refs[category] = embs
-
-        # Per-route confidence thresholds (calibrated on training data)
-        # Lower threshold = easier to accept embedding decision for that route
+        # Minimal keyword guards — cheap, set up immediately
         self.route_confidence_thresholds = {
-            "LOCAL": 0.15,      # Very easy to accept LOCAL (safe fallback)
-            "AUGMENTED": 0.35,  # Need more confidence for paid provider
-            "EVIDENCE": 0.30,   # Evidence needs moderate confidence
-            "NEWS": 0.20,       # News is easy to verify
-            "TIME": 0.15,       # Time is cheap to verify
-            "WEATHER": 0.20,    # Weather is cheap to verify
+            "LOCAL": 0.15,
+            "AUGMENTED": 0.35,
+            "EVIDENCE": 0.30,
+            "NEWS": 0.20,
+            "TIME": 0.15,
+            "WEATHER": 0.20,
         }
-
-        # Minimal keyword guards for cases embedding cannot handle
         self.time_keywords = [
             "time is it", "current time", "what day is it",
             "timezone", "what date", "how many days until",
@@ -207,6 +152,67 @@ class HybridRouterV2:
             "overcast", "barometer", "celsius", "fahrenheit", "uv index",
             "pollen count", "heat index", "wind chill", "current conditions",
         ]
+
+    def _lazy_init(self) -> None:
+        """Load model, examples, embeddings, and disambiguation refs on first use."""
+        if self._initialized:
+            return
+
+        _debug = os.environ.get("LUCY_DEBUG_TRANSFORMERS", "").lower() in {"1", "true", "yes"}
+        _tf_logger = logging.getLogger("transformers")
+        _hf_logger = logging.getLogger("huggingface_hub")
+        _orig_level = _tf_logger.level
+        _orig_hf_level = _hf_logger.level
+        if not _debug:
+            _tf_logger.setLevel(logging.ERROR)
+            _hf_logger.setLevel(logging.ERROR)
+
+        try:
+            with contextlib.redirect_stdout(io.StringIO() if not _debug else sys.stdout):
+                self.model = SentenceTransformer(self._base_model, device="cpu")
+        finally:
+            _tf_logger.setLevel(_orig_level)
+            _hf_logger.setLevel(_orig_hf_level)
+
+        self.model.eval()
+
+        logger = logging.getLogger(__name__)
+
+        with open(self._examples_path) as f:
+            self.examples = json.load(f)
+
+        try:
+            self.embeddings = np.load(self._embeddings_path)
+        except FileNotFoundError:
+            logger.warning(
+                "Embeddings file not found (%s). Building from %d examples — "
+                "this will take ~30-60s on first run.",
+                self._embeddings_path, len(self.examples),
+            )
+            self.embeddings = self._build_embeddings_from_examples()
+            np.save(self._embeddings_path, self.embeddings)
+            logger.info("Saved rebuilt embeddings to %s (%s)", self._embeddings_path, self.embeddings.shape)
+
+        expected_dim = self.model.get_embedding_dimension()
+        if self.embeddings.shape[1] != expected_dim:
+            logger.warning(
+                "Embeddings dimension mismatch: file has %s but model expects %d. "
+                "Rebuilding from %d examples...",
+                self.embeddings.shape, expected_dim, len(self.examples),
+            )
+            self.embeddings = self._build_embeddings_from_examples()
+            np.save(self._embeddings_path, self.embeddings)
+            logger.info(
+                "Rebuilt and saved embeddings to %s (%s)",
+                self._embeddings_path, self.embeddings.shape,
+            )
+
+        self.disambiguation_refs = {}
+        for category, texts in _DISAMBIGUATION_REFS.items():
+            embs = self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+            self.disambiguation_refs[category] = embs
+
+        self._initialized = True
 
         self.creative_verbs = [
             "write", "compose", "craft", "tell", "create", "make up", "imagine",
@@ -584,6 +590,7 @@ class HybridRouterV2:
     # -----------------------------------------------------------------------
 
     def predict(self, query: str, k: int = 3) -> dict:
+        self._lazy_init()
         guards_fired: list[str] = []
 
         # Stage 1: Structural safety

@@ -69,9 +69,9 @@ export OLLAMA_FLASH_ATTENTION=1
 export OLLAMA_KV_CACHE_TYPE=q8_0
 
 # Force TTS (Kokoro) to CPU.
-# With 1024 context (local-lucy-fast) + Whisper large-v3-turbo on GPU,
-# VRAM is fully utilized (~11.2 GB / 12 GB).  Kokoro (~0.2 GB) does not fit
-# reliably without causing CUDA OOM.  It runs fast via the persistent worker.
+# With qwen3:14b @ 2048 ctx + Flash Attention + q8_0 KV cache,
+# VRAM is fully utilized (~11.8 GB / 12 GB).  Kokoro (~0.2 GB) does not fit
+# reliably without causing CUDA OOM.  It runs fast enough via the CPU worker.
 export LUCY_VOICE_KOKORO_DEVICE=cpu
 export LUCY_VOICE_KOKORO_SPEED=1.2
 export LUCY_VOICE_TTS_CHUNK_MAX_CHARS=400
