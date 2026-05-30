@@ -291,6 +291,7 @@ class StateWriter:
             "reason": route.policy_reason or "router_classifier_mapper",
             "session_id": session_id,
             "utc": utc_now,
+            "provider": result.provider or route.provider or "",
         }
 
         # Outcome block
@@ -314,10 +315,14 @@ class StateWriter:
             "augmented_allowed": "",
             "augmented_provider": "",
             "augmented_provider_selected": "",
-            "augmented_provider_used": result.provider if result.route == "AUGMENTED" else "none",
+            "augmented_provider_used": result.provider if result.route in {"AUGMENTED", "EVIDENCE"} else "none",
             "augmented_provider_usage_class": result.provider_usage_class or "local",
             "augmented_provider_call_reason": metadata.get("augmented_provider_call_reason", ""),
             "augmented_provider_status": metadata.get("augmented_provider_status", ""),
+            "ANSWER_BASIS": metadata.get("ANSWER_BASIS", ""),
+            "LIVE_FETCH_STATUS": metadata.get("LIVE_FETCH_STATUS", ""),
+            "CONFIDENCE": metadata.get("CONFIDENCE", ""),
+            "DEGRADED_REASON": metadata.get("DEGRADED_REASON", ""),
             "augmented_provider_error_reason": "",
             "augmented_provider_selection_reason": "",
             "augmented_provider_selection_query": "",

@@ -408,13 +408,17 @@ def resolve_last_request_provider(payload: dict[str, Any] | None) -> str:
     outcome = payload.get("outcome")
     if isinstance(outcome, dict):
         provider = _stringify(outcome.get("augmented_provider_used") or outcome.get("augmented_provider")).lower()
-        if provider in {"openai", "kimi", "wikipedia", "none"}:
+        if provider in {"openai", "kimi", "wikipedia", "trusted", "none"}:
+            return provider
+        if provider:
             return provider
     # Fallback to route.provider (local, news, time routes)
     route = payload.get("route")
     if isinstance(route, dict):
         provider = _stringify(route.get("provider")).lower()
-        if provider in {"openai", "kimi", "wikipedia", "news", "local", "none"}:
+        if provider in {"openai", "kimi", "wikipedia", "trusted", "news", "local", "none"}:
+            return provider
+        if provider:
             return provider
     return "unknown"
 
@@ -431,7 +435,7 @@ def resolve_last_request_paid(payload: dict[str, Any] | None) -> str:
     if paid_flag in {"false", "0", "no"}:
         return "no"
     provider = resolve_last_request_provider(payload)
-    if provider in {"wikipedia", "none"}:
+    if provider in {"wikipedia", "trusted", "none"}:
         return "no"
     return "unknown"
 

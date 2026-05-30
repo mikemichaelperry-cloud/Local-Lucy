@@ -41,6 +41,10 @@ def main() -> int:
     assert_ok(resolve_last_request_provider(openai_payload) == "openai", "openai request should report openai")
     assert_ok(resolve_last_request_paid(openai_payload) == "yes", "openai paid invocation should report yes")
 
+    trusted_payload = {"outcome": {"augmented_provider_used": "trusted", "augmented_paid_provider_invoked": "false"}}
+    assert_ok(resolve_last_request_provider(trusted_payload) == "trusted", "trusted evidence should report trusted")
+    assert_ok(resolve_last_request_paid(trusted_payload) == "no", "trusted evidence should report paid=no")
+
     legacy_payload = {"outcome": {"augmented_provider": "grok"}}
     assert_ok(resolve_last_request_provider(legacy_payload) == "grok", "legacy provider field should still be honored")
     assert_ok(resolve_last_request_paid(legacy_payload) == "unknown", "paid state should stay unknown without explicit flag")

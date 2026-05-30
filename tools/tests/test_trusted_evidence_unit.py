@@ -113,6 +113,22 @@ class TestFormatVetResponseWithMockFetch(unittest.TestCase):
 
 
 class TestFetchContextEntryPoint(unittest.TestCase):
+    @patch.object(uct, "_search_restricted", return_value=[
+        {"url": "https://medlineplus.gov/appendicitis.html", "title": "Appendicitis"}
+    ])
+    @patch.object(
+        uct,
+        "_fetch_article_content",
+        return_value="Appendicitis is inflammation of the appendix. It can cause severe abdominal pain, fever, nausea, and vomiting. It often needs urgent evaluation and may require surgery depending on severity and complications.",
+    )
+    def test_medical_context_live_fetch_metadata_success(self, mock_fetch, mock_search):
+        result = uct.fetch_context("what is appendicitis", evidence_reason="medical_context")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["ANSWER_BASIS"], "live_trusted_source")
+        self.assertEqual(result["LIVE_FETCH_STATUS"], "success")
+        self.assertEqual(result["CONFIDENCE"], "normal")
+        self.assertEqual(result["DEGRADED_REASON"], "")
+
     def test_medical_context_returns_bounded(self):
         with patch.object(uct, "_search_restricted", return_value=[]):
             result = uct.fetch_context("what is appendicitis", evidence_reason="medical_context")
@@ -121,6 +137,10 @@ class TestFetchContextEntryPoint(unittest.TestCase):
         self.assertTrue(result["bounded_response"])
         self.assertIn("content", result)
         self.assertIn("sources", result)
+        self.assertEqual(result["ANSWER_BASIS"], "trusted_domain_fallback")
+        self.assertEqual(result["LIVE_FETCH_STATUS"], "failed")
+        self.assertEqual(result["CONFIDENCE"], "limited")
+        self.assertEqual(result["DEGRADED_REASON"], "search_no_results")
 
     def test_vet_context_returns_bounded(self):
         with patch.object(uct, "_search_restricted", return_value=[]):

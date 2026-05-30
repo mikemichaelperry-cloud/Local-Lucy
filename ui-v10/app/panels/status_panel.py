@@ -667,6 +667,24 @@ class StatusPanel(QFrame):
             return "Failed"
         return value
 
+    def _trusted_evidence_metadata(
+        self, payload: dict[str, object] | None
+    ) -> tuple[str, str, str, str]:
+        return (
+            self._nested_text(payload, "outcome", "ANSWER_BASIS").lower(),
+            self._nested_text(payload, "outcome", "LIVE_FETCH_STATUS").lower(),
+            self._nested_text(payload, "outcome", "CONFIDENCE").lower(),
+            self._nested_text(payload, "outcome", "DEGRADED_REASON").lower(),
+        )
+
+    def _trusted_evidence_is_degraded(self, payload: dict[str, object] | None) -> bool:
+        answer_basis, live_fetch_status, confidence, _ = self._trusted_evidence_metadata(payload)
+        if confidence in {"limited", "low"}:
+            return True
+        if live_fetch_status in {"failed", "unavailable"}:
+            return True
+        return answer_basis in {"trusted_domain_fallback", "static_template", "error_fallback"}
+
     def _answer_path_text(self, payload: dict[str, object] | None) -> str:
         if self._is_validated_insufficient(payload):
             return "Evidence insufficient"
@@ -687,6 +705,21 @@ class StatusPanel(QFrame):
         provider_label = provider.upper() if provider and provider.lower() != "none" else "augmented"
         forced_augmented = self._nested_text(payload, "outcome", "augmented_direct_request").lower() in {"1", "true", "yes", "on"}
         outcome_code = self._nested_text(payload, "outcome", "outcome_code").lower()
+        answer_basis, _live_fetch_status, confidence, _degraded_reason = self._trusted_evidence_metadata(payload)
+        trusted_degraded = self._trusted_evidence_is_degraded(payload)
+
+        if trust_class == "trusted" or final_mode_upper == "EVIDENCE":
+            if trusted_degraded:
+                if answer_basis == "trusted_domain_fallback":
+                    return "Trusted fallback (limited)"
+                if answer_basis == "static_template":
+                    return "Static trusted template"
+                if answer_basis == "error_fallback":
+                    return "Trusted error fallback"
+                if confidence == "low":
+                    return "Evidence-backed answer (low)"
+                return "Evidence-backed answer (limited)"
+            return "Evidence-backed answer"
 
         if final_mode_upper == "AUGMENTED":
             if fallback_used:
@@ -698,7 +731,7 @@ class StatusPanel(QFrame):
             if forced_augmented:
                 return f"Forced augmented -> {provider_label}"
             return f"Augmented via {provider_label}"
-        if trust_class == "evidence_backed" or final_mode_upper == "EVIDENCE":
+        if trust_class == "evidence_backed":
             return "Evidence-backed answer"
         if outcome_code == "clarification_requested" or final_mode_upper == "CLARIFY":
             return "Clarification requested"
@@ -752,12 +785,31 @@ class StatusPanel(QFrame):
         trust_class = self._nested_text(payload, "outcome", "trust_class").lower()
         final_mode = (self._nested_text(payload, "outcome", "final_mode") or self._nested_text(payload, "route", "mode")).upper()
         outcome_code = self._nested_text(payload, "outcome", "outcome_code").lower()
+        answer_basis, live_fetch_status, confidence, degraded_reason = self._trusted_evidence_metadata(payload)
+        trusted_degraded = self._trusted_evidence_is_degraded(payload)
 
         if fallback_used and fallback_reason == "local_generation_degraded":
             return "Escalated because the local answer degraded."
         if fallback_used and fallback_reason == "validated_insufficient":
             return "Escalated because the evidence path was insufficient."
-        if trust_class == "evidence_backed" or final_mode == "EVIDENCE":
+        if trust_class == "trusted" or final_mode == "EVIDENCE":
+            if trusted_degraded:
+                prefix = "Low confidence" if confidence == "low" else "Limited confidence"
+                if live_fetch_status == "failed":
+                    note = f"{prefix}: live trusted fetch failed; showing fallback from trusted domains."
+                elif live_fetch_status == "unavailable":
+                    note = f"{prefix}: live trusted fetch was unavailable; showing fallback from trusted domains."
+                elif answer_basis == "static_template":
+                    note = f"{prefix}: showing a static trusted template."
+                elif answer_basis == "error_fallback":
+                    note = f"{prefix}: trusted evidence failed and an error fallback was shown."
+                else:
+                    note = f"{prefix}: trusted evidence was degraded."
+                if degraded_reason:
+                    note = f"{note[:-1]} ({degraded_reason})."
+                return note
+            return "Answer is grounded in current evidence."
+        if trust_class == "evidence_backed":
             return "Answer is grounded in current evidence."
         if outcome_code == "clarification_requested" or final_mode == "CLARIFY":
             return "A narrower question is required for correctness."

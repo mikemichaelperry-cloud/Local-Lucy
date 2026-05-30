@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 # Ensure tools/ is on path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -161,6 +162,59 @@ class TestMemoryServiceUnit(unittest.TestCase):
         ms.store_turn("user", "a", session_id="s1")
         ms.store_turn("user", "b", session_id="s2")
         self.assertEqual(ms.get_session_count(), 2)
+
+    # ------------------------------------------------------------------
+    # persistent facts
+    # ------------------------------------------------------------------
+
+    def test_get_relevant_persistent_facts_selects_pet_fact(self):
+        ms.store_persistent_fact("Rex is your dog.", category="pets")
+        ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
+        ms.store_persistent_fact("Project Atlas uses Go.", category="project")
+
+        embeddings = {
+            "What is my dog's name?": [1.0, 0.0],
+            "Rex is your dog.": [0.99, 0.01],
+            "Your daughter Anna lives in Haifa.": [0.0, 1.0],
+            "Project Atlas uses Go.": [-1.0, 0.0],
+        }
+
+        with patch.object(ms, "_get_embedding", side_effect=lambda text, timeout=15.0: embeddings.get(text)):
+            facts = ms.get_relevant_persistent_facts(
+                "What is my dog's name?",
+                limit=3,
+                threshold=0.80,
+            )
+
+        self.assertEqual(facts, ["Rex is your dog."])
+
+    def test_get_relevant_persistent_facts_selects_family_fact(self):
+        ms.store_persistent_fact("Rex is your dog.", category="pets")
+        ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
+
+        embeddings = {
+            "Where does my daughter live?": [0.0, 1.0],
+            "Rex is your dog.": [1.0, 0.0],
+            "Your daughter Anna lives in Haifa.": [0.02, 0.98],
+        }
+
+        with patch.object(ms, "_get_embedding", side_effect=lambda text, timeout=15.0: embeddings.get(text)):
+            facts = ms.get_relevant_persistent_facts(
+                "Where does my daughter live?",
+                limit=3,
+                threshold=0.80,
+            )
+
+        self.assertEqual(facts, ["Your daughter Anna lives in Haifa."])
+
+    def test_get_relevant_persistent_facts_returns_empty_on_embedding_failure(self):
+        ms.store_persistent_fact("Rex is your dog.", category="pets")
+        ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
+
+        with patch.object(ms, "_get_embedding", return_value=None):
+            facts = ms.get_relevant_persistent_facts("What is my dog's name?")
+
+        self.assertEqual(facts, [])
 
 
 if __name__ == "__main__":
