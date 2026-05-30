@@ -11561,5 +11561,265 @@
       ],
       "embedding_route": "HOSTILE_OVERRIDE"
     }
+  },
+  {
+    "query": "who are my children",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "how many kids do I have",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "tell me about my family",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "what is my wife doing today",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "do I have any grandchildren",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "my dog is scared of thunder",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "what time is it",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "time"
+    }
+  },
+  {
+    "query": "what time is it in Tokyo right now",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "time"
+    }
+  },
+  {
+    "query": "current time in London",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "time"
+    }
+  },
+  {
+    "query": "what is the time now",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "time"
+    }
+  },
+  {
+    "query": "weather in London",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "current weather in New York",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "will it rain today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "temperature in Paris right now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "gold price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "stock market today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "current inflation rate in the US",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "USD to EUR exchange rate",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "Tesla stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "S&P 500 current value",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "routing_guard_correction",
+      "category": "finance"
+    }
   }
 ]
