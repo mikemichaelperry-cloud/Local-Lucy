@@ -22,6 +22,14 @@ import html
 from pathlib import Path
 from typing import Any
 
+# Web extraction adapter (webclaw → fallback)
+sys.path.insert(0, str(Path(__file__).resolve().parent / "internet"))
+try:
+    from web_extract import extract_webpage
+    HAS_WEB_EXTRACT = True
+except Exception:
+    HAS_WEB_EXTRACT = False
+
 
 def _print_fail(reason: str) -> int:
     print(json.dumps({"ok": False, "provider": "trusted", "reason": reason}))
@@ -278,20 +286,70 @@ def _fetch_news_headlines(region: str, max_items: int = 8) -> list[dict[str, str
     return all_items[:max_items]
 
 
+def _search_restricted(query: str, domains: list[str], max_results: int = 3) -> list[dict[str, str]]:
+    """Search SearXNG restricted to a domain allowlist."""
+    root = _get_root()
+    search_script = root / "tools" / "internet" / "search_web.py"
+    if not search_script.exists():
+        return []
+    try:
+        payload = json.dumps({"query": query, "max_results": max_results, "domains": domains})
+        result = subprocess.run(
+            [str(sys.executable), str(search_script)],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            return data.get("results", [])
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception):
+        pass
+    return []
+
+
+def _fetch_article_content(url: str, max_chars: int = 5000) -> str | None:
+    """Fetch and extract clean text from a trusted URL."""
+    if not HAS_WEB_EXTRACT:
+        return None
+    try:
+        return extract_webpage(url, max_chars=max_chars, timeout=15)
+    except Exception:
+        return None
+
+
 def _format_medical_response(domains: list[str], question: str) -> str:
     """Format medical response based on query type."""
     q_lower = question.lower()
     deduped = _dedupe_domains(domains)
-    
+
+    # Try to fetch live content from trusted medical sources
+    search_results = _search_restricted(question, deduped, max_results=3)
+    if search_results:
+        top_url = search_results[0].get("url", "")
+        top_title = search_results[0].get("title", "")
+        if top_url:
+            content = _fetch_article_content(top_url, max_chars=5000)
+            if content and len(content) > 200:
+                lines = [
+                    f"Source: {top_title or top_url}",
+                    "",
+                    content,
+                    "",
+                    "Consult a healthcare professional for personal medical advice.",
+                ]
+                return "\n".join(lines)
+
     # Check for specific medication
     medication_match = re.search(
-        r'\b(amoxicillin|aspirin|tadalafil|cialis|viagra|metformin|insulin|ibuprofen|acetaminophen|paracetamol)\b', 
+        r'\b(amoxicillin|aspirin|tadalafil|cialis|viagra|metformin|insulin|ibuprofen|acetaminophen|paracetamol)\b',
         q_lower
     )
-    
+
     if medication_match:
         medication = medication_match.group(1).lower()
-        
+
         # Dose query
         if any(word in q_lower for word in ["dose", "dosage", "how much", "how many"]):
             return (
@@ -300,7 +358,7 @@ def _format_medical_response(domains: list[str], question: str) -> str:
                 f"Trusted medical sources:\n" +
                 "\n".join(f"- {src}" for src in deduped[:6])
             )
-        
+
         # What is / usage query
         if any(phrase in q_lower for phrase in ["what is", "what's", "used for", "what does"]):
             return (
@@ -310,7 +368,7 @@ def _format_medical_response(domains: list[str], question: str) -> str:
                 f"Trusted medical sources:\n" +
                 "\n".join(f"- {src}" for src in deduped[:6])
             )
-    
+
     # Generic medical response
     return (
         "Medical information is available from trusted sources. "
@@ -348,11 +406,32 @@ def _format_vet_response(domains: list[str], question: str) -> str:
     q_lower = question.lower()
     deduped = _dedupe_domains(domains)
 
-    # Emergency / symptom queries
+    # Emergency / symptom queries — always prepend emergency guidance
     emergency_keywords = ['vomiting', 'diarrhea', 'seizure', 'bleeding', 'collapse',
                           'unconscious', 'not breathing', 'choking', 'bloat',
                           'poison', 'toxin', 'toxic', 'emergency', 'urgent']
-    if any(word in q_lower for word in emergency_keywords):
+    is_emergency = any(word in q_lower for word in emergency_keywords)
+
+    # Try to fetch live content from trusted veterinary sources
+    search_results = _search_restricted(question, deduped, max_results=3)
+    if search_results:
+        top_url = search_results[0].get("url", "")
+        top_title = search_results[0].get("title", "")
+        if top_url:
+            content = _fetch_article_content(top_url, max_chars=5000)
+            if content and len(content) > 200:
+                lines = []
+                if is_emergency:
+                    lines.append("This may be a veterinary emergency. Contact a veterinarian or emergency animal hospital immediately.")
+                    lines.append("")
+                lines.append(f"Source: {top_title or top_url}")
+                lines.append("")
+                lines.append(content)
+                lines.append("")
+                lines.append("Always consult a licensed veterinarian for diagnosis and treatment.")
+                return "\n".join(lines)
+
+    if is_emergency:
         return (
             "This may be a veterinary emergency. "
             "Contact a veterinarian or emergency animal hospital immediately.\n\n"

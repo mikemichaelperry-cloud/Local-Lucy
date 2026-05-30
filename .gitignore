@@ -105,3 +105,4 @@ desktop_backups/
 .env
 *.env
 .env.*
+bin/
