@@ -114,7 +114,27 @@ def _is_category_supported(intent_family: str, question: str) -> tuple[str | Non
     """
     q_lower = question.lower()
     
-    # Check for medical queries FIRST
+    # Check for veterinary queries FIRST (before medical, to avoid false overlap)
+    veterinary_keywords = [
+        'veterinary', 'vet', 'veterinarian', 'animal health',
+        'dog', 'dogs', 'puppy', 'puppies',
+        'cat', 'cats', 'kitten', 'kittens',
+        'pet', 'pets', 'parvovirus', 'parvo',
+        'rabies', 'distemper', 'bordetella', 'leptospirosis',
+        'heartworm', 'flea', 'tick', 'tapeworm', 'roundworm',
+        'spay', 'neuter', 'neutering', 'spaying',
+        'kennel cough', 'hip dysplasia', 'bloat', 'gastric dilatation',
+        'pancreatitis', 'diabetes', 'hyperthyroidism', 'hypothyroidism',
+        'renal failure', 'kidney disease', 'liver disease',
+        'arthritis', 'osteoarthritis', 'dysplasia',
+        'vaccination', 'vaccine', 'deworm', 'deworming',
+        'grooming', 'dental', 'teeth cleaning',
+        'merck vet', 'avma', 'vca', 'aaha', 'aspca',
+    ]
+    if any(kw in q_lower for kw in veterinary_keywords):
+        return ("vet", "vet")
+
+    # Check for medical queries
     medical_keywords = [
         'medical', 'medication', 'medicine', 'drug', 'dose', 'dosage',
         'side effect', 'interaction', 'contraindication', 'health',
@@ -323,6 +343,32 @@ def _format_finance_response(domains: list[str], question: str) -> str:
     )
 
 
+def _format_vet_response(domains: list[str], question: str) -> str:
+    """Format veterinary response based on query type."""
+    q_lower = question.lower()
+    deduped = _dedupe_domains(domains)
+
+    # Emergency / symptom queries
+    emergency_keywords = ['vomiting', 'diarrhea', 'seizure', 'bleeding', 'collapse',
+                          'unconscious', 'not breathing', 'choking', 'bloat',
+                          'poison', 'toxin', 'toxic', 'emergency', 'urgent']
+    if any(word in q_lower for word in emergency_keywords):
+        return (
+            "This may be a veterinary emergency. "
+            "Contact a veterinarian or emergency animal hospital immediately.\n\n"
+            f"Trusted veterinary sources:\n" +
+            "\n".join(f"- {src}" for src in deduped[:6])
+        )
+
+    # Generic veterinary response
+    return (
+        "Veterinary information is available from trusted animal-health sources. "
+        "Always consult a licensed veterinarian for diagnosis and treatment.\n\n"
+        f"Trusted veterinary sources:\n" +
+        "\n".join(f"- {src}" for src in deduped[:6])
+    )
+
+
 def _format_news_response_with_headlines(items: list[dict[str, str]], region: str) -> str:
     """Format news response with actual headlines."""
     if region == "news_israel":
@@ -399,12 +445,19 @@ def _is_complex_medical_query(question: str) -> bool:
     return has_medication and has_complex
 
 
-def fetch_context(question: str, intent_family: str = "") -> dict[str, Any] | None:
+def fetch_context(question: str, intent_family: str = "", evidence_reason: str = "") -> dict[str, Any] | None:
     """
     Main entry point to fetch trusted context for a question.
     Returns None if not applicable (should fall back to other providers).
     """
-    category, sub_type = _is_category_supported(intent_family, question)
+    # If the classifier already identified this as medical/vet, trust it
+    # and bypass keyword matching (which often misses symptom/disease names).
+    if evidence_reason in ("medical_context", "medical_body_symptom"):
+        category, sub_type = "medical", "medical"
+    elif evidence_reason == "veterinary_context":
+        category, sub_type = "vet", "vet"
+    else:
+        category, sub_type = _is_category_supported(intent_family, question)
     if not category:
         return None
     
@@ -418,13 +471,11 @@ def fetch_context(question: str, intent_family: str = "") -> dict[str, Any] | No
         headlines = _fetch_news_headlines(category, max_items=8)
         content = _format_news_response_with_headlines(headlines, category)
     elif sub_type == "medical":
-        # For complex medical queries, return None to fall through to LLM
-        # The LLM will be constrained to medical domains via allow_domains_file
-        if _is_complex_medical_query(question):
-            return None
         content = _format_medical_response(domains, question)
     elif sub_type == "finance":
         content = _format_finance_response(domains, question)
+    elif sub_type == "vet":
+        content = _format_vet_response(domains, question)
     else:
         content = "Information available from trusted sources."
     

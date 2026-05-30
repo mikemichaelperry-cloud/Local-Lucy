@@ -103,10 +103,14 @@ def build_augmented_prompt(
     route: RoutingDecision,
 ) -> str:
     """Build augmented prompt with evidence context."""
-    if not evidence or not evidence.get("context"):
+    if not evidence:
         return question
 
-    context_text = evidence.get("context", "")
+    # Trusted provider uses "content"; Wikipedia/news use "context"
+    context_text = evidence.get("context") or evidence.get("content", "")
+    if not context_text:
+        return question
+
     title = evidence.get("title", "")
     url = evidence.get("url", "")
     provider = evidence.get("provider", "unknown")
@@ -124,6 +128,11 @@ def build_augmented_prompt(
         prompt_parts.append(f"\nSource: {title}")
     if url:
         prompt_parts.append(f"URL: {url}")
+
+    # Append trusted sources list if present
+    sources = evidence.get("sources", [])
+    if sources:
+        prompt_parts.append(f"\nTrusted sources: {', '.join(sources[:6])}")
 
     prompt_parts.append(f"\nProvider: {provider}")
     prompt_parts.append(
