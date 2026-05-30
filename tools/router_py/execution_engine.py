@@ -2073,7 +2073,8 @@ them according to the route type (bypass, provisional, or full). It handles:
         if evidence and evidence.get("bounded_response") and bounded_text:
             content = bounded_text
             sources = evidence.get("sources", [])
-            if sources:
+            # Append sources only if not already included in the content
+            if sources and "trusted sources" not in content.lower():
                 content += "\n\nTrusted sources:\n" + "\n".join(f"- {s}" for s in sources[:6])
             return ExecutionResult(
                 status="completed",
