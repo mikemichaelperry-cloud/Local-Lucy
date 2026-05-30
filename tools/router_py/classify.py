@@ -626,6 +626,54 @@ def select_route(
                 return _make_local_with_fallback(classification, query=query)
         return _make_local_decision(classification, query=query)
 
+    # Time query guard — catch unambiguous time queries that the embedding router
+    # may miss (e.g. "what time is it" sometimes routes to LOCAL).
+    if query and _is_time_query(query):
+        decision = RoutingDecision(
+            route="TIME",
+            mode="AUTO",
+            intent_family="current_evidence",
+            confidence=1.0,
+            provider="timeapi",
+            provider_usage_class="free",
+            evidence_mode="",
+            evidence_reason="time_query",
+            requires_evidence=False,
+            policy_reason="router_time_guard",
+            ephemeral=True,
+        )
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="TIME_KEYWORD_GUARD",
+            guards_fired=["time_keyword_guard"],
+        )
+        return decision
+
+    # Weather query guard — catch unambiguous weather queries that the embedding
+    # router may miss (e.g. "weather in London" sometimes routes to LOCAL).
+    if query and _is_weather_query(query):
+        decision = RoutingDecision(
+            route="WEATHER",
+            mode="AUTO",
+            intent_family="current_evidence",
+            confidence=1.0,
+            provider="weather",
+            provider_usage_class="free",
+            evidence_mode="",
+            evidence_reason="weather_query",
+            requires_evidence=False,
+            policy_reason="router_weather_guard",
+            ephemeral=True,
+        )
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="WEATHER_KEYWORD_GUARD",
+            guards_fired=["weather_keyword_guard"],
+        )
+        return decision
+
     # Primary path: embedding router
     router = _get_router()
     if router and query:
@@ -853,6 +901,53 @@ def _is_clear_news_query(query: str) -> bool:
         return False
     q = query.lower()
     return any(p.search(q) for p in _CLEAR_NEWS_RE)
+
+
+def _is_time_query(query: str) -> bool:
+    """Detect unambiguous time-of-day queries.
+
+    Catches queries like "what time is it", "current time in London",
+    "what's the time now" that the embedding router sometimes misses.
+    Excludes scheduling questions ("what time does the meeting start").
+    """
+    if not query:
+        return False
+    q = query.lower().strip()
+    # Core time patterns
+    time_patterns = [
+        r"^(what time is it|what's the time|what is the time)",
+        r"^(current time|time right now|time now)",
+        r"\btime\s+in\s+[a-z]+",  # "time in London", "time in Tokyo"
+    ]
+    if any(__import__("re").search(p, q) for p in time_patterns):
+        # Exclude scheduling questions
+        scheduling = [
+            r"what time\s+(does|do|did|will|can|should|would)",
+            r"what time\s+is\s+(the|a|an|this|that|my|your|his|her)\s+\w+",
+            r"what time\s+(is|was)\s+(the|a|an)\s+(meeting|event|party|class|flight|train|bus|movie|show|game|appointment)",
+        ]
+        if not any(__import__("re").search(p, q) for p in scheduling):
+            return True
+    return False
+
+
+def _is_weather_query(query: str) -> bool:
+    """Detect unambiguous weather queries.
+
+    Catches queries like "weather in London", "current weather",
+    "temperature in Tokyo" that the embedding router sometimes misses.
+    """
+    if not query:
+        return False
+    q = query.lower().strip()
+    weather_patterns = [
+        r"\bweather\s*(in|at|for|near|today|now)?\b",
+        r"^(current weather|weather today|weather now|what is the weather|what's the weather)",
+        r"\btemperature\s+(in|at|for)\b",
+        r"\bforecast\s+(for|in)\b",
+        r"^(will it rain|is it raining|do i need an umbrella)",
+    ]
+    return any(__import__("re").search(p, q) for p in weather_patterns)
 
 
 def _is_financial_ephemeral(query: str) -> bool:
