@@ -3,7 +3,7 @@
 
 DB1="/home/mike/lucy-v10/state/lucy_state.db"
 DB2="/home/mike/lucy-v10/data/tubes/tube_database.db"
-DB3="/home/mike/lucy-v10/state/memory.db"
+DB3="/home/mike/.codex-api-home/lucy/runtime-v10/state/memory.db"
 
 show_lucy_state() {
     echo ""
@@ -78,11 +78,20 @@ show_memory() {
     echo ""
 
     # Try to show turns if table exists
-    if echo "$tables" | grep -qi "turn"; then
+    if echo "$tables" | grep -qi "conversation_turns"; then
         echo "💬 Recent Conversation Turns:"
-        sqlite3 "$DB3" "SELECT substr(role,1,10) AS role, substr(content,1,55) AS content, substr(created_at,1,19) AS time FROM turns ORDER BY created_at DESC LIMIT 8;" -column -header 2>/dev/null || echo "(Could not read turns table)"
+        sqlite3 "$DB3" "SELECT substr(role,1,10) AS role, substr(text,1,55) AS text, substr(created_at,1,19) AS time FROM conversation_turns ORDER BY created_at DESC LIMIT 8;" -column -header 2>/dev/null || echo "(Could not read conversation_turns table)"
     else
-        echo "No 'turns' table found."
+        echo "No 'conversation_turns' table found."
+    fi
+    echo ""
+
+    # Show persistent facts
+    if echo "$tables" | grep -qi "persistent_facts"; then
+        echo "📌 Persistent Facts:"
+        sqlite3 "$DB3" "SELECT substr(fact_text,1,55) AS fact FROM persistent_facts ORDER BY id;" -column -header 2>/dev/null || echo "(Could not read persistent_facts table)"
+    else
+        echo "No 'persistent_facts' table found."
     fi
     echo ""
 
