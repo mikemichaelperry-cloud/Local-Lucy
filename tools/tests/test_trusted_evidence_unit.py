@@ -95,8 +95,9 @@ class TestFormatVetResponseWithMockFetch(unittest.TestCase):
         self.assertIn("Parvovirus is a highly contagious viral disease", result)
         self.assertIn("Source: Parvovirus", result)
 
+    @patch.object(uct, "_try_direct_fetch", return_value=None)
     @patch.object(uct, "_search_restricted", return_value=[])
-    def test_emergency_warning_without_fetch(self, mock_search):
+    def test_emergency_warning_without_fetch(self, mock_search, mock_direct):
         domains = ["avma.org"]
         result = uct._format_vet_response(domains, "my dog is vomiting")
         self.assertIn("veterinary emergency", result)
