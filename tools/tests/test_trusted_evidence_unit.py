@@ -66,8 +66,9 @@ class TestFormatMedicalResponseWithMockFetch(unittest.TestCase):
         mock_search.assert_called_once()
         mock_fetch.assert_called_once()
 
+    @patch.object(uct, "_try_direct_fetch", return_value=None)
     @patch.object(uct, "_search_restricted", return_value=[])
-    def test_falls_back_to_generic_when_no_results(self, mock_search):
+    def test_falls_back_to_generic_when_no_results(self, mock_search, mock_direct):
         domains = ["medlineplus.gov"]
         result = uct._format_medical_response(domains, "symptoms of appendicitis")
         self.assertIn("Medical information is available", result)
@@ -131,7 +132,8 @@ class TestFetchContextEntryPoint(unittest.TestCase):
 
     def test_medical_context_returns_bounded(self):
         with patch.object(uct, "_search_restricted", return_value=[]):
-            result = uct.fetch_context("what is appendicitis", evidence_reason="medical_context")
+            with patch.object(uct, "_try_direct_fetch", return_value=None):
+                result = uct.fetch_context("what is appendicitis", evidence_reason="medical_context")
         self.assertIsNotNone(result)
         self.assertTrue(result["ok"])
         self.assertTrue(result["bounded_response"])
