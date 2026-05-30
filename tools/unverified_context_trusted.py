@@ -329,46 +329,106 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
 
     q_lower = question.lower()
     q_encoded = question.replace(" ", "%20")
+    q_dashed = q_lower.replace(" ", "-")
 
     # Extract likely topic keywords from the query
-    # Remove common stop words to get the core medical topic
     stop_words = {"what", "are", "the", "symptoms", "of", "is", "a", "an",
                   "my", "i", "have", "do", "does", "how", "why", "when",
                   "where", "who", "can", "should", "would", "could", "will",
-                  "treatment", "for", "cause", "causes", "signs", "diagnosis"}
+                  "treatment", "for", "cause", "causes", "signs", "diagnosis",
+                  "side", "effects", "definition", "explain", "tell", "about"}
     words = [w for w in re.findall(r'[a-z]+', q_lower) if w not in stop_words and len(w) > 2]
 
     candidates: list[tuple[str, str]] = []
 
     if category == "medical":
-        # Try direct MedlinePlus topic pages for each keyword
+        # --- MedlinePlus (primary US gov health source) ---
         for word in words:
             candidates.append(
                 (f"https://medlineplus.gov/{word}.html", "MedlinePlus")
             )
-        # Try MedlinePlus encyc article (common format)
         for word in words:
             candidates.append(
                 (f"https://medlineplus.gov/ency/article/{word}.htm", "MedlinePlus")
             )
-        # DailyMed search
+        # MedlinePlus search
+        candidates.append(
+            (f"https://medlineplus.gov/search.html?query={q_encoded}", "MedlinePlus")
+        )
+
+        # --- DailyMed (FDA drug labels) ---
         candidates.append(
             (f"https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query={q_encoded}", "DailyMed")
         )
 
-    elif category == "vet":
-        # Merck Vet Manual direct topic (uses /topic/ format)
+        # --- Mayo Clinic ---
+        candidates.append(
+            (f"https://www.mayoclinic.org/search/search-results?q={q_encoded}", "Mayo Clinic")
+        )
+        # Try direct Mayo topic pages for each keyword
         for word in words:
             candidates.append(
-                (f"https://www.merckvetmanual.com/{word}", "Merck Veterinary Manual")
+                (f"https://www.mayoclinic.org/diseases-conditions/{word}/symptoms-causes/syc-20300000", "Mayo Clinic")
             )
-        # Merck Vet Manual search
+
+        # --- CDC ---
+        candidates.append(
+            (f"https://search.cdc.gov/search/?query={q_encoded}&affiliate=cdc-main", "CDC")
+        )
+
+        # --- WHO ---
+        candidates.append(
+            (f"https://www.who.int/search?q={q_encoded}", "WHO")
+        )
+
+    elif category == "vet":
+        # --- Merck Veterinary Manual ---
+        # Try pet-owner landing pages based on animal keywords
+        animal_map = {
+            "dog": "dog-owners",
+            "dogs": "dog-owners",
+            "cat": "cat-owners",
+            "cats": "cat-owners",
+            "horse": "horse-owners",
+            "horses": "horse-owners",
+            "rabbit": "exotic-animals",
+            "rabbits": "exotic-animals",
+            "bird": "exotic-animals",
+            "birds": "exotic-animals",
+            "reptile": "exotic-animals",
+            "reptiles": "exotic-animals",
+        }
+        for word in words:
+            if word in animal_map:
+                candidates.append(
+                    (f"https://www.merckvetmanual.com/{animal_map[word]}", "Merck Veterinary Manual")
+                )
+        # Merck search page
         candidates.append(
             (f"https://www.merckvetmanual.com/search?query={q_encoded}", "Merck Veterinary Manual")
         )
-        # VCA Hospitals search
+        # Merck home page as last resort
+        candidates.append(
+            ("https://www.merckvetmanual.com/home", "Merck Veterinary Manual")
+        )
+
+        # --- VCA Hospitals ---
+        # Try direct "know-your-pet" topic URLs for common conditions
+        for word in words:
+            candidates.append(
+                (f"https://vcahospitals.com/know-your-pet/{word}-in-dogs", "VCA Hospitals")
+            )
+            candidates.append(
+                (f"https://vcahospitals.com/know-your-pet/{word}-in-cats", "VCA Hospitals")
+            )
+        # VCA search
         candidates.append(
             (f"https://vcahospitals.com/search?query={q_encoded}", "VCA Hospitals")
+        )
+
+        # --- AVMA ---
+        candidates.append(
+            ("https://www.avma.org/resources-tools/pet-owners/petcare", "AVMA")
         )
 
     for url, name in candidates:

@@ -69,6 +69,124 @@ def _strip_toc_nav(text: str) -> str:
     return text.strip()
 
 
+# Simple noise lines — matched case-insensitively against stripped line content.
+_NOISE_LINES: set[str] = {
+    # MedlinePlus nav sections
+    "see, play and learn",
+    "research",
+    "resources",
+    "for you",
+    "patient handouts",
+    "find an expert",
+    "statistics and research",
+    "clinical trials",
+    "journal articles",
+    "children",
+    "teenagers",
+    # MedlinePlus bullets
+    "no links available",
+    # DailyMed / NIH
+    "skip to main content",
+    "national library of medicine",
+    "report adverse events",
+    "- loading image",
+    "recalls",
+    "dailymed announcements",
+    "get rss news & updates",
+    "about dailymed",
+    "customer support",
+    "safety reporting & recalls",
+    "fda safety recalls",
+    "fda resources",
+    "nlm spl resources",
+    "download data",
+    "all drug labels",
+    "all indexing & rems files",
+    "all mapping files",
+    "spl image guidelines",
+    "articles & presentations",
+    "application development support",
+    "help",
+    "all drugs",
+    "human drugs",
+    "animal drugs",
+    "home",
+    "news",
+    # Merck Vet Manual
+    "honeypot link",
+    "skip to main content",
+    "merck manual",
+    "veterinary manual",
+    "veterinary professionals",
+    "pet owners",
+    "resources",
+    "quizzes",
+    "about",
+    "expand all",
+    "collapse all",
+    "<",
+    # General
+    "",
+}
+
+
+def _strip_site_noise(text: str) -> str:
+    """Remove known navigation/header noise from extracted text.
+
+    Handles site-specific patterns from MedlinePlus, DailyMed, Merck Vet Manual,
+    and other common medical/veterinary sources.  Operates line-by-line and also
+    strips consecutive bullet lines that follow a known nav section header.
+    """
+    if not text:
+        return text
+
+    lines = text.split("\n")
+    kept: list[str] = []
+    in_nav_section = False
+
+    for line in lines:
+        stripped = line.strip().lower()
+
+        # Skip leading blank lines
+        if not kept and not stripped:
+            continue
+
+        # Detect nav section headers (case-insensitive)
+        if stripped in _NOISE_LINES:
+            in_nav_section = True
+            continue
+
+        # If we're in a nav section, skip bullet lines and blank lines
+        # until we hit non-bullet, non-blank content
+        if in_nav_section:
+            if stripped == "" or stripped.startswith("-") or stripped.startswith("•"):
+                continue
+            in_nav_section = False
+
+        # Skip specific prefix patterns that aren't caught above
+        if stripped.startswith("url of this page:"):
+            continue
+        if stripped.startswith("we're sorry."):
+            continue
+        if stripped.startswith("share sensitive information only on official"):
+            continue
+        if stripped.startswith("a lock (") and "https" in stripped:
+            continue
+        if stripped.startswith("secure .gov websites use https"):
+            continue
+        if stripped.startswith("official websites use .gov"):
+            continue
+        if stripped.startswith("dailymed - search results for"):
+            continue
+
+        kept.append(line)
+
+    text = "\n".join(kept)
+    # Collapse excessive blank lines
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def _extract_with_webclaw(url: str, timeout: int = 20) -> str | None:
     """Use webclaw to extract clean text from a URL."""
     binary = _find_webclaw()
@@ -148,6 +266,8 @@ def extract_webpage(
         text = _extract_with_fallback(url, timeout=timeout)
     if text is None:
         return None
+    text = _strip_toc_nav(text)
+    text = _strip_site_noise(text)
     return _truncate(text, max_chars)
 
 
