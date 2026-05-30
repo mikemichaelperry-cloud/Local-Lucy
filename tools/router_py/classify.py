@@ -581,15 +581,18 @@ def select_route(
 
     # Personal / family guard: queries about the user's own relations must
     # stay LOCAL so persistent facts from memory.db can be injected.
+    # SAFETY EXCEPTION: medical/veterinary/legal evidence_mode=required queries
+    # must NOT be forced LOCAL — they need cited, vetted sources.
     if query and _is_personal_family_query(query):
-        decision = _make_local_decision(classification, query=query)
-        _log_decision(
-            query or "",
-            decision,
-            embedding_route="PERSONAL_FAMILY_OVERRIDE",
-            guards_fired=["personal_family_override"],
-        )
-        return decision
+        if classification.evidence_mode != "required":
+            decision = _make_local_decision(classification, query=query)
+            _log_decision(
+                query or "",
+                decision,
+                embedding_route="PERSONAL_FAMILY_OVERRIDE",
+                guards_fired=["personal_family_override"],
+            )
+            return decision
 
     # Fallback when no query provided
     if not query:
@@ -635,11 +638,12 @@ def select_route(
             top_k_neighbours = result.get("top_k_neighbours", [])
             ephemeral = result.get("ephemeral", False)
 
-            # Trust the V2 router fully.  All keyword override guards have been
-            # removed in favour of the embedding classifier.  The only overrides
-            # that remain are:
-            #   1. Memory routing gate (follow-up context awareness)
-            #   2. Medical/vet evidence reasons (safety-critical policy layer)
+            # Medical/veterinary safety override: the embedding router sometimes
+            # returns LOCAL for symptom queries. Force EVIDENCE so the user gets
+            # cited, vetted information rather than parametric knowledge.
+            if evidence_reason in ("medical_context", "medical_body_symptom", "veterinary_context"):
+                route = "EVIDENCE"
+                guards_fired = guards_fired + ["medical_vet_safety_override"]
 
             # Memory-aware routing gate: override live-data routes for follow-ups
             memory_gate_override = _memory_routing_gate(query, route, session_id=session_id)
