@@ -71,12 +71,17 @@ def resolve_provider(
         prefer_paid: If True, default to openai regardless of query type.
 
     Returns:
-        Provider name: "wikipedia", "openai", "kimi", or "local".
+        Provider name: "wikipedia", "openai", "kimi", "trusted", or "local".
     """
-    # 1. Medical safety override — hardcoded, cannot be bypassed
-    if classification.evidence_reason == "medical_context":
-        logger.debug("Medical safety: forcing provider to wikipedia")
-        return "wikipedia"
+    # 1. Medical / veterinary safety override — hardcoded, cannot be bypassed.
+    #    These route to domain-restricted trusted sources (medlineplus, pubmed,
+    #    avma, merckvetmanual, etc.) instead of general Wikipedia.
+    if classification.evidence_reason in ("medical_context", "medical_body_symptom"):
+        logger.debug("Medical safety: forcing provider to trusted")
+        return "trusted"
+    if classification.evidence_reason == "veterinary_context":
+        logger.debug("Veterinary safety: forcing provider to trusted")
+        return "trusted"
 
     # 2. User preference from context (HMI, CLI, voice surfaces set this)
     if context:

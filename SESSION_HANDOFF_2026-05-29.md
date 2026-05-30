@@ -1,7 +1,7 @@
 # Local Lucy V10 — Session Handoff
-**Date:** 2026-05-29  
-**Session focus:** Persistent memory SQL migration, self-knowledge fix, routing guards, voice pipeline audit, HMI memory dialog  
-**Branch:** `main` (tracks V10)
+**Date:** 2026-05-29 → 2026-05-30 (extended session)  
+**Session focus:** Persistent memory SQL migration, self-knowledge fix, routing guards, voice pipeline audit, HMI memory dialog, evidence mode trusted sources fix  
+**Branch:** `main` (tracks V10) — pushed to GitHub as `bfd49e4`
 
 ---
 
@@ -42,7 +42,15 @@
 - **`ui-v10/app/panels/control_panel.py`**: Added "Manage Memory Facts" button in Actions group
 - **Not tested live**: Qt app not launched to verify visual rendering
 
-### 7. Tests
+### 7. Evidence Mode — Medical/Veterinary Trusted Sources (Critical Fix)
+- **Root cause**: Provider resolver forced medical queries to "wikipedia" instead of "trusted". Veterinary queries weren't recognized by the trusted provider at all. The execution engine didn't handle `bounded_response` from trusted sources.
+- **Files changed**: `provider_resolver.py`, `classify.py`, `unverified_context_trusted.py`, `execution_engine.py`, `response_formatter.py`, `providers/evidence.py`
+- **Verified end-to-end**:
+  - "symptoms of appendicitis" → EVIDENCE/trusted (Cochrane, PubMed, JAMA, NEJM)
+  - "my dog is vomiting" → EVIDENCE/trusted (AVMA, Merck Vet Manual, VCA, AAHA)
+  - "side effects of ibuprofen" → EVIDENCE/trusted (MedlinePlus, DailyMed)
+
+### 8. Tests
 - **66/66 unit tests passing**: `test_local_answer.py` (28), `test_memory_gate.py` (18), `test_classify.py` (20)
 
 ---
@@ -59,6 +67,7 @@
 | **Embedding router lacks family examples** | Keyword guard is a safety net. The 899-example embedding index has zero family/personal examples. | Add ~10-20 training examples to `comprehensive_examples.json` + rebuild embeddings |
 | **Finance/news keywords still fall through** | "gold price", "stock market today", "todays headlines" → LOCAL due to low embedding confidence | Expand keyword guards in `classify.py` or add training examples |
 | **Ollama cold start** | First query after idle ~2.7s, warm ~0.5s | Add background warmup ping (thread that hits Ollama every N minutes) or bump `keep_alive` |
+| **Trusted evidence is generic** | Medical/vet queries return domain lists, not actual article content. No live web scraping of trusted sources. | Integrate MedlinePlus API, PubMed API, or web scraping with domain allowlist |
 
 ### Medium Priority
 
@@ -118,8 +127,13 @@ Run `python tools/memory_cli.py list` to see current facts. As of this session:
 
 ## 🚀 Next Session Recommendations
 
-1. **Semantic fact-retriever** — Most impactful. Embed facts, similarity-search against query, inject only top-k. Solves token bloat + "children" counting bug.
-2. **Router training examples** — Add 10-20 family/personal + 10-20 finance/news examples to `comprehensive_examples.json`, rebuild embeddings.
-3. **Warmup ping** — Background thread to keep Ollama model hot. 5-line change, big UX win.
-4. **Live voice test** — Actually run audio through the pipeline.
-5. **Git commit + push** — All changes are staged and ready.
+1. **API-based trusted medical/vet sources** — Replace generic domain-list responses with actual content.
+   - **Infrastructure already exists**: SearXNG (:8080), fetch gate (`run_fetch_with_gate.sh`), HTML extraction (`extract_text.py`), domain allowlists (`config/trust/generated/medical.txt`, `vet.txt`).
+   - **Recommended approach (B)**: MedlinePlus Connect API (free, structured, gov-run) + PubMed E-utilities (free, abstracts) for medical. Veterinary fallback to scraping Merck Vet Manual / VCA Hospitals via existing fetch gate.
+   - **Effort**: ~1 day for good quality. ~2-3 hours for basic SearXNG-restricted search → fetch → extract.
+   - **Why not now**: User explicitly saved for next session.
+2. **Semantic fact-retriever** — Most impactful. Embed facts, similarity-search against query, inject only top-k. Solves token bloat + "children" counting bug.
+3. **Router training examples** — Add 10-20 family/personal + 10-20 finance/news examples to `comprehensive_examples.json`, rebuild embeddings.
+4. **Warmup ping** — Background thread to keep Ollama model hot. 5-line change, big UX win.
+5. **Live voice test** — Actually run audio through the pipeline.
+6. **HMI memory dialog visual verification** — Launch Qt app, confirm dialog renders correctly.

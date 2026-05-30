@@ -396,8 +396,9 @@ async def fetch_trusted_evidence(
         import unverified_context_trusted as trusted_provider
         loop = asyncio.get_event_loop()
         intent_family = route.intent_family if route else ""
+        evidence_reason = route.evidence_reason if route else ""
         payload = await loop.run_in_executor(
-            None, trusted_provider.fetch_context, question, intent_family
+            None, trusted_provider.fetch_context, question, intent_family, evidence_reason
         )
         if payload and payload.get("ok"):
             return {

@@ -2066,10 +2066,35 @@ them according to the route type (bypass, provisional, or full). It handles:
                 },
             )
         
-        # Step 2: Build augmented prompt with evidence
+        # Step 2: Check for bounded response from trusted provider
+        # Trusted medical/vet/finance providers return pre-formatted responses
+        # with source citations — no need to call the LLM again.
+        bounded_text = evidence.get("content") or evidence.get("context") if evidence else None
+        if evidence and evidence.get("bounded_response") and bounded_text:
+            content = bounded_text
+            sources = evidence.get("sources", [])
+            if sources:
+                content += "\n\nTrusted sources:\n" + "\n".join(f"- {s}" for s in sources[:6])
+            return ExecutionResult(
+                status="completed",
+                outcome_code="answered",
+                route=route.route,
+                provider=route.provider,
+                provider_usage_class=route.provider_usage_class,
+                response_text=content,
+                error_message="",
+                metadata={
+                    "route_type": "trusted_bounded",
+                    "evidence_fetched": True,
+                    "trust_class": "trusted",
+                    "real_route_preserved": True,
+                },
+            )
+
+        # Step 3: Build augmented prompt with evidence
         prompt = response_formatter.build_augmented_prompt(question, evidence, route)
         
-        # Step 3: Call appropriate provider
+        # Step 4: Call appropriate provider
         session_memory = ""
         memory_telemetry: dict[str, Any] = {}
         if route.provider == "wikipedia":
