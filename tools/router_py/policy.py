@@ -414,6 +414,25 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             if not any(h in normalized for h in health_symptoms):
                 return False, "personal_family_context"
 
+    # Weather-context negation: "temperature" in a weather query should not
+    # trigger medical_context (e.g. "temperature in London", "current temperature outside").
+    weather_context_terms = [
+        "weather", "forecast", "rain", "sunny", "cloudy", "snow", "wind",
+        "humidity", "pressure", "uv index", "dew point", "precipitation",
+        "in london", "in tokyo", "in paris", "in new york", "in berlin",
+        "outside", "outdoors", "today", "tomorrow", "this week",
+    ]
+    has_weather_context = any(t in normalized for t in weather_context_terms)
+    if has_weather_context and "temperature" in normalized:
+        health_symptoms = [
+            "sick", "ill", "hurt", "pain", "fever", "cough", "vomit",
+            "diarrhea", "rash", "swelling", "bleeding", "wound", "injury",
+            "symptom", "symptoms", "doctor", "hospital", "medicine",
+            "body", "head", "chest", "stomach", "throat", "my temperature",
+        ]
+        if not any(h in normalized for h in health_symptoms):
+            return False, "weather_context"
+
     # Medical/health keywords — comprehensive coverage for safety-critical queries
     medical_keywords = [
         # General health inquiry

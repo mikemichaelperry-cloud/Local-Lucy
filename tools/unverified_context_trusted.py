@@ -319,6 +319,73 @@ def _fetch_article_content(url: str, max_chars: int = 5000) -> str | None:
         return None
 
 
+def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
+    """When SearXNG search fails, try fetching directly from trusted sources.
+
+    Returns (content, source_name) or None if all fail.
+    """
+    if not HAS_WEB_EXTRACT:
+        return None
+
+    q_lower = question.lower()
+    q_encoded = question.replace(" ", "%20")
+
+    # Extract likely topic keywords from the query
+    # Remove common stop words to get the core medical topic
+    stop_words = {"what", "are", "the", "symptoms", "of", "is", "a", "an",
+                  "my", "i", "have", "do", "does", "how", "why", "when",
+                  "where", "who", "can", "should", "would", "could", "will",
+                  "treatment", "for", "cause", "causes", "signs", "diagnosis"}
+    words = [w for w in re.findall(r'[a-z]+', q_lower) if w not in stop_words and len(w) > 2]
+
+    candidates: list[tuple[str, str]] = []
+
+    if category == "medical":
+        # Try direct MedlinePlus topic pages for each keyword
+        for word in words:
+            candidates.append(
+                (f"https://medlineplus.gov/{word}.html", "MedlinePlus")
+            )
+        # Try MedlinePlus encyc article (common format)
+        for word in words:
+            candidates.append(
+                (f"https://medlineplus.gov/ency/article/{word}.htm", "MedlinePlus")
+            )
+        # DailyMed search
+        candidates.append(
+            (f"https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query={q_encoded}", "DailyMed")
+        )
+
+    elif category == "vet":
+        # Merck Vet Manual direct topic (uses /topic/ format)
+        for word in words:
+            candidates.append(
+                (f"https://www.merckvetmanual.com/{word}", "Merck Veterinary Manual")
+            )
+        # Merck Vet Manual search
+        candidates.append(
+            (f"https://www.merckvetmanual.com/search?query={q_encoded}", "Merck Veterinary Manual")
+        )
+        # VCA Hospitals search
+        candidates.append(
+            (f"https://vcahospitals.com/search?query={q_encoded}", "VCA Hospitals")
+        )
+
+    for url, name in candidates:
+        try:
+            content = extract_webpage(url, max_chars=4000, timeout=15)
+            # Reject "sorry" / error / redirect pages
+            if content and len(content) > 300:
+                lower = content.lower()
+                if any(bad in lower for bad in ["we're sorry", "page not found", "404", "sorrypages", "no results"]):
+                    continue
+                return content, name
+        except Exception:
+            continue
+
+    return None
+
+
 def _trusted_metadata(
     *,
     answer_basis: str,
@@ -391,6 +458,25 @@ def _format_medical_response(
             if not HAS_WEB_EXTRACT:
                 live_fetch_status = "unavailable"
                 degraded_reason = "extractor_unavailable"
+    else:
+        # SearXNG search failed — try direct fetch from known trusted sources
+        direct = _try_direct_fetch(question, "medical")
+        if direct:
+            content, source_name = direct
+            lines = [
+                f"Source: {source_name}",
+                "",
+                content,
+                "",
+                "Consult a healthcare professional for personal medical advice.",
+            ]
+            return _with_trusted_metadata(
+                "\n".join(lines),
+                include_metadata=include_metadata,
+                answer_basis="live_trusted_source",
+                live_fetch_status="success",
+                confidence="normal",
+            )
 
     # Check for specific medication
     medication_match = re.search(
@@ -526,6 +612,27 @@ def _format_vet_response(
             if not HAS_WEB_EXTRACT:
                 live_fetch_status = "unavailable"
                 degraded_reason = "extractor_unavailable"
+    else:
+        # SearXNG search failed — try direct fetch from known trusted sources
+        direct = _try_direct_fetch(question, "vet")
+        if direct:
+            content, source_name = direct
+            lines = []
+            if is_emergency:
+                lines.append("This may be a veterinary emergency. Contact a veterinarian or emergency animal hospital immediately.")
+                lines.append("")
+            lines.append(f"Source: {source_name}")
+            lines.append("")
+            lines.append(content)
+            lines.append("")
+            lines.append("Always consult a licensed veterinarian for diagnosis and treatment.")
+            return _with_trusted_metadata(
+                "\n".join(lines),
+                include_metadata=include_metadata,
+                answer_basis="live_trusted_source",
+                live_fetch_status="success",
+                confidence="normal",
+            )
 
     if is_emergency:
         return _with_trusted_metadata(
