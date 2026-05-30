@@ -317,12 +317,33 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         # Skip veterinary trigger for memory queries about pets
         pass
     else:
+        # Programming-context negation: queries about programming languages or
+        # software development should not trigger veterinary context even if they
+        # contain animal-named terms (e.g. "Python", "Go", "Swift", "RabbitMQ").
+        programming_context_terms = [
+            "program", "programming", "function", "code", "coding", "tutorial",
+            "developer", "development", "software", "script", "library",
+            "framework", "language", "compile", "compiler", "debugger",
+            "algorithm", "data structure", "object oriented", "class", "module",
+            "import", "package", "syntax", "variable", "string", "array",
+            "list comprehension", "dictionary", "tuple", "set", "loop",
+            "recursion", "iterable", "generator", "decorator", "lambda",
+            "javascript", "typescript", "java", "kotlin", "scala",
+            "c++", "csharp", "golang", "rust", "swift", "dart", "julia",
+            "django", "flask", "fastapi", "react", "angular", "vue",
+            "numpy", "pandas", "tensorflow", "pytorch", "sklearn",
+        ]
+        has_programming_context = any(t in normalized for t in programming_context_terms)
+
         # Tier 1: Specific animal species — immediate trigger (very high confidence)
-        if _ANIMAL_SINGLE_RE.search(normalized):
-            return True, "veterinary_context"
-        for term in _ANIMAL_MULTI:
-            if term in normalized:
+        # Skip if query is clearly about programming (prevents "Python function"
+        # from triggering veterinary_context)
+        if not has_programming_context:
+            if _ANIMAL_SINGLE_RE.search(normalized):
                 return True, "veterinary_context"
+            for term in _ANIMAL_MULTI:
+                if term in normalized:
+                    return True, "veterinary_context"
         
         # Tier 2: General animal terms — require health context to avoid false positives
         # (e.g., "animal rights", "pet project", "pet peeve")

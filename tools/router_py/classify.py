@@ -936,10 +936,22 @@ def _is_weather_query(query: str) -> bool:
 
     Catches queries like "weather in London", "current weather",
     "temperature in Tokyo" that the embedding router sometimes misses.
+    Excludes planet/space weather (e.g. "weather on Mars") which is a
+    science/history question, not a live-data request.
     """
     if not query:
         return False
     q = query.lower().strip()
+
+    # Exclude planet/space weather — these are science questions, not live data
+    space_terms = [
+        "mars", "moon", "jupiter", "saturn", "venus", "mercury", "neptune",
+        "uranus", "pluto", "sun", "solar", "space", "nasa", "planet",
+        "exoplanet", "atmosphere of", "climate on mars", "martian",
+    ]
+    if any(t in q for t in space_terms):
+        return False
+
     weather_patterns = [
         r"\bweather\s*(in|at|for|near|today|now)?\b",
         r"^(current weather|weather today|weather now|what is the weather|what's the weather)",
