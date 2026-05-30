@@ -388,6 +388,32 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             if not any(h in normalized for h in health_symptoms):
                 return False, "education_context"
 
+    # Personal/family-context negation: queries about the user's own family
+    # should not trigger medical_context unless health symptoms are present.
+    # (e.g. "who are my children", "how many kids do I have", "tell me about my family")
+    personal_family_indicators = [
+        "who are my", "how many", "do i have any", "tell me about my",
+        "my family", "my wife", "my husband", "my partner", "my spouse",
+        "my children", "my kids", "my dog", "my cat", "my pet",
+    ]
+    has_personal_family = any(t in normalized for t in personal_family_indicators)
+    if has_personal_family:
+        # Check if pediatric/pet terms are present without health symptoms
+        personal_subjects = ["baby", "child", "kid", "toddler", "infant",
+                             "my son", "my daughter", "year old", "years old",
+                             "my dog", "my cat", "my pet"]
+        has_subject = any(t in normalized for t in personal_subjects)
+        if has_subject:
+            health_symptoms = [
+                "sick", "ill", "hurt", "pain", "fever", "cough", "vomit",
+                "diarrhea", "rash", "swelling", "bleeding", "wound", "injury",
+                "symptom", "symptoms", "doctor", "hospital", "medicine",
+                "tremor", "tremors", "seizure", "collapse", "not breathing",
+                "emergency", "urgent", "poison", "toxic", "bloat",
+            ]
+            if not any(h in normalized for h in health_symptoms):
+                return False, "personal_family_context"
+
     # Medical/health keywords — comprehensive coverage for safety-critical queries
     medical_keywords = [
         # General health inquiry
