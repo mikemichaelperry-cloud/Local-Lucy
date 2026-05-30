@@ -56,6 +56,13 @@ _MEDICAL_DEFAULT_DOMAINS = [
     "cochranelibrary.com",
 ]
 
+_TRUSTED_EVIDENCE_DEFAULTS = {
+    "ANSWER_BASIS": "live_trusted_source",
+    "LIVE_FETCH_STATUS": "success",
+    "CONFIDENCE": "normal",
+    "DEGRADED_REASON": "",
+}
+
 
 def _load_medical_domains(path: Path) -> list[str]:
     """Load medical domains with mtime-based caching."""
@@ -76,6 +83,39 @@ def _load_medical_domains(path: Path) -> list[str]:
         return _MEDICAL_DOMAINS_CACHE
     except Exception:
         return list(_MEDICAL_DEFAULT_DOMAINS)
+
+
+def _trusted_evidence_metadata(
+    payload: dict[str, Any] | None,
+    *,
+    answer_basis: str | None = None,
+    live_fetch_status: str | None = None,
+    confidence: str | None = None,
+    degraded_reason: str | None = None,
+) -> dict[str, str]:
+    source = payload if isinstance(payload, dict) else {}
+    return {
+        "ANSWER_BASIS": str(
+            source.get("ANSWER_BASIS")
+            or answer_basis
+            or _TRUSTED_EVIDENCE_DEFAULTS["ANSWER_BASIS"]
+        ).strip(),
+        "LIVE_FETCH_STATUS": str(
+            source.get("LIVE_FETCH_STATUS")
+            or live_fetch_status
+            or _TRUSTED_EVIDENCE_DEFAULTS["LIVE_FETCH_STATUS"]
+        ).strip(),
+        "CONFIDENCE": str(
+            source.get("CONFIDENCE")
+            or confidence
+            or _TRUSTED_EVIDENCE_DEFAULTS["CONFIDENCE"]
+        ).strip(),
+        "DEGRADED_REASON": str(
+            source.get("DEGRADED_REASON")
+            or degraded_reason
+            or _TRUSTED_EVIDENCE_DEFAULTS["DEGRADED_REASON"]
+        ).strip(),
+    }
 
 
 sys.path.insert(0, str(ROOT_DIR / "tools"))
@@ -2073,6 +2113,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         if evidence and evidence.get("bounded_response") and bounded_text:
             content = bounded_text
             sources = evidence.get("sources", [])
+            trusted_meta = _trusted_evidence_metadata(evidence)
             # Append sources only if not already included in the content
             if sources and "trusted sources" not in content.lower():
                 content += "\n\nTrusted sources:\n" + "\n".join(f"- {s}" for s in sources[:6])
@@ -2089,6 +2130,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                     "evidence_fetched": True,
                     "trust_class": "trusted",
                     "real_route_preserved": True,
+                    **trusted_meta,
                 },
             )
 
@@ -2700,7 +2742,18 @@ them according to the route type (bypass, provisional, or full). It handles:
                     "- pubmed.ncbi.nlm.nih.gov"
                 ),
                 error_message="No evidence found in trusted sources",
-                metadata={"providers_attempted": ["trusted"], "strict_evidence": True},
+                metadata={
+                    "providers_attempted": ["trusted"],
+                    "strict_evidence": True,
+                    "trust_class": "trusted",
+                    **_trusted_evidence_metadata(
+                        None,
+                        answer_basis="error_fallback",
+                        live_fetch_status="failed",
+                        confidence="low",
+                        degraded_reason="no_trusted_evidence_found",
+                    ),
+                },
             )
         
         # Determine provider chain - start with requested or default
@@ -2901,6 +2954,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                 response_text = payload.get("content", "")
                 sources = payload.get("sources", [])
                 category = payload.get("category", "trusted")
+                trusted_meta = _trusted_evidence_metadata(payload)
                 
                 # Use content as-is - trusted provider already formatted it with sources
                 
@@ -2916,6 +2970,7 @@ them according to the route type (bypass, provisional, or full). It handles:
                         "category": category,
                         "sources": sources,
                         "trust_class": "trusted",
+                        **trusted_meta,
                         **memory_telemetry,
                     },
                 )

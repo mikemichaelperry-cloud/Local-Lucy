@@ -300,7 +300,7 @@ class TestPromptBuilding(unittest.TestCase):
     def test_build_basic_prompt(self):
         """Test basic prompt building."""
         # Mock away persistent facts so the test is deterministic
-        with patch("local_answer._get_persistent_facts", return_value=[]):
+        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
             prompt = self.answer._build_prompt(
                 "what is Python",
                 "",
@@ -314,29 +314,74 @@ class TestPromptBuilding(unittest.TestCase):
     
     def test_build_prompt_with_memory(self):
         """Test prompt building with session memory."""
-        prompt = self.answer._build_prompt(
-            "what about that",
-            "Previously discussed Python.",
-            "chat",
-            "- Be concise.",
-            False,
-            False
-        )
+        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
+            prompt = self.answer._build_prompt(
+                "what about that",
+                "Previously discussed Python.",
+                "chat",
+                "- Be concise.",
+                False,
+                False
+            )
         self.assertIn("memory", prompt.lower())
         self.assertIn("Previously discussed Python", prompt)
     
     def test_build_prompt_conversation_mode(self):
         """Test prompt building with conversation mode."""
-        prompt = self.answer._build_prompt(
-            "what is Python",
-            "",
-            "chat",
-            "- Be concise.",
-            True,
-            True
-        )
+        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
+            prompt = self.answer._build_prompt(
+                "what is Python",
+                "",
+                "chat",
+                "- Be concise.",
+                True,
+                True
+            )
         self.assertIn("CONVERSATION_MODE", prompt)
         self.assertIn("sharp", prompt)
+
+    def test_build_prompt_injects_only_relevant_pet_fact(self):
+        """Test only relevant persistent facts are injected for a pet query."""
+        with patch("local_answer._get_relevant_persistent_facts", return_value=["Rex is your dog."]):
+            prompt = self.answer._build_prompt(
+                "What is my dog's name?",
+                "",
+                "chat",
+                "- Be concise.",
+                False,
+                False
+            )
+        self.assertIn("Rex is your dog.", prompt)
+        self.assertNotIn("Your daughter Anna lives in Haifa.", prompt)
+        self.assertIn("Answer using the [PERSISTENT FACTS] block above.", prompt)
+
+    def test_build_prompt_injects_only_relevant_family_fact(self):
+        """Test family query gets family facts rather than unrelated ones."""
+        with patch("local_answer._get_relevant_persistent_facts", return_value=["Your daughter Anna lives in Haifa."]):
+            prompt = self.answer._build_prompt(
+                "Where does my daughter live?",
+                "",
+                "chat",
+                "- Be concise.",
+                False,
+                False
+            )
+        self.assertIn("Your daughter Anna lives in Haifa.", prompt)
+        self.assertNotIn("Rex is your dog.", prompt)
+
+    def test_build_prompt_skips_persistent_facts_when_retrieval_fails(self):
+        """Test retrieval failure does not fall back to bulk persistent facts."""
+        with patch("local_answer._get_relevant_persistent_facts", side_effect=RuntimeError("embed failed")):
+            prompt = self.answer._build_prompt(
+                "What is my dog's name?",
+                "",
+                "chat",
+                "- Be concise.",
+                False,
+                False
+            )
+        self.assertNotIn("[PERSISTENT FACTS", prompt)
+        self.assertIn("Answer from your own knowledge", prompt)
 
 
 class TestCompletionGuards(unittest.TestCase):

@@ -521,6 +521,34 @@ class TestJsonStateFiles:
         assert payload["outcome"]["augmented_provider_used"] == "wikipedia"
         assert payload["outcome"]["augmented_paid_provider_invoked"] == "false"
 
+    def test_trusted_evidence_metadata_persisted(self, writer, sample_context, tmp_path, monkeypatch):
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        route = RoutingDecision(
+            route="EVIDENCE", mode="AUTO", intent_family="current_evidence",
+            confidence=0.91, provider="trusted", provider_usage_class="local",
+            evidence_mode="required",
+        )
+        result = ExecutionResult(
+            status="completed", outcome_code="augmented_answer_bounded",
+            route="EVIDENCE", provider="trusted", provider_usage_class="local",
+            response_text="Fallback from trusted domains.", execution_time_ms=180,
+            metadata={
+                "trust_class": "trusted",
+                "ANSWER_BASIS": "trusted_domain_fallback",
+                "LIVE_FETCH_STATUS": "failed",
+                "CONFIDENCE": "limited",
+                "DEGRADED_REASON": "search_no_results",
+            },
+        )
+        writer.write_json_state_files(route, result, sample_context)
+        payload = json.loads((tmp_path / "last_request_result.json").read_text(encoding="utf-8"))
+        assert payload["route"]["provider"] == "trusted"
+        assert payload["outcome"]["augmented_provider_used"] == "trusted"
+        assert payload["outcome"]["ANSWER_BASIS"] == "trusted_domain_fallback"
+        assert payload["outcome"]["LIVE_FETCH_STATUS"] == "failed"
+        assert payload["outcome"]["CONFIDENCE"] == "limited"
+        assert payload["outcome"]["DEGRADED_REASON"] == "search_no_results"
+
     def test_error_case(self, writer, sample_context, tmp_path, monkeypatch):
         monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
         route = RoutingDecision(

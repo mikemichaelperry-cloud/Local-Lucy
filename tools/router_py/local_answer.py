@@ -62,12 +62,12 @@ _ollama_call_lock = threading.Lock()
 
 # Import persistent facts from SQL memory service (with fallback for standalone use)
 try:
-    from memory.memory_service import get_persistent_facts as _get_persistent_facts
+    from memory.memory_service import get_relevant_persistent_facts as _get_relevant_persistent_facts
 except ImportError:
     try:
-        from tools.memory.memory_service import get_persistent_facts as _get_persistent_facts
+        from tools.memory.memory_service import get_relevant_persistent_facts as _get_relevant_persistent_facts
     except ImportError:
-        def _get_persistent_facts(category=None):
+        def _get_relevant_persistent_facts(query, category=None, limit=3, threshold=0.35):
             return []
 
 
@@ -839,10 +839,10 @@ class LocalAnswer:
         # Placed BEFORE self-knowledge so they are the most salient context
         # when the user asks about their own life / family / pets.
         try:
-            persistent_facts = _get_persistent_facts()
+            persistent_facts = _get_relevant_persistent_facts(query, limit=3)
         except Exception:
             persistent_facts = []
-            logger.debug("Failed to load persistent facts from DB", exc_info=True)
+            logger.debug("Failed to load relevant persistent facts from DB", exc_info=True)
         if persistent_facts:
             facts_block = "\n".join(f"- {f}" for f in persistent_facts)
             parts.append(

@@ -319,14 +319,56 @@ def _fetch_article_content(url: str, max_chars: int = 5000) -> str | None:
         return None
 
 
-def _format_medical_response(domains: list[str], question: str) -> str:
+def _trusted_metadata(
+    *,
+    answer_basis: str,
+    live_fetch_status: str,
+    confidence: str,
+    degraded_reason: str = "",
+) -> dict[str, str]:
+    return {
+        "ANSWER_BASIS": answer_basis,
+        "LIVE_FETCH_STATUS": live_fetch_status,
+        "CONFIDENCE": confidence,
+        "DEGRADED_REASON": degraded_reason,
+    }
+
+
+def _with_trusted_metadata(
+    content: str,
+    *,
+    include_metadata: bool,
+    answer_basis: str,
+    live_fetch_status: str,
+    confidence: str,
+    degraded_reason: str = "",
+) -> str | tuple[str, dict[str, str]]:
+    metadata = _trusted_metadata(
+        answer_basis=answer_basis,
+        live_fetch_status=live_fetch_status,
+        confidence=confidence,
+        degraded_reason=degraded_reason,
+    )
+    if include_metadata:
+        return content, metadata
+    return content
+
+
+def _format_medical_response(
+    domains: list[str],
+    question: str,
+    include_metadata: bool = False,
+) -> str | tuple[str, dict[str, str]]:
     """Format medical response based on query type."""
     q_lower = question.lower()
     deduped = _dedupe_domains(domains)
+    degraded_reason = "search_no_results"
+    live_fetch_status = "failed"
 
     # Try to fetch live content from trusted medical sources
     search_results = _search_restricted(question, deduped, max_results=3)
     if search_results:
+        degraded_reason = "article_fetch_failed"
         top_url = search_results[0].get("url", "")
         top_title = search_results[0].get("title", "")
         if top_url:
@@ -339,7 +381,16 @@ def _format_medical_response(domains: list[str], question: str) -> str:
                     "",
                     "Consult a healthcare professional for personal medical advice.",
                 ]
-                return "\n".join(lines)
+                return _with_trusted_metadata(
+                    "\n".join(lines),
+                    include_metadata=include_metadata,
+                    answer_basis="live_trusted_source",
+                    live_fetch_status="success",
+                    confidence="normal",
+                )
+            if not HAS_WEB_EXTRACT:
+                live_fetch_status = "unavailable"
+                degraded_reason = "extractor_unavailable"
 
     # Check for specific medication
     medication_match = re.search(
@@ -352,56 +403,89 @@ def _format_medical_response(domains: list[str], question: str) -> str:
 
         # Dose query
         if any(word in q_lower for word in ["dose", "dosage", "how much", "how many"]):
-            return (
+            return _with_trusted_metadata(
                 f"Standard dosing for {medication} varies by indication and patient factors. "
                 f"Consult a clinician or pharmacist for personalized dosing guidance.\n\n"
                 f"Trusted medical sources:\n" +
-                "\n".join(f"- {src}" for src in deduped[:6])
+                "\n".join(f"- {src}" for src in deduped[:6]),
+                include_metadata=include_metadata,
+                answer_basis="trusted_domain_fallback",
+                live_fetch_status=live_fetch_status,
+                confidence="limited",
+                degraded_reason=degraded_reason,
             )
 
         # What is / usage query
         if any(phrase in q_lower for phrase in ["what is", "what's", "used for", "what does"]):
-            return (
+            return _with_trusted_metadata(
                 f"{medication.capitalize()} is a medication covered by trusted medical sources. "
                 f"Use those sources for official indication, dosing, and safety details. "
                 f"Do not start, stop, or change medication without clinician guidance.\n\n"
                 f"Trusted medical sources:\n" +
-                "\n".join(f"- {src}" for src in deduped[:6])
+                "\n".join(f"- {src}" for src in deduped[:6]),
+                include_metadata=include_metadata,
+                answer_basis="trusted_domain_fallback",
+                live_fetch_status=live_fetch_status,
+                confidence="limited",
+                degraded_reason=degraded_reason,
             )
 
     # Generic medical response
-    return (
+    return _with_trusted_metadata(
         "Medical information is available from trusted sources. "
         "Consult a healthcare professional for personal medical advice.\n\n"
         f"Trusted medical sources:\n" +
-        "\n".join(f"- {src}" for src in deduped[:6])
+        "\n".join(f"- {src}" for src in deduped[:6]),
+        include_metadata=include_metadata,
+        answer_basis="trusted_domain_fallback",
+        live_fetch_status=live_fetch_status,
+        confidence="limited",
+        degraded_reason=degraded_reason,
     )
 
 
-def _format_finance_response(domains: list[str], question: str) -> str:
+def _format_finance_response(
+    domains: list[str],
+    question: str,
+    include_metadata: bool = False,
+) -> str | tuple[str, dict[str, str]]:
     """Format finance response based on query type."""
     q_lower = question.lower()
     deduped = _dedupe_domains(domains)
     
     # Currency/FX queries
     if any(word in q_lower for word in ["exchange rate", "currency", "usd", "ils", "eur", "gbp"]):
-        return (
+        return _with_trusted_metadata(
             "Currency exchange rates fluctuate continuously. "
             "Check current rates from official financial sources.\n\n"
             f"Trusted financial sources:\n" +
-            "\n".join(f"- {src}" for src in deduped[:6])
+            "\n".join(f"- {src}" for src in deduped[:6]),
+            include_metadata=include_metadata,
+            answer_basis="static_template",
+            live_fetch_status="skipped",
+            confidence="limited",
+            degraded_reason="static_finance_template",
         )
     
     # Generic finance response
-    return (
+    return _with_trusted_metadata(
         "Financial information is available from trusted sources. "
         "Consult a financial advisor for personal investment decisions.\n\n"
         f"Trusted financial sources:\n" +
-        "\n".join(f"- {src}" for src in deduped[:6])
+        "\n".join(f"- {src}" for src in deduped[:6]),
+        include_metadata=include_metadata,
+        answer_basis="static_template",
+        live_fetch_status="skipped",
+        confidence="limited",
+        degraded_reason="static_finance_template",
     )
 
 
-def _format_vet_response(domains: list[str], question: str) -> str:
+def _format_vet_response(
+    domains: list[str],
+    question: str,
+    include_metadata: bool = False,
+) -> str | tuple[str, dict[str, str]]:
     """Format veterinary response based on query type."""
     q_lower = question.lower()
     deduped = _dedupe_domains(domains)
@@ -411,10 +495,13 @@ def _format_vet_response(domains: list[str], question: str) -> str:
                           'unconscious', 'not breathing', 'choking', 'bloat',
                           'poison', 'toxin', 'toxic', 'emergency', 'urgent']
     is_emergency = any(word in q_lower for word in emergency_keywords)
+    degraded_reason = "search_no_results"
+    live_fetch_status = "failed"
 
     # Try to fetch live content from trusted veterinary sources
     search_results = _search_restricted(question, deduped, max_results=3)
     if search_results:
+        degraded_reason = "article_fetch_failed"
         top_url = search_results[0].get("url", "")
         top_title = search_results[0].get("title", "")
         if top_url:
@@ -429,26 +516,49 @@ def _format_vet_response(domains: list[str], question: str) -> str:
                 lines.append(content)
                 lines.append("")
                 lines.append("Always consult a licensed veterinarian for diagnosis and treatment.")
-                return "\n".join(lines)
+                return _with_trusted_metadata(
+                    "\n".join(lines),
+                    include_metadata=include_metadata,
+                    answer_basis="live_trusted_source",
+                    live_fetch_status="success",
+                    confidence="normal",
+                )
+            if not HAS_WEB_EXTRACT:
+                live_fetch_status = "unavailable"
+                degraded_reason = "extractor_unavailable"
 
     if is_emergency:
-        return (
+        return _with_trusted_metadata(
             "This may be a veterinary emergency. "
             "Contact a veterinarian or emergency animal hospital immediately.\n\n"
             f"Trusted veterinary sources:\n" +
-            "\n".join(f"- {src}" for src in deduped[:6])
+            "\n".join(f"- {src}" for src in deduped[:6]),
+            include_metadata=include_metadata,
+            answer_basis="trusted_domain_fallback",
+            live_fetch_status=live_fetch_status,
+            confidence="limited",
+            degraded_reason=degraded_reason,
         )
 
     # Generic veterinary response
-    return (
+    return _with_trusted_metadata(
         "Veterinary information is available from trusted animal-health sources. "
         "Always consult a licensed veterinarian for diagnosis and treatment.\n\n"
         f"Trusted veterinary sources:\n" +
-        "\n".join(f"- {src}" for src in deduped[:6])
+        "\n".join(f"- {src}" for src in deduped[:6]),
+        include_metadata=include_metadata,
+        answer_basis="trusted_domain_fallback",
+        live_fetch_status=live_fetch_status,
+        confidence="limited",
+        degraded_reason=degraded_reason,
     )
 
 
-def _format_news_response_with_headlines(items: list[dict[str, str]], region: str) -> str:
+def _format_news_response_with_headlines(
+    items: list[dict[str, str]],
+    region: str,
+    include_metadata: bool = False,
+) -> str | tuple[str, dict[str, str]]:
     """Format news response with actual headlines."""
     if region == "news_israel":
         region_name = "Israel"
@@ -470,7 +580,14 @@ def _format_news_response_with_headlines(items: list[dict[str, str]], region: st
             lines.append(f"- {src}")
         lines.append("")
         lines.append("Note: Live headlines temporarily unavailable. Visit sources directly.")
-        return "\n".join(lines)
+        return _with_trusted_metadata(
+            "\n".join(lines),
+            include_metadata=include_metadata,
+            answer_basis="trusted_domain_fallback",
+            live_fetch_status="failed",
+            confidence="limited",
+            degraded_reason="rss_headlines_unavailable",
+        )
     
     lines = [f"Latest {region_name} news headlines:", ""]
     
@@ -489,7 +606,13 @@ def _format_news_response_with_headlines(items: list[dict[str, str]], region: st
                 lines.append(f"  {desc}")
             lines.append("")
     
-    return "\n".join(lines)
+    return _with_trusted_metadata(
+        "\n".join(lines),
+        include_metadata=include_metadata,
+        answer_basis="live_trusted_source",
+        live_fetch_status="success",
+        confidence="normal",
+    )
 
 
 def _is_complex_medical_query(question: str) -> bool:
@@ -548,15 +671,21 @@ def fetch_context(question: str, intent_family: str = "", evidence_reason: str =
     if sub_type == "news":
         # Try to fetch actual RSS headlines
         headlines = _fetch_news_headlines(category, max_items=8)
-        content = _format_news_response_with_headlines(headlines, category)
+        content, metadata = _format_news_response_with_headlines(headlines, category, include_metadata=True)
     elif sub_type == "medical":
-        content = _format_medical_response(domains, question)
+        content, metadata = _format_medical_response(domains, question, include_metadata=True)
     elif sub_type == "finance":
-        content = _format_finance_response(domains, question)
+        content, metadata = _format_finance_response(domains, question, include_metadata=True)
     elif sub_type == "vet":
-        content = _format_vet_response(domains, question)
+        content, metadata = _format_vet_response(domains, question, include_metadata=True)
     else:
         content = "Information available from trusted sources."
+        metadata = _trusted_metadata(
+            answer_basis="static_template",
+            live_fetch_status="skipped",
+            confidence="limited",
+            degraded_reason="static_trusted_template",
+        )
     
     return {
         "ok": True,
@@ -565,6 +694,7 @@ def fetch_context(question: str, intent_family: str = "", evidence_reason: str =
         "content": content,
         "sources": _dedupe_domains(domains)[:10],
         "bounded_response": True,
+        **metadata,
     }
 
 

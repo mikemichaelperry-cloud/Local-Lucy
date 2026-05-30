@@ -287,8 +287,58 @@ def get_persistent_facts(category: str | None = None) -> list[str]:
     else:
         cursor = conn.execute(
             "SELECT fact_text FROM persistent_facts ORDER BY id"
-        )
+    )
     return [row[0] for row in cursor.fetchall()]
+
+
+def get_relevant_persistent_facts(
+    query: str,
+    category: str | None = None,
+    limit: int = 3,
+    threshold: float = 0.35,
+) -> list[str]:
+    """Return up to *limit* persistent facts relevant to *query*.
+
+    Uses the existing local embedding infrastructure. If semantic retrieval
+    cannot run (empty query, missing embeddings, or runtime failure), returns
+    an empty list rather than falling back to bulk injection.
+    """
+    if not query or not query.strip() or limit <= 0:
+        return []
+
+    try:
+        conn = _get_connection()
+        if category:
+            cursor = conn.execute(
+                "SELECT id, fact_text FROM persistent_facts WHERE category = ? ORDER BY id",
+                (category,),
+            )
+        else:
+            cursor = conn.execute(
+                "SELECT id, fact_text FROM persistent_facts ORDER BY id"
+            )
+        rows = cursor.fetchall()
+        if not rows:
+            return []
+
+        query_embedding = _get_embedding(query.strip())
+        if query_embedding is None:
+            return []
+
+        scored: list[tuple[float, int, str]] = []
+        for fact_id, fact_text in rows:
+            fact_embedding = _get_embedding(str(fact_text).strip())
+            if fact_embedding is None:
+                continue
+            similarity = _cosine_similarity(query_embedding, fact_embedding)
+            if similarity >= threshold:
+                scored.append((similarity, int(fact_id), str(fact_text)))
+
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return [fact_text for _, _, fact_text in scored[:limit]]
+    except Exception:
+        logger.debug("Relevant persistent-fact retrieval failed", exc_info=True)
+        return []
 
 
 def delete_persistent_fact(fact_id: int) -> None:
