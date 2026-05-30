@@ -579,10 +579,29 @@ def select_route(
         if len(q_stripped) >= 5 and q_stripped.isupper() and q_stripped.isalpha():
             return _make_local_decision(classification, query=query)
 
+    # Medical/veterinary emergency override — must run BEFORE the personal/family
+    # guard so that health emergencies are NEVER forced LOCAL, even when the
+    # query contains personal pronouns ("my dog", "my child", etc.).
+    # This is a belt-and-suspenders safety check: the classifier already sets
+    # evidence_mode="required" for these, but we enforce it at the guard level
+    # to protect against stale runtime caches or module-aliasing issues.
+    if classification.evidence_reason in (
+        "medical_context", "medical_body_symptom", "veterinary_context"
+    ):
+        decision = _make_augmented_decision(classification, prefer_paid=False, query=query)
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="MEDICAL_VET_SAFETY_PRE_GUARD",
+            guards_fired=["medical_vet_safety_pre_guard"],
+        )
+        return decision
+
     # Personal / family guard: queries about the user's own relations must
     # stay LOCAL so persistent facts from memory.db can be injected.
     # SAFETY EXCEPTION: medical/veterinary/legal evidence_mode=required queries
     # must NOT be forced LOCAL — they need cited, vetted sources.
+    # (Also covered by the pre-guard above; kept as defense-in-depth.)
     if query and _is_personal_family_query(query):
         if classification.evidence_mode != "required":
             decision = _make_local_decision(classification, query=query)
