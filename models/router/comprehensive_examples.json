@@ -12588,5 +12588,593 @@
       "source": "synthetic_fix",
       "feedback_type": "manual_label"
     }
+  },
+  {
+    "query": "What is the current stock price of Apple?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_live_data"
+    }
+  },
+  {
+    "query": "What's the USD to ILS exchange rate today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_live_data"
+    }
+  },
+  {
+    "query": "Show me the latest Bitcoin price.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_live_data"
+    }
+  },
+  {
+    "query": "What is the current price of Tesla stock?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_live_data"
+    }
+  },
+  {
+    "query": "EUR to GBP exchange rate right now.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_live_data"
+    }
+  },
+  {
+    "query": "Current mortgage interest rates in the US.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_live_data"
+    }
+  },
+  {
+    "query": "What is the S&P 500 trading at today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_live_data"
+    }
+  },
+  {
+    "query": "Latest crypto market prices.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_live_data"
+    }
+  },
+  {
+    "query": "Explain what a P/E ratio means.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_concept"
+    }
+  },
+  {
+    "query": "How should I diversify my investment portfolio?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_concept"
+    }
+  },
+  {
+    "query": "What is the difference between a Roth IRA and a traditional IRA?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_concept"
+    }
+  },
+  {
+    "query": "Explain compound interest in simple terms.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_concept"
+    }
+  },
+  {
+    "query": "What is dollar-cost averaging?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_concept"
+    }
+  },
+  {
+    "query": "How do I create a household budget?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_concept"
+    }
+  },
+  {
+    "query": "What are the tax implications of selling stock?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "finance_concept"
+    }
+  },
+  {
+    "query": "What's the latest news from Israel?",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "Give me today's headlines.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "Breaking news about the Middle East.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "Latest world news headlines.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "What's happening in Ukraine right now?",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "Show me recent tech news.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "Any breaking news today?",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "What are the top stories right now?",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "Latest news about climate change.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "News from Europe today.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_live"
+    }
+  },
+  {
+    "query": "Tell me about the history of Israeli news media.",
+    "labels": {
+      "intent_family": "background_overview",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_historical"
+    }
+  },
+  {
+    "query": "What was the role of newspapers in World War II?",
+    "labels": {
+      "intent_family": "background_overview",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "news_historical"
+    }
+  },
+  {
+    "query": "What is my daughter's name?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "How old is my son?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "Where does my wife work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "What is my husband's favorite food?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "Tell me about my children.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "What breed is my dog?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "How old is my cat?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "What is my mother's birthday?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "Where does my father live?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "What is my pet's name?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "Remind me about my family.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "What does my brother do for work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "My dog has been vomiting. What should I do?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "vet_safety_override"
+    }
+  },
+  {
+    "query": "My child has a fever. Is it serious?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "medical_safety_override"
+    }
+  },
+  {
+    "query": "My cat is not eating. What could be wrong?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label",
+      "category": "vet_safety_override"
+    }
   }
 ]

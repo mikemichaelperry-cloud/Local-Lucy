@@ -725,54 +725,21 @@ class RuntimeBridge:
             # Calculate execution time
             execution_time_ms = int((os.times()[0] - start_time) * 1000)
             
-            # Build payload matching subprocess format
-            route_data = {
-                "intent": outcome.intent_family or "unknown",
-                "confidence": outcome.confidence or 0.0,
-                "strategy": outcome.route or "LOCAL",
-                "metadata": {},
-            }
-            outcome_data = {
-                "success": outcome.status == "completed",
-                "duration_ms": outcome.execution_time_ms or execution_time_ms,
-                "result": {
-                    "outcome_code": outcome.outcome_code,
-                    "route": outcome.route,
-                    "provider": outcome.provider,
-                },
-                "error_message": outcome.error_message or "",
-            }
-            
-            # Build a pseudo-ExecutionResult for payload builder compatibility
-            class _PseudoResult:
-                def __init__(self, outcome):
-                    self.status = outcome.status
-                    self.route = outcome.route
-                    self.provider = outcome.provider
-                    self.provider_usage_class = outcome.provider_usage_class
-                    self.outcome_code = outcome.outcome_code
-                    self.response_text = outcome.response_text
-                    self.error_message = outcome.error_message
-                    self.execution_time_ms = outcome.execution_time_ms
-                    self.metadata = dict(outcome.metadata) if outcome.metadata else {}
-                    self.confidence = outcome.confidence
-            
-            pseudo_result = _PseudoResult(outcome)
-            
-            payload = self._build_payload_from_result(
-                result=pseudo_result,
-                route_data=route_data,
-                outcome_data=outcome_data,
+            # Build payload directly from RouterOutcome — no reconstruction.
+            # The HMI is a display layer only; it must reflect the core's
+            # exact output without reinterpretation.
+            payload = self._build_payload_from_outcome(
+                outcome=outcome,
                 request_text=request_text,
                 execution_time_ms=execution_time_ms,
             )
             
-            # Write to history file for HMI display
-            if outcome.route != "NEWS":
-                try:
-                    self._write_history_entry(payload)
-                except Exception as hist_exc:
-                    print(f"[runtime_bridge] Warning: failed to write history entry: {hist_exc}", file=sys.stderr)
+            # NOTE: We do NOT write history entries here.
+            # The core ExecutionEngine's StateWriter already writes the
+            # canonical entry to request_history.jsonl using the SAME
+            # request_id. Dual writes caused duplicate entries and data
+            # divergence (runtime_bridge used a different ID schema).
+            # The HMI reads from that file via load_recent_request_history().
             
             return CommandResult(
                 action=action,
@@ -797,33 +764,22 @@ class RuntimeBridge:
                 payload=None,
             )
     
-    def _build_payload_from_result(
+    def _build_payload_from_outcome(
         self,
-        result: Any,
-        route_data: dict,
-        outcome_data: dict,
+        outcome: Any,
         request_text: str,
         execution_time_ms: int,
     ) -> dict[str, Any]:
         """
-        Build JSON payload matching runtime_request.py format.
-        
-        Args:
-            result: ExecutionResult from ExecutionEngine
-            route_data: Route data from StateManager
-            outcome_data: Outcome data from StateManager
-            request_text: Original request text
-            execution_time_ms: Execution time in milliseconds
-            
-        Returns:
-            Payload dict matching subprocess path format
+        Build JSON payload from RouterOutcome — faithful, no reinterpretation.
+
+        The HMI is a display layer; it must show exactly what the core
+        pipeline produced.  All fields are copied directly from the
+        RouterOutcome dataclass.
         """
-        import hashlib
-        import time
-        
-        request_id = f"direct_{hashlib.sha256(request_text.encode()).hexdigest()[:16]}_{time.time_ns()}"
-        
-        # Build control state from environment
+        # Use the core's request_id (propagated from main.py via pipeline)
+        request_id = outcome.request_id or ""
+
         control_state = {
             "mode": os.environ.get("LUCY_MODE", "offline"),
             "conversation": os.environ.get("LUCY_CONVERSATION_MODE", "off"),
@@ -835,35 +791,36 @@ class RuntimeBridge:
             "model": os.environ.get("LUCY_MODEL", "local"),
             "profile": os.environ.get("LUCY_PROFILE", "default"),
         }
-        
-        # Build route payload
+
+        is_augmented = (outcome.route or "") == "AUGMENTED"
+        is_completed = (outcome.status or "") == "completed"
+        meta = outcome.metadata or {}
+
         route_payload = {
-            "mode": result.route if result.route else "LOCAL",
-            "intent_family": getattr(result, 'intent_family', 'unknown'),
-            "confidence": getattr(result, 'confidence', 0.0),
-            "route_reason": route_data.get("metadata", {}).get("final_mode", "direct_execution"),
-            "provider": result.provider if result.provider else "local",
-            "provider_usage_class": result.provider_usage_class if result.provider_usage_class else "local",
-            "requested_mode": route_data.get("strategy", result.route),
-            "final_mode": result.route if result.route else "LOCAL",
-            "is_medical": route_data.get("metadata", {}).get("is_medical_query", False),
+            "mode": outcome.route or "LOCAL",
+            "intent_family": outcome.intent_family or "unknown",
+            "confidence": outcome.confidence or 0.0,
+            "reason": outcome.evidence_reason or outcome.policy_reason or "unknown",
+            "route_reason": outcome.policy_reason or "unknown",
+            "evidence_reason": outcome.evidence_reason or "",
+            "provider": outcome.provider or "local",
+            "provider_usage_class": outcome.provider_usage_class or "local",
+            "final_mode": outcome.route or "LOCAL",
+            "is_medical": meta.get("is_medical_query", False),
         }
-        
-        # Build outcome payload
-        is_augmented = (result.route or "") == "AUGMENTED"
-        is_completed = (result.status or "") == "completed"
+
         outcome_payload = {
-            "outcome_code": result.outcome_code if result.outcome_code else "completed",
+            "outcome_code": outcome.outcome_code or "completed",
             "fallback_used": "false" if is_completed else "true",
-            "fallback_reason": result.error_message or "none",
-            "trust_class": result.metadata.get("trust_class", "local") if result.metadata else "local",
-            "error_message": result.error_message or "",
+            "fallback_reason": outcome.error_message or "none",
+            "trust_class": meta.get("trust_class", "local") or "local",
+            "error_message": outcome.error_message or "",
             "execution_time_ms": execution_time_ms,
-            "augmented_provider_used": result.provider if is_augmented else "none",
-            "augmented_provider_usage_class": result.provider_usage_class if result.provider_usage_class else "local",
+            "augmented_provider_used": outcome.provider if is_augmented else "none",
+            "augmented_provider_usage_class": outcome.provider_usage_class or "local",
             "augmented_provider_call_reason": (
-                "direct" if is_augmented and result.outcome_code == "augmented_answer"
-                else "fallback" if is_augmented and result.outcome_code == "augmented_fallback"
+                "direct" if is_augmented and outcome.outcome_code == "augmented_answer"
+                else "fallback" if is_augmented and outcome.outcome_code == "augmented_fallback"
                 else "error" if is_augmented and not is_completed
                 else "not_needed"
             ),
@@ -873,12 +830,12 @@ class RuntimeBridge:
                 else "none"
             ),
             "augmented_paid_provider_invoked": (
-                "true" if is_augmented and result.provider_usage_class == "paid"
+                "true" if is_augmented and outcome.provider_usage_class == "paid"
                 else "false"
             ),
             "augmented_direct_request": "",
         }
-        
+
         return {
             "accepted": True,
             "authority": {
@@ -887,85 +844,20 @@ class RuntimeBridge:
             },
             "completed_at": self._iso_now(),
             "control_state": control_state,
-            "error": result.error_message or "",
+            "error": outcome.error_message or "",
             "outcome": outcome_payload,
-            "metadata": result.metadata or {},
+            "metadata": meta,
             "request_id": request_id,
             "request_text": request_text,
-            "response_text": result.response_text,
+            "response_text": outcome.response_text,
             "route": route_payload,
-            "status": "completed" if result.status == "completed" else result.status,
+            "status": "completed" if outcome.status == "completed" else outcome.status,
         }
-    
+
     def _iso_now(self) -> str:
         """Return ISO format current timestamp."""
         from datetime import datetime, timezone
         return datetime.now(timezone.utc).isoformat()
-
-    def _write_history_entry(self, payload: dict[str, Any]) -> None:
-        """Write a history entry to the jsonl file for HMI display.
-        
-        Uses fcntl locking to coordinate with runtime_request.py and prevent
-        interleaved writes under concurrency. Skips if request_id already exists
-        (StateWriter may have already written the same entry).
-        """
-        from datetime import datetime, timezone
-        
-        # Resolve history file path (same logic as runtime_request.py)
-        history_file = self._resolve_history_file()
-        
-        request_id = str(payload.get("request_id", "")).strip()
-        if not request_id:
-            return
-        
-        # Build entry matching runtime_request.py format
-        entry = {
-            "authority": payload.get("authority", {}),
-            "completed_at": payload.get("completed_at", self._iso_now()),
-            "control_state": payload.get("control_state", {}),
-            "error": payload.get("error", ""),
-            "outcome": payload.get("outcome", {}),
-            "request_id": request_id,
-            "request_text": payload.get("request_text", ""),
-            "response_text": payload.get("response_text", ""),
-            "route": payload.get("route", {}),
-            "status": payload.get("status", "unknown"),
-        }
-        
-        # Write to file under lock to coordinate with runtime_request.py
-        history_file.parent.mkdir(parents=True, exist_ok=True)
-        lock_file = history_file.with_suffix(history_file.suffix + ".lock")
-        lock_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(lock_file, "a+", encoding="utf-8") as lock_handle:
-            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
-            try:
-                # Skip if StateWriter (or another writer) already recorded this request_id
-                if self._history_contains_request_id(history_file, request_id):
-                    return
-                with open(history_file, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(entry, sort_keys=True))
-                    f.write("\n")
-            finally:
-                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-    
-    def _history_contains_request_id(self, history_file: Path, request_id: str) -> bool:
-        """Check if request_id already exists in history file."""
-        if not history_file.exists():
-            return False
-        try:
-            for raw_line in history_file.read_text(encoding="utf-8").splitlines():
-                line = raw_line.strip()
-                if not line:
-                    continue
-                try:
-                    parsed = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(parsed, dict) and str(parsed.get("request_id", "")).strip() == request_id:
-                    return True
-        except OSError:
-            pass
-        return False
 
     def _resolve_current_model(self) -> str:
         """Read the active model from runtime state file."""

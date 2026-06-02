@@ -120,6 +120,8 @@ CREATE TABLE IF NOT EXISTS persistent_facts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fact_text TEXT NOT NULL,
     category TEXT,
+    embedding BLOB,
+    embedding_model TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -130,7 +132,116 @@ CREATE INDEX IF NOT EXISTS idx_facts_category ON persistent_facts(category);
 def _ensure_schema(conn: sqlite3.Connection) -> None:
     """Create tables and indexes if they don't exist."""
     conn.executescript(_SCHEMA)
+    _migrate_fact_embedding_columns(conn)
     conn.commit()
+
+
+def _migrate_fact_embedding_columns(conn: sqlite3.Connection) -> None:
+    """Add embedding columns to persistent_facts if missing (idempotent)."""
+    cursor = conn.execute("PRAGMA table_info(persistent_facts)")
+    columns = {row[1] for row in cursor.fetchall()}
+    if "embedding" not in columns:
+        conn.execute("ALTER TABLE persistent_facts ADD COLUMN embedding BLOB")
+    if "embedding_model" not in columns:
+        conn.execute("ALTER TABLE persistent_facts ADD COLUMN embedding_model TEXT")
+
+
+# ---------------------------------------------------------------------------
+# Fact embedding engine (MiniLM-L6-v2 primary, Ollama fallback)
+# ---------------------------------------------------------------------------
+
+_MINILM_MODEL: Any | None = None
+_MINILM_LOCK = threading.Lock()
+_MINILM_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+
+# Module-level telemetry cache for the most recent fact-retrieval call.
+# Populated by get_relevant_persistent_facts; read by execution_engine.
+_LAST_FACT_TELEMETRY: dict[str, Any] = {}
+
+
+def _get_minilm_model() -> Any | None:
+    """Lazy-load MiniLM-L6-v2. Returns None if sentence_transformers unavailable."""
+    global _MINILM_MODEL
+    if _MINILM_MODEL is not None:
+        return _MINILM_MODEL
+    with _MINILM_LOCK:
+        if _MINILM_MODEL is not None:
+            return _MINILM_MODEL
+        try:
+            from sentence_transformers import SentenceTransformer
+
+            _MINILM_MODEL = SentenceTransformer(_MINILM_MODEL_NAME, device="cpu")
+            _MINILM_MODEL.eval()
+            logger.info("Loaded MiniLM-L6-v2 for fact embeddings")
+            return _MINILM_MODEL
+        except Exception as exc:
+            logger.debug(f"MiniLM-L6-v2 unavailable for fact embeddings: {exc}")
+            return None
+
+
+def _get_fact_embedding_engine_name() -> str:
+    """Return identifier for the currently active fact-embedding engine."""
+    if _get_minilm_model() is not None:
+        return "minilm"
+    return f"ollama:{os.environ.get('LUCY_OLLAMA_MODEL', 'local-lucy')}"
+
+
+def _compute_fact_embedding(text: str) -> list[float] | None:
+    """Embed *text* using MiniLM-L6-v2 if available, else Ollama."""
+    if not text or not text.strip():
+        return None
+    stripped = text.strip()
+    model = _get_minilm_model()
+    if model is not None:
+        try:
+            vec = model.encode(stripped, convert_to_numpy=True, normalize_embeddings=True)
+            return vec.tolist()
+        except Exception as exc:
+            logger.debug(f"MiniLM embedding failed: {exc}")
+    return _get_embedding(stripped)
+
+
+def _store_fact_embedding(conn: sqlite3.Connection, fact_id: int, embedding: list[float]) -> None:
+    """Persist a computed embedding alongside its model identifier."""
+    blob = json.dumps(embedding).encode("utf-8")
+    model_name = _get_fact_embedding_engine_name()
+    conn.execute(
+        "UPDATE persistent_facts SET embedding = ?, embedding_model = ? WHERE id = ?",
+        (blob, model_name, fact_id),
+    )
+
+
+def _load_fact_with_embeddings(conn: sqlite3.Connection, category: str | None = None):
+    """Load facts. Backfill missing/stale embeddings on demand. Returns rows."""
+    current_engine = _get_fact_embedding_engine_name()
+    if category:
+        cursor = conn.execute(
+            "SELECT id, fact_text, embedding, embedding_model FROM persistent_facts WHERE category = ? ORDER BY id",
+            (category,),
+        )
+    else:
+        cursor = conn.execute(
+            "SELECT id, fact_text, embedding, embedding_model FROM persistent_facts ORDER BY id"
+        )
+    rows = cursor.fetchall()
+    result = []
+    for fact_id, fact_text, embedding_blob, embedding_model in rows:
+        if embedding_blob is None or embedding_model != current_engine:
+            # Backfill missing or stale embedding
+            embedding = _compute_fact_embedding(fact_text)
+            if embedding is not None:
+                _store_fact_embedding(conn, fact_id, embedding)
+                embedding_blob = json.dumps(embedding).encode("utf-8")
+                embedding_model = current_engine
+        if embedding_blob is not None:
+            try:
+                embedding = json.loads(embedding_blob.decode("utf-8"))
+                result.append((fact_id, fact_text, embedding))
+            except Exception:
+                continue
+    if result:
+        conn.commit()
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +374,7 @@ def format_turns_for_prompt(turns: list[dict[str, Any]]) -> str:
 # ---------------------------------------------------------------------------
 
 def store_persistent_fact(fact_text: str, category: str | None = None) -> int:
-    """Store a persistent fact. Returns the new row id."""
+    """Store a persistent fact with its embedding. Returns the new row id."""
     fact_text = fact_text.strip()
     if not fact_text:
         raise ValueError("fact_text must be non-empty")
@@ -272,8 +383,12 @@ def store_persistent_fact(fact_text: str, category: str | None = None) -> int:
         "INSERT INTO persistent_facts (fact_text, category) VALUES (?, ?)",
         (fact_text, category),
     )
+    fact_id = cur.lastrowid
+    embedding = _compute_fact_embedding(fact_text)
+    if embedding is not None:
+        _store_fact_embedding(conn, fact_id, embedding)
     conn.commit()
-    return cur.lastrowid
+    return fact_id
 
 
 def get_persistent_facts(category: str | None = None) -> list[str]:
@@ -295,50 +410,63 @@ def get_relevant_persistent_facts(
     query: str,
     category: str | None = None,
     limit: int = 3,
-    threshold: float = 0.35,
+    threshold: float = 0.30,
 ) -> list[str]:
     """Return up to *limit* persistent facts relevant to *query*.
 
-    Uses the existing local embedding infrastructure. If semantic retrieval
-    cannot run (empty query, missing embeddings, or runtime failure), returns
-    an empty list rather than falling back to bulk injection.
+    Facts are pre-embedded at storage time using MiniLM-L6-v2 (primary) or
+    Ollama (fallback). At query time the query is embedded once and compared
+    against cached fact embeddings via cosine similarity. This is O(N) with a
+    single embedding call instead of O(N) embedding calls.
+
+    If semantic retrieval cannot run, returns an empty list.
     """
+    global _LAST_FACT_TELEMETRY
+    _LAST_FACT_TELEMETRY = {}
+
     if not query or not query.strip() or limit <= 0:
+        _LAST_FACT_TELEMETRY["fallback_reason"] = "invalid_query"
         return []
 
     try:
         conn = _get_connection()
-        if category:
-            cursor = conn.execute(
-                "SELECT id, fact_text FROM persistent_facts WHERE category = ? ORDER BY id",
-                (category,),
-            )
-        else:
-            cursor = conn.execute(
-                "SELECT id, fact_text FROM persistent_facts ORDER BY id"
-            )
-        rows = cursor.fetchall()
-        if not rows:
+        facts = _load_fact_with_embeddings(conn, category)
+        if not facts:
+            _LAST_FACT_TELEMETRY["fallback_reason"] = "no_facts_in_db"
             return []
 
-        query_embedding = _get_embedding(query.strip())
+        query_embedding = _compute_fact_embedding(query.strip())
+        engine_used = _get_fact_embedding_engine_name()
+        _LAST_FACT_TELEMETRY["successful_backend"] = engine_used
+        _LAST_FACT_TELEMETRY["fallback_used"] = engine_used.startswith("ollama")
+        _LAST_FACT_TELEMETRY["primary_failed"] = "minilm" if engine_used.startswith("ollama") else ""
+        _LAST_FACT_TELEMETRY["fallback_to"] = "ollama" if engine_used.startswith("ollama") else ""
+        _LAST_FACT_TELEMETRY["degradation_level"] = "limited" if engine_used.startswith("ollama") else "none"
+
         if query_embedding is None:
+            _LAST_FACT_TELEMETRY["fallback_reason"] = "embedding_failed"
             return []
 
         scored: list[tuple[float, int, str]] = []
-        for fact_id, fact_text in rows:
-            fact_embedding = _get_embedding(str(fact_text).strip())
-            if fact_embedding is None:
-                continue
+        for fact_id, fact_text, fact_embedding in facts:
             similarity = _cosine_similarity(query_embedding, fact_embedding)
             if similarity >= threshold:
                 scored.append((similarity, int(fact_id), str(fact_text)))
 
         scored.sort(key=lambda item: (-item[0], item[1]))
-        return [fact_text for _, _, fact_text in scored[:limit]]
-    except Exception:
+        results = [fact_text for _, _, fact_text in scored[:limit]]
+        _LAST_FACT_TELEMETRY["facts_returned"] = len(results)
+        _LAST_FACT_TELEMETRY["facts_considered"] = len(facts)
+        return results
+    except Exception as exc:
         logger.debug("Relevant persistent-fact retrieval failed", exc_info=True)
+        _LAST_FACT_TELEMETRY["fallback_reason"] = f"exception:{type(exc).__name__}"
         return []
+
+
+def get_last_fact_telemetry() -> dict[str, Any]:
+    """Return telemetry from the most recent get_relevant_persistent_facts call."""
+    return dict(_LAST_FACT_TELEMETRY)
 
 
 def delete_persistent_fact(fact_id: int) -> None:

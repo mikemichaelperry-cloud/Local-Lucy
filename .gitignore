@@ -106,3 +106,4 @@ desktop_backups/
 *.env
 .env.*
 bin/
+burn_in_logs/

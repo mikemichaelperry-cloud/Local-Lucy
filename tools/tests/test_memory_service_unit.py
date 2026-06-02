@@ -7,6 +7,7 @@ Uses a temporary in-memory SQLite DB to avoid polluting production state.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -167,11 +168,19 @@ class TestMemoryServiceUnit(unittest.TestCase):
     # persistent facts
     # ------------------------------------------------------------------
 
-    def test_get_relevant_persistent_facts_selects_pet_fact(self):
-        ms.store_persistent_fact("Rex is your dog.", category="pets")
-        ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
-        ms.store_persistent_fact("Project Atlas uses Go.", category="project")
+    def test_store_persistent_fact_saves_embedding(self):
+        with patch.object(ms, "_compute_fact_embedding", return_value=[0.5, 0.5]):
+            fid = ms.store_persistent_fact("I have a cat named Luna.", category="pets")
+        conn = ms._get_connection()
+        row = conn.execute(
+            "SELECT embedding, embedding_model FROM persistent_facts WHERE id = ?", (fid,)
+        ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertIsNotNone(row[0])
+        vec = json.loads(row[0].decode("utf-8"))
+        self.assertEqual(vec, [0.5, 0.5])
 
+    def test_get_relevant_persistent_facts_selects_pet_fact(self):
         embeddings = {
             "What is my dog's name?": [1.0, 0.0],
             "Rex is your dog.": [0.99, 0.01],
@@ -179,7 +188,11 @@ class TestMemoryServiceUnit(unittest.TestCase):
             "Project Atlas uses Go.": [-1.0, 0.0],
         }
 
-        with patch.object(ms, "_get_embedding", side_effect=lambda text, timeout=15.0: embeddings.get(text)):
+        with patch.object(ms, "_compute_fact_embedding", side_effect=lambda text: embeddings.get(text)):
+            ms.store_persistent_fact("Rex is your dog.", category="pets")
+            ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
+            ms.store_persistent_fact("Project Atlas uses Go.", category="project")
+
             facts = ms.get_relevant_persistent_facts(
                 "What is my dog's name?",
                 limit=3,
@@ -189,16 +202,16 @@ class TestMemoryServiceUnit(unittest.TestCase):
         self.assertEqual(facts, ["Rex is your dog."])
 
     def test_get_relevant_persistent_facts_selects_family_fact(self):
-        ms.store_persistent_fact("Rex is your dog.", category="pets")
-        ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
-
         embeddings = {
             "Where does my daughter live?": [0.0, 1.0],
             "Rex is your dog.": [1.0, 0.0],
             "Your daughter Anna lives in Haifa.": [0.02, 0.98],
         }
 
-        with patch.object(ms, "_get_embedding", side_effect=lambda text, timeout=15.0: embeddings.get(text)):
+        with patch.object(ms, "_compute_fact_embedding", side_effect=lambda text: embeddings.get(text)):
+            ms.store_persistent_fact("Rex is your dog.", category="pets")
+            ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
+
             facts = ms.get_relevant_persistent_facts(
                 "Where does my daughter live?",
                 limit=3,
@@ -211,10 +224,38 @@ class TestMemoryServiceUnit(unittest.TestCase):
         ms.store_persistent_fact("Rex is your dog.", category="pets")
         ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
 
-        with patch.object(ms, "_get_embedding", return_value=None):
+        with patch.object(ms, "_compute_fact_embedding", return_value=None):
             facts = ms.get_relevant_persistent_facts("What is my dog's name?")
 
         self.assertEqual(facts, [])
+
+    def test_get_relevant_persistent_facts_backfills_missing_embeddings(self):
+        # Store facts without embedding (simulate old row)
+        conn = ms._get_connection()
+        conn.execute(
+            "INSERT INTO persistent_facts (fact_text, category, embedding, embedding_model) VALUES (?, ?, ?, ?)",
+            ("I drive a Tesla.", "car", None, None),
+        )
+        conn.commit()
+
+        embeddings = {
+            "What car do I drive?": [1.0, 0.0],
+            "I drive a Tesla.": [0.95, 0.05],
+        }
+
+        with patch.object(ms, "_compute_fact_embedding", side_effect=lambda text: embeddings.get(text)):
+            facts = ms.get_relevant_persistent_facts(
+                "What car do I drive?",
+                limit=3,
+                threshold=0.80,
+            )
+
+        self.assertEqual(facts, ["I drive a Tesla."])
+        # Verify embedding was backfilled
+        row = conn.execute(
+            "SELECT embedding FROM persistent_facts WHERE fact_text = ?", ("I drive a Tesla.",)
+        ).fetchone()
+        self.assertIsNotNone(row[0])
 
 
 if __name__ == "__main__":

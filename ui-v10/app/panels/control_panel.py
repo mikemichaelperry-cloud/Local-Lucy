@@ -454,7 +454,7 @@ class ControlPanel(QFrame):
         layout.addWidget(memory_button)
         layout.addWidget(shutdown_button)
 
-        note = QLabel("UI-local actions. Shutdown closes the console.")
+        note = QLabel("UI-local actions. Shutdown kills the process so code changes take effect on restart.")
         note.setWordWrap(True)
         layout.addWidget(note)
         self._safe_actions_note = note

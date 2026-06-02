@@ -626,7 +626,7 @@ class OperatorConsoleWindow(QMainWindow):
         self._thread_pool.start(self._action_task)
 
     def _handle_shutdown_requested(self) -> None:
-        """Gracefully shutdown Local Lucy."""
+        """Gracefully shutdown Local Lucy — kills the Python process."""
         self._append_ui_event("[info] shutdown requested")
         self.statusBar().showMessage("Shutting down Local Lucy...", 2000)
 
@@ -644,8 +644,16 @@ class OperatorConsoleWindow(QMainWindow):
         if self._voice_action_task:
             self._voice_action_task.cancel()
 
-        # Close the window
-        QTimer.singleShot(500, self.close)
+        # Close the window and then force-quit the application.
+        # closeEvent() only accepts the close event; it does not terminate
+        # the process if background threads or the event loop keep it alive.
+        # We need a hard exit so the process reloads fresh code on restart.
+        def _force_quit():
+            self.close()
+            import sys
+            sys.exit(0)
+
+        QTimer.singleShot(500, _force_quit)
 
     @Slot(object)
     def _handle_backend_action_complete(self, result: CommandResult) -> None:

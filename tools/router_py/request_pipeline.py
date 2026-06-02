@@ -128,6 +128,8 @@ def process(
                 confidence=0.0,
                 error_message=f"Classification failed: {exc}",
                 execution_time_ms=execution_time,
+                evidence_reason="",
+                policy_reason="classification_failed",
             )
             return outcome, None, None
 
@@ -155,6 +157,8 @@ def process(
                 confidence=classification.confidence,
                 error_message=f"Routing failed: {exc}",
                 execution_time_ms=execution_time,
+                evidence_reason=classification.evidence_reason,
+                policy_reason="routing_failed",
             )
             return outcome, classification, None
 
@@ -262,6 +266,8 @@ def process(
             error_message=str(exc),
             execution_time_ms=execution_time,
             metadata={"latency_profile": _profile} if _profiling else {},
+            evidence_reason=decision.evidence_reason,
+            policy_reason=decision.policy_reason,
         )
         return outcome, classification, decision
 
@@ -292,6 +298,8 @@ def process(
         error_message=result.error_message,
         execution_time_ms=execution_time,
         metadata=_meta,
+        evidence_reason=result.evidence_reason or decision.evidence_reason,
+        policy_reason=result.policy_reason or decision.policy_reason,
     )
 
     return outcome, classification, decision

@@ -100,6 +100,140 @@ _SHORT_FINANCIAL_RE = re.compile(
     r'\b(?:' + '|'.join(map(re.escape, _SHORT_FINANCIAL_KEYWORDS)) + r')\b'
 )
 
+# ---------------------------------------------------------------------------
+# Semantic guard — MiniLM-based classification for personal/family vs
+# medical/veterinary queries.  Runs before keyword-based veterinary Tier 1
+# so that queries like "Where is my cat?" are not incorrectly flagged as
+# veterinary_context just because they contain an animal species word.
+# ---------------------------------------------------------------------------
+
+_SEMANTIC_MODEL = None  # Lazy-loaded SentenceTransformer or False if unavailable
+
+# Reference queries for each category — used to compute centroid embeddings
+_SEMANTIC_REFS = {
+    "personal_family_context": [
+        "how old is my daughter",
+        "how old is my son",
+        "what is my daughter's name",
+        "what is my dog's name",
+        "tell me about my son",
+        "tell me about my daughter",
+        "do i have any children",
+        "how many kids do i have",
+        "who is my wife",
+        "who is my husband",
+        "where is my cat",
+        "where is my dog",
+        "is my cat hungry",
+        "when did i get my dog",
+        "my wife's birthday",
+        "my dog likes to play",
+        "my cat sleeps all day",
+        "who are my children",
+        "what is my wife's name",
+        "do i have a pet",
+    ],
+    "medical_context": [
+        "my daughter has a fever",
+        "my child has stomach pain",
+        "my son is vomiting",
+        "my wife has chest pain",
+        "my husband has a headache",
+        "my mother has diabetes",
+        "my father has heart disease",
+        "i have a fever",
+        "my head hurts",
+        "i am feeling sick",
+        "what are the symptoms of flu",
+        "how to treat a headache",
+        "diabetes medication",
+        "heart attack symptoms",
+    ],
+    "veterinary_context": [
+        "my dog has diarrhea",
+        "my cat is vomiting",
+        "my dog is not eating",
+        "my cat has a fever",
+        "my dog is limping",
+        "my dog has been vomiting",
+        "my dog may have eaten chocolate",
+        "my cat is refusing food",
+        "my dog has a lump",
+        "my cat has worms",
+        "my dog is coughing",
+        "my cat is lethargic",
+        "my dog is scratching",
+        "my cat is losing hair",
+    ],
+}
+
+_SEMANTIC_EMBEDDINGS: dict[str, "numpy.ndarray | None"] = {
+    k: None for k in _SEMANTIC_REFS
+}
+
+
+def _get_semantic_model():
+    """Lazy-load the MiniLM model; returns None if sentence_transformers is unavailable."""
+    global _SEMANTIC_MODEL
+    if _SEMANTIC_MODEL is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            # Force CPU — the RTX 3060 12GB is fully committed to Ollama (qwen3:14b
+            # ~9.8GB).  MiniLM-L6-v2 is tiny (22MB) and fast enough on CPU.
+            _SEMANTIC_MODEL = SentenceTransformer(
+                "sentence-transformers/all-MiniLM-L6-v2",
+                device="cpu",
+            )
+        except Exception:
+            _SEMANTIC_MODEL = False
+    return _SEMANTIC_MODEL if _SEMANTIC_MODEL is not False else None
+
+
+def _get_semantic_embeddings(category: str):
+    """Return normalized reference embeddings for a category (cached)."""
+    global _SEMANTIC_EMBEDDINGS
+    cache = _SEMANTIC_EMBEDDINGS.get(category)
+    if cache is not None:
+        return cache
+    model = _get_semantic_model()
+    if model is None:
+        return None
+    import numpy as np
+    embeddings = model.encode(_SEMANTIC_REFS[category], convert_to_numpy=True)
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-9
+    cache = embeddings / norms
+    _SEMANTIC_EMBEDDINGS[category] = cache
+    return cache
+
+
+def _semantic_classify(query: str) -> str | None:
+    """
+    Use MiniLM embeddings to classify a query as personal_family_context,
+    medical_context, or veterinary_context.
+
+    Returns the category with the highest max-similarity score, but only
+    if the top score exceeds a threshold (indicating reasonable confidence).
+    Returns None if the model is unavailable or confidence is too low.
+    """
+    model = _get_semantic_model()
+    if model is None:
+        return None
+    import numpy as np
+    q_embed = model.encode(query.lower().strip(), convert_to_numpy=True)
+    q_embed = q_embed / (np.linalg.norm(q_embed) + 1e-9)
+    scores = {}
+    for category in _SEMANTIC_REFS:
+        ref_embeds = _get_semantic_embeddings(category)
+        if ref_embeds is None:
+            continue
+        scores[category] = float(np.max(np.dot(ref_embeds, q_embed)))
+    if not scores:
+        return None
+    top_cat = max(scores, key=scores.get)
+    if scores[top_cat] < 0.40:
+        return None
+    return top_cat
+
 
 def normalize_augmentation_policy(raw: str) -> AugmentationPolicy:
     """
@@ -303,6 +437,39 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     ]):
         return False, "creative_writing"
     
+    # =====================================================================
+    # SEMANTIC GUARD (MiniLM)
+    # Before keyword-based veterinary Tier 1 fires, use embeddings to
+    # distinguish personal/family queries about pets/people from medical/vet.
+    # Only runs when no obvious health symptoms are present (fast keyword check).
+    # =====================================================================
+    _HEALTH_SYMPTOM_QUICK = [
+        "sick", "ill", "hurt", "pain", "fever", "cough", "vomit", "vomiting",
+        "diarrhea", "rash", "swelling", "bleeding", "wound", "injury", "injured",
+        "symptom", "symptoms", "doctor", "hospital", "medicine", "medication",
+        "tremor", "tremors", "seizure", "collapse", "not breathing",
+        "emergency", "urgent", "poison", "toxic", "bloat",
+        "limp", "limping", "lame", "lameness", "lethargic",
+        "not eating", "wont eat", "refusing food", "dehydrated",
+        "lump", "bump", "tumor", "cancer", "infection", "infected",
+        "worm", "flea", "tick", "mite", "mange", "rabies",
+        "surgery", "operation", "treatment", "drug",
+        "vaccine", "vaccination", "shot", "deworm", "neuter", "spay", "castrate",
+        "vet ", "veterinary", "veterinarian", "clinic",
+        "heartworm", "parvovirus", "distemper", "kennel cough", "bordetella",
+        "hip dysplasia", "luxating patella", "gdv",
+        "pancreatitis", "kidney disease", "liver disease",
+        "diabetes in dogs", "diabetes in cats", "hyperthyroidism in cats",
+        "cushing's disease in dogs", "addison's disease in dogs",
+    ]
+    has_health_symptom = any(h in normalized for h in _HEALTH_SYMPTOM_QUICK)
+    if not has_health_symptom:
+        semantic_reason = _semantic_classify(query)
+        if semantic_reason == "personal_family_context":
+            return False, "personal_family_context"
+        # We do NOT return early for medical/veterinary semantic results;
+        # keyword logic is more reliable for high-confidence health queries.
+    
     # Veterinary / animal health — check FIRST so vet-specific queries get
     # veterinary_context instead of being swallowed by medical_context.
     
@@ -317,6 +484,19 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         # Skip veterinary trigger for memory queries about pets
         pass
     else:
+        # Keyword fallback guard for personal pet queries (used when MiniLM is
+        # unavailable). Catches location/identity queries that Tier 1 would
+        # otherwise incorrectly flag as veterinary_context.
+        personal_pet_phrases = [
+            "where is my dog", "where is my cat", "where are my dogs", "where are my cats",
+            "who is my dog", "who is my cat",
+            "how old is my dog", "how old is my cat",
+            "is my dog hungry", "is my cat hungry",
+            "when did i get my dog", "when did i get my cat",
+        ]
+        if any(p in normalized for p in personal_pet_phrases):
+            return False, "personal_family_context"
+        
         # Programming-context negation: queries about programming languages or
         # software development should not trigger veterinary context even if they
         # contain animal-named terms (e.g. "Python", "Go", "Swift", "RabbitMQ").
@@ -413,16 +593,27 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     # should not trigger medical_context unless health symptoms are present.
     # (e.g. "who are my children", "how many kids do I have", "tell me about my family")
     personal_family_indicators = [
-        "who are my", "how many", "do i have any", "tell me about my",
+        "who are my", "who is my",
+        "how many", "how old is my", "how old are my",
+        "what is my", "what are my",
+        "where is my", "where are my",
+        "do i have any", "tell me about my",
         "my family", "my wife", "my husband", "my partner", "my spouse",
-        "my children", "my kids", "my dog", "my cat", "my pet",
+        "my son", "my daughter", "my child", "my children",
+        "my kid", "my kids", "my baby",
+        "my mother", "my father", "my mom", "my dad",
+        "my brother", "my sister",
+        "my dog", "my cat", "my pet",
     ]
     has_personal_family = any(t in normalized for t in personal_family_indicators)
     if has_personal_family:
         # Check if pediatric/pet terms are present without health symptoms
         personal_subjects = ["baby", "child", "kid", "toddler", "infant",
-                             "my son", "my daughter", "year old", "years old",
-                             "my dog", "my cat", "my pet"]
+                             "son", "daughter", "year old", "years old",
+                             "wife", "husband", "partner", "spouse",
+                             "mother", "father", "mom", "dad",
+                             "brother", "sister",
+                             "dog", "cat", "pet"]
         has_subject = any(t in normalized for t in personal_subjects)
         if has_subject:
             health_symptoms = [
@@ -473,9 +664,9 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "appetite", "weight loss", "weight gain", "bleeding", "bruising", "wound", "cut",
         "chills", "shivering", "dehydration", "seizure", "convulsion", "paralysis",
         "palpitation", "sweating", "hallucination", "delusion", "panic",
-        # Pediatric indicators
+        # Pediatric indicators (age-only descriptors, NOT family relationship terms)
         "baby", "child", "toddler", "infant", "2-year-old", "3-year-old",
-        "4-year-old", "5-year-old", "year old", "years old", "my son", "my daughter",
+        "4-year-old", "5-year-old", "year old", "years old",
         # Medications and interactions
         "tadalafil", "cialis", "viagra", "sildenafil", "interaction", "interact",
         "grapefruit", "side effect", "contraindication", "dosage", "dose",

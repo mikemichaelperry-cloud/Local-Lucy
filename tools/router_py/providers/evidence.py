@@ -401,7 +401,7 @@ async def fetch_trusted_evidence(
             None, trusted_provider.fetch_context, question, intent_family, evidence_reason
         )
         if payload and payload.get("ok"):
-            return {
+            evidence = {
                 "context": payload.get("content", ""),
                 "title": payload.get("category", "Trusted Sources"),
                 "url": "",
@@ -410,6 +410,13 @@ async def fetch_trusted_evidence(
                 "sources": payload.get("sources", []),
                 "bounded_response": payload.get("bounded_response", False),
             }
+            # Pass through fallback telemetry fields from trusted provider metadata
+            for key in ("fallback_used", "fallback_reason", "primary_failed",
+                        "fallback_to", "attempted_chain", "successful_backend",
+                        "degradation_level", "answer_basis", "DEGRADED_REASON"):
+                if key in payload:
+                    evidence[key] = payload[key]
+            return evidence
         return None
     except Exception as e:
         logger.warning(f"Trusted evidence fetch failed: {e}")

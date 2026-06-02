@@ -3,7 +3,7 @@
 **Generated:** 2026-06-02
 **Version:** v10-dev
 **Hardware:** RTX 3060 12GB, 31GB RAM, CPU+GPU hybrid
-**Test Suite:** ~720 passed, 19 skipped, 0 failures
+**Test Suite:** ~722 passed, 19 skipped, 0 failures
 **Router:** HybridRouterV2 (MiniLM embedding k-NN + keyword guards)
 **Models:** qwen3:14b via Ollama (local-lucy-fast default), Whisper GPU on-demand, Kokoro TTS CPU
 **Branch:** v10-dev
@@ -17,7 +17,7 @@
 |-----------|--------|
 | Core routing | Stable (Stage 9 complete) |
 | Local answer generation | Stable |
-| Memory system | SQLite-native, semantic retrieval |
+| Memory system | SQLite-native, semantic retrieval, **MiniLM-L6-v2 fact embeddings** |
 | Trusted evidence | Direct-fetch fallback + live extraction |
 | Voice pipeline | Code-complete, backend tests pass |
 | HMI memory dialog | Code-complete, visually verified |
@@ -77,6 +77,13 @@
 - `test_router_contract_schema.sh` — deprecated (validates shell pipeline)
 - `run_router_regression_gate.sh` — deprecated (validates shell pipeline)
 
+### Semantic Fact-Retriever
+- `get_relevant_persistent_facts()` now uses **MiniLM-L6-v2** (primary) or Ollama (fallback) for query-time semantic retrieval
+- Facts are **pre-embedded at storage time** and cached in SQLite (`embedding BLOB`, `embedding_model TEXT`)
+- Backfill-on-read for existing facts without embeddings
+- Injects only 1–3 relevant facts per query instead of all 10+ facts
+- Reduces token bloat and fixes children/stepchildren conflation caused by irrelevant fact noise
+
 ---
 
 ## Weaknesses & Known Issues
@@ -86,8 +93,9 @@
 2. **qwen3 privacy guardrails** — "Do I have any kids?" triggers model-level refusal. Unfixable without fine-tuning.
 
 ### High Priority
-3. **Live voice end-to-end not tested** — Code-complete but never tested with real audio hardware.
-4. **num_ctx stuck at 2048** — Needs hardware upgrade (RTX 3060 12GB at limit).
+3. **Model-level conflation of stepchildren** — "How many children do I have?" conflates stepchildren with biological children due to baked-in training bias. Requires fine-tuning or model swap.
+4. **Live voice end-to-end not tested** — Code-complete but never tested with real audio hardware.
+5. **num_ctx stuck at 2048** — Needs hardware upgrade (RTX 3060 12GB at limit).
 
 ### Medium Priority
 5. **Regex-based SearXNG HTML parsing** — Deprecated; JSON API is primary. HTML fallback remains for resilience.
@@ -100,7 +108,7 @@
 | Suite | Tests | Status |
 |-------|-------|--------|
 | Router unit (`tools/router_py/`) | 554 + 148 subtests | Pass |
-| Memory (all 8 files) | 94 | Pass |
+| Memory (all 8 files) | 96 | Pass |
 | Trusted evidence unit | 19 | Pass |
 | Web extract | 16 | Pass |
 | HMI offscreen | 35 | Pass |
@@ -128,8 +136,8 @@
 ## Git Status
 
 **Branch:** `v10-dev`
-**Latest commit:** `ce5a847` (2026-05-30)
-**Uncommitted changes:** 31 modified files + 7 untracked files
+**Latest commit:** `ea35d7a` (2026-06-02)
+**Uncommitted changes:** Semantic fact-retriever implementation
 
 ---
 

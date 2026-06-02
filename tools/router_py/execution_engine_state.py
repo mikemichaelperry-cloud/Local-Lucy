@@ -472,24 +472,27 @@ class StateWriter:
                 raise
 
     def _append_history_entry(self, history_file: Path, payload: dict[str, Any]) -> None:
-        """Append deduplicated entry to request_history.jsonl."""
+        """Append entry to request_history.jsonl.
+
+        NOTE: We no longer deduplicate by request_id.  The request_id now
+        includes a nanosecond timestamp (main.py), so every execution is
+        unique.  Dedup was originally needed because runtime_bridge.py
+        used to write the same entry with the same deterministic ID.
+        That dual-write has been removed; StateWriter is the sole writer.
+        """
         entry = self._build_history_entry(payload)
         request_id = str(entry.get("request_id", "")).strip()
         if not request_id:
             return
         history_file.parent.mkdir(parents=True, exist_ok=True)
         with self._file_lock(history_file):
-            if self._history_contains_request_id(history_file, request_id):
-                return
             with history_file.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(entry, sort_keys=True))
                 handle.write("\n")
-            # Cache the ID we just wrote so future checks are O(1)
+            # Cache the ID we just wrote so future in-process checks are O(1)
             self._history_id_cache.add(request_id)
             # Prevent unbounded growth: trim to 2000 entries
             if len(self._history_id_cache) > 2000:
-                # Simple eviction: keep ~1000 by clearing and re-adding last 1000
-                # (approximation; exact LRU not needed for dedup)
                 self._history_id_cache = set(list(self._history_id_cache)[-1000:])
 
     def _history_contains_request_id(self, history_file: Path, request_id: str) -> bool:

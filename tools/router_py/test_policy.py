@@ -175,6 +175,76 @@ class TestRequiresEvidenceMode(unittest.TestCase):
                 self.assertFalse(requires)
                 self.assertEqual(reason, "default_light")
     
+    def test_family_personal_queries_no_evidence(self):
+        """Personal/family queries without symptoms should NOT trigger evidence."""
+        family_queries = [
+            ("How old is my daughter?", "personal_family_context"),
+            ("What is my daughter's name?", "personal_family_context"),
+            ("Tell me about my son.", "personal_family_context"),
+            ("What is my dog's name?", "personal_family_context"),
+            ("Do I have any children?", "personal_family_context"),
+            ("How many kids do I have?", "personal_family_context"),
+            ("Who is my wife?", "personal_family_context"),
+            ("Where is my cat?", "personal_family_context"),
+        ]
+        for query, expected_reason in family_queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertFalse(requires, f"Expected no evidence for: {query}")
+                self.assertEqual(reason, expected_reason)
+
+    def test_family_with_symptoms_triggers_medical(self):
+        """Family queries WITH health symptoms should trigger medical evidence."""
+        medical_queries = [
+            "My daughter has a fever.",
+            "My child has stomach pain.",
+            "My son is vomiting.",
+            "My wife has chest pain.",
+        ]
+        for query in medical_queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertTrue(requires, f"Expected evidence for: {query}")
+                self.assertTrue(reason.startswith("medical"), f"Expected medical reason, got: {reason}")
+
+    def test_pet_with_symptoms_triggers_veterinary(self):
+        """Pet queries WITH health symptoms should trigger veterinary evidence."""
+        vet_queries = [
+            "My dog has been vomiting.",
+            "My cat is not eating.",
+            "My dog has diarrhea.",
+            "My dog may have eaten chocolate.",
+        ]
+        for query in vet_queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertTrue(requires, f"Expected evidence for: {query}")
+                self.assertEqual(reason, "veterinary_context")
+
+    def test_adversarial_symptoms_override_personal_family(self):
+        """
+        Adversarial: health symptoms MUST override semantic personal-family
+        classification. Keywords are higher authority than MiniLM here.
+        """
+        # These must NEVER return personal_family_context — symptoms win.
+        evidence_queries = [
+            ("My wife has chest pain.", "medical"),
+            ("My dog has diarrhea.", "veterinary"),
+            ("My cat is not eating.", "veterinary"),
+            ("My child has a fever.", "medical"),
+            ("My dog ate chocolate.", "veterinary"),
+        ]
+        for query, expected_prefix in evidence_queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertTrue(requires, f"Symptoms must trigger evidence: {query}")
+                self.assertTrue(
+                    reason.startswith(expected_prefix),
+                    f"Expected {expected_prefix}_context, got: {reason} for: {query}"
+                )
+                # Hard guard: must never be classified as personal_family
+                self.assertNotEqual(reason, "personal_family_context")
+
     def test_empty_query(self):
         """Test empty query handling."""
         requires, reason = requires_evidence_mode("")

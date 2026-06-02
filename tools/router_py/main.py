@@ -331,7 +331,10 @@ def execute_plan_python(
     ensure_control_env()
 
     start_time = time.time()
-    request_id = sha256_text(question)[:16]
+    # request_id must be unique per execution so the StateWriter does not
+    # deduplicate reruns of the same question.  Prefix with question hash
+    # so logs remain correlatable; suffix with nanoseconds for uniqueness.
+    request_id = f"{sha256_text(question)[:16]}_{time.time_ns()}"
 
     # --- Input validation / prompt injection guard ---
     validation = validate_input(question, surface=surface)
@@ -348,6 +351,8 @@ def execute_plan_python(
             error_message=validation.reason or "input_rejected",
             execution_time_ms=int((time.time() - start_time) * 1000),
             request_id=request_id,
+            evidence_reason="",
+            policy_reason="input_rejected",
         )
     question = validation.sanitized
 
@@ -422,6 +427,8 @@ def execute_plan_python(
                     error_message="",
                     execution_time_ms=execution_time,
                     request_id=request_id,
+                    evidence_reason="",
+                    policy_reason="feedback_acknowledged",
                 )
         except Exception as e:
             print(f"[Feedback check warning] {e}")
@@ -507,6 +514,8 @@ def execute_plan_python(
             error_message=str(e),
             execution_time_ms=execution_time,
             request_id=request_id,
+            evidence_reason="",
+            policy_reason="router_error",
         )
     finally:
         if lock_acquired and lock_fd:

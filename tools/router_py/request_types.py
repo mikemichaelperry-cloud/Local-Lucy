@@ -154,6 +154,11 @@ class ExecutionResult:
     execution_time_ms: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    # Policy-layer provenance (propagated from RoutingDecision so HMI
+    # can display WHY this route was chosen without re-deriving it)
+    evidence_reason: str = ""
+    policy_reason: str = ""
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
@@ -165,6 +170,8 @@ class ExecutionResult:
             "error_message": self.error_message,
             "execution_time_ms": self.execution_time_ms,
             "metadata": self.metadata,
+            "evidence_reason": self.evidence_reason,
+            "policy_reason": self.policy_reason,
         }
 
 
@@ -185,6 +192,11 @@ class RouterOutcome:
     request_id: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    # Policy-layer provenance (mirrors RoutingDecision fields so HMI
+    # displays the exact reason the router chose this path)
+    evidence_reason: str = ""
+    policy_reason: str = ""
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
@@ -198,6 +210,8 @@ class RouterOutcome:
             "error_message": self.error_message,
             "execution_time_ms": self.execution_time_ms,
             "request_id": self.request_id,
+            "evidence_reason": self.evidence_reason,
+            "policy_reason": self.policy_reason,
         }
 
     def with_execution_time(self, ms: int) -> RouterOutcome:
@@ -215,6 +229,8 @@ class RouterOutcome:
             execution_time_ms=ms,
             request_id=self.request_id,
             metadata=dict(self.metadata),
+            evidence_reason=self.evidence_reason,
+            policy_reason=self.policy_reason,
         )
 
     def with_request_id(self, request_id: str) -> RouterOutcome:
@@ -232,6 +248,8 @@ class RouterOutcome:
             execution_time_ms=self.execution_time_ms,
             request_id=request_id,
             metadata=dict(self.metadata),
+            evidence_reason=self.evidence_reason,
+            policy_reason=self.policy_reason,
         )
 
 

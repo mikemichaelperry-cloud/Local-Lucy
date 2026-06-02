@@ -129,6 +129,16 @@ from router_py.execution_engine_state import StateWriter
 from router_py.resilience import get_breaker, CircuitBreakerOpen
 from router_py.shutdown_handler import register_closeable
 from router_py.structured_logging import get_structured_logger, ContextualLogger
+
+try:
+    from router_py.fallback_telemetry import make as _ft, merge as _ft_merge
+    HAS_FALLBACK_TELEMETRY = True
+except Exception:
+    HAS_FALLBACK_TELEMETRY = False
+    def _ft(**_kw):
+        return {}
+    def _ft_merge(base, _tel):
+        return dict(base)
 from router_py.execution_engine_utils import (
     is_truthy,
     sha256_text,
@@ -777,6 +787,8 @@ them according to the route type (bypass, provisional, or full). It handles:
                 error_message="Query is empty or contains only whitespace.",
                 execution_time_ms=execution_time,
                 metadata={"reason": "empty_query_rejected"},
+                evidence_reason=route.evidence_reason if route else "",
+                policy_reason=route.policy_reason if route else "",
             )
             self._write_state_files(route, result, context)
             self._write_json_state_files(route, result, context)
@@ -880,6 +892,8 @@ them according to the route type (bypass, provisional, or full). It handles:
                     "execution_time_ms": execution_time,
                     "route_type": route_type,
                 },
+                evidence_reason=route.evidence_reason,
+                policy_reason=route.policy_reason,
             )
             
             # Persist execution state
@@ -940,6 +954,8 @@ them according to the route type (bypass, provisional, or full). It handles:
                 error_message=str(e),
                 execution_time_ms=execution_time,
                 metadata={"exception_type": type(e).__name__},
+                evidence_reason=route.evidence_reason,
+                policy_reason=route.policy_reason,
             )
             
             # Still try to write state files for error cases
@@ -1383,7 +1399,14 @@ them according to the route type (bypass, provisional, or full). It handles:
                 fallback_kind = "none"
                 local_force_plain_fallback = False
         
-        # Build metadata
+        # Build metadata — normalize ad-hoc bypass fields into standard schema
+        bypass_telemetry = _ft(
+            fallback_used=local_direct_fallback,
+            fallback_reason="local_worker_failed" if local_direct_fallback else "",
+            primary_failed="local_answer.sh" if local_direct_fallback else "",
+            fallback_to=local_direct_path if local_direct_fallback else "",
+            degradation_level="limited" if local_direct_fallback else "none",
+        )
         metadata = {
             "route_type": "bypass",
             "local_direct_used": local_direct_used,
@@ -1394,6 +1417,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             "trust_class": "local",
             **memory_telemetry,
         }
+        metadata = _ft_merge(metadata, bypass_telemetry)
         
         return ExecutionResult(
             status="completed" if rc == 0 or local_force_plain_fallback else "failed",
@@ -1807,6 +1831,8 @@ them according to the route type (bypass, provisional, or full). It handles:
                 error_message="Query is empty or contains only whitespace.",
                 execution_time_ms=execution_time,
                 metadata={"reason": "empty_query_rejected"},
+                evidence_reason=route.evidence_reason if route else "",
+                policy_reason=route.policy_reason if route else "",
             )
         
         # Check for medical context and configure safety constraints
@@ -1871,6 +1897,8 @@ them according to the route type (bypass, provisional, or full). It handles:
                     "execution_time_ms": execution_time,
                     "execution_path": "python_async",
                 },
+                evidence_reason=route.evidence_reason,
+                policy_reason=route.policy_reason,
             )
             
             # Persist execution state
@@ -1897,6 +1925,8 @@ them according to the route type (bypass, provisional, or full). It handles:
                 error_message=str(e),
                 execution_time_ms=execution_time,
                 metadata={"exception_type": type(e).__name__, "execution_path": "python_async"},
+                evidence_reason=route.evidence_reason,
+                policy_reason=route.policy_reason,
             )
             
             try:
@@ -2133,7 +2163,8 @@ them according to the route type (bypass, provisional, or full). It handles:
 
             if route.provider == "local":
                 response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
-            elif route.provider in ("openai", "kimi"):
+            api_fallback_telemetry: dict[str, Any] = {}
+            if route.provider in ("openai", "kimi"):
                 # Prepend session memory to the prompt so API providers also see it
                 api_prompt = prompt
                 if session_memory.strip():
@@ -2144,6 +2175,13 @@ them according to the route type (bypass, provisional, or full). It handles:
                     self._logger.warning(
                         f"{route.provider} returned error: {response[:120]}. Falling back to local model."
                     )
+                    api_fallback_telemetry = _ft(
+                        fallback_used=True,
+                        fallback_reason=f"{route.provider}_api_error",
+                        primary_failed=route.provider,
+                        fallback_to="local",
+                        degradation_level="limited",
+                    )
                     response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
             else:
                 # Default to local model
@@ -2151,8 +2189,38 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         # Step 4: Validate response
         validated = response_formatter.validate_response(response, route)
-        
+
+        # Collect fact-retrieval telemetry from memory service
+        fact_telemetry: dict[str, Any] = {}
+        try:
+            from memory.memory_service import get_last_fact_telemetry
+            fact_telemetry = get_last_fact_telemetry()
+        except Exception:
+            pass
+
+        # Merge evidence fallback telemetry (if any) into metadata
+        evidence_telemetry: dict[str, Any] = {}
+        if evidence and isinstance(evidence, dict):
+            for key in ("fallback_used", "fallback_reason", "primary_failed",
+                        "fallback_to", "attempted_chain", "successful_backend",
+                        "degradation_level"):
+                if key in evidence:
+                    evidence_telemetry[key] = evidence[key]
+
         # Step 5: Return with REAL route (no mapping)
+        base_metadata: dict[str, Any] = {
+            "route_type": "full_python",
+            "evidence_fetched": evidence is not None,
+            "evidence_title": evidence.get("title", "") if evidence else "",
+            "evidence_url": evidence.get("url", "") if evidence else "",
+            "trust_class": "unverified" if evidence else "local",
+            "real_route_preserved": True,  # Marker for testing
+            **memory_telemetry,
+        }
+        base_metadata = _ft_merge(base_metadata, evidence_telemetry)
+        base_metadata = _ft_merge(base_metadata, api_fallback_telemetry)
+        base_metadata = _ft_merge(base_metadata, fact_telemetry)
+
         result = ExecutionResult(
             status="completed",
             outcome_code="answered",
@@ -2161,15 +2229,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             provider_usage_class=route.provider_usage_class,
             response_text=validated,
             error_message="",
-            metadata={
-                "route_type": "full_python",
-                "evidence_fetched": evidence is not None,
-                "evidence_title": evidence.get("title", "") if evidence else "",
-                "evidence_url": evidence.get("url", "") if evidence else "",
-                "trust_class": "unverified" if evidence else "local",
-                "real_route_preserved": True,  # Marker for testing
-                **memory_telemetry,
-            },
+            metadata=base_metadata,
         )
 
         if is_medical_query and result.route == "AUGMENTED" and result.response_text:
@@ -2235,7 +2295,9 @@ them according to the route type (bypass, provisional, or full). It handles:
             chain = [primary, "wikipedia", "openai", "kimi"]
         
         last_error = ""
+        attempted: list[str] = []
         for provider in chain:
+            attempted.append(provider)
             try:
                 result: dict[str, Any] | None = None
                 if provider == "trusted":
@@ -2249,13 +2311,35 @@ them according to the route type (bypass, provisional, or full). It handles:
                 
                 if result:
                     self._logger.info(f"Evidence fetched successfully from {provider}")
+                    # Inject fallback telemetry into the evidence dict
+                    if provider != primary:
+                        result["fallback_used"] = True
+                        result["fallback_reason"] = f"primary_provider_failed:{primary}"
+                        result["primary_failed"] = primary
+                        result["fallback_to"] = provider
+                        result["attempted_chain"] = attempted
+                        result["successful_backend"] = provider
+                        result["degradation_level"] = "limited"
+                    else:
+                        result["successful_backend"] = provider
+                        result["attempted_chain"] = attempted
+                        result["degradation_level"] = "none"
                     return result
             except Exception as e:
                 last_error = str(e)
                 self._logger.warning(f"Evidence fetch failed for {provider}: {e}")
         
         self._logger.warning(f"All evidence providers failed. Last error: {last_error}")
-        return None
+        # Return a minimal dict with telemetry so callers know what was attempted
+        return {
+            "fallback_used": True,
+            "fallback_reason": f"all_providers_failed:{last_error}",
+            "primary_failed": primary,
+            "fallback_to": "",
+            "attempted_chain": attempted,
+            "successful_backend": "",
+            "degradation_level": "low",
+        }
     
     async def _fetch_wikipedia_evidence(self, question: str) -> dict[str, Any] | None:
         """Fetch evidence from Wikipedia (delegated to provider module)."""

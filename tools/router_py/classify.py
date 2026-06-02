@@ -677,27 +677,33 @@ def select_route(
 
     # News query guard — catch unambiguous news queries that the embedding router
     # may miss (e.g. "What's the latest world news?" sometimes routes LOCAL).
+    # Skip when policy layer already identified this as live conflict (policy > guard).
     if query and (_is_clear_news_query(query) or _is_news_query_typos(query)):
-        decision = RoutingDecision(
-            route="NEWS",
-            mode="AUTO",
-            intent_family="current_evidence",
-            confidence=1.0,
-            provider="news",
-            provider_usage_class="local",
-            evidence_mode="",
-            evidence_reason="news_synthesis",
-            requires_evidence=False,
-            policy_reason="router_news_guard",
-            ephemeral=True,
-        )
-        _log_decision(
-            query or "",
-            decision,
-            embedding_route="NEWS_KEYWORD_GUARD",
-            guards_fired=["news_keyword_guard"],
-        )
-        return decision
+        if classification.evidence_reason == "conflict_live":
+            # Policy layer has authority for live conflict; do not override with
+            # generic news_synthesis. Fall through to embedding router path.
+            pass
+        else:
+            decision = RoutingDecision(
+                route="NEWS",
+                mode="AUTO",
+                intent_family="current_evidence",
+                confidence=1.0,
+                provider="news",
+                provider_usage_class="local",
+                evidence_mode="",
+                evidence_reason="news_synthesis",
+                requires_evidence=False,
+                policy_reason="router_news_guard",
+                ephemeral=True,
+            )
+            _log_decision(
+                query or "",
+                decision,
+                embedding_route="NEWS_KEYWORD_GUARD",
+                guards_fired=["news_keyword_guard"],
+            )
+            return decision
 
     # Primary path: embedding router
     router = _get_router()
@@ -708,7 +714,7 @@ def select_route(
             intent_family = result.get("intent_family", classification.intent_family)
             confidence = result.get("confidence", classification.confidence)
             evidence_mode = result.get("evidence_mode", "")
-            evidence_reason = result.get("evidence_reason", classification.evidence_reason)
+            evidence_reason = result.get("evidence_reason") or classification.evidence_reason
             # Prefer classification evidence_reason for medical/veterinary context
             # (policy layer is more accurate than embedding router for these)
             if classification.evidence_reason in (
@@ -717,12 +723,12 @@ def select_route(
                 evidence_reason = classification.evidence_reason
                 evidence_mode = "required"
             
-            # Prefer classification evidence_reason for personal-finance reasoning
-            # (policy layer distinguishes reasoning from live data; embedding router
-            # often conflates them into generic financial_data)
-            if classification.evidence_reason == "personal_finance_reasoning":
+            # Prefer classification evidence_reason for conflict/live-news and
+            # personal-finance reasoning (policy layer is more accurate).
+            if classification.evidence_reason in ("conflict_live", "personal_finance_reasoning"):
                 evidence_reason = classification.evidence_reason
-                evidence_mode = ""
+                if classification.evidence_reason == "personal_finance_reasoning":
+                    evidence_mode = ""
             
             requires_evidence = evidence_mode == "required"
             embedding_route = result.get("embedding_route", route)

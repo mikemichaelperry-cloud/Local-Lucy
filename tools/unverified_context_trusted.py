@@ -309,13 +309,25 @@ def _search_restricted(query: str, domains: list[str], max_results: int = 3) -> 
     return []
 
 
-def _fetch_article_content(url: str, max_chars: int = 2500) -> str | None:
+def _fetch_article_content(
+    url: str, max_chars: int = 2500, _telemetry_out: dict[str, Any] | None = None
+) -> str | None:
     """Fetch and extract clean text from a trusted URL."""
     if not HAS_WEB_EXTRACT:
         return None
     try:
-        return extract_webpage(url, max_chars=max_chars, timeout=15)
+        telemetry: dict[str, Any] = {}
+        result = extract_webpage(url, max_chars=max_chars, timeout=15, _telemetry_out=telemetry)
+        if _telemetry_out is not None:
+            _telemetry_out.update(telemetry)
+        return result
     except Exception:
+        if _telemetry_out is not None:
+            _telemetry_out["fallback_used"] = True
+            _telemetry_out["primary_failed"] = "article_extraction"
+            _telemetry_out["fallback_to"] = ""
+            _telemetry_out["successful_backend"] = ""
+            _telemetry_out["degradation_level"] = "low"
         return None
 
 
@@ -544,13 +556,17 @@ def _trusted_metadata(
     live_fetch_status: str,
     confidence: str,
     degraded_reason: str = "",
-) -> dict[str, str]:
-    return {
+    fallback_telemetry: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    meta: dict[str, Any] = {
         "ANSWER_BASIS": answer_basis,
         "LIVE_FETCH_STATUS": live_fetch_status,
         "CONFIDENCE": confidence,
         "DEGRADED_REASON": degraded_reason,
     }
+    if fallback_telemetry:
+        meta.update(fallback_telemetry)
+    return meta
 
 
 def _with_trusted_metadata(
@@ -561,12 +577,14 @@ def _with_trusted_metadata(
     live_fetch_status: str,
     confidence: str,
     degraded_reason: str = "",
-) -> str | tuple[str, dict[str, str]]:
+    fallback_telemetry: dict[str, Any] | None = None,
+) -> str | tuple[str, dict[str, Any]]:
     metadata = _trusted_metadata(
         answer_basis=answer_basis,
         live_fetch_status=live_fetch_status,
         confidence=confidence,
         degraded_reason=degraded_reason,
+        fallback_telemetry=fallback_telemetry,
     )
     if include_metadata:
         return content, metadata
@@ -586,12 +604,13 @@ def _format_medical_response(
 
     # Try to fetch live content from trusted medical sources
     search_results = _search_restricted(question, deduped, max_results=3)
+    extract_telemetry: dict[str, Any] = {}
     if search_results:
         degraded_reason = "article_fetch_failed"
         top_url = search_results[0].get("url", "")
         top_title = search_results[0].get("title", "")
         if top_url:
-            content = _fetch_article_content(top_url, max_chars=5000)
+            content = _fetch_article_content(top_url, max_chars=5000, _telemetry_out=extract_telemetry)
             if content and len(content) > 200:
                 lines = [
                     f"Source: {top_title or top_url}",
@@ -606,6 +625,7 @@ def _format_medical_response(
                     answer_basis="live_trusted_source",
                     live_fetch_status="success",
                     confidence="normal",
+                    fallback_telemetry=extract_telemetry if extract_telemetry else None,
                 )
             if not HAS_WEB_EXTRACT:
                 live_fetch_status = "unavailable"
@@ -738,12 +758,13 @@ def _format_vet_response(
 
     # Try to fetch live content from trusted veterinary sources
     search_results = _search_restricted(question, deduped, max_results=3)
+    extract_telemetry: dict[str, Any] = {}
     if search_results:
         degraded_reason = "article_fetch_failed"
         top_url = search_results[0].get("url", "")
         top_title = search_results[0].get("title", "")
         if top_url:
-            content = _fetch_article_content(top_url, max_chars=5000)
+            content = _fetch_article_content(top_url, max_chars=5000, _telemetry_out=extract_telemetry)
             if content and len(content) > 200:
                 lines = []
                 if is_emergency:
@@ -760,6 +781,7 @@ def _format_vet_response(
                     answer_basis="live_trusted_source",
                     live_fetch_status="success",
                     confidence="normal",
+                    fallback_telemetry=extract_telemetry if extract_telemetry else None,
                 )
             if not HAS_WEB_EXTRACT:
                 live_fetch_status = "unavailable"

@@ -253,6 +253,7 @@ def extract_webpage(
     max_chars: int = 2500,
     timeout: int = 20,
     prefer_webclaw: bool = True,
+    _telemetry_out: dict[str, Any] | None = None,
 ) -> str | None:
     """
     Extract readable text from a web page.
@@ -263,6 +264,9 @@ def extract_webpage(
             Cannot exceed MAX_EXTRACT_CHARS_HARD_CAP (default 3000).
         timeout: Seconds to wait for fetch + extraction.
         prefer_webclaw: Try webclaw first if available.
+        _telemetry_out: Optional dict populated with fallback telemetry.
+            Keys: fallback_used, primary_failed, fallback_to, successful_backend,
+            degradation_level.  For internal use only.
 
     Returns:
         Clean extracted text, or None if extraction failed.
@@ -271,14 +275,39 @@ def extract_webpage(
     effective_max = min(max_chars, MAX_EXTRACT_CHARS_HARD_CAP)
 
     text: str | None = None
+    backend: str | None = None
+    primary_failed: str = ""
+
     if prefer_webclaw:
         text = _extract_with_webclaw(url, timeout=timeout)
+        if text is not None:
+            backend = "webclaw"
+        else:
+            primary_failed = "webclaw"
     if text is None:
         text = _extract_with_fallback(url, timeout=timeout)
+        if text is not None:
+            backend = "legacy_html_parser"
+
     if text is None:
+        if _telemetry_out is not None:
+            _telemetry_out["fallback_used"] = primary_failed != ""
+            _telemetry_out["primary_failed"] = primary_failed
+            _telemetry_out["fallback_to"] = ""
+            _telemetry_out["successful_backend"] = ""
+            _telemetry_out["degradation_level"] = "low"
         return None
+
     text = _strip_toc_nav(text)
     text = _strip_site_noise(text)
+
+    if _telemetry_out is not None:
+        _telemetry_out["fallback_used"] = primary_failed != ""
+        _telemetry_out["primary_failed"] = primary_failed
+        _telemetry_out["fallback_to"] = "legacy_html_parser" if primary_failed else ""
+        _telemetry_out["successful_backend"] = backend or ""
+        _telemetry_out["degradation_level"] = "limited" if primary_failed else "none"
+
     return _truncate(text, effective_max)
 
 
