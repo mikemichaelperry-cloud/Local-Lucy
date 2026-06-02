@@ -309,7 +309,7 @@ def _search_restricted(query: str, domains: list[str], max_results: int = 3) -> 
     return []
 
 
-def _fetch_article_content(url: str, max_chars: int = 5000) -> str | None:
+def _fetch_article_content(url: str, max_chars: int = 2500) -> str | None:
     """Fetch and extract clean text from a trusted URL."""
     if not HAS_WEB_EXTRACT:
         return None
@@ -383,29 +383,121 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
 
     elif category == "vet":
         # --- Merck Veterinary Manual ---
-        # Try pet-owner landing pages based on animal keywords
-        animal_map = {
+        # Map common animal keywords to Merck owner-page prefixes.
+        # Focused on dog-owners (primary user interest); exotic animals included
+        # for completeness but cat/horse owners omitted per user preference.
+        _MERCK_ANIMAL_MAP = {
             "dog": "dog-owners",
             "dogs": "dog-owners",
-            "cat": "cat-owners",
-            "cats": "cat-owners",
-            "horse": "horse-owners",
-            "horses": "horse-owners",
-            "rabbit": "exotic-animals",
-            "rabbits": "exotic-animals",
-            "bird": "exotic-animals",
-            "birds": "exotic-animals",
-            "reptile": "exotic-animals",
-            "reptiles": "exotic-animals",
+            "rabbit": "rabbit-owners",
+            "rabbits": "rabbit-owners",
+            "bird": "bird-owners",
+            "birds": "bird-owners",
+            "reptile": "reptile-owners",
+            "reptiles": "reptile-owners",
+            "guinea": "guinea-pig-owners",
+            "pig": "guinea-pig-owners",
+            "ferret": "ferret-owners",
+            "ferrets": "ferret-owners",
         }
-        for word in words:
-            if word in animal_map:
-                candidates.append(
-                    (f"https://www.merckvetmanual.com/{animal_map[word]}", "Merck Veterinary Manual")
-                )
-        # Merck search page
+
+        # Map common condition keywords to Merck section paths
+        # Only high-confidence mappings that have verified pages are listed.
+        _MERCK_CONDITION_SECTIONS = {
+            # Digestive
+            "vomiting": "digestive-disorders-of-{animal}s/vomiting-in-{animal}s",
+            "diarrhea": "digestive-disorders-of-{animal}s/diarrhea-in-{animal}s",
+            "constipation": "digestive-disorders-of-{animal}s/constipation-in-{animal}s",
+            "pancreatitis": "digestive-disorders-of-{animal}s/pancreatitis-and-other-disorders-of-the-pancreas-in-{animal}s",
+            "bloat": "digestive-disorders-of-{animal}s/bloat-in-{animal}s",
+            "gi": "digestive-disorders-of-{animal}s",
+            "digestive": "digestive-disorders-of-{animal}s",
+            "stomach": "digestive-disorders-of-{animal}s/disorders-of-the-stomach-and-intestines-in-{animal}s",
+            "colic": "digestive-disorders-of-{animal}s/colic-in-{animal}s",
+            # Skin
+            "skin": "skin-disorders-of-{animal}s",
+            "itching": "skin-disorders-of-{animal}s/itching-and-scratching-in-{animal}s",
+            "allergy": "skin-disorders-of-{animal}s/allergies-in-{animal}s",
+            "fleas": "skin-disorders-of-{animal}s/fleas-in-{animal}s",
+            "mange": "skin-disorders-of-{animal}s/mange-in-{animal}s",
+            # Ear
+            "ear": "ear-disorders-of-{animal}s",
+            "ear infection": "ear-disorders-of-{animal}s/ear-infections-in-{animal}s",
+            # Eye
+            "eye": "eye-disorders-of-{animal}s",
+            "cataract": "eye-disorders-of-{animal}s/cataracts-in-{animal}s",
+            # Heart
+            "heart": "heart-and-blood-vessel-disorders-of-{animal}s",
+            "heartworm": "heart-and-blood-vessel-disorders-of-{animal}s/heartworm-disease-in-{animal}s",
+            # Respiratory
+            "cough": "lung-and-airway-disorders-of-{animal}s/coughing-in-{animal}s",
+            "kennel": "lung-and-airway-disorders-of-{animal}s/kennel-cough-in-{animal}s",
+            "respiratory": "lung-and-airway-disorders-of-{animal}s",
+            # Urinary
+            "kidney": "kidney-and-urinary-tract-disorders-of-{animal}s",
+            "urinary": "kidney-and-urinary-tract-disorders-of-{animal}s",
+            "bladder": "kidney-and-urinary-tract-disorders-of-{animal}s/bladder-stones-in-{animal}s",
+            # Reproductive
+            "pregnant": "reproductive-disorders-of-{animal}s",
+            "pregnancy": "reproductive-disorders-of-{animal}s",
+            "spay": "reproductive-disorders-of-{animal}s/spaying-in-{animal}s",
+            "neuter": "reproductive-disorders-of-{animal}s/neutering-in-{animal}s",
+            # Behavioral / general
+            "anxiety": "behavior-of-{animal}s/behavior-problems-in-{animal}s",
+            "seizure": "brain-spinal-cord-and-nerve-disorders-of-{animal}s/seizures-in-{animal}s",
+            "paralysis": "brain-spinal-cord-and-nerve-disorders-of-{animal}s/leg-paralysis-in-{animal}s",
+            "lameness": "bone-joint-and-muscle-disorders-of-{animal}s/lameness-in-{animal}s",
+            "arthritis": "bone-joint-and-muscle-disorders-of-{animal}s/osteoarthritis-degenerative-joint-disease",
+            "hip": "bone-joint-and-muscle-disorders-of-{animal}s/hip-dysplasia",
+            "diabetes": "hormonal-disorders-of-{animal}s/diabetes-mellitus-in-{animal}s",
+            "thyroid": "hormonal-disorders-of-{animal}s/thyroid-disorders-in-{animal}s",
+            "obesity": "metabolic-disorders-of-{animal}s/obesity-in-{animal}s",
+            "poison": "disorders-affecting-multiple-body-systems-of-{animal}s/poisoning-in-{animal}s",
+            "toxin": "disorders-affecting-multiple-body-systems-of-{animal}s/poisoning-in-{animal}s",
+            "heat": "disorders-affecting-multiple-body-systems-of-{animal}s/heat-stroke-in-{animal}s",
+            "rabies": "infectious-diseases-of-{animal}s/rabies-in-{animal}s",
+            "parvo": "infectious-diseases-of-{animal}s/parvovirus-in-{animal}s",
+            "distemper": "infectious-diseases-of-{animal}s/distemper-in-{animal}s",
+            "leptospirosis": "infectious-diseases-of-{animal}s/leptospirosis-in-{animal}s",
+            "lyme": "infectious-diseases-of-{animal}s/lyme-disease-in-{animal}s",
+            "tick": "infectious-diseases-of-{animal}s/tick-borne-diseases-in-{animal}s",
+            "anemia": "blood-disorders-of-{animal}s/anemia-in-{animal}s",
+            "cancer": "cancer-and-tumors-of-{animal}s",
+            "tumor": "cancer-and-tumors-of-{animal}s",
+        }
+
+        # Build high-confidence Merck direct URLs from condition + animal mapping
+        detected_animal = None
+        for w in words:
+            if w in _MERCK_ANIMAL_MAP:
+                detected_animal = _MERCK_ANIMAL_MAP[w]
+                break
+
+        if detected_animal:
+            animal_token = detected_animal.replace("-owners", "")
+            # Owner landing page
+            candidates.append(
+                (f"https://www.merckvetmanual.com/{detected_animal}", "Merck Veterinary Manual")
+            )
+            # Condition-specific pages (only if both condition and animal known)
+            for w in words:
+                if w in _MERCK_CONDITION_SECTIONS:
+                    section = _MERCK_CONDITION_SECTIONS[w].format(animal=animal_token)
+                    candidates.append(
+                        (f"https://www.merckvetmanual.com/{detected_animal}/{section}", "Merck Veterinary Manual")
+                    )
+            # Two-word condition phrases (e.g., "ear infection")
+            for i in range(len(words) - 1):
+                phrase = words[i] + " " + words[i + 1]
+                if phrase in _MERCK_CONDITION_SECTIONS:
+                    section = _MERCK_CONDITION_SECTIONS[phrase].format(animal=animal_token)
+                    candidates.append(
+                        (f"https://www.merckvetmanual.com/{detected_animal}/{section}", "Merck Veterinary Manual")
+                    )
+
+        # Merck search (homepage with query param)
         candidates.append(
-            (f"https://www.merckvetmanual.com/search?query={q_encoded}", "Merck Veterinary Manual")
+            (f"https://www.merckvetmanual.com/?q={q_encoded}", "Merck Veterinary Manual")
         )
         # Merck home page as last resort
         candidates.append(
@@ -433,7 +525,7 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
 
     for url, name in candidates:
         try:
-            content = extract_webpage(url, max_chars=4000, timeout=15)
+            content = extract_webpage(url, max_chars=2500, timeout=15)
             # Reject "sorry" / error / redirect pages
             if content and len(content) > 300:
                 lower = content.lower()
@@ -780,38 +872,6 @@ def _format_news_response_with_headlines(
         live_fetch_status="success",
         confidence="normal",
     )
-
-
-def _is_complex_medical_query(question: str) -> bool:
-    """
-    Check if this is a complex medical query that needs LLM synthesis.
-    
-    Simple queries (like "what is tadalafil") can use generic templates.
-    Complex queries (interactions, side effects, specific questions) need
-    informative answers from LLM constrained to medical domains.
-    """
-    q_lower = question.lower()
-    
-    # Specific medication names indicate complex queries
-    medication_names = [
-        'tadalafil', 'cialis', 'viagra', 'sildenafil',
-        'amoxicillin', 'aspirin', 'metformin', 'insulin',
-        'ibuprofen', 'acetaminophen', 'paracetamol', 'advil',
-        'warfarin', 'atorvastatin', 'lipitor', 'omeprazole'
-    ]
-    has_medication = any(med in q_lower for med in medication_names)
-    
-    # Complex query indicators
-    complex_indicators = [
-        'interaction', 'interact', 'grapefruit', 'alcohol', 
-        'side effect', 'adverse', 'contraindication', 'warning',
-        'can i', 'should i', 'is it safe', 'can you',
-        'while taking', 'with', 'and', 'cause', 'risk'
-    ]
-    has_complex = any(ind in q_lower for ind in complex_indicators)
-    
-    # If it has a medication AND complex indicators, it's complex
-    return has_medication and has_complex
 
 
 def fetch_context(question: str, intent_family: str = "", evidence_reason: str = "") -> dict[str, Any] | None:

@@ -142,6 +142,7 @@ _CLEAR_NEWS_RE = tuple(re.compile(p) for p in (
     r"\bdevelopments in\b",
     r"\bcurrent sanctions\b",
     r"\blatest ceasefire\b",
+    r"\bworld news\b",
 ))
 
 # Pre-compiled historical query regexes
@@ -674,6 +675,30 @@ def select_route(
         )
         return decision
 
+    # News query guard — catch unambiguous news queries that the embedding router
+    # may miss (e.g. "What's the latest world news?" sometimes routes LOCAL).
+    if query and (_is_clear_news_query(query) or _is_news_query_typos(query)):
+        decision = RoutingDecision(
+            route="NEWS",
+            mode="AUTO",
+            intent_family="current_evidence",
+            confidence=1.0,
+            provider="news",
+            provider_usage_class="local",
+            evidence_mode="",
+            evidence_reason="news_synthesis",
+            requires_evidence=False,
+            policy_reason="router_news_guard",
+            ephemeral=True,
+        )
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="NEWS_KEYWORD_GUARD",
+            guards_fired=["news_keyword_guard"],
+        )
+        return decision
+
     # Primary path: embedding router
     router = _get_router()
     if router and query:
@@ -886,7 +911,7 @@ def _is_news_query_typos(query: str) -> bool:
     has_news_typo = any(t in q for t in news_typos)
     news_context = ["latest", "current", "breaking", "update", "updates", "today", "now"]
     has_news_context = any(c in q for c in news_context)
-    wat_pattern = any(p in q for p in ["wats ", "wat ", "wut ", "whats "])
+    wat_pattern = any(p in q for p in ["wats ", "wat ", "wut ", "whats ", "what's "])
     return has_news_typo or (wat_pattern and has_news_context)
 
 
@@ -896,10 +921,14 @@ def _is_clear_news_query(query: str) -> bool:
 
     Catches clear news phrasing like "top stories", "live updates",
     "UN said today", etc.
+    Excludes historical/analysis queries (e.g. "history of Israeli news media").
     """
     if not query:
         return False
     q = query.lower()
+    # Exclude historical or analytical queries about news media itself
+    if "history of" in q and "news" in q:
+        return False
     return any(p.search(q) for p in _CLEAR_NEWS_RE)
 
 
@@ -943,13 +972,15 @@ def _is_weather_query(query: str) -> bool:
         return False
     q = query.lower().strip()
 
-    # Exclude planet/space weather — these are science questions, not live data
-    space_terms = [
+    # Exclude science/history weather questions — not live-data requests
+    weather_science_terms = [
         "mars", "moon", "jupiter", "saturn", "venus", "mercury", "neptune",
         "uranus", "pluto", "sun", "solar", "space", "nasa", "planet",
         "exoplanet", "atmosphere of", "climate on mars", "martian",
+        "weather patterns", "climate patterns", "typical weather", "average weather",
+        "weather history", "historical weather",
     ]
-    if any(t in q for t in space_terms):
+    if any(t in q for t in weather_science_terms):
         return False
 
     weather_patterns = [

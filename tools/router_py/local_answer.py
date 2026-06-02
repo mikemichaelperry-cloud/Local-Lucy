@@ -24,6 +24,7 @@ import re
 import sys
 import threading
 import time
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -242,6 +243,7 @@ class LocalAnswerConfig:
     cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "lucy" / "local_repeat")
     cache_ttl_seconds: int = 300
     cache_max_entries: int = 100
+    cache_max_bytes: int = 10_000_000
     root_path: Path = field(default_factory=lambda: Path.home() / "lucy-v10")
     conversation_mode_active: bool = False
     conversation_mode_force: bool = False
@@ -280,6 +282,7 @@ class LocalAnswerConfig:
             cache_dir=Path(cache_dir) if cache_dir else (root / "cache" / "local_repeat"),
             cache_ttl_seconds=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_TTL_S", "300")),
             cache_max_entries=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_ENTRIES", "100")),
+            cache_max_bytes=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_BYTES", "10000000")),
             root_path=root,
             conversation_mode_active=os.environ.get("LUCY_CONVERSATION_MODE_ACTIVE", "").lower() in ("1", "true", "yes", "on"),
             conversation_mode_force=os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "").lower() in ("1", "true", "yes", "on"),
@@ -315,15 +318,157 @@ class LatencyMetrics:
     total_ms: int = 0
 
 
+class _OllamaWarmupThread(threading.Thread):
+    """Daemon thread that pings Ollama periodically to keep the model loaded.
+
+    Uses a lightweight generate request (empty prompt, num_predict=0) so the
+    model stays hot in VRAM without wasting compute or tokens.
+    """
+
+    def __init__(
+        self,
+        interval_s: int,
+        model: str,
+        api_url: str,
+        keep_alive: str,
+    ):
+        super().__init__(daemon=True, name="ollama-warmup")
+        self.interval_s = interval_s
+        self.model = model
+        self.api_url = api_url
+        self.keep_alive = keep_alive
+        self._stop_event = threading.Event()
+
+    def run(self) -> None:
+        while not self._stop_event.is_set():
+            # Wait for the interval, but wake early if stopped
+            if self._stop_event.wait(self.interval_s):
+                break
+            self._ping()
+
+    def _ping(self) -> None:
+        body = {
+            "model": self.model,
+            "prompt": "",
+            "stream": False,
+            "keep_alive": self.keep_alive,
+            "options": {"num_predict": 0},
+        }
+        try:
+            req = urllib.request.Request(
+                self.api_url,
+                data=json.dumps(body).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=30.0) as resp:
+                resp.read()
+        except Exception:
+            pass  # Silently fail — Ollama may not be running yet
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+
 class LocalAnswer:
     """Main class for generating local LLM answers."""
-    
-    
+
+    _warmup_done = False
+    _warmup_thread: Optional[threading.Thread] = None
+
     def __init__(self, config: Optional[LocalAnswerConfig] = None):
         self.config = config or LocalAnswerConfig.from_env()
         self._session: Optional[Any] = None
         self._lat_metrics = LatencyMetrics()
         self._total_start_time: Optional[float] = None
+
+    @classmethod
+    def warmup_ollama(cls, config: Optional[LocalAnswerConfig] = None) -> None:
+        """Send a lightweight request to Ollama to keep the model loaded.
+
+        This runs in a background thread so the caller is not blocked.
+        The warmup is skipped if it has already been triggered in this process.
+        """
+        if cls._warmup_done:
+            return
+        cls._warmup_done = True
+        cfg = config or LocalAnswerConfig.from_env()
+        if not cfg.model:
+            return
+        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate")
+        keep_alive = os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "10m")
+        body = {
+            "model": cfg.model,
+            "prompt": "",
+            "stream": False,
+            "keep_alive": keep_alive,
+            "options": {"num_predict": 0},
+        }
+
+        def _ping():
+            try:
+                req = urllib.request.Request(
+                    api_url,
+                    data=json.dumps(body).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=60.0) as resp:
+                    resp.read()
+            except Exception:
+                pass
+
+        threading.Thread(target=_ping, daemon=True).start()
+
+    @classmethod
+    def start_recurring_warmup(cls, config: Optional[LocalAnswerConfig] = None) -> None:
+        """Start a background thread that pings Ollama periodically.
+
+        This keeps the local model loaded in VRAM between queries, eliminating
+        the ~2.7 s cold-start latency after idle periods.
+
+        Environment variables:
+            LUCY_WARMUP_ENABLED: "1" (default) or "0" to disable.
+            LUCY_WARMUP_INTERVAL_S: Seconds between pings (default 300 = 5 min).
+            LUCY_WARMUP_KEEP_ALIVE: keep_alive string passed to Ollama
+                (default: same as LUCY_LOCAL_KEEP_ALIVE or "10m").
+
+        The thread is a daemon, so it will not block process exit.
+        Calling this method multiple times is safe — only one thread is started.
+        """
+        if cls._warmup_thread is not None and cls._warmup_thread.is_alive():
+            return
+
+        enabled = os.environ.get("LUCY_WARMUP_ENABLED", "1").lower() in (
+            "1", "true", "yes", "on"
+        )
+        if not enabled:
+            return
+
+        interval_s = int(os.environ.get("LUCY_WARMUP_INTERVAL_S", "300"))
+        if interval_s <= 0:
+            return
+
+        cfg = config or LocalAnswerConfig.from_env()
+        if not cfg.model:
+            return
+
+        api_url = os.environ.get(
+            "LUCY_OLLAMA_API_URL", cfg.ollama_url
+        )
+        keep_alive = os.environ.get(
+            "LUCY_WARMUP_KEEP_ALIVE",
+            os.environ.get("LUCY_LOCAL_KEEP_ALIVE", cfg.keep_alive),
+        )
+
+        thread = _OllamaWarmupThread(
+            interval_s=interval_s,
+            model=cfg.model,
+            api_url=api_url,
+            keep_alive=keep_alive,
+        )
+        cls._warmup_thread = thread
+        thread.start()
         
     def _now_ms(self) -> int:
         """Current time in milliseconds."""
@@ -603,7 +748,7 @@ class LocalAnswer:
             logger.debug(f"Cache store failed: {e}")
     
     def _cache_prune(self) -> None:
-        """Prune old cache entries."""
+        """Prune old cache entries by count and total byte size."""
         try:
             if not self.config.cache_dir.exists():
                 return
@@ -612,10 +757,28 @@ class LocalAnswer:
                 key=lambda p: p.stat().st_mtime,
                 reverse=True
             )
+            # Prune by entry count
             for meta_file in meta_files[self.config.cache_max_entries:]:
                 text_file = meta_file.with_suffix(".txt")
                 meta_file.unlink(missing_ok=True)
                 text_file.unlink(missing_ok=True)
+            # Prune by total byte size (oldest first)
+            all_meta = sorted(
+                self.config.cache_dir.glob("*.meta"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            total_bytes = 0
+            to_remove = []
+            for mf in all_meta:
+                tf = mf.with_suffix(".txt")
+                size = mf.stat().st_size + (tf.stat().st_size if tf.exists() else 0)
+                total_bytes += size
+                if total_bytes > self.config.cache_max_bytes:
+                    to_remove.append((mf, tf))
+            for mf, tf in to_remove:
+                mf.unlink(missing_ok=True)
+                tf.unlink(missing_ok=True)
         except Exception as e:
             logger.debug(f"Cache prune failed: {e}")
     

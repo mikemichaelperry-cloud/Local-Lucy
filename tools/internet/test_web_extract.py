@@ -96,6 +96,17 @@ class TestExtractWebpageLive(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertLessEqual(len(result), 850)  # small margin for truncation logic
 
+    def test_hard_cap_enforced(self):
+        """Hard cap prevents callers from requesting excessive content."""
+        with patch.object(we, "_extract_with_webclaw", return_value="x" * 10000):
+            result = we.extract_webpage(
+                self.TEST_URL, max_chars=9000, timeout=20
+            )
+        # Should be truncated to hard cap (default 3000)
+        self.assertIsNotNone(result)
+        self.assertLessEqual(len(result), 3050)
+        self.assertGreater(len(result), 2000)
+
     def test_no_nav_noise(self):
         """Should not contain .gov banner or skip-navigation noise."""
         result = we.extract_webpage(self.TEST_URL, max_chars=2000, timeout=20)

@@ -53,3 +53,19 @@ class TestNewsSynthesisRouting:
         assert decision.route == "LOCAL", (
             f"{query!r} should route to LOCAL, got {decision.route}"
         )
+
+    @pytest.mark.parametrize("query", [
+        "What's the latest world news?",
+        "What is the latest world news?",
+        "world news",
+        "news today",
+        "breaking news",
+    ])
+    def test_news_keyword_guard_routes_news(self, query):
+        """Unambiguous news phrasing should route to NEWS via keyword guard."""
+        classification = classify_intent(query)
+        decision = select_route(classification, query=query)
+        assert decision.route == "NEWS", (
+            f"{query!r} should route to NEWS, got {decision.route}"
+        )
+        assert decision.policy_reason == "router_news_guard"

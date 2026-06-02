@@ -157,5 +157,40 @@ class TestFetchContextEntryPoint(unittest.TestCase):
         self.assertIsNone(result)
 
 
+class TestVetTopicMapping(unittest.TestCase):
+    """Verify vet direct-fetch URL generation maps conditions to correct sections."""
+
+    def test_condition_animal_mapping_generates_urls(self):
+        # _try_direct_fetch should produce condition-specific Merck URLs
+        # when both an animal and a known condition are present.
+        candidates = []
+        with patch.object(uct, "extract_webpage", side_effect=lambda url, **kw: None) as mock_fetch:
+            uct._try_direct_fetch("my dog is vomiting", "vet")
+            calls = [c[0][0] for c in mock_fetch.call_args_list]
+            # Should include the condition-specific Merck URL
+            self.assertTrue(
+                any("merckvetmanual.com/dog-owners/digestive-disorders-of-dogs/vomiting-in-dogs" in c for c in calls),
+                f"Expected Merck vomiting URL in candidates, got: {calls}"
+            )
+
+    def test_two_word_condition_phrase_mapped(self):
+        with patch.object(uct, "extract_webpage", side_effect=lambda url, **kw: None) as mock_fetch:
+            uct._try_direct_fetch("dog ear infection", "vet")
+            calls = [c[0][0] for c in mock_fetch.call_args_list]
+            self.assertTrue(
+                any("merckvetmanual.com/dog-owners/ear-disorders-of-dogs/ear-infections-in-dogs" in c for c in calls),
+                f"Expected Merck ear-infection URL in candidates, got: {calls}"
+            )
+
+    def test_unknown_condition_falls_back_to_search(self):
+        with patch.object(uct, "extract_webpage", side_effect=lambda url, **kw: None) as mock_fetch:
+            uct._try_direct_fetch("dog xyzabc123 condition", "vet")
+            calls = [c[0][0] for c in mock_fetch.call_args_list]
+            self.assertTrue(
+                any("merckvetmanual.com/?q=" in c for c in calls),
+                f"Expected Merck search fallback, got: {calls}"
+            )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

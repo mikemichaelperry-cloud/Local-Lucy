@@ -97,12 +97,42 @@ def render_chat_fast_from_raw(raw: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _truncate_evidence(text: str, max_chars: int) -> str:
+    """Truncate evidence text, preferring sentence boundaries."""
+    if len(text) <= max_chars:
+        return text
+    truncated = text[:max_chars]
+    # Find the last sentence boundary within the allowed range
+    last_period = truncated.rfind(". ")
+    if last_period > max_chars * 0.5:
+        return text[:last_period + 1].rstrip()
+    last_exclaim = truncated.rfind("! ")
+    if last_exclaim > max_chars * 0.5:
+        return text[:last_exclaim + 1].rstrip()
+    last_question = truncated.rfind("? ")
+    if last_question > max_chars * 0.5:
+        return text[:last_question + 1].rstrip()
+    # Fallback to word boundary
+    idx = truncated.rfind(" ")
+    if idx > max_chars * 0.8:
+        return text[:idx].rstrip()
+    return truncated.rstrip()
+
+
 def build_augmented_prompt(
     question: str,
     evidence: dict[str, Any] | None,
     route: RoutingDecision,
+    *,
+    max_evidence_chars: int = 1200,
+    max_total_prompt_chars: int = 3000,
 ) -> str:
-    """Build augmented prompt with evidence context."""
+    """Build augmented prompt with evidence context.
+
+    Args:
+        max_evidence_chars: Maximum characters for the evidence context section.
+        max_total_prompt_chars: Safety ceiling for the entire prompt.
+    """
     if not evidence:
         return question
 
@@ -116,13 +146,19 @@ def build_augmented_prompt(
     provider = evidence.get("provider", "unknown")
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
+    # Truncate evidence to prevent prompt overflow
+    truncated = _truncate_evidence(context_text, max_evidence_chars)
+    was_truncated = len(truncated) < len(context_text)
+
     prompt_parts = [
         f"Question: {question}",
         f"Current date and time: {now}",
         "",
         "Background Context:",
-        context_text,
+        truncated,
     ]
+    if was_truncated:
+        prompt_parts.append("(Context truncated for length.)")
 
     if title:
         prompt_parts.append(f"\nSource: {title}")
@@ -141,7 +177,18 @@ def build_augmented_prompt(
         "say so and answer from your own knowledge up to your training cutoff."
     )
 
-    return "\n".join(prompt_parts)
+    prompt = "\n".join(prompt_parts)
+
+    # Hard safety ceiling: if evidence is still too large, drop it entirely
+    if len(prompt) > max_total_prompt_chars:
+        return (
+            f"Question: {question}\n"
+            f"Current date and time: {now}\n\n"
+            "(Background context omitted — too large for context window.)\n\n"
+            "Based on your own knowledge, please answer the question."
+        )
+
+    return prompt
 
 
 # ---------------------------------------------------------------------------

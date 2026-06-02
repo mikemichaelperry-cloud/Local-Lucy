@@ -564,6 +564,14 @@ def main() -> int:
 # Install graceful shutdown handlers once at module load
 install_shutdown_handler()
 
+# Start recurring Ollama warmup ping to eliminate cold-start latency.
+# This is a no-op if LUCY_WARMUP_ENABLED is not "1" or if Ollama is unreachable.
+try:
+    from router_py.local_answer import LocalAnswer
+    LocalAnswer.start_recurring_warmup()
+except Exception:
+    pass
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

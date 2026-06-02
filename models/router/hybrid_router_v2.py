@@ -233,6 +233,7 @@ class HybridRouterV2:
         return self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
 
     def fit(self, examples: list[dict]):
+        self._lazy_init()
         self.examples = examples
         texts = [ex["query"] for ex in examples]
         print(f"Encoding {len(texts)} examples...")

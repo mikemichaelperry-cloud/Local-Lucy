@@ -19,6 +19,7 @@ from local_answer import (
     AnswerResult,
     FIXED_POLICY_RESPONSES,
     WATER_WET_RESPONSE,
+    _OllamaWarmupThread,
 )
 
 
@@ -427,6 +428,109 @@ class TestCompletionGuards(unittest.TestCase):
         self.assertEqual(reason, "trimmed_to_last_complete_sentence")
 
 
+class TestWarmup(unittest.TestCase):
+    """Test Ollama warmup thread and recurring warmup starter."""
+
+    def tearDown(self):
+        """Stop any leftover warmup threads."""
+        if LocalAnswer._warmup_thread is not None:
+            try:
+                LocalAnswer._warmup_thread.stop()
+                LocalAnswer._warmup_thread.join(timeout=1.0)
+            except Exception:
+                pass
+            LocalAnswer._warmup_thread = None
+        LocalAnswer._warmup_done = False
+
+    def test_warmup_thread_ping_success(self):
+        """Test _OllamaWarmupThread._ping sends the expected payload."""
+        thread = _OllamaWarmupThread(
+            interval_s=300,
+            model="test-model",
+            api_url="http://127.0.0.1:11434/api/generate",
+            keep_alive="5m",
+        )
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = b"{}"
+            mock_urlopen.return_value.__enter__ = MagicMock(return_value=mock_resp)
+            mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+            thread._ping()
+
+            mock_urlopen.assert_called_once()
+            req = mock_urlopen.call_args[0][0]
+            self.assertEqual(req.full_url, "http://127.0.0.1:11434/api/generate")
+            self.assertEqual(req.method, "POST")
+            body = json.loads(req.data)
+            self.assertEqual(body["model"], "test-model")
+            self.assertEqual(body["prompt"], "")
+            self.assertEqual(body["keep_alive"], "5m")
+            self.assertEqual(body["options"]["num_predict"], 0)
+
+    def test_warmup_thread_ping_failure_is_silent(self):
+        """Test _OllamaWarmupThread._ping does not raise on failure."""
+        thread = _OllamaWarmupThread(
+            interval_s=300,
+            model="test-model",
+            api_url="http://127.0.0.1:11434/api/generate",
+            keep_alive="5m",
+        )
+        with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
+            # Should not raise
+            thread._ping()
+
+    def test_warmup_thread_respects_stop(self):
+        """Test _OllamaWarmupThread stops promptly."""
+        thread = _OllamaWarmupThread(
+            interval_s=3600,  # Long interval so it won't ping during test
+            model="test-model",
+            api_url="http://127.0.0.1:11434/api/generate",
+            keep_alive="5m",
+        )
+        thread.start()
+        self.assertTrue(thread.is_alive())
+        thread.stop()
+        thread.join(timeout=2.0)
+        self.assertFalse(thread.is_alive())
+
+    def test_start_recurring_warmup_respects_disabled_env(self):
+        """Test LUCY_WARMUP_ENABLED=0 prevents thread start."""
+        with patch.dict(os.environ, {"LUCY_WARMUP_ENABLED": "0"}):
+            LocalAnswer.start_recurring_warmup(
+                config=LocalAnswerConfig(model="test-model")
+            )
+            self.assertIsNone(LocalAnswer._warmup_thread)
+
+    def test_start_recurring_warmup_idempotent(self):
+        """Test start_recurring_warmup only starts one thread."""
+        with patch.dict(os.environ, {"LUCY_WARMUP_ENABLED": "1"}):
+            cfg = LocalAnswerConfig(model="test-model")
+            LocalAnswer.start_recurring_warmup(config=cfg)
+            first_thread = LocalAnswer._warmup_thread
+            self.assertIsNotNone(first_thread)
+            self.assertTrue(first_thread.is_alive())
+
+            # Second call should be a no-op
+            LocalAnswer.start_recurring_warmup(config=cfg)
+            self.assertIs(LocalAnswer._warmup_thread, first_thread)
+
+    def test_start_recurring_warmup_zero_interval_is_noop(self):
+        """Test interval <= 0 prevents thread start."""
+        with patch.dict(os.environ, {
+            "LUCY_WARMUP_ENABLED": "1",
+            "LUCY_WARMUP_INTERVAL_S": "0",
+        }):
+            LocalAnswer.start_recurring_warmup(
+                config=LocalAnswerConfig(model="test-model")
+            )
+            self.assertIsNone(LocalAnswer._warmup_thread)
+
+    def test_start_recurring_warmup_no_model_is_noop(self):
+        """Test missing model name prevents thread start."""
+        LocalAnswer.start_recurring_warmup(config=LocalAnswerConfig(model=""))
+        self.assertIsNone(LocalAnswer._warmup_thread)
+
+
 class TestIntegration(unittest.TestCase):
     """Integration tests with mocked Ollama API."""
     
@@ -483,14 +587,13 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestQueryClassification))
     suite.addTests(loader.loadTestsFromTestCase(TestSanitization))
     suite.addTests(loader.loadTestsFromTestCase(TestCache))
-    suite.addTests(loader.loadTestsFromTestCase(TestIdentityResponses))
-    suite.addTests(loader.loadTestsFromTestCase(TestPolicyResponses))
-    suite.addTests(loader.loadTestsFromTestCase(TestSocialGreetingResponses))
-    suite.addTests(loader.loadTestsFromTestCase(TestGenerationProfiles))
-    suite.addTests(loader.loadTestsFromTestCase(Test807Questions))
+    # Note: TestIdentityResponses, TestPolicyResponses, TestSocialGreetingResponses,
+    # TestGenerationProfiles, Test807Questions referenced here historically but are
+    # not present in this file; they may exist in other test files.
     suite.addTests(loader.loadTestsFromTestCase(TestAugmentedMode))
     suite.addTests(loader.loadTestsFromTestCase(TestPromptBuilding))
     suite.addTests(loader.loadTestsFromTestCase(TestCompletionGuards))
+    suite.addTests(loader.loadTestsFromTestCase(TestWarmup))
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
     
     runner = unittest.TextTestRunner(verbosity=2)
