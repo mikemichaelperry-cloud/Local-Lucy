@@ -11,6 +11,7 @@ from html import unescape
 
 TOOL_VERSION = 0
 SEARXNG_HTML_URL = "http://127.0.0.1:8080/search"
+SEARXNG_JSON_URL = "http://127.0.0.1:8080/search?format=json"
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 
 def default_root() -> str:
@@ -71,6 +72,36 @@ def strip_tags(s: str) -> str:
     s = unescape(s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
+
+def searxng_search_json(query: str, max_results: int):
+    """Search via SearXNG JSON API.  Returns a list of result dicts."""
+    params = {"q": query}
+    url = SEARXNG_JSON_URL + "&" + urllib.parse.urlencode(params)
+
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": UA,
+            "X-Forwarded-For": "127.0.0.1",
+            "X-Real-IP": "127.0.0.1",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode("utf-8", errors="replace"))
+
+    results = []
+    for item in data.get("results", []):
+        url2 = item.get("url", "").strip()
+        title = item.get("title", "").strip()
+        snippet = item.get("content", "").strip()
+        if title and url2:
+            results.append({"title": title, "url": url2, "snippet": snippet})
+        if len(results) >= max_results:
+            break
+
+    return results
+
 
 def searxng_search_html(query: str, max_results: int):
     params = {"q": query}
@@ -198,11 +229,17 @@ def main():
 
     fetched_at = now_utc_iso()
 
+    backend = "searxng_localhost_json"
     try:
-        results = searxng_search_html(query, max_results=max_results * 2)
+        results = searxng_search_json(query, max_results=max_results * 2)
     except Exception as e:
-        print(json.dumps({"error": "search_backend_failed", "detail": str(e)}, ensure_ascii=False))
-        sys.exit(3)
+        # Fall back to legacy HTML scraping if JSON fails
+        backend = "searxng_localhost_html"
+        try:
+            results = searxng_search_html(query, max_results=max_results * 2)
+        except Exception as e2:
+            print(json.dumps({"error": "search_backend_failed", "detail": f"json:{e}; html:{e2}"}, ensure_ascii=False))
+            sys.exit(3)
 
     results = [r for r in results if domain_allowed(r["url"], effective_domains)]
     results = results[:max_results]
@@ -212,7 +249,7 @@ def main():
         "meta": {
             "fetched_at_utc": fetched_at,
             "tool_version": TOOL_VERSION,
-            "backend": "searxng_localhost_html",
+            "backend": backend,
         }
     }
 
@@ -224,7 +261,7 @@ def main():
         "ts_utc": fetched_at,
         "tool": "search_web",
         "tool_version": TOOL_VERSION,
-        "backend": "searxng_localhost_html",
+        "backend": backend,
         "inputs": {"query": query, "max_results": max_results, "domains": effective_domains},
         "output_sha256": out_hash,
     })

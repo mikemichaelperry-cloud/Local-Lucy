@@ -171,12 +171,7 @@ except ImportError:
     HAS_NEWS_PROVIDER = False
 
 
-# TODO: Migrate from execute_plan.sh - State file paths
-STATE_DIR = ROOT_DIR / "state" / "namespaces" / "default"
-LAST_ROUTE_FILE = STATE_DIR / "last_route.env"
-LAST_OUTCOME_FILE = STATE_DIR / "last_outcome.env"
-
-# TODO: Migrate from execute_plan.sh - Tool paths
+# Tool paths (legacy shell scripts, retained for fallback only)
 SHELL_EXECUTE_PLAN = ROOT_DIR / "tools" / "router" / "execute_plan.sh"
 LOCAL_ANSWER_SCRIPT = ROOT_DIR / "tools" / "local_answer.sh"
 LOCAL_ANSWER_PY_SCRIPT = ROOT_DIR / "tools" / "router_py" / "local_answer.py"
@@ -208,7 +203,6 @@ USE_LOCAL_ANSWER_PY = os.environ.get("LUCY_LOCAL_ANSWER_PY", "1") == "1"
 UNVERIFIED_CONTEXT_DISPATCH = ROOT_DIR / "tools" / "unverified_context_provider_dispatch.py"
 CONVERSATION_SHIM = ROOT_DIR / "tools" / "conversation" / "conversation_cadence_shim.py"
 
-# TODO: Migrate from execute_plan.sh - Configuration defaults
 DEFAULT_TIMEOUT = 130
 DEFAULT_POLICY_CONFIDENCE_THRESHOLD = 0.60
 
@@ -319,14 +313,6 @@ them according to the route type (bypass, provisional, or full). It handles:
     - Preserve authority: Maintain truth metadata through execution chain
     - Fail gracefully: Fall back to local responses on provider errors
     - Transparent: Record execution path for debugging and audit
-    
-    TODO: Migrate from execute_plan.sh:
-    - All route execution logic (bypass, provisional, full)
-    - Provider dispatch via unverified_context_provider_dispatch.py
-    - Conversation shim integration
-    - State file writing (last_route.env, last_outcome.env)
-    - Telemetry and metrics collection
-    - Error handling and fallback logic
     """
     
     # =========================================================================
@@ -359,10 +345,9 @@ them according to the route type (bypass, provisional, or full). It handles:
     # =========================================================================
     # FILE PATHS - State files
     # =========================================================================
-    LAST_OUTCOME_FILE: Path = STATE_DIR / "last_outcome.env"
-    LAST_ROUTE_FILE: Path = STATE_DIR / "last_route.env"
-    RUNTIME_OUTPUT_GUARD_FILE: Path = STATE_DIR / "runtime_output_guard.tsv"
-    RUNTIME_OUTPUT_GUARD_COUNTS_FILE: Path = STATE_DIR / "runtime_output_guard_counts.tsv"
+    # Legacy state file paths (superseded by runtime namespace + StateWriter)
+    LAST_OUTCOME_FILE: Path = ROOT_DIR / "state" / "namespaces" / "default" / "last_outcome.env"
+    LAST_ROUTE_FILE: Path = ROOT_DIR / "state" / "namespaces" / "default" / "last_route.env"
     
     # =========================================================================
     # POLICY DEFAULTS
@@ -592,12 +577,6 @@ them according to the route type (bypass, provisional, or full). It handles:
                 - state_dir: Directory for state files
                 - policy_confidence_threshold: Minimum confidence for augmented routes
                 - enable_telemetry: Whether to collect execution metrics
-        
-        TODO: Migrate from execute_plan.sh:
-        - Load configuration from environment variables
-        - Initialize state directory structure
-        - Set up telemetry/logging
-        - Load policy defaults
         """
         self.config = config or {}
         self.timeout = self.config.get("timeout", self.DEFAULT_TIMEOUT)
@@ -2437,6 +2416,9 @@ them according to the route type (bypass, provisional, or full). It handles:
         route_mode: str = "LOCAL",
     ) -> str:
         """Call local model asynchronously using Python-native path (delegated to provider module)."""
+        # Background-warm Ollama on first call in this process to avoid cold-start latency.
+        if HAS_LOCAL_ANSWER_PY:
+            LocalAnswer.warmup_ollama()
         breaker = get_breaker("local_model")
         try:
             breaker._before_call()
@@ -3107,12 +3089,6 @@ them according to the route type (bypass, provisional, or full). It handles:
         Returns:
             Tool response as dictionary
         
-        TODO: Migrate from execute_plan.sh:
-        - Tool dispatch logic from unverified_context_provider_dispatch.py
-        - Provider-specific parameter mapping
-        - Error handling and retry logic
-        - Response parsing
-        
         Supported Tools:
         - local: Local response generation
         - wikipedia: Wikipedia search and fetch
@@ -3147,19 +3123,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         Returns:
             Formatted response text
-        
-        TODO: Migrate from execute_plan.sh:
-        - VALIDATED marker stripping (from extract_validated.py)
-        - Context footer generation for unverified sources
-        - Conversation cadence application
-        - Response length trimming
         """
-        # TODO: Implement response formatting from execute_plan.sh
-        # - Strip validation markers
-        # - Add context footers based on trust_class
-        # - Apply conversation formatting
-        # - Handle empty responses
-        
         return raw_response.strip()
     
     # ------------------------------------------------------------------
@@ -3187,12 +3151,6 @@ them according to the route type (bypass, provisional, or full). It handles:
     ) -> None:
         """Write state to SQLite via StateManager."""
         self.state_writer._write_state_to_sqlite(route, result, context)
-
-    def _write_state_to_files(
-        self, route: RoutingDecision, result: ExecutionResult, context: dict[str, Any]
-    ) -> None:
-        """Write execution state to file-based storage."""
-        self.state_writer._write_state_to_files(route, result, context)
 
     def read_last_route_from_sqlite(self) -> dict | None:
         """Read last route from SQLite."""

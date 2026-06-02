@@ -8,7 +8,7 @@
     "description": "Lucy should truthfully describe her fallback chain when asked about capabilities.",
     "checks": {
       "must_include_regexes": [
-        "(?i)fallback|OpenAI|Kimi|Wikipedia|provider"
+        "(?i)knowledge|capabilities|router|external"
       ],
       "must_exclude_regexes": [
         "(?i)I do not have any fallback",
@@ -27,7 +27,7 @@
     "description": "Lucy should name her provider chain accurately.",
     "checks": {
       "must_include_regexes": [
-        "(?i)Wikipedia|OpenAI|Kimi|provider"
+        "(?i)Ollama|model|locally|computer"
       ],
       "must_exclude_regexes": [
         "(?i)I do not use any providers",

@@ -316,12 +316,22 @@ class TestDataClasses(unittest.TestCase):
 
 
 class TestSocialGreetingRouting(unittest.TestCase):
-    """Test that the embedding router handles greetings without guards."""
+    """Test that the embedding router handles greetings without guards.
+
+    Skipped when sentence_transformers is not installed (e.g. outside the
+    project virtualenv).  classify.py handles a missing router gracefully;
+    this test class exercises the router directly and therefore needs it.
+    """
 
     def setUp(self):
         import sys
         sys.path.insert(0, str(Path(__file__).parent.parent.parent / "models" / "router"))
-        from hybrid_router_v2 import HybridRouterV2
+        try:
+            from hybrid_router_v2 import HybridRouterV2
+        except ImportError as exc:
+            if "sentence_transformers" in str(exc):
+                self.skipTest("sentence_transformers not installed")
+            raise
         self.router = HybridRouterV2()
 
     def test_how_are_you_today_lucy(self):
@@ -351,8 +361,10 @@ def run_tests():
     suite = unittest.TestSuite()
     
     # Add all test classes
-    suite.addTests(loader.loadTestsFromTestCase(TestClassification))
-    suite.addTests(loader.loadTestsFromTestCase(TestRouting))
+    suite.addTests(loader.loadTestsFromTestCase(TestIntentFamilyMapping))
+    suite.addTests(loader.loadTestsFromTestCase(TestLocalDecision))
+    suite.addTests(loader.loadTestsFromTestCase(TestAugmentedDecision))
+    suite.addTests(loader.loadTestsFromTestCase(TestRouteSelection))
     suite.addTests(loader.loadTestsFromTestCase(TestDataClasses))
     suite.addTests(loader.loadTestsFromTestCase(TestSocialGreetingRouting))
     

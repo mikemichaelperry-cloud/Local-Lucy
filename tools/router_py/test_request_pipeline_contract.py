@@ -174,7 +174,7 @@ class TestProviderPreferencePropagation:
         assert result == provider
 
     def test_provider_preference_medical_safety_override(self, monkeypatch):
-        """Medical queries must stay wikipedia regardless of preference."""
+        """Medical queries must route to trusted sources regardless of preference."""
         monkeypatch.setenv("LUCY_AUGMENTED_PROVIDER", "openai")
         from router_py.provider_resolver import resolve_provider
         from router_py.request_types import ClassificationResult
@@ -183,7 +183,7 @@ class TestProviderPreferencePropagation:
             evidence_reason="medical_context",
         )
         result = resolve_provider(classification)
-        assert result == "wikipedia"
+        assert result == "trusted"
 
     def test_provider_preference_no_env_falls_back(self, monkeypatch):
         """No env var set should fall back to default provider."""

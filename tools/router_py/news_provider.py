@@ -66,6 +66,36 @@ def _clean_html(text: str) -> str:
     return text
 
 
+def _parse_rfc822_date(date_str: str) -> datetime | None:
+    """Parse an RFC 822 / ISO 8601 date string into a timezone-aware datetime.
+
+    Returns None if the string cannot be parsed.
+    """
+    if not date_str:
+        return None
+    normalized = date_str.strip()
+    if normalized.endswith(" GMT"):
+        normalized = normalized[:-4] + " +0000"
+    elif normalized.endswith(" UTC"):
+        normalized = normalized[:-4] + " +0000"
+
+    for fmt in [
+        "%a, %d %b %Y %H:%M:%S %z",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%d %H:%M:%S",
+    ]:
+        try:
+            dt = datetime.strptime(normalized, fmt)
+            if dt.tzinfo is None:
+                from datetime import timezone
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except ValueError:
+            continue
+    return None
+
+
 def _format_time_ago(published: str) -> str:
     """Format publish time as 'X minutes/hours ago'."""
     try:
@@ -194,7 +224,7 @@ class RSSNewsProvider:
 
     TIMEOUT = 10.0
     MAX_ARTICLES_PER_SOURCE = 3
-    MAX_TOTAL_ARTICLES = 10
+    MAX_TOTAL_ARTICLES = 15
     # Region keywords to detect in queries
     REGION_KEYWORDS = {
         "middle_east": ["israel", "israeli", "israel's", "jerusalem", "tel aviv", "haifa",
@@ -285,7 +315,17 @@ class RSSNewsProvider:
             ns = {"atom": "http://www.w3.org/2005/Atom"}
             items = root.findall("atom:entry", ns)
 
-        for item in items:
+        # Pre-parse a channel-level fallback timestamp for feeds that omit
+        # item-level pubDate (e.g. news.com.au).
+        channel_fallback_dt: datetime | None = None
+        if channel is not None:
+            for fallback_tag in ("lastBuildDate", "pubDate"):
+                fb_elem = channel.find(fallback_tag)
+                if fb_elem is not None and fb_elem.text:
+                    channel_fallback_dt = _parse_rfc822_date(fb_elem.text)
+                    break
+
+        for idx, item in enumerate(items):
             title_elem = item.find("title")
             title = _clean_html(title_elem.text) if title_elem is not None else ""
 
@@ -311,12 +351,18 @@ class RSSNewsProvider:
                 pub_date_elem = item.find("{http://www.w3.org/2005/Atom}published")
             pub_date = pub_date_elem.text if pub_date_elem is not None else ""
 
+            has_own_date = bool(pub_date)
             if pub_date:
                 pub_date = pub_date.strip()
                 if pub_date.endswith(" GMT"):
                     pub_date = pub_date[:-4] + " +0000"
                 elif pub_date.endswith(" UTC"):
                     pub_date = pub_date[:-4] + " +0000"
+            elif channel_fallback_dt is not None:
+                # Feeds without per-item timestamps: stagger slightly by position
+                # so the first item is considered newest, second slightly older, etc.
+                staggered = channel_fallback_dt - timedelta(seconds=idx)
+                pub_date = staggered.strftime("%a, %d %b %Y %H:%M:%S %z")
 
             # Filter by query if provided (only for specific search terms)
             generic_terms = ['latest', 'world news', 'news today', 'current news', 'breaking news', 'news', 'headlines', 'headline', 'todays', "today's"]
@@ -345,6 +391,7 @@ class RSSNewsProvider:
                     sentence_end = 380
                 clean_desc = clean_desc[:sentence_end].rstrip() + "."
 
+            sort_dt = _parse_rfc822_date(pub_date)
             articles.append({
                 "title": title,
                 "description": clean_desc,
@@ -353,6 +400,7 @@ class RSSNewsProvider:
                 "published": pub_date,
                 "time_ago": _format_time_ago(pub_date),
                 "timestamp": pub_date,
+                "_sort_dt": sort_dt,
             })
 
         return articles
@@ -426,9 +474,25 @@ class RSSNewsProvider:
                 deduped.append(article)
         all_articles = deduped
 
-        # Sort by time (most recent first) and limit
-        all_articles.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-        all_articles = all_articles[:cls.MAX_TOTAL_ARTICLES]
+        # Sort by parsed datetime (most recent first).  Feeds without parseable
+        # timestamps sort to the end so they don't push fresher content down.
+        all_articles.sort(
+            key=lambda x: (x.get("_sort_dt") is not None, x.get("_sort_dt")),
+            reverse=True,
+        )
+
+        # Enforce a per-source cap so one fast-updating feed can't monopolise
+        # the top 10 slots.
+        source_counts: dict[str, int] = {}
+        capped: list[dict[str, Any]] = []
+        for article in all_articles:
+            src = article.get("source", "")
+            if source_counts.get(src, 0) < cls.MAX_ARTICLES_PER_SOURCE:
+                source_counts[src] = source_counts.get(src, 0) + 1
+                capped.append(article)
+            if len(capped) >= cls.MAX_TOTAL_ARTICLES:
+                break
+        all_articles = capped
 
         # Format response
         formatted = cls._format_news_response(all_articles, query, for_voice=for_voice)

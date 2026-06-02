@@ -7,7 +7,7 @@ falls back to fetch gate + legacy HTMLParser-based extraction.
 
 Usage:
     from web_extract import extract_webpage
-    text = extract_webpage("https://medlineplus.gov/appendicitis.html", max_chars=4000)
+    text = extract_webpage("https://medlineplus.gov/appendicitis.html", max_chars=2500)
 """
 from __future__ import annotations
 
@@ -240,10 +240,17 @@ def _extract_with_fallback(url: str, timeout: int = 20) -> str | None:
     return None
 
 
+# Hard ceiling for fetched article content.
+# The prompt builder truncates evidence to ~1200 chars, so fetching more
+# than ~2.5× that wastes bandwidth and extraction time without benefit.
+# This cap is applied regardless of what the caller requests.
+MAX_EXTRACT_CHARS_HARD_CAP = int(os.environ.get("LUCY_WEB_EXTRACT_MAX_CHARS", "3000"))
+
+
 def extract_webpage(
     url: str,
     *,
-    max_chars: int = 6000,
+    max_chars: int = 2500,
     timeout: int = 20,
     prefer_webclaw: bool = True,
 ) -> str | None:
@@ -253,12 +260,16 @@ def extract_webpage(
     Args:
         url: The URL to fetch.
         max_chars: Maximum characters to return (truncates intelligently).
+            Cannot exceed MAX_EXTRACT_CHARS_HARD_CAP (default 3000).
         timeout: Seconds to wait for fetch + extraction.
         prefer_webclaw: Try webclaw first if available.
 
     Returns:
         Clean extracted text, or None if extraction failed.
     """
+    # Enforce hard cap regardless of caller request
+    effective_max = min(max_chars, MAX_EXTRACT_CHARS_HARD_CAP)
+
     text: str | None = None
     if prefer_webclaw:
         text = _extract_with_webclaw(url, timeout=timeout)
@@ -268,18 +279,7 @@ def extract_webpage(
         return None
     text = _strip_toc_nav(text)
     text = _strip_site_noise(text)
-    return _truncate(text, max_chars)
-
-
-def extract_webpage_sync(
-    url: str,
-    *,
-    max_chars: int = 6000,
-    timeout: int = 20,
-    prefer_webclaw: bool = True,
-) -> str | None:
-    """Alias for extract_webpage (always synchronous)."""
-    return extract_webpage(url, max_chars=max_chars, timeout=timeout, prefer_webclaw=prefer_webclaw)
+    return _truncate(text, effective_max)
 
 
 if __name__ == "__main__":
@@ -287,7 +287,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Extract text from a web page")
     parser.add_argument("url", help="URL to extract")
-    parser.add_argument("--max-chars", type=int, default=6000, help="Max characters to return")
+    parser.add_argument("--max-chars", type=int, default=2500, help="Max characters to return")
     parser.add_argument("--no-webclaw", action="store_true", help="Skip webclaw, use fallback only")
     args = parser.parse_args()
 

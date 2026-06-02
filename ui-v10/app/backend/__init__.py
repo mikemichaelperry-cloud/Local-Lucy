@@ -22,9 +22,15 @@ from pathlib import Path
 
 # V8 ISOLATION: Use environment variable or authority root, not hardcoded home path
 import os
+
 AUTHORITY_ROOT = os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", "").strip()
 if AUTHORITY_ROOT:
-    SNAPSHOT_ROOT = Path(AUTHORITY_ROOT).expanduser()
+    _candidate = Path(AUTHORITY_ROOT).expanduser()
+    # If authority root doesn't contain tools/router_py, fall back to __file__ derivation
+    if (_candidate / "tools" / "router_py" / "__init__.py").exists():
+        SNAPSHOT_ROOT = _candidate
+    else:
+        SNAPSHOT_ROOT = Path(__file__).resolve().parents[3]
 else:
     # Fallback: derive local lucy-v10 root from ui-v10/app/backend/__init__.py.
     SNAPSHOT_ROOT = Path(__file__).resolve().parents[3]
