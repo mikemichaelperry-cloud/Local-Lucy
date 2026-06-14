@@ -261,6 +261,11 @@ def _get_connection() -> sqlite3.Connection:
         _CONN_CACHE.execute("PRAGMA journal_mode=WAL")
         _CONN_CACHE.execute("PRAGMA synchronous=NORMAL")
         _ensure_schema(_CONN_CACHE)
+        # Harden DB file permissions (production readiness)
+        try:
+            os.chmod(db_path, 0o600)
+        except OSError:
+            pass
     return _CONN_CACHE
 
 

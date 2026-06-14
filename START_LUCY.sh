@@ -129,6 +129,14 @@ rm -f "${LUCY_RUNTIME_AUTHORITY_ROOT}/tmp/run/kokoro_tts_worker.sock"
 # STARTUP VALIDATION
 # =============================================================================
 
+# Ollama health probe — fail fast if the local LLM daemon is unreachable.
+_ollama_url="${LUCY_OLLAMA_API_URL%/*}/tags"
+if ! curl -sf --max-time 2 "${_ollama_url}" >/dev/null 2>&1; then
+    echo "[START_LUCY] ERROR: Ollama is not responding at ${LUCY_OLLAMA_API_URL}"
+    echo "[START_LUCY] Start Ollama first:  ollama serve"
+    exit 1
+fi
+
 # Warn if current_state.json model conflicts with LUCY_LOCAL_MODEL env var.
 # This is a common silent misconfiguration: the env says one thing, the
 # persistent state file says another, and the state file wins at runtime.

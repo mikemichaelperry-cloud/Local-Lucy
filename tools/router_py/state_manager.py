@@ -171,10 +171,16 @@ class StateManager:
         
         # Ensure state directory exists
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize schema and namespace
         self._init_schema()
         self._namespace_id = self._ensure_namespace()
+
+        # Harden DB file permissions (production readiness)
+        try:
+            os.chmod(self.db_path, 0o600)
+        except OSError:
+            pass
     
     # ---------------------------------------------------------------------
     # Connection Management
