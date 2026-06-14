@@ -335,5 +335,106 @@ class TestEvidenceVsAugmentedDistinction(unittest.TestCase):
                 self.assertEqual(decision.evidence_reason, reason)
 
 
+class TestMedicalFollowUpRouting(unittest.TestCase):
+    """Medical/vet follow-ups must NOT silently fall back to LOCAL."""
+
+    def test_medical_followup_inherits_evidence(self) -> None:
+        """Short follow-up after medical EVIDENCE stays in evidence mode."""
+        # Simulate prior medical context by injecting a feedback buffer entry
+        import json
+        import tempfile
+        from router_py.classify import classify_intent, select_route
+
+        with tempfile.TemporaryDirectory() as tmp:
+            buf_path = Path(tmp) / "feedback_buffer.json"
+            buf_path.write_text(json.dumps({
+                "exchanges": [
+                    {
+                        "route": "EVIDENCE",
+                        "query": "what are the side effects of metformin",
+                        "response": "...",
+                    }
+                ]
+            }))
+
+            # Patch the runtime namespace root so classify reads our buffer
+            old_ns = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
+            os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = tmp
+            try:
+                followups = [
+                    "why",
+                    "what about that",
+                    "side effects",
+                    "is it safe",
+                    "can I drink alcohol with it",
+                ]
+                for q in followups:
+                    with self.subTest(query=q):
+                        classification = classify_intent(q)
+                        decision = select_route(
+                            classification, policy="fallback_only", query=q
+                        )
+                        # After a medical EVIDENCE response, short informational
+                        # follow-ups must not route to LOCAL.
+                        self.assertNotEqual(
+                            decision.route,
+                            "LOCAL",
+                            f"{q!r} after medical EVIDENCE should not route LOCAL",
+                        )
+                        self.assertIn(
+                            decision.route,
+                            ("EVIDENCE", "AUGMENTED"),
+                            f"{q!r}: expected EVIDENCE or AUGMENTED, got {decision.route}",
+                        )
+            finally:
+                if old_ns is not None:
+                    os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = old_ns
+                else:
+                    os.environ.pop("LUCY_RUNTIME_NAMESPACE_ROOT", None)
+
+    def test_vet_followup_inherits_evidence(self) -> None:
+        """Short follow-up after veterinary EVIDENCE stays in evidence mode."""
+        import json
+        import tempfile
+        from router_py.classify import classify_intent, select_route
+
+        with tempfile.TemporaryDirectory() as tmp:
+            buf_path = Path(tmp) / "feedback_buffer.json"
+            buf_path.write_text(json.dumps({
+                "exchanges": [
+                    {
+                        "route": "EVIDENCE",
+                        "query": "my dog has hip dysplasia",
+                        "response": "...",
+                    }
+                ]
+            }))
+
+            old_ns = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
+            os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = tmp
+            try:
+                followups = [
+                    "what should I do",
+                    "treatment options",
+                    "is surgery needed",
+                ]
+                for q in followups:
+                    with self.subTest(query=q):
+                        classification = classify_intent(q)
+                        decision = select_route(
+                            classification, policy="fallback_only", query=q
+                        )
+                        self.assertNotEqual(
+                            decision.route,
+                            "LOCAL",
+                            f"{q!r} after vet EVIDENCE should not route LOCAL",
+                        )
+            finally:
+                if old_ns is not None:
+                    os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = old_ns
+                else:
+                    os.environ.pop("LUCY_RUNTIME_NAMESPACE_ROOT", None)
+
+
 if __name__ == "__main__":
     unittest.main()

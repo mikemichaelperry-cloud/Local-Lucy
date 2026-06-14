@@ -24,12 +24,28 @@ export QT_QPA_PLATFORM_PLUGIN_PATH="/usr/lib/x86_64-linux-gnu/qt6/plugins"
 # Lucy paths
 export LUCY_ROOT="$SCRIPT_DIR"
 export LUCY_UI_ROOT="${SCRIPT_DIR}/ui-v10"
-# Unify all runtime state (JSON, SQLite, logs) to the user-local directory
-# where StateWriter and backend defaults already write. This eliminates the
-# split-brain where HMI reads from /home/mike/lucy-v10/state/ but router
-# writes to ~/.codex-api-home/lucy/runtime-v10/state/.
-export LUCY_RUNTIME_NAMESPACE_ROOT="$HOME/.codex-api-home/lucy/runtime-v10"
+
+# XDG-compliant runtime state (data, config, cache).
+# Falls back to legacy ~/.codex-api-home path if the user already has it set.
+if [ -n "${LUCY_RUNTIME_NAMESPACE_ROOT:-}" ]; then
+    : # user override — keep it
+elif [ -d "$HOME/.codex-api-home/lucy/runtime-v10" ]; then
+    # Legacy migration: existing data found
+    export LUCY_RUNTIME_NAMESPACE_ROOT="$HOME/.codex-api-home/lucy/runtime-v10"
+else
+    # XDG default
+    export LUCY_RUNTIME_NAMESPACE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy"
+fi
+
 export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
+export LUCY_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/local-lucy"
+export LUCY_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/local-lucy"
+
+# Ensure directories exist
+mkdir -p "$LUCY_RUNTIME_NAMESPACE_ROOT/state"
+mkdir -p "$LUCY_RUNTIME_NAMESPACE_ROOT/logs"
+mkdir -p "$LUCY_CONFIG_DIR"
+mkdir -p "$LUCY_CACHE_DIR"
 
 # Voice capture directory stays in project tree (temporary audio, not persistent state)
 export LUCY_VOICE_CAPTURE_DIR="$SCRIPT_DIR/voice/ui_ptt"

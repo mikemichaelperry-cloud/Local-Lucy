@@ -18,6 +18,15 @@ export LUCY_RUNTIME_AUTHORITY_ROOT="${ROOT}"
 export LUCY_CONF_DIR="${ROOT}/config"
 export LUCY_TOOLS_DIR="${ROOT}/tools"
 
+# XDG-compliant runtime state with legacy fallback
+if [ -n "${LUCY_RUNTIME_NAMESPACE_ROOT:-}" ]; then
+    : # user override
+elif [ -d "$HOME/.codex-api-home/lucy/runtime-v10" ]; then
+    export LUCY_RUNTIME_NAMESPACE_ROOT="$HOME/.codex-api-home/lucy/runtime-v10"
+else
+    export LUCY_RUNTIME_NAMESPACE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy"
+fi
+
 # Python router for execution
 ROUTER_PY="${ROOT}/tools/router_py/main.py"
 LOCAL_WORKER="${ROOT}/tools/local_worker.py"
@@ -31,7 +40,8 @@ export LUCY_ROUTER_PY="${LUCY_ROUTER_PY:-1}"
 export LUCY_EXEC_PY="${LUCY_EXEC_PY:-1}"
 
 # Ensure state directories exist
-mkdir -p "${ROOT}/state/namespaces/default"
+mkdir -p "$LUCY_RUNTIME_NAMESPACE_ROOT/state/namespaces/default"
+mkdir -p "$LUCY_RUNTIME_NAMESPACE_ROOT/logs"
 mkdir -p "${ROOT}/logs"
 
 # Check Ollama is available

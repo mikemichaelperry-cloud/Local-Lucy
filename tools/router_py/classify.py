@@ -761,6 +761,59 @@ def select_route(
         )
         return decision
 
+    # Medical/veterinary follow-up guard: after an EVIDENCE response to a
+    # medical or veterinary query, ambiguous follow-ups ("what about that",
+    # "is it safe", "why") must NOT silently fall back to LOCAL via the
+    # embedding router. Bias them toward AUGMENTED so cited sources remain
+    # available.
+    if query and len(query.strip()) <= 30:
+        _followup_q = query.strip().lower()
+        _followup_pronouns = ("it", "that", "this", "those", "them", "they")
+        _followup_stems = ("why", "what about", "how about", "side effect",
+                           "dosage", "dose", "safe", "interact", "take with",
+                           "drink", "eat", "food", "alcohol", "should i")
+        _is_ambiguous_followup = (
+            any(p in _followup_q.split() for p in _followup_pronouns)
+            or any(stem in _followup_q for stem in _followup_stems)
+        )
+        if _is_ambiguous_followup:
+            try:
+                _ns2 = Path(
+                    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT",
+                                   str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
+                )
+                _buf_path2 = _ns2 / "feedback_buffer.json"
+                if _buf_path2.exists():
+                    _data2 = _load_feedback_buffer(_buf_path2)
+                    _exchanges2 = _data2.get("exchanges", [])
+                    if _exchanges2:
+                        _last2 = _exchanges2[-1]
+                        _last_route2 = str(_last2.get("route", "")).upper()
+                        _last_query2 = str(_last2.get("query", "") or "").lower()
+                        # Infer medical/vet context from prior query keywords
+                        _medical_keywords = (
+                            "side effect", "metformin", "ibuprofen", "aspirin", "warfarin",
+                            "amoxicillin", "tadalafil", "diabetes", "hypertension", "medication",
+                            "drug", "dosage", "symptom", "chest", "shortness of breath",
+                            "headache", "fever", "nausea", "pregnant", "surgery", "treatment",
+                            "dog", "cat", "canine", "feline", "veterinary", "vet", "hip dysplasia",
+                            "heartworm", "hyperthyroidism", "bloat",
+                        )
+                        _was_medical = any(kw in _last_query2 for kw in _medical_keywords)
+                        if _last_route2 == "EVIDENCE" and _was_medical:
+                            decision = _make_augmented_decision(
+                                classification, prefer_paid=False, query=query
+                            )
+                            _log_decision(
+                                query or "",
+                                decision,
+                                embedding_route="MEDICAL_FOLLOWUP_GUARD",
+                                guards_fired=["medical_followup_guard"],
+                            )
+                            return decision
+            except Exception:
+                pass
+
     # Primary path: embedding router
     router = _get_router()
     if router and query:
