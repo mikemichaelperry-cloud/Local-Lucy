@@ -1,31 +1,37 @@
-# Local Lucy v10 — Codex Execution Rules
+# Local Lucy v10 — Agent Instructions
 
-## Related Documents
+> **READ `SESSION_CONTEXT.md` FIRST at every session start.**  
+> It contains the current branch, git state, environment variables, and latest changes.  
+> This file contains the rules; `SESSION_CONTEXT.md` contains the live state.
 
-- For structural details (directory tree, routing precedence, file line counts, known gotchas), see `~/.kimi/LOCAL_LUCY_V9_CODEBASE_MAP.md` (agent-maintained, read at session start).  
-  **Note:** The map filename still says V9 for historical reasons; it describes the V10 codebase.
-- **If the map contradicts this file, this file wins.**
+---
 
 ## Authority
 
-- The authoritative working root is:
-  /home/mike/lucy-v10
+- **Working root:** `/home/mike/lucy-v10`
+- **Active branch:** `v10-dev`
+- **Frozen:** V9 is tagged `local-lucy-v9-frozen-2026-05-28`. Never modify it.
+- **Default model:** `local-lucy-llama31` (llama3.1:8b via Ollama)
 
-- Do not modify:
-  - launcher structure
-  - HMI structure
-  - unrelated subsystems
+---
 
-- Backend is authoritative. UI must not fabricate state.
+## Session Lifecycle
 
-## System Privileges
+### At Session Start (Mandatory)
+1. Read `SESSION_CONTEXT.md` to understand current state
+2. Run `git status --short` and `git log --oneline -5` to verify it matches
+3. Read `AGENTS.md` (this file) for rules
 
-- Make changes only within `~/lucy-v10/` directories.
-- **V9 is frozen** at tag `local-lucy-v9-frozen-2026-05-28`. Do not modify V9.
-- V10 (`/home/mike/lucy-v10/`) is the sole active development branch.
-- For system-level changes (e.g., systemd, global env vars), use user-level alternatives:
-  - Modify `START_LUCY.sh` to export env vars
-  - Use per-user systemd overrides (`~/.config/systemd/user/`) if available
+### At Session End / Handoff (Mandatory)
+1. Update `SESSION_CONTEXT.md` with:
+   - Any new commits
+   - Working tree changes
+   - New TODOs completed or discovered
+   - Any architectural decisions
+2. `git add SESSION_CONTEXT.md && git commit -m "docs: update SESSION_CONTEXT.md"`
+3. If changes were made, ensure working tree is clean before ending
+
+---
 
 ## Operating Principles
 
@@ -34,261 +40,66 @@
 - No hallucinated files
 - Test every change
 - Prefer Python over shell for logic
-- Prefer `StrReplaceFile` over `WriteFile` for edits
-
-## Feedback Learning System (Conversational)
-
-Local Lucy can learn from natural-language user feedback without CLI commands.
-
-### How it works
-
-When you react to a response, Lucy detects the feedback *before* routing it as a new query:
-
-| You say | Detected as | Action |
-|---|---|---|
-| "that was wrong, it should have been LOCAL" | Route correction | Logs `{query, correct_route: LOCAL}` → rebuilds embeddings |
-| "wrong route, that was NEWS" | Route correction | Same, with route=NEWS |
-| "that was a bad answer" | Negative quality | Logs complaint (no auto-route guess) |
-| "perfect, thank you" | Positive quality | Confirms/strengthens existing route |
-| "forget that" | Retraction | Removes prior exchange from memory |
-
-### Files
-
-- `tools/router_py/feedback_buffer.py` — Ring buffer of last 5 exchanges (persisted to runtime namespace)
-- `tools/router_py/feedback_parser.py` — Pattern-based NL feedback detection + logging
-- `models/router/user_feedback.jsonl` — Logged corrections (ingested by background_learner.py)
-- `models/router/background_learner.py` — Rebuilds embedding index from feedback + auto-feedback
-
-### Attribution
-
-Feedback is always attributed to the **most recent exchange** in the buffer. The buffer records:
-- Query text
-- Route chosen
-- Intent family
-- Response text (truncated)
-- Confidence
-
-### Learning trigger
-
-After each logged correction, `maybe_auto_learn(min_entries=1)` is called. This starts a background thread that:
-1. Reads `user_feedback.jsonl`
-2. Deduplicates by query
-3. Rebuilds `comprehensive_embeddings.npy` and `comprehensive_examples.json`
-4. The next query uses the updated index immediately
-
-### Adding new feedback patterns
-
-Edit `feedback_parser.py`:
-- `ROUTE_CORRECTION_PATTERNS` — regexes that extract route names
-- `ANSWER_NEGATIVE_PATTERNS` — negative quality signals
-- `ANSWER_POSITIVE_PATTERNS` — positive quality signals
-- `RETRACTION_PATTERNS` — commands to forget/retract
-
-Patterns are checked in order: route correction → retraction → negative → positive.
-
-### Architecture Refactor Status
-
-Stages 0–9 complete. Python-native path is authoritative. Shell/parity paths removed.
-See `tools/router_py/ARCHITECTURE.md` for full pipeline diagram.
-
-New modules introduced:
-- `tools/router_py/request_pipeline.py` — pipeline choke point
-- `tools/router_py/request_types.py` — centralized dataclasses
-- `tools/router_py/provider_resolver.py` — single source of truth for provider selection
-- `tools/router_py/response_formatter.py` — pure formatting/validation utilities
-
-All entry points (CLI, HMI, voice) now call `main.run()`.
-
-### Testing
-
-```bash
-cd ~/lucy-v10/ui-v10
-.venv/bin/python3 -m pytest tests/ -q
-```
-
-Also run the fast routing stress test:
-```bash
-.venv/bin/python3 fast_routing_stress_test.py
-```
-
-Router tests:
-```bash
-cd ~/lucy-v10
-# Route-only (fast, ~56s)
-LUCY_SYNTHETIC_ROUTER_ONLY=1 python3 -m pytest tools/router_py/test_synthetic_adversarial.py -x -q
-
-# Full-answer with LLM calls (~8 min, 1099 passed / 514 skipped when green)
-LUCY_SYNTHETIC_FULL_ANSWER=1 python3 -m pytest tools/router_py/test_synthetic_adversarial.py --tb=short
-```
-
-### Synthetic Adversarial Test Suite
-- 403 cases in `tests/synthetic_adversarial_cases.jsonl`
-- Route-only mode: 807 passed, 806 skipped
-- Full-answer mode: ~1099 passed, 514 skipped
-- **Guard invariants:** `must_not_contain=['Traceback', 'Exception', 'error']` — local model must not emit "ERROR:" on garbage input
-- Test fixture: function-scoped `local_answer_engine` with `engine.close()` finalizer to prevent unclosed sessions and event-loop errors
-
-### Per-Request Optimizations Applied (Phases 1–4)
-| Phase | File | Change |
-|-------|------|--------|
-| 1 | `classify.py`, `policy.py` | Pre-compiled ~180 regexes; guard booleans cached after `router.predict()` |
-| 2A | `execution_engine_state.py` | History dedup cache (O(n) → O(1)) |
-| 2B | `memory_service.py` | Thread-safe bounded embedding LRU cache (256 entries, SHA-256 keyed) |
-| 2C | `state_manager.py`, `execution_engine_state.py` | SQLite batch writes (single transaction) |
-| 2D | `providers/evidence.py` | TTL/LRU evidence cache (Wikipedia 1h, Time 60s, Weather 5m) |
-| 2E | `execution_engine.py` | Lazy session memory load (only when provider needs it) |
-| 3A | `providers/evidence.py` | Idempotent `sys.path` guard (no duplicate inserts) |
-| 3B | `local_answer.py` | Pre-compiled medical/time-sensitive regex patterns |
-| 3C | `local_answer.py` | Persistent file handle in `LocalAnswerLogger` |
-| 3D | `classify.py` | Feedback buffer disk read cached by `mtime` |
-| 3E | `execution_engine.py`, `execution_engine_state.py` | Medical domains cached by `mtime`; `utc_now` computed once per payload |
-| 4 | `START_LUCY.sh`, `streaming_tts*.py` | KV-cache q8_0 quantization; Kokoro device env-var fixes |
-
-**Next target:** Phase 5 — Evidence parallelism (`asyncio.gather()` for AUGMENTED route evidence fetching).
-
-Router tests:
-```bash
-cd ~/lucy-v10
-source ui-v10/.venv/bin/activate
-python -m pytest tools/router_py/ --ignore=tools/router_py/test_resource_leaks.py -q
-```
-
-### Sync rule
-
-`snapshots/opt-experimental-v9-dev/` is a historical mirror. Do not sync to it.
-All changes stay in the V10 root (`/home/mike/lucy-v10/`).
+- Prefer `Edit` over `Write` for incremental changes
+- Make MINIMAL changes
 
 ---
 
-## 🎯 NEXT SESSION BOOTSTRAP — Production Migration (Streams 1–6 Complete)
-
-**Date written:** 2026-05-14  
-**Final commit:** `dd9024a8` (pushed to `origin/main`)  
-**System state:** `main` is up to date with `origin/main`. Clean working tree.  
-**Active router:** Python-native (`LUCY_ROUTER_PY=1`, `LUCY_EXEC_PY=1`)  
-**Model:** MiniLM-L6-v2 hybrid router V2, ~899 examples  
-**GPU constraint:** LOW VRAM. No GPU tests. No model loading in tests.  
-
----
-
-### What "Production Ready" Means Here
-
-The user's rating for this session:
-- Architecture: 8.8/10
-- Operational coherence: 8.5/10
-- Report reliability: 7.5/10
-- Ready for daily dogfood: **yes**
-- Ready for no-supervision production: **not yet**
-
-V9 is frozen at tag `local-lucy-v9-frozen-2026-05-28`. Do not modify V9.
-V10 is the active development branch.
-All work, fixes, and improvements belong in V10 only.
-
----
-
-### ✅ What Is Working Now (Do Not Break)
-
-1. **State pipeline is coherent**
-   - Python router → `PipelineContext` → `ExecutionEngine` → `StateWriter`
-   - JSON files (`last_request_result.json`, `last_route.json`, `request_history.jsonl`) are the HMI-facing contract
-   - SQLite (`lucy_state.db`) is the durable internal state
-   - `.env` writes are deprecated (commented out, not deleted)
-
-2. **request_id is unified end-to-end**
-   - `main.py` generates `sha256(question)[:16]`
-   - Flows through `PipelineContext.extras` → `ExecutionEngine` → `StateWriter`
-   - Present in JSON payload, SQLite metadata, and history entries
-   - Test: `test_request_id_propagation()`
-
-3. **Training data is git-stable**
-   - `comprehensive_examples.json` no longer drifts with runtime timestamps
-   - Timestamps normalized to `"training_data"`
-   - Mutable metadata goes to untracked `examples_metadata.json`
-
-4. **Shared payload builders exist**
-   - `tools/router_py/payload_builders.py` — pure functions used by both shell and Python routers
-   - `build_route_snapshot_payload()`, `determine_route_source_type()`, `build_history_entry()`
-
-5. **Tube database is integrated**
-   - `data/tubes/tube_database.db` — 648 vacuum tubes with specs (vplate, vscreen, pplate, gm, heater, notes)
-   - `local_answer.py` short-circuits to `tube_database` lookup before any Ollama call for known tubes
-   - Zero-latency answers for audio/power tube queries (6V6GT, EL34, KT88, 300B, 12AX7, etc.)
-
-6. **HMI displays real state**
-   - 138/138 inspection checks pass
-   - 9/9 non-GPU offscreen tests pass
-   - Dead preprocess fields removed from display
-
----
-
-### 🔧 Known Issues (Next Priority Order)
-
-**Priority 1 — Watch during daily use (no code changes yet):**
-- Does HMI always show the current route correctly?
-- Does `request_history.jsonl` grow sensibly?
-- Does SQLite metadata match JSON `request_id`?
-- Does `comprehensive_examples.json` stay clean?
-- Does `git status` remain clean after normal usage?
-- Does weather/time/local routing behave consistently?
-
-**Priority 2 — Safe cleanup (after 1–2 weeks stable JSON-only operation):**
-- Delete `_write_state_to_files()`, `get_state_file_paths()`, and `.env` read-back helpers from `execution_engine_state.py`
-- Search for `TODO: Remove` comments
-- This is low risk — the methods are already dead code
-
-**Priority 3 — Fix when VRAM is available or mocks are written:**
-- `test_voice_ptt_offscreen.py` — segfault (whisper.cpp server processes occupy VRAM)
-- `test_whisper_gpu_cpu_fallback_offscreen.py` — GPU model loading fails
-- `test_whisper_gpu_success_offscreen.py` — GPU model loading fails
-
-**Priority 4 — Orphaned file (cosmetic):**
-- `last_preprocess.json` — no writer exists in Python router
-- Fields already removed from HMI, so this is harmless
-- Can add a no-op writer for completeness, or ignore
-
----
-
-### 🚧 Architecture Boundaries (Do Not Cross Without Approval)
+## Boundaries (Do Not Cross Without Approval)
 
 | Area | Rule |
 |------|------|
 | Router classification | Do not change ModernBERT or keyword guard behavior |
 | SQLite schema | Do not modify `lucy_state.db` or `memory.db` schema |
-| HMI redesign | Forbidden per user constraint set |
+| HMI redesign | Forbidden per user constraint |
 | Model weights | Do not retrain or replace embedding index without explicit instruction |
-| Launcher structure | Do not modify `START_LUCY.sh` structure |
 | Voice runtime | Do not modify whisper.cpp or kokoro integration |
 
 **Allowed changes:**
-- `execution_engine_state.py` — state persistence
-- `execution_engine.py` — dispatch and state write calls
-- `payload_builders.py` — pure payload formatting
+- `execution_engine.py`, `execution_engine_state.py` — state persistence
+- `classify.py` — routing guards (with tests)
+- `payload_builders.py` — pure formatting
 - Tests in `tools/router_py/test_*.py` and `ui-v10/tests/test_*.py`
-- Documentation and reports
+- Documentation, config, scripts, CI
 
 ---
 
-### 📁 Load-Bearing Files
+## Key Files
 
-| File | What it does | Touch with care |
-|------|-------------|-----------------|
-| `tools/router_py/main.py` | Entry point, generates `request_id` | Yes — keep request_id contract |
-| `tools/router_py/request_pipeline.py` | Pipeline choke point, builds `PipelineContext` | Yes — frozen dataclass contract |
-| `tools/router_py/execution_engine.py` | Dispatches routes, calls state writes | Yes — all 6 paths must call JSON writes |
-| `tools/router_py/execution_engine_state.py` | `StateWriter` — JSON + SQLite persistence | Yes — public API must not break |
+| File | Role | Touch with care |
+|------|------|-----------------|
+| `tools/router_py/main.py` | Entry point | Yes — keep request_id contract |
+| `tools/router_py/request_pipeline.py` | Pipeline choke point | Yes — frozen dataclass contract |
+| `tools/router_py/execution_engine.py` | Dispatcher | Yes — all routes must write state |
+| `tools/router_py/execution_engine_state.py` | StateWriter (JSON + SQLite) | Yes — public API must not break |
+| `tools/router_py/classify.py` | Intent classification + guards | Yes — add tests for new guards |
 | `tools/router_py/payload_builders.py` | Shared pure payload builders | Yes — both routers depend on this |
 | `tools/router_py/request_types.py` | Centralized frozen dataclasses | Yes — schema changes ripple |
-| `tools/runtime_request.py` | Shell router, imports payload builders | Yes — graceful fallback required |
-| `ui-v10/app/services/state_store.py` | HMI reads JSON state files | No — read-only per constraints |
+| `ui-v10/app/services/state_store.py` | HMI reads JSON state | No — read-only per constraints |
 | `ui-v10/app/panels/status_panel.py` | HMI displays state | No — read-only per constraints |
-| `models/router/background_learner.py` | Rebuilds embedding index | Yes — keep timestamp normalization |
-| `data/tubes/tube_database.db` | SQLite tube specs (648 tubes) | Yes — HMI answers depend on it |
-| `data/tubes/tube_database.py` | Schema + seed + lookup helpers | Yes — local_answer.py imports this |
-| `tools/router_py/local_answer.py` | Local LLM path, tube DB lookup | Yes — short-circuits before Ollama |
+| `ui-v10/app/backend/*.py` | **RE-EXPORT WRAPPERS ONLY** | Never add logic here |
+
+**Critical:** `ui-v10/app/backend/*.py` are 3–9 line wrappers. Edit `tools/router_py/` and let wrappers pick it up. This has been a repeated footgun.
 
 ---
 
-### 🧪 Test Commands (Copy-Paste Ready)
+## Environment Variables
+
+```bash
+LUCY_ROOT=~/lucy-v10                    # Project root
+LUCY_RUNTIME_NAMESPACE_ROOT=~/.local/share/local-lucy   # XDG data (or legacy ~/.codex-api-home)
+LUCY_RUNTIME_AUTHORITY_ROOT=~/lucy-v10  # Code authority validation
+LUCY_UI_ROOT=~/lucy-v10/ui-v10          # HMI path
+LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
+LUCY_LOCAL_MODEL=local-lucy-llama31
+LUCY_ROUTER_PY=1                        # Use Python router
+LUCY_EXEC_PY=1                          # Use Python execution engine
+LUCY_AUTO_LEARN=0                       # Set 0 during development to prevent mutation
+```
+
+---
+
+## Test Commands
 
 ```bash
 # Full router suite (CPU only, ~1min40s)
@@ -296,132 +107,63 @@ cd ~/lucy-v10
 source ui-v10/.venv/bin/activate
 python -m pytest tools/router_py/ -q
 
-# StateWriter specifically
-python -m pytest tools/router_py/test_execution_engine_state.py -q
+# Medical routing specifically
+python -m pytest tools/router_py/test_medical_evidence_routing.py -v
 
-# E2E voice (mocked, no GPU)
-python -m pytest tools/router_py/test_e2e_hmi_voice.py -q
-
-# HMI comprehensive inspection (offscreen Qt)
+# HMI offscreen tests
 QT_QPA_PLATFORM=offscreen python3 ui-v10/tests/test_comprehensive_hmi_inspection.py
 
-# HMI offscreen tests (non-GPU only)
-for f in ui-v10/tests/*offscreen*.py; do
-  QT_QPA_PLATFORM=offscreen timeout 30 python3 "$f" && echo "PASS $f" || echo "FAIL $f"
-done
-
 # Live end-to-end (single request)
-LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 LUCY_AUGMENTATION_POLICY=fallback_only \
+LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 \
   python3 -c "import sys; sys.path.insert(0,'tools'); from router_py.main import execute_plan_python; \
-  r = execute_plan_python('What is 2+2?', policy='fallback_only', timeout=30); \
-  print(r.status, r.route, r.request_id)"
+  r = execute_plan_python('What is 2+2?', timeout=30); print(r.status, r.route)"
 ```
 
 ---
 
-### 📊 State File Locations
+## Feedback Learning System
 
-**Unified location (canonical):**
-```
-~/.codex-api-home/lucy/runtime-v10/state/
-├── current_state.json          # HMI control state (unified — see below)
-├── last_request_result.json    # Full request payload (NEW — Stream 2)
-├── last_route.json             # Route snapshot (NEW — Stream 2)
-├── request_history.jsonl       # Deduplicated history (NEW — Stream 2)
-├── runtime_lifecycle.json      # Process status
-├── health.json                 # System health
-├── voice_runtime.json          # Voice backend status
+Local Lucy learns from natural-language user feedback.
 
-~/.codex-api-home/lucy/runtime-v10/
-├── lucy_state.db               # SQLite routes/outcomes
-└── memory.db                   # SQLite memory
-```
+| User says | Detected as | Action |
+|---|---|---|
+| "that was wrong, it should have been LOCAL" | Route correction | Logs correction → rebuilds embeddings |
+| "that was a bad answer" | Negative quality | Logs complaint |
+| "perfect, thank you" | Positive quality | Strengthens existing route |
+| "forget that" | Retraction | Removes from memory |
 
-**Legacy location (project root):**
-```
-/home/mike/lucy-v10/state/
-├── current_state.json          # Legacy fallback
-```
+**Files:**
+- `tools/router_py/feedback_buffer.py` — Ring buffer of last 5 exchanges
+- `tools/router_py/feedback_parser.py` — NL feedback detection
+- `models/router/user_feedback.jsonl` — Logged corrections
+- `models/router/background_learner.py` — Rebuilds embedding index
 
-**Why two locations?** The project was created with state in the repo directory, but the HMI and `runtime_control.py` default to `~/.codex-api-home/lucy/runtime-v10/`. Before 2026-05-16, `START_LUCY.sh` and the HMI read/wrote different `current_state.json` files, causing silent drift (e.g. model mismatch warnings on startup).
-
-**Fix applied (2026-05-16):**
-- `START_LUCY.sh` now exports `LUCY_RUNTIME_STATE_FILE=~/.codex-api-home/lucy/runtime-v10/state/current_state.json`
-- `router_py/main.py` `load_state_from_file()` checks `LUCY_RUNTIME_STATE_FILE` env var first
-- This ensures all entry points (launcher, HMI, runtime_control.py, main.py) use the SAME `current_state.json`
-
-**Note:** `~/.codex-api-home` is a legacy directory name from the Codex era. It contains only Local Lucy data. Renaming it is deferred to a later cleanup sprint.
+**Rule:** Set `LUCY_AUTO_LEARN=0` during development unless explicitly testing learner behavior.
 
 ---
 
-### 📝 Report Locations
+## Common Footguns
 
-| Report | Path |
-|--------|------|
-| Full migration report | `reports/Production_Migration_Report_Streams_1-6_2026-05-14.md` |
-| Session handoff | `dev_notes/SESSION_HANDOFF_2026-05-14T19-35-00+0300.md` |
-| Desktop handoff | `~/Desktop/SESSION_HANDOFF_2026-05-14T19-35-00+0300.md` |
-| Desktop report | `~/Desktop/Production_Migration_Report_Streams_1-6_2026-05-14.md` |
-| Approved plan | `.kimi/plans/captain-marvel-ice-static.md` |
+1. **Two `current_state.json` locations** — HMI uses `~/.local/share/local-lucy/state/` (XDG) or legacy `~/.codex-api-home/lucy/runtime-v10/state/`. `START_LUCY.sh` sets the canonical path via `LUCY_RUNTIME_NAMESPACE_ROOT`.
 
----
+2. **`PipelineContext` is frozen** — Use `dataclasses.replace()` to modify. Unknown keys from `context` dict merge into `.extras`.
 
-### 🔑 Key Environment Variables
+3. **SQLite namespaces** — `StateManager` uses hostname-based namespaces by default, not `"default"`.
 
-```bash
-LUCY_ROUTER_PY=1          # Use Python router (active)
-LUCY_EXEC_PY=1            # Use Python execution engine (active)
-LUCY_AUGMENTATION_POLICY=fallback_only   # Current policy
-LUCY_UI_STATE_DIR=~/.codex-api-home/lucy/runtime-v10/state  # JSON state output
-LUCY_STATE_DB=~/lucy-v10/state/lucy_state.db  # SQLite DB path
-```
+4. **`.env` writes are deprecated** — `execution_engine_state.py` no longer writes `.env` files. JSON + SQLite are canonical.
+
+5. **HMI offscreen tests are standalone scripts** — Run directly: `QT_QPA_PLATFORM=offscreen python3 test_*.py`, not via `pytest`.
+
+6. **No GPU in tests** — Low VRAM environment. Router tests use mocks.
 
 ---
 
-### ⚠️ Things That Have Confused Me Before
+## Operational Guardrails
 
-1. **`request_id` in `PipelineContext`**: `PipelineContext` is a frozen dataclass. Unknown keys from `context` dict are merged into `.extras` via `dataclasses.replace()`. `to_dict()` propagates `.extras` flat. This is the correct contract.
-
-2. **SQLite namespaces**: `StateManager` uses hostname-based namespaces by default (`mike-System-Product-Name_<pid>_<timestamp>_<hash>`), not `"default"`. The `default` namespace exists but is empty in normal operation. Tests create their own namespaces.
-
-3. **`comprehensive_examples.json` learner drift**: Route label changes (e.g. `LOCAL` → `WEATHER` from feedback) are **expected** and correct. Only timestamp drift was a bug. Do not revert route label changes unless the user explicitly asks.
-
-4. **`.env` deprecation vs. deletion**: The `.env` write methods are commented out in the public entry point but the methods still exist. This is intentional — they will be fully removed after burn-in.
-
-5. **HMI offscreen tests are NOT pytest tests**: They are standalone Python scripts with `main()` functions. Run them directly, not via `pytest`.
-
-6. **No GPU in tests**: The user has low VRAM (~3.7GB used by whisper-server processes). Never run tests that load torch/transformers models. All router tests use mocks.
-
-7. **Two `current_state.json` files**: Before 2026-05-16 there were two independent files:
-   - `~/.codex-api-home/lucy/runtime-v10/state/current_state.json` — HMI default, runtime_control.py default
-   - `/home/mike/lucy-v10/state/current_state.json` — START_LUCY.sh, main.py legacy path
-   
-   They could diverge silently (e.g. model mismatch warnings). Fixed by adding `LUCY_RUNTIME_STATE_FILE` env var to START_LUCY.sh and making main.py respect it. Always use the env var when referring to current_state.json.
-
-8. **`ui-v10/app/backend/*.py` are RE-EXPORT WRAPPERS ONLY**: These files (classify.py, execution_engine.py, local_answer.py, policy.py) are 3–9 line wrappers that import from `tools/router_py/`. **Do not add logic to them.** Edit `tools/router_py/` and let the wrappers pick it up via `backend/__init__.py`. This has been a repeated footgun in past sessions.
-
-9. **`StateWriter` uses `write_batch()` not `write_route()`/`write_outcome()`**: The Phase 2C optimization (May 23) batched SQLite writes into a single transaction. Tests that mock `state_manager.write_route` or `write_outcome` will fail — mock `write_batch` instead and unpack the two positional args.
+1. **Sync only after tests pass.** Never push a dirty snapshot.
+2. **Do not use `rsync --delete` unless explicitly approved.**
+3. **Stop and ask before editing:** SQLite schema, router classification, HMI redesign, model retraining, launcher restructuring.
 
 ---
 
-### 🛡️ Operational Guardrails
-
-1. **Set `LUCY_AUTO_LEARN=0` during development, audit, or test sessions** unless the explicit task is to test learner behavior. Do not allow test prompts or agent-generated corrections to mutate production router examples.
-
-2. **Sync only after tests pass.** Never push a dirty snapshot.
-
-3. **Do not use `rsync --delete` unless explicitly approved by Michael.** Destructive syncs can wipe snapshot files.
-
-4. **Snapshot is NOT authoritative.** Python-native path is authoritative. Shell/parity paths are legacy compatibility only and must not be expanded.
-
-5. **Stop and ask Michael before editing:**
-   - SQLite schema changes
-   - Router classification changes
-   - HMI redesign
-   - Model replacement or retraining
-   - Launcher restructuring
-   - Production memory changes
-
----
-
-*End of bootstrap. Read this at the start of every new session before touching code.*
+*End of instructions. Read `SESSION_CONTEXT.md` for live state.*
