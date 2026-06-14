@@ -17,7 +17,7 @@ Usage:
 
 Safety:
     - Deduplicates against existing 395 examples
-    - Backs up comprehensive_index.jsonl and comprehensive_examples.json
+    - Backs up comprehensive_examples.json and comprehensive_embeddings.npy
     - Only appends genuinely new queries
     - Rebuilds embeddings atomically
 """
@@ -430,20 +430,8 @@ NEW_EXAMPLES: list[dict] = [
 
 
 def load_existing_queries() -> set[str]:
-    """Load existing queries for deduplication."""
+    """Load existing queries for deduplication from canonical JSON."""
     existing: set[str] = set()
-
-    if INDEX_PATH.exists():
-        with open(INDEX_PATH, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                    existing.add(entry.get("query", "").lower().strip())
-                except json.JSONDecodeError:
-                    continue
 
     if EXAMPLES_PATH.exists():
         with open(EXAMPLES_PATH, encoding="utf-8") as f:
@@ -458,12 +446,10 @@ def load_existing_queries() -> set[str]:
 
 
 def backup_files():
-    """Create timestamped backups of index and examples."""
+    """Create timestamped backups of canonical examples and embeddings."""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
-    if INDEX_PATH.exists():
-        shutil.copy2(INDEX_PATH, BACKUP_DIR / f"comprehensive_index_{ts}.jsonl")
     if EXAMPLES_PATH.exists():
         shutil.copy2(EXAMPLES_PATH, BACKUP_DIR / f"comprehensive_examples_{ts}.json")
     if EMBEDDINGS_PATH.exists():
@@ -473,30 +459,16 @@ def backup_files():
     return ts
 
 
-def append_to_index(new_examples: list[dict]):
-    """Append new examples to the JSONL index."""
-    with open(INDEX_PATH, "a", encoding="utf-8") as f:
-        for ex in new_examples:
-            f.write(json.dumps(ex) + "\n")
-    print(f"Appended {len(new_examples)} examples to {INDEX_PATH}")
-
-
-def rebuild_examples_json():
-    """Rebuild the JSON array examples file from the JSONL index."""
+def append_to_examples(new_examples: list[dict]):
+    """Append new examples to the canonical JSON file."""
     examples = []
-    with open(INDEX_PATH, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                examples.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-
+    if EXAMPLES_PATH.exists():
+        with open(EXAMPLES_PATH, encoding="utf-8") as f:
+            examples = json.load(f)
+    examples.extend(new_examples)
     with open(EXAMPLES_PATH, "w", encoding="utf-8") as f:
-        json.dump(examples, f, indent=2)
-    print(f"Rebuilt {EXAMPLES_PATH} with {len(examples)} examples")
+        json.dump(examples, f, indent=2, ensure_ascii=False)
+    print(f"Appended {len(new_examples)} examples to {EXAMPLES_PATH} (total {len(examples)})")
 
 
 def rebuild_embeddings():
@@ -567,8 +539,7 @@ def main():
         return
 
     backup_files()
-    append_to_index(new_examples)
-    rebuild_examples_json()
+    append_to_examples(new_examples)
     rebuild_embeddings()
 
     print(f"\n✅ Done! Index now has {len(existing) + len(new_examples)} examples")

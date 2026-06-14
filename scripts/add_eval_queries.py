@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-INDEX_PATH = Path("/home/mike/lucy-v10/models/router/comprehensive_index.jsonl")
+EXAMPLES_PATH = Path("/home/mike/lucy-v10/models/router/comprehensive_examples.json")
 
 # Evaluation queries with correct labels
 EVAL_QUERIES = [
@@ -114,20 +114,28 @@ def route_to_labels(route: str) -> dict:
 
 
 def main():
+    examples = []
+    if EXAMPLES_PATH.exists():
+        with open(EXAMPLES_PATH, "r", encoding="utf-8") as f:
+            examples = json.load(f)
+
     added = 0
-    with open(INDEX_PATH, "a", encoding="utf-8") as f:
-        for query, expected_route, category in EVAL_QUERIES:
-            if not query:
-                continue  # Skip empty string
-            entry = {
-                "query": query,
-                "labels": route_to_labels(expected_route),
-                "metadata": {"source": "adversarial_evaluation_v1", "category": category},
-            }
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-            added += 1
-    print(f"Added {added} evaluation queries to {INDEX_PATH}")
-    print(f"Total index size: {sum(1 for _ in open(INDEX_PATH))} entries")
+    for query, expected_route, category in EVAL_QUERIES:
+        if not query:
+            continue  # Skip empty string
+        entry = {
+            "query": query,
+            "labels": route_to_labels(expected_route),
+            "metadata": {"source": "adversarial_evaluation_v1", "category": category},
+        }
+        examples.append(entry)
+        added += 1
+
+    with open(EXAMPLES_PATH, "w", encoding="utf-8") as f:
+        json.dump(examples, f, indent=2, ensure_ascii=False)
+
+    print(f"Added {added} evaluation queries to {EXAMPLES_PATH}")
+    print(f"Total examples: {len(examples)}")
 
 
 if __name__ == "__main__":

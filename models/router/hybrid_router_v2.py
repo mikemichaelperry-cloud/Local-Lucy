@@ -179,7 +179,9 @@ class HybridRouterV2:
         logger = logging.getLogger(__name__)
 
         with open(self._examples_path) as f:
-            self.examples = json.load(f)
+            raw_examples = json.load(f)
+
+        self.examples = self._validate_examples(raw_examples)
 
         try:
             self.embeddings = np.load(self._embeddings_path)
@@ -199,6 +201,19 @@ class HybridRouterV2:
                 "Embeddings dimension mismatch: file has %s but model expects %d. "
                 "Rebuilding from %d examples...",
                 self.embeddings.shape, expected_dim, len(self.examples),
+            )
+            self.embeddings = self._build_embeddings_from_examples()
+            np.save(self._embeddings_path, self.embeddings)
+            logger.info(
+                "Rebuilt and saved embeddings to %s (%s)",
+                self._embeddings_path, self.embeddings.shape,
+            )
+
+        if self.embeddings.shape[0] != len(self.examples):
+            logger.warning(
+                "Embeddings count mismatch: file has %d rows but examples has %d. "
+                "Rebuilding from %d examples...",
+                self.embeddings.shape[0], len(self.examples), len(self.examples),
             )
             self.embeddings = self._build_embeddings_from_examples()
             np.save(self._embeddings_path, self.embeddings)
@@ -231,6 +246,50 @@ class HybridRouterV2:
     def _build_embeddings_from_examples(self) -> np.ndarray:
         texts = [ex["query"] for ex in self.examples]
         return self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+
+    def _validate_examples(self, examples: list[dict]) -> list[dict]:
+        """Reject empty, blank, or structurally invalid training examples.
+
+        Empty queries pollute the embedding space: a zero-length string
+        encodes to the model's [CLS] token embedding, which can spuriously
+        match unrelated queries with high similarity and misroute them.
+        """
+        logger = logging.getLogger(__name__)
+        valid: list[dict] = []
+        rejected = 0
+        for i, ex in enumerate(examples):
+            if not isinstance(ex, dict):
+                logger.warning("[ROUTER_VALIDATE] Rejected example %d: not a dict", i)
+                rejected += 1
+                continue
+            query = str(ex.get("query", "")).strip()
+            if not query:
+                logger.warning("[ROUTER_VALIDATE] Rejected example %d: empty/blank query", i)
+                rejected += 1
+                continue
+            labels = ex.get("labels")
+            if not isinstance(labels, dict):
+                logger.warning("[ROUTER_VALIDATE] Rejected example %d: missing labels", i)
+                rejected += 1
+                continue
+            if not labels.get("route"):
+                logger.warning("[ROUTER_VALIDATE] Rejected example %d: missing route label", i)
+                rejected += 1
+                continue
+            # Correct known mislabels that survive data-generation pipelines
+            q_lower = query.lower()
+            if q_lower == "what is python?" and labels.get("route") == "WEATHER":
+                logger.warning("[ROUTER_VALIDATE] Corrected mislabeled example %d: '%s' WEATHER -> LOCAL", i, query)
+                labels["route"] = "LOCAL"
+                labels["intent_family"] = "local_answer"
+                labels["evidence_mode"] = "not_required"
+            valid.append(ex)
+        if rejected:
+            logger.info(
+                "[ROUTER_VALIDATE] Loaded %d valid examples, rejected %d invalid",
+                len(valid), rejected,
+            )
+        return valid
 
     def fit(self, examples: list[dict]):
         self._lazy_init()

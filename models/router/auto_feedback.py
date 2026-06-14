@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """Auto-feedback from answer quality — detects obvious misroutes.
 
-This module analyzes execution results to detect cases where the router
-probably made the wrong decision. It catches the most obvious cases:
+TELEMETRY ONLY: This module writes to auto_feedback.jsonl for observability
+and manual review. background_learner.py does NOT ingest auto-feedback into
+the training index. Auto-feedback heuristics conflate execution failures with
+routing errors and are not trustworthy enough for unsupervised learning.
 
+Detected cases:
 1. AUGMENTED answer that fails (provider error, empty response, "I don't know")
 2. LOCAL answer to a medical/financial/legal query that contains a disclaimer
-
-These auto-detected misroutes are written to a feedback file that
-background_learner.py can ingest during index rebuild.
 
 Usage:
     from auto_feedback import analyze_answer_quality, log_auto_feedback
     suggestion = analyze_answer_quality(query, route, response_text)
     if suggestion:
-        log_auto_feedback(suggestion)
+        log_auto_feedback(suggestion)  # Telemetry only — NOT training data
 """
 
 from __future__ import annotations

@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Rebuild embedding index from comprehensive_index.jsonl."""
+"""Rebuild embedding index from comprehensive_examples.json.
+
+This script reads the canonical comprehensive_examples.json (git-tracked),
+rebuilds the embedding matrix, and writes:
+  - comprehensive_embeddings.npy
+  - comprehensive_examples.json (re-validated)
+  - comprehensive_index.jsonl (derived, for backward compatibility)
+"""
 import json
 import sys
 from pathlib import Path
@@ -7,23 +14,15 @@ from pathlib import Path
 ROUTER_DIR = Path(__file__).resolve().parent.parent / "models" / "router"
 sys.path.insert(0, str(ROUTER_DIR))
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent / "models" / "router"))
 from hybrid_router_v2 import HybridRouterV2
 
 
 def main():
-    index_path = ROUTER_DIR / "comprehensive_index.jsonl"
-    print(f"Reading index from {index_path}")
+    examples_path = ROUTER_DIR / "comprehensive_examples.json"
+    print(f"Reading examples from {examples_path}")
 
-    examples = []
-    with open(index_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            examples.append(json.loads(line))
+    with open(examples_path, "r", encoding="utf-8") as f:
+        examples = json.load(f)
 
     print(f"Loaded {len(examples)} examples")
 
@@ -47,16 +46,23 @@ def main():
 
     # Save
     embeddings_path = ROUTER_DIR / "comprehensive_embeddings.npy"
-    examples_path = ROUTER_DIR / "comprehensive_examples.json"
+    examples_path_out = ROUTER_DIR / "comprehensive_examples.json"
+    index_path = ROUTER_DIR / "comprehensive_index.jsonl"
 
     import numpy as np
     np.save(embeddings_path, router.embeddings)
-    with open(examples_path, "w", encoding="utf-8") as f:
+    with open(examples_path_out, "w", encoding="utf-8") as f:
         json.dump(router.examples, f, indent=2, ensure_ascii=False)
 
+    # Derive JSONL for backward compatibility
+    with open(index_path, "w", encoding="utf-8") as f:
+        for ex in router.examples:
+            f.write(json.dumps(ex, ensure_ascii=False) + "\n")
+
     print(f"\nSaved:")
-    print(f"  Embeddings: {embeddings_path}")
-    print(f"  Examples:   {examples_path}")
+    print(f"  Embeddings: {embeddings_path} ({router.embeddings.shape})")
+    print(f"  Examples:   {examples_path_out} ({len(router.examples)} entries)")
+    print(f"  Index:      {index_path} (derived)")
 
 
 if __name__ == "__main__":

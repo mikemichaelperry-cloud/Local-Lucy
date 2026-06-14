@@ -112,51 +112,36 @@ NEW_EXAMPLES: list[dict] = [
 
 def load_existing_queries() -> set[str]:
     existing = set()
-    if INDEX_PATH.exists():
-        with open(INDEX_PATH, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    ex = json.loads(line)
-                    existing.add(ex["query"].lower().strip())
-                except (json.JSONDecodeError, KeyError):
-                    continue
+    if EXAMPLES_PATH.exists():
+        with open(EXAMPLES_PATH, "r", encoding="utf-8") as f:
+            examples = json.load(f)
+        for ex in examples:
+            try:
+                existing.add(ex["query"].lower().strip())
+            except (KeyError, AttributeError):
+                continue
     return existing
 
 
 def backup_files():
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     BACKUP_DIR.mkdir(exist_ok=True)
-    for src in (INDEX_PATH, EXAMPLES_PATH, EMBEDDINGS_PATH):
+    for src in (EXAMPLES_PATH, EMBEDDINGS_PATH):
         if src.exists():
             dst = BACKUP_DIR / f"{src.stem}_{timestamp}{src.suffix}"
             shutil.copy2(src, dst)
             print(f"  Backup: {dst.name}")
 
 
-def append_to_index(new_examples: list[dict]):
-    with open(INDEX_PATH, "a", encoding="utf-8") as f:
-        for ex in new_examples:
-            f.write(json.dumps(ex, ensure_ascii=False) + "\n")
-    print(f"Appended {len(new_examples)} examples to {INDEX_PATH}")
-
-
-def rebuild_examples_json():
+def append_to_examples(new_examples: list[dict]):
     examples = []
-    with open(INDEX_PATH, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                examples.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
+    if EXAMPLES_PATH.exists():
+        with open(EXAMPLES_PATH, "r", encoding="utf-8") as f:
+            examples = json.load(f)
+    examples.extend(new_examples)
     with open(EXAMPLES_PATH, "w", encoding="utf-8") as f:
-        json.dump(examples, f, indent=2)
-    print(f"Rebuilt {EXAMPLES_PATH} with {len(examples)} examples")
+        json.dump(examples, f, indent=2, ensure_ascii=False)
+    print(f"Appended {len(new_examples)} examples to {EXAMPLES_PATH} (total {len(examples)})")
 
 
 def rebuild_embeddings():
@@ -221,8 +206,7 @@ def main():
         return
 
     backup_files()
-    append_to_index(new_examples)
-    rebuild_examples_json()
+    append_to_examples(new_examples)
     rebuild_embeddings()
     print(f"\n✅ Done! Index now has {len(existing) + len(new_examples)} examples")
 

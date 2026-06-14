@@ -512,9 +512,9 @@
   {
     "query": "How to bake sourdough bread from scratch",
     "labels": {
-      "intent_family": "how_to",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -1025,9 +1025,9 @@
   {
     "query": "How do I make hummus from scratch?",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -1159,9 +1159,9 @@
   {
     "query": "Best chocolate chip cookie recipe",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -1463,7 +1463,7 @@
     "labels": {
       "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -1581,9 +1581,9 @@
   {
     "query": "How do I bake sourdough bread?",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -2027,9 +2027,9 @@
   {
     "query": "How to cook pasta al dente",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -2478,9 +2478,9 @@
   {
     "query": "How to make pizza dough",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -2490,9 +2490,9 @@
   {
     "query": "How to make sushi rolls",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -2666,9 +2666,9 @@
   {
     "query": "Sourdough bread recipe",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -2799,9 +2799,9 @@
   {
     "query": "Homemade pasta recipe",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -6889,14 +6889,15 @@
   {
     "query": "What is the difference between a Roth IRA and a traditional IRA?",
     "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
       "policy_override": "none"
     },
     "metadata": {
       "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
+      "feedback_type": "manual_label",
+      "category": "finance_concept"
     }
   },
   {
@@ -10049,9 +10050,9 @@
   {
     "query": "What is the capital of Italy?",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -10114,9 +10115,9 @@
   {
     "query": "What is the capital of Canada?",
     "labels": {
-      "intent_family": "local_answer",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -12502,8 +12503,8 @@
     "query": "What is Python?",
     "labels": {
       "intent_family": "local_answer",
-      "evidence_mode": "required",
-      "route": "WEATHER",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
       "policy_override": "none"
     },
     "metadata": {
@@ -12717,20 +12718,6 @@
   },
   {
     "query": "How should I diversify my investment portfolio?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label",
-      "category": "finance_concept"
-    }
-  },
-  {
-    "query": "What is the difference between a Roth IRA and a traditional IRA?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -13175,6 +13162,90 @@
       "source": "synthetic_augmentation",
       "feedback_type": "manual_label",
       "category": "vet_safety_override"
+    }
+  },
+  {
+    "query": "What is the population of Tokyo?",
+    "labels": {
+      "route": "AUGMENTED",
+      "intent_family": "background_overview",
+      "evidence_mode": "not_required"
+    }
+  },
+  {
+    "query": "What is the population of Japan?",
+    "labels": {
+      "route": "AUGMENTED",
+      "intent_family": "background_overview",
+      "evidence_mode": "not_required"
+    }
+  },
+  {
+    "query": "What is the population of Paris?",
+    "labels": {
+      "route": "AUGMENTED",
+      "intent_family": "background_overview",
+      "evidence_mode": "not_required"
+    }
+  },
+  {
+    "query": "What is the capital of Germany?",
+    "labels": {
+      "route": "AUGMENTED",
+      "intent_family": "background_overview",
+      "evidence_mode": "not_required"
+    }
+  },
+  {
+    "query": "quantum mechanics",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "user_feedback",
+      "feedback_type": "route_correction"
+    }
+  },
+  {
+    "query": "string theory",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "user_feedback",
+      "feedback_type": "answer_positive"
+    }
+  },
+  {
+    "query": "Good. How intilligent would you consider yourself?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "user_feedback",
+      "feedback_type": "answer_positive"
+    }
+  },
+  {
+    "query": "Do you think that the MiniLM-L6-v2 embedding router was a major upgade for purely keyword routing?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "user_feedback",
+      "feedback_type": "answer_positive"
     }
   }
 ]

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Background learner — continuously improves embedding index from usage.
+"""Background learner — improves embedding index from explicit user feedback ONLY.
 
-Processes three sources of learning signal:
-  1. Router decision logs (high-confidence decisions)
-  2. Explicit user feedback (--feedback CLI)
-  3. Auto-feedback from answer quality analysis (execution engine)
+Auto-feedback and router decision logs are telemetry-only and are NEVER
+ingested into the training index unsupervised. Only explicit user feedback
+that passes safety gating is used.
+
+Safety gate: feedback for medical, veterinary, finance, or legal queries is
+written to pending_review.jsonl for mandatory human review instead of
+auto-ingestion.
 
 Usage:
-    # Run once to process pending logs
+    # Run once to process pending user feedback
     python background_learner.py --process
 
     # Run as daemon (checks every 60 seconds)
@@ -15,6 +18,9 @@ Usage:
 
     # Add explicit feedback
     python background_learner.py --feedback \"What is 2+2?\" --route LOCAL --correct
+
+    # Review high-stakes feedback queued for human review
+    python background_learner.py --list-pending
 """
 
 import argparse
@@ -40,7 +46,7 @@ EMBEDDINGS_PATH = ROUTER_DIR / "comprehensive_embeddings.npy"
 EXAMPLES_PATH = ROUTER_DIR / "comprehensive_examples.json"
 EXAMPLES_METADATA_PATH = ROUTER_DIR / "examples_metadata.json"
 FEEDBACK_PATH = ROUTER_DIR / "user_feedback.jsonl"
-LEARNED_PATH = ROUTER_DIR / "learned_examples.jsonl"
+PENDING_REVIEW_PATH = ROUTER_DIR / "pending_review.jsonl"
 LOG_PROGRESS_PATH = ROUTER_DIR / ".router_log_progress"
 
 # Lock file for atomic updates
@@ -83,14 +89,11 @@ def release_lock(lock_file):
 
 
 def load_index() -> list[dict]:
-    """Load current embedding index."""
+    """Load current embedding index from the canonical JSON file."""
     examples = []
-    if INDEX_PATH.exists():
-        with open(INDEX_PATH) as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    examples.append(json.loads(line))
+    if EXAMPLES_PATH.exists():
+        with open(EXAMPLES_PATH) as f:
+            examples = json.load(f)
     return examples
 
 
@@ -170,7 +173,7 @@ def create_version(reason: str = "") -> Path:
     meta = {
         "timestamp": stamp,
         "reason": reason,
-        "example_count": len(load_index()) if INDEX_PATH.exists() else 0,
+        "example_count": len(load_index()) if EXAMPLES_PATH.exists() else 0,
     }
     with open(vdir / "version.json", "w") as f:
         json.dump(meta, f, indent=2)
@@ -229,17 +232,31 @@ def rollback_version(version_name: str) -> bool:
 
 
 def save_index(examples: list[dict]):
-    """Save embedding index atomically."""
+    """Save embedding index atomically to canonical JSON and derived JSONL."""
     import tempfile
-    tmp_dir = str(Path(INDEX_PATH).parent)
-    tmp = tempfile.NamedTemporaryFile(
+    tmp_dir = str(Path(EXAMPLES_PATH).parent)
+
+    # Strip mutable timestamps before writing to tracked files
+    cleaned = _strip_example_timestamps(examples)
+
+    # Atomic write to canonical JSON
+    tmp_json = tempfile.NamedTemporaryFile(
+        mode="w", dir=tmp_dir, delete=False,
+        prefix=".comprehensive_examples.", suffix=".tmp"
+    )
+    json.dump(cleaned, tmp_json, indent=2)
+    tmp_json.close()
+    os.replace(tmp_json.name, EXAMPLES_PATH)
+
+    # Derived JSONL for backward compatibility
+    tmp_jsonl = tempfile.NamedTemporaryFile(
         mode="w", dir=tmp_dir, delete=False,
         prefix=".comprehensive_index.", suffix=".tmp"
     )
-    for ex in examples:
-        tmp.write(json.dumps(ex) + "\n")
-    tmp.close()
-    os.replace(tmp.name, INDEX_PATH)
+    for ex in cleaned:
+        tmp_jsonl.write(json.dumps(ex, ensure_ascii=False) + "\n")
+    tmp_jsonl.close()
+    os.replace(tmp_jsonl.name, INDEX_PATH)
 
 
 def _strip_example_timestamps(examples: list[dict]) -> list[dict]:
@@ -273,6 +290,11 @@ def rebuild_embeddings(examples: list[dict]):
     with open(EXAMPLES_PATH, "w") as f:
         json.dump(cleaned, f, indent=2)
 
+    # Derived JSONL for backward compatibility
+    with open(INDEX_PATH, "w") as f:
+        for ex in cleaned:
+            f.write(json.dumps(ex, ensure_ascii=False) + "\n")
+
     # Write mutable metadata to separate untracked file
     metadata = {
         "last_rebuilt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -285,13 +307,74 @@ def rebuild_embeddings(examples: list[dict]):
     print(f"  Saved: {EMBEDDINGS_PATH} ({router.embeddings.shape})")
 
 
-def deduplicate(examples: list[dict]) -> list[dict]:
-    """Remove duplicate queries, keeping the most recent label."""
-    seen = {}
+def deduplicate(examples: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Remove duplicate queries, keeping the most recent label.
+
+    Returns (deduped_examples, conflicts) where conflicts are entries
+    where the same query had different routes. Conflicts are logged to
+    pending_review.jsonl for audit but the latest label still wins.
+    """
+    seen: dict[str, dict] = {}
+    conflicts: list[dict] = []
     for ex in examples:
         key = ex["query"].lower().strip()
+        if key in seen:
+            old_route = seen[key].get("labels", {}).get("route")
+            new_route = ex.get("labels", {}).get("route")
+            if old_route != new_route:
+                conflicts.append({
+                    "query": key,
+                    "existing_route": old_route,
+                    "incoming_route": new_route,
+                    "incoming_source": ex.get("metadata", {}).get("source", "unknown"),
+                })
         seen[key] = ex  # Overwrite with latest
-    return list(seen.values())
+    return list(seen.values()), conflicts
+
+
+def _is_high_stakes_feedback(query: str, route: str) -> bool:
+    """Determine if feedback is high-stakes and requires human review.
+
+    High-stakes categories: medical, veterinary, finance, legal.
+    """
+    # EVIDENCE route is always treated as high-stakes for safety
+    if route == "EVIDENCE":
+        return True
+
+    # Check policy-based evidence reasons
+    _tools_path = str(Path(__file__).parent.parent.parent / "tools" / "router_py")
+    if _tools_path not in sys.path:
+        sys.path.insert(0, _tools_path)
+    try:
+        from policy import requires_evidence_mode
+        _requires, reason = requires_evidence_mode(query)
+        if _requires and reason in (
+            "medical_context",
+            "medical_body_symptom",
+            "veterinary_context",
+            "financial_data",
+            "legal_context",
+        ):
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def _append_pending_review(entry: dict) -> None:
+    """Append an entry to the pending review queue."""
+    PENDING_REVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(PENDING_REVIEW_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _count_pending_review() -> int:
+    """Count entries in pending_review.jsonl."""
+    if not PENDING_REVIEW_PATH.exists():
+        return 0
+    with open(PENDING_REVIEW_PATH) as f:
+        return sum(1 for line in f if line.strip())
 
 
 def _load_log_progress() -> int:
@@ -433,7 +516,11 @@ def process_router_logs(log_path: Path, min_confidence: float = 0.7) -> list[dic
 
 
 def process_user_feedback() -> list[dict]:
-    """Process explicit user feedback (thumbs up/down)."""
+    """Process explicit user feedback. High-stakes feedback is queued for review.
+
+    Medical, veterinary, finance, and legal feedback is NEVER auto-ingested.
+    It is written to pending_review.jsonl for mandatory human review.
+    """
     if not FEEDBACK_PATH.exists():
         return []
 
@@ -451,6 +538,20 @@ def process_user_feedback() -> list[dict]:
             query = entry.get("query", "").strip()
             correct_route = entry.get("correct_route", "")
             if not query or not correct_route:
+                continue
+
+            # Safety gate: never auto-learn medical/vet/finance/legal feedback
+            if _is_high_stakes_feedback(query, correct_route):
+                _append_pending_review({
+                    "timestamp": entry.get("timestamp", ""),
+                    "query": query,
+                    "correct_route": correct_route,
+                    "feedback_type": entry.get("feedback_type", "correction"),
+                    "original_route": entry.get("original_route", ""),
+                    "reason": "high_stakes_requires_review",
+                    "confidence": entry.get("confidence", 1.0),
+                    "raw_feedback": entry.get("raw_feedback", ""),
+                })
                 continue
 
             sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "router_py"))
@@ -490,7 +591,12 @@ def _route_to_intent(route: str) -> str:
 
 
 def learn_once(log_path: Path | None = None, verbose: bool = True) -> dict:
-    """Single learning iteration: process logs, update index, rebuild embeddings."""
+    """Single learning iteration: process user feedback, update index, rebuild embeddings.
+
+    Auto-feedback and router logs are telemetry-only and are NOT ingested.
+    High-stakes user feedback (medical/vet/finance/legal) is routed to
+    pending_review.jsonl for human review instead of auto-ingestion.
+    """
     if not is_learning_enabled():
         if verbose:
             print("🛑 Auto-learning is DISABLED (via .learner_disable or LUCY_AUTO_LEARN=0)")
@@ -509,26 +615,33 @@ def learn_once(log_path: Path | None = None, verbose: bool = True) -> dict:
         if verbose:
             print(f"Current index: {original_count} examples")
 
-        # Process router decision logs
-        new_from_logs = []
-        if log_path and log_path.exists():
-            new_from_logs = process_router_logs(log_path)
-            if verbose:
-                print(f"New from router logs: {len(new_from_logs)}")
-
-        # Process user feedback
+        # Router logs and auto-feedback are telemetry-only — NOT ingested.
+        # Only explicit user feedback is used for training.
         new_from_feedback = process_user_feedback()
         if verbose:
             print(f"New from user feedback: {len(new_from_feedback)}")
+            pending_count = _count_pending_review()
+            if pending_count:
+                print(f"  ({pending_count} items queued for human review)")
 
-        # Process auto-feedback from answer quality analysis
-        new_from_auto = process_auto_feedback()
-        if verbose:
-            print(f"New from auto-feedback: {len(new_from_auto)}")
+        # Combine and deduplicate with conflict tracking
+        combined = examples + new_from_feedback
+        all_examples, conflicts = deduplicate(combined)
 
-        # Combine and deduplicate
-        all_examples = examples + new_from_logs + new_from_feedback + new_from_auto
-        all_examples = deduplicate(all_examples)
+        # Log route conflicts for audit
+        if conflicts:
+            for conflict in conflicts:
+                _append_pending_review({
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "query": conflict["query"],
+                    "correct_route": conflict["incoming_route"],
+                    "existing_route": conflict["existing_route"],
+                    "reason": "route_conflict",
+                    "feedback_type": "correction",
+                    "details": "User feedback changed the route for a known query",
+                })
+            if verbose:
+                print(f"  ({len(conflicts)} route conflicts logged for audit)")
 
         added = len(all_examples) - original_count
         if verbose:
@@ -554,10 +667,6 @@ def learn_once(log_path: Path | None = None, verbose: bool = True) -> dict:
                 processed_path = FEEDBACK_PATH.with_suffix(".processed")
                 os.replace(FEEDBACK_PATH, processed_path)
 
-            # Mark auto-feedback as processed
-            from auto_feedback import clear_auto_feedback
-            clear_auto_feedback()
-
             if verbose:
                 print(f"\n✅ Index updated: +{added} examples")
         else:
@@ -566,9 +675,9 @@ def learn_once(log_path: Path | None = None, verbose: bool = True) -> dict:
 
         return {
             "original_count": original_count,
-            "new_from_logs": len(new_from_logs),
+            "new_from_logs": 0,
             "new_from_feedback": len(new_from_feedback),
-            "new_from_auto": len(new_from_auto),
+            "new_from_auto": 0,
             "added": added,
             "total": len(all_examples),
         }
@@ -621,14 +730,17 @@ def run_daemon(log_path: Path | None, interval: int = 60):
 
 
 def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = None) -> bool:
-    """Trigger background learning if enough pending feedback exists.
+    """Trigger background learning if enough pending user feedback exists.
 
-    Called from execution_engine after writing auto-feedback.
+    Only explicit user feedback counts toward the threshold.
+    Auto-feedback and router logs are telemetry-only and do NOT trigger learning.
+
+    Called from feedback_parser after user feedback is logged.
     Runs learning in a background thread to avoid blocking response.
 
     Args:
-        log_path: Router decision log path
-        min_entries: Minimum auto-feedback entries to trigger rebuild
+        log_path: Router decision log path (ignored — no longer used)
+        min_entries: Minimum user feedback entries to trigger rebuild
 
     Returns:
         True if learning was triggered, False otherwise
@@ -636,61 +748,26 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
     if not is_learning_enabled():
         return False
 
-    # Separate thresholds: user feedback is high-trust, auto-feedback is low-trust.
-    # min_entries parameter overrides user_threshold for backward compatibility.
     user_threshold = (
         min_entries
         if min_entries is not None
         else int(os.environ.get("LUCY_AUTO_LEARN_THRESHOLD", "3"))
     )
-    auto_threshold = int(os.environ.get("LUCY_AUTO_FEEDBACK_THRESHOLD", "5"))
 
-    # Default log_path from environment when caller doesn't provide it
-    if log_path is None:
-        log_dir = os.environ.get("LUCY_ROUTER_LOG_DIR")
-        if log_dir:
-            log_path = Path(log_dir) / "router_decisions.jsonl"
-
-    sys.path.insert(0, str(ROUTER_DIR))
-
-    # Count auto-feedback if available; don't bail out if the module is missing
-    auto_count = 0
-    try:
-        from auto_feedback import load_auto_feedback
-        auto_count = len(load_auto_feedback(min_confidence=0.6))
-    except ImportError:
-        pass
-
-    # Also count pending user feedback (not just auto-feedback)
+    # Only count pending explicit user feedback
     user_count = 0
     if FEEDBACK_PATH.exists():
         with open(FEEDBACK_PATH) as f:
             user_count = sum(1 for line in f if line.strip())
 
-    # Count new router-decision log entries since last learn
-    log_count = _count_new_router_entries(log_path)
-    log_threshold = int(os.environ.get("LUCY_AUTO_LEARN_LOG_THRESHOLD", "5"))
-
-    # Combined threshold as a fallback (e.g. 3 user + 2 auto = 5)
-    combined_threshold = int(
-        os.environ.get("LUCY_AUTO_LEARN_THRESHOLD", str(max(user_threshold, auto_threshold)))
-    ) if min_entries is None else user_threshold
-
-    # Trigger learning if ANY threshold is met.
-    # User feedback is highest-trust, auto-feedback medium, router logs lowest.
-    if (
-        user_count < user_threshold
-        and auto_count < auto_threshold
-        and log_count < log_threshold
-        and (user_count + auto_count + log_count) < combined_threshold
-    ):
+    if user_count < user_threshold:
         return False
 
     # Trigger learning in background thread
     import threading
     def _learn():
         try:
-            learn_once(log_path, verbose=False)
+            learn_once(verbose=False)
         except Exception:
             pass
 
@@ -700,43 +777,13 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
 
 
 def process_auto_feedback() -> list[dict]:
-    """Process auto-feedback from answer quality analysis."""
-    sys.path.insert(0, str(ROUTER_DIR))
-    try:
-        from auto_feedback import load_auto_feedback, clear_auto_feedback
-    except ImportError:
-        return []
+    """Process auto-feedback from answer quality analysis.
 
-    entries = load_auto_feedback(min_confidence=0.6)
-    new_examples = []
-    for entry in entries:
-        query = entry.get("query", "").strip()
-        correct_route = entry.get("correct_route", "")
-        if not query or not correct_route:
-            continue
-
-        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "router_py"))
-        from policy import requires_evidence_mode
-        requires_evidence, _ = requires_evidence_mode(query)
-        evidence = "required" if requires_evidence else "not_required"
-
-        new_examples.append({
-            "query": query,
-            "labels": {
-                "intent_family": _route_to_intent(correct_route),
-                "evidence_mode": evidence,
-                "route": correct_route,
-                "policy_override": "none",
-            },
-            "metadata": {
-                "source": "auto_feedback",
-                "reason": entry.get("reason", ""),
-                "confidence": entry.get("confidence", 0),
-                "timestamp": entry.get("timestamp", ""),
-            },
-        })
-
-    return new_examples
+    DEPRECATED: Auto-feedback is telemetry-only and is NEVER ingested into
+    the training index. background_learner.py no longer calls this function.
+    Kept for backward compatibility with external scripts.
+    """
+    return []
 
 
 def main():
@@ -757,6 +804,7 @@ def main():
     # Versioning commands
     parser.add_argument("--snapshot", action="store_true", help="Create a manual snapshot of current index")
     parser.add_argument("--list-versions", action="store_true", help="List all saved versions")
+    parser.add_argument("--list-pending", action="store_true", help="List feedback queued for human review")
     parser.add_argument("--rollback", type=str, metavar="VERSION", help="Rollback to a named version (e.g., v_20260512_120000)")
     args = parser.parse_args()
 
@@ -797,6 +845,31 @@ def main():
     if args.rollback:
         ok = rollback_version(args.rollback)
         sys.exit(0 if ok else 1)
+    if args.list_pending:
+        if not PENDING_REVIEW_PATH.exists():
+            print("No pending review items.")
+            return
+        entries = []
+        with open(PENDING_REVIEW_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        if not entries:
+            print("No pending review items.")
+            return
+        print(f"{'Query':<45} {'Route':<12} {'Reason'}")
+        print("-" * 75)
+        for e in entries:
+            q = e.get("query", "")[:44]
+            r = e.get("correct_route", e.get("incoming_route", "?"))
+            reason = e.get("reason", "")
+            print(f"{q:<45} {r:<12} {reason}")
+        return
 
     # Determine log path
     log_path = args.log_path

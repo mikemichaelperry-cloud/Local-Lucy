@@ -18,7 +18,7 @@ Usage:
     python generate_learning_candidates.py --apply
 
 Safety:
-    - Never modifies comprehensive_index.jsonl or comprehensive_examples.json
+    - Never modifies comprehensive_examples.json
       unless --apply is explicitly passed.
     - Deduplicates against existing examples.
     - Filters test/junk queries.
@@ -105,23 +105,9 @@ def _normalize_query(query: str) -> str:
 # ---------------------------------------------------------------------------
 
 def load_existing_queries() -> set[str]:
-    """Load all existing queries from the embedding index for deduplication."""
+    """Load all existing queries from the canonical JSON for deduplication."""
     existing: set[str] = set()
 
-    # Try JSONL index first
-    if INDEX_PATH.exists():
-        with open(INDEX_PATH, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                    existing.add(_normalize_query(entry.get("query", "")))
-                except json.JSONDecodeError:
-                    continue
-
-    # Also check JSON examples
     if EXAMPLES_PATH.exists():
         with open(EXAMPLES_PATH, encoding="utf-8") as f:
             try:
