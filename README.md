@@ -117,10 +117,15 @@ source ui-v10/.venv/bin/activate
 # Install dependencies
 pip install -r ui-v10/requirements.txt
 
-# Download the base model (~9.8 GB) and create the custom variants
+# Download the base models and create the custom variants
+# Default: qwen3:14b (~9.8 GB VRAM, good general performance)
 ollama pull qwen3:14b
 ollama create local-lucy -f config/Modelfile.local-lucy
 ollama create local-lucy-fast -f config/Modelfile.local-lucy-fast
+
+# Alternative: mistral-nemo 12B (~7.1 GB VRAM, faster inference)
+ollama pull mistral-nemo
+ollama create local-lucy-mistral -f config/Modelfile.local-lucy-mistral
 
 # (Optional) Copy and configure API keys for cloud providers
 cp .env.example .env

@@ -1,144 +1,267 @@
-# Local Lucy V10 — Complete System Architecture
+# Local Lucy V10 — Comprehensive Architecture Report
 
-**Generated:** 2026-06-02
+**Date:** 2026-06-08
+**For:** Kimi / ChatGPT / Any Future Agent
 **Version:** v10-dev
-**Hardware:** RTX 3060 12GB, 31GB RAM, CPU+GPU hybrid
-**Test Suite:** ~722 passed, 19 skipped, 0 failures
-**Router:** HybridRouterV2 (MiniLM embedding k-NN + keyword guards)
-**Models:** qwen3:14b via Ollama (local-lucy-fast default), Whisper GPU on-demand, Kokoro TTS CPU
-**Branch:** v10-dev
-**Git Remote:** github.com:mikemichaelperry-cloud/Local-Lucy
-
----
-
-## Current Maturity
-
-| Component | Status |
-|-----------|--------|
-| Core routing | Stable (Stage 9 complete) |
-| Local answer generation | Stable |
-| Memory system | SQLite-native, semantic retrieval, **MiniLM-L6-v2 fact embeddings** |
-| Trusted evidence | Direct-fetch fallback + live extraction |
-| Voice pipeline | Code-complete, backend tests pass |
-| HMI memory dialog | Code-complete, visually verified |
-| SearXNG search | JSON API primary, HTML fallback |
-| Ollama warmup | Recurring background ping implemented |
-
----
-
-## Technology Stack
-
-| Layer | Technology |
-|-------|------------|
-| LLM Backend | Ollama (qwen3:14b, ~14B params, 2048-token context, KV cache q8_0) |
-| Embedding Router | MiniLM-L6-v2, 384-dim, k-NN (k=3), ~978 examples |
-| UI/HMI | PySide6/Qt6 desktop application |
-| Voice STT | whisper.cpp (GPU on-demand) |
-| Voice TTS | Kokoro (CPU) with Piper fallback |
-| Memory | SQLite (WAL mode) with Ollama embeddings for semantic search |
-| Web Extraction | webclaw (Rust binary) + legacy HTMLParser fallback |
-| Search | SearXNG (self-hosted on :8080) — JSON API primary |
-| State | SQLite + JSON files + `.env` legacy files |
-| Python | 3.10 (ui-v10 venv), 3.13 (kimi-cli) |
-| GPU | RTX 3060 12GB — qwen3:14b ~9.8GB VRAM |
-
----
-
-## Key Architectural Decisions
-
-1. **Python-native path is authoritative** — Shell scripts deprecated; all routing in Python.
-2. **Single-path router** — One router (`HybridRouterV2`), one decision.
-3. **Medical/veterinary safety at 4+ levels** — policy, classifier pre-guard, embedding override, provider hardcoding.
-4. **Memory is dual-track** — SQLite for structured data + text files for backward compatibility.
-5. **Caching is aggressive** — Local model responses cached by SHA-256 key including model + SELF_KNOWLEDGE hash.
-6. **Namespace isolation** — Every execution gets a unique namespace directory.
-7. **Ollama warmup ping** — Background thread keeps model hot, eliminating ~2.7s cold start.
-
----
-
-## Recent Changes (2026-06-02)
-
-### Ollama Warmup Ping
-- `_OllamaWarmupThread`: daemon thread pings Ollama every 5 min (empty prompt, `num_predict=0`)
-- Auto-starts at module load via `main.py`
-- Configurable via `LUCY_WARMUP_ENABLED`, `LUCY_WARMUP_INTERVAL_S`, `LUCY_WARMUP_KEEP_ALIVE`
-
-### Bounded Content Length Guard
-- `MAX_EXTRACT_CHARS_HARD_CAP = 3000` in `web_extract.py`
-- Default `max_chars` reduced: 6000 → 2500
-- Prevents fetched articles from overflowing the 2048-token context window
-
-### SearXNG JSON API
-- `searxng_search_json()` uses `/search?format=json`
-- JSON-first with automatic HTML fallback
-- SearXNG container restarted with `json` format enabled
-
-### Deprecated Legacy Tests
-- `test_router_contract_schema.sh` — deprecated (validates shell pipeline)
-- `run_router_regression_gate.sh` — deprecated (validates shell pipeline)
-
-### Semantic Fact-Retriever
-- `get_relevant_persistent_facts()` now uses **MiniLM-L6-v2** (primary) or Ollama (fallback) for query-time semantic retrieval
-- Facts are **pre-embedded at storage time** and cached in SQLite (`embedding BLOB`, `embedding_model TEXT`)
-- Backfill-on-read for existing facts without embeddings
-- Injects only 1–3 relevant facts per query instead of all 10+ facts
-- Reduces token bloat and fixes children/stepchildren conflation caused by irrelevant fact noise
-
----
-
-## Weaknesses & Known Issues
-
-### Critical
-1. **SearXNG backends down** — Brave, DDG, Google all returning CAPTCHA. Mitigated by direct-fetch fallback.
-2. **qwen3 privacy guardrails** — "Do I have any kids?" triggers model-level refusal. Unfixable without fine-tuning.
-
-### High Priority
-3. **Model-level conflation of stepchildren** — "How many children do I have?" conflates stepchildren with biological children due to baked-in training bias. Requires fine-tuning or model swap.
-4. **Live voice end-to-end not tested** — Code-complete but never tested with real audio hardware.
-5. **num_ctx stuck at 2048** — Needs hardware upgrade (RTX 3060 12GB at limit).
-
-### Medium Priority
-5. **Regex-based SearXNG HTML parsing** — Deprecated; JSON API is primary. HTML fallback remains for resilience.
-6. **Structural noise stripper is whitelist-based** — Could use link-density / all-caps detection.
-
----
-
-## Test Coverage
-
-| Suite | Tests | Status |
-|-------|-------|--------|
-| Router unit (`tools/router_py/`) | 554 + 148 subtests | Pass |
-| Memory (all 8 files) | 96 | Pass |
-| Trusted evidence unit | 19 | Pass |
-| Web extract | 16 | Pass |
-| HMI offscreen | 35 | Pass |
-| Shell integration | 6 | Pass |
-| Models/router | 22 | Pass |
-
----
-
-## Environment Variables
-
-### Warmup
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `LUCY_WARMUP_ENABLED` | `1` | Enable/disable Ollama warmup |
-| `LUCY_WARMUP_INTERVAL_S` | `300` | Seconds between pings |
-| `LUCY_WARMUP_KEEP_ALIVE` | `10m` | keep_alive passed to Ollama |
-
-### Web Extract
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `LUCY_WEB_EXTRACT_MAX_CHARS` | `3000` | Hard cap on fetched content chars |
-
----
-
-## Git Status
-
 **Branch:** `v10-dev`
-**Latest commit:** `ea35d7a` (2026-06-02)
-**Uncommitted changes:** Semantic fact-retriever implementation
+**Hardware:** RTX 3060 12GB, 31GB RAM
 
 ---
 
-*End of Architecture Summary*
+## 1. Project Overview
+
+Local Lucy v10 is a locally-hosted AI assistant running entirely on the user's machine. It combines a PySide6 desktop HMI, a hybrid keyword/embedding router, persistent SQLite memory, voice input/output (Whisper STT + Kokoro TTS), and web-augmented answering via multi-backend search (DuckDuckGo primary, SearXNG fallback, Brave API optional).
+
+**Core philosophy:** Facts only, no evasion, no political correctness. The AI does what the user asks.
+
+**Hardware fallback:** Ollama auto-offloads GPU layers to CPU/RAM when VRAM is full. With 31 GB system RAM, any model can run entirely in RAM if needed.
+
+---
+
+## 2. Directory Structure
+
+```
+lucy-v10/
+├── config/                  # Modelfiles, environment configs
+│   ├── Modelfile.local-lucy-llama31   ← default
+│   ├── Modelfile.local-lucy
+│   ├── Modelfile.local-lucy-fast
+│   ├── Modelfile.local-lucy-mistral
+│   └── latency_optimizations.env
+├── models/router/           # Embedding router, training data, auto-learn
+│   ├── hybrid_router_v2.py
+│   ├── background_learner.py          ← user-feedback only
+│   ├── auto_feedback.py               ← telemetry only
+│   ├── comprehensive_examples.json    ← 1,019 examples
+│   └── pending_review.jsonl           ← human-review queue
+├── tools/router_py/         # Python-native execution engine
+│   ├── main.py
+│   ├── local_answer.py
+│   ├── classify.py                    ← router loading + exception logging
+│   ├── policy.py
+│   ├── execution_engine.py
+│   └── execution_engine_state.py
+├── tools/router/core/       # Semantic interpreter
+│   └── semantic_interpreter.py
+├── ui-v10/                  # PySide6 HMI (ONLY ui-v10, NO ui-v7 fallback)
+│   ├── app/panels/control_panel.py    ← 4-model selector
+│   ├── app/services/runtime_bridge.py ← v10 isolation enforced
+│   └── tests/                         # offscreen HMI tests
+├── runtime/voice/           # whisper.cpp, Kokoro TTS
+├── memory/                  # SQLite memory service
+├── state/                   # Runtime state JSON
+├── data/tubes/              # Web extraction pipelines
+├── tests/                   # Golden responses, regression cases
+├── test_reports/            # Test output reports
+└── docs/                    # Session handoffs, architecture
+```
+
+---
+
+## 3. Model Configuration
+
+### Default: `local-lucy-llama31` (llama3.1:8b)
+
+```modelfile
+FROM llama3.1:8b
+PARAMETER num_ctx 4096
+PARAMETER num_thread 8
+PARAMETER temperature 0.0
+PARAMETER top_p 0.5
+PARAMETER repeat_penalty 1.2
+SYSTEM """
+You are Local Lucy, an AI running locally on the user's computer via Ollama.
+Rules:
+- Speak in first person as "I". Never use third person.
+- Do not fabricate facts. Say "I don't know" when uncertain.
+- Answer directly and factually. Never apologize, hedge, or add disclaimers.
+- Do not refuse questions about the user, their family, or their pets.
+- Facts only. Nothing else.
+"""
+```
+
+**Why this model:**
+- Zero refusals on personal/family queries (unlike qwen3)
+- ~3× faster cold-start than qwen3:14b
+- ~8.5 GB VRAM usage leaves 3.5 GB headroom for Whisper GPU
+- 4096-token context window (vs 2048 for qwen3/mistral)
+- Not Chinese-regulatory-tuned; follows system prompts literally
+
+### Legacy Options (still selectable in HMI)
+
+| Model | Base | Context | VRAM | Notes |
+|-------|------|---------|------|-------|
+| `local-lucy` | qwen3:14b | 2048 | ~9.3 GB | Has privacy guardrails; refuses personal queries |
+| `local-lucy-fast` | qwen3:14b | 2048 | ~9.3 GB | Identical to local-lucy; name is misleading |
+| `local-lucy-mistral` | mistral-nemo | 2048 | ~8.5 GB | Less constrained, drier/encyclopedic style |
+
+---
+
+## 4. Routing Architecture
+
+```
+User Query
+    ↓
+[Keyword Guards] — Medical? Vet? News? Weather? → Hard route
+    ↓
+[HybridRouterV2] — MiniLM embedding k-NN (k=3) + keyword boost
+    ↓
+RoutingDecision: LOCAL | AUGMENTED | NEWS | WEATHER | EVIDENCE | URL_REFERENCE | CLARIFY | UNKNOWN
+    ↓
+[ExecutionEngine] — Route-specific handler
+    ↓
+Response
+```
+
+### Router Loading (Fixed 2026-06-08)
+- `_get_router()` in `classify.py` now logs all exceptions to stderr
+- Previously had bare `except Exception:` that silently swallowed errors
+- Common failure: missing `pytz` → `sentence_transformers` import chain fails
+
+### Safety Layers (Medical/Vet)
+1. **Keyword guard** — Pre-router regex catches critical medical/vet terms
+2. **Policy check** — `policy.requires_evidence_mode()` for medical_context, body_symptom, etc.
+3. **Embedding override** — If router misroutes, evidence mode is forced
+4. **Provider hardcoding** — Medical queries always route to trusted evidence
+
+### Memory Follow-up Guard (Fixed 2026-06-07)
+- Short follow-ups like "why?" after medical answers no longer override EVIDENCE back to LOCAL
+- EVIDENCE routes are preserved from memory follow-up override
+
+---
+
+## 5. Search Architecture (Multi-Backend, 2026-06-08)
+
+```
+User Query (AUGMENTED/NEWS/WEATHER/EVIDENCE)
+    ↓
+[search_web.py]
+    ├─→ DuckDuckGo direct (free, no API key) ← PRIMARY
+    ├─→ SearXNG JSON (local Docker, 127.0.0.1:8080)
+    ├─→ SearXNG HTML scrape fallback
+    └─→ Brave Search API (optional, requires key)
+    ↓
+[Domain allowlist filter] — trust_catalog.yaml tiers 1+2
+    ↓
+[web_extract.py] — webclaw → curl fetch → HTMLParser
+    ↓
+Response text (truncated to 3000 chars)
+```
+
+### Backend Priority (configurable)
+Default: `duckduckgo,searxng_json,searxng_html,brave`
+
+Set `LUCY_SEARCH_BACKEND_PRIORITY` to reorder or disable backends.
+Set `LUCY_BRAVE_API_KEY` to enable Brave Search (free tier: 2,000 queries/month).
+
+### Why DuckDuckGo primary?
+- No API key required
+- No CAPTCHA/rate-limit issues (unlike SearXNG scraping Google/Bing)
+- Returns clean structured results
+- For personal use (~50-100 queries/day), well within limits
+
+---
+
+## 6. Memory Architecture
+
+### Persistent Memory (SQLite)
+- **Table:** `persistent_facts` — approved facts (family, pets, preferences)
+- **Embeddings:** MiniLM-L6-v2 (384-dim) pre-computed at storage time
+- **Retrieval:** `get_relevant_persistent_facts()` — semantic search with threshold 0.35
+- **Fallback:** `_load_family_facts_direct()` — raw SQLite SELECT for family category
+
+### Session Memory
+- **SQLite:** `chat_turns` table per session
+- **Injection:** Last 3 turns prepended to prompt
+- **Suppressor guard:** Session memory is cleared for personal/family queries when explicit persistent facts are loaded
+
+---
+
+## 7. Auto-Learn System
+
+### Signal Sources
+
+| Source | Destination | Ingested? |
+|--------|-------------|-----------|
+| User feedback | `comprehensive_examples.json` | **Yes** (after safety gate) |
+| Auto-feedback heuristics | `auto_feedback.jsonl` | **No** — telemetry only |
+| Router decision logs | `router_logs/` | **No** — telemetry only |
+| High-stakes feedback | `pending_review.jsonl` | **No** — human review required |
+| Route conflicts | `pending_review.jsonl` | **No** — human review required |
+
+### Safety Gate
+- `route == "EVIDENCE"` → always review
+- `policy.requires_evidence_mode()` returns medical/vet/finance/legal → review
+
+---
+
+## 8. Voice Pipeline
+
+```
+PTT Press → Record Audio → Whisper.cpp (GPU if available) → Transcript
+    → Router → LLM → Kokoro TTS (CPU) → Audio Out
+```
+
+**Voice model:** `local-lucy-llama31` (was hardcoded to `local-lucy-fast`, fixed 2026-06-07)
+
+**TTS:** Kokoro on CPU (forced via `LUCY_VOICE_KOKORO_DEVICE=cpu` to prevent GPU OOM)
+
+---
+
+## 9. Environment Isolation (Fixed 2026-06-08)
+
+**CRITICAL:** `ui-v10/.venv` is the ONLY Python environment. No `ui-v7` fallback.
+
+**PYTHONPATH:** `tools:ui-v10/app` (user site `~/.local/lib/python3.10/site-packages` EXCLUDED)
+
+**Launcher scripts:**
+- `START_LUCY.sh` — Desktop shortcut entrypoint
+- `tools/start_local_lucy_v9.sh` — Legacy terminal launcher
+
+Both must only reference `ui-v10/.venv/bin/python3`.
+
+---
+
+## 10. Key Files for Agents
+
+| File | Purpose |
+|------|---------|
+| `models/router/hybrid_router_v2.py` | Core routing logic |
+| `models/router/background_learner.py` | Learning pipeline |
+| `tools/router_py/classify.py` | Intent classification, router loading |
+| `tools/router_py/local_answer.py` | Local answer generation |
+| `tools/router_py/execution_engine.py` | Route execution |
+| `tools/router_py/policy.py` | Evidence mode policy |
+| `ui-v10/app/services/runtime_bridge.py` | HMI ↔ backend bridge |
+| `config/Modelfile.local-lucy-llama31` | Default model config |
+| `memory/memory_service.py` | SQLite memory operations |
+| `pytest.ini` | Test config (asyncio_mode = auto) |
+
+---
+
+## 11. Environment Quick Reference
+
+```bash
+# Python (venv only)
+~/lucy-v10/ui-v10/.venv/bin/python3
+
+# PYTHONPATH (isolated)
+export PYTHONPATH="${LUCY_ROOT}/ui-v10/app"
+
+# Default model
+export LUCY_LOCAL_MODEL=local-lucy-llama31
+
+# Features
+export LUCY_ROUTER_PY=1
+export LUCY_EXEC_PY=1
+export LUCY_ENABLE_INTERNET=1
+export LUCY_SESSION_MEMORY=1
+
+# GPU optimization
+export OLLAMA_FLASH_ATTENTION=1
+export OLLAMA_KV_CACHE_TYPE=q8_0
+```
+
+---
+
+*End of Comprehensive Architecture Report*
