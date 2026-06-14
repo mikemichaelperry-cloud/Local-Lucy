@@ -1,13 +1,13 @@
 """
-Local Lucy v8 - Consolidated Backend (Single Source of Truth)
+Local Lucy v10 - Consolidated Backend (Single Source of Truth)
 
 This module provides a unified interface to the backend by importing
-from the authoritative local v8 location:
+from the authoritative location:
   /home/mike/lucy-v10/tools/router_py/
 
 This ensures both text and voice paths use the exact same code.
 
-Last Updated: 2026-04-20
+Last Updated: 2026-06-08
 Architecture: Single Source of Truth
 """
 

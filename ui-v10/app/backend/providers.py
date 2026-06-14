@@ -1,6 +1,4 @@
-"""Providers module - wrapper to single source of truth.
+"""Re-export for backward compatibility — implementation lives in router_py."""
+from router_py.execution_engine import ExecutionEngine
 
-In v8, providers are internal to ExecutionEngine rather than standalone classes.
-This module re-exports nothing; use ExecutionEngine directly for provider calls.
-"""
-__all__ = []
+__all__ = ["ExecutionEngine"]

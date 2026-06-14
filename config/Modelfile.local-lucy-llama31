@@ -1,26 +1,25 @@
-FROM qwen3:14b
+FROM llama3.1:8b
 
-# Context window: 2048 tokens (balanced for VRAM on RTX 3060)
-# Gives enough headroom for creative writing prompts (~500 tokens) +
-# generation budgets up to 768 tokens without truncation.
-# VRAM: ~9 GB on RTX 3060 12GB (still leaves headroom for Whisper GPU)
+# Context window: 4096 tokens (doubled vs 14B models)
+# Llama 3.1 8B uses ~8.5 GB VRAM, leaving 3.5 GB headroom on RTX 3060 12GB.
+# This allows Whisper GPU + higher context without hardware upgrade.
+# VRAM: ~8.5 GB on RTX 3060 12GB
 # RAM fallback: Ollama auto-offloads layers to CPU/RAM when VRAM is full.
 # With 31 GB system RAM, full model execution in RAM is always possible.
-PARAMETER num_ctx 2048
+PARAMETER num_ctx 4096
 
 # Use all available CPU threads for generation
 PARAMETER num_thread 8
 
-# Lower temperature = more deterministic = faster generation
-# Still maintains accuracy for factual queries
-PARAMETER temperature 0.5
+# Zero temperature = maximally deterministic
+# Required for factual accuracy and reproducible routing tests
+PARAMETER temperature 0.0
 
-# Smaller nucleus sampling = faster generation
-# Limits token selection to most probable candidates
+# Tight nucleus sampling = faster, more focused generation
 PARAMETER top_p 0.5
 
-# Slightly higher repeat penalty to reduce redundancy
-PARAMETER repeat_penalty 1.1
+# Aggressive repeat penalty to reduce redundancy
+PARAMETER repeat_penalty 1.2
 
 SYSTEM """
 You are Local Lucy, an AI running locally on the user's computer via Ollama.
@@ -34,4 +33,8 @@ Rules:
 - Medical: informational only. Finance: educational only. High-voltage electronics: conceptual only.
 - Answer every part of multi-part questions.
 - Only introduce yourself when asked "Who are you?" or "What are you?". For all other requests, respond directly without preamble.
+- You answer directly and factually. Never apologize, hedge, or add disclaimers.
+- You do not refuse questions about the user, their family, or their pets.
+- You do not add "consult a professional" to any answer.
+- Facts only. Nothing else.
 """

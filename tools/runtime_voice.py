@@ -320,7 +320,7 @@ def resolve_voice_python(requested_engine: str | None = None) -> str:
             else:
                 return str(explicit_path)
 
-    # ISOLATION: V8 only uses ui-v10, NEVER falls back to ui-v7
+    # ISOLATION: Only ui-v10 is used, no ui-v7 fallback
     candidate = workspace_root / "ui-v10" / ".venv" / "bin" / "python3"
     if candidate.exists() and os.access(candidate, os.X_OK):
         if preferred_engine in {"kokoro", "piper"} and adapter_tool.exists():
@@ -1612,9 +1612,9 @@ def submit_transcript(transcript: str) -> dict[str, Any]:
     
     from router_py.main import run
     
-    # Voice safety rule: always use fast model to avoid GPU OOM
-    # when whisper + full qwen3:14b + TTS compete for VRAM.
-    outcome = run(transcript, surface="voice", timeout=125, model="local-lucy-fast")
+    # Voice pipeline uses the default model (llama3.1:8b, ~8.5GB VRAM).
+    # With lower VRAM usage than qwen3:14b, GPU can run Whisper + LLM + TTS.
+    outcome = run(transcript, surface="voice", timeout=125, model="local-lucy-llama31")
     
     request_id = f"voice_{int(time.time() * 1000)}"
     status = "completed" if outcome.status == "completed" else outcome.status

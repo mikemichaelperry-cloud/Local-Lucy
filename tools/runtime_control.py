@@ -155,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     model_parser.add_argument(
         "--value",
         required=True,
-        choices=("local-lucy", "local-lucy-fast"),
+        choices=("local-lucy-llama31", "local-lucy", "local-lucy-fast", "local-lucy-mistral"),
     )
 
     return parser
@@ -274,7 +274,7 @@ def enforce_authority_contract(*, expected_authority_root: Path | None = None) -
     if ui_root.name != "ui-v10":
         raise RuntimeControlError(
             f"V8 ISOLATION VIOLATION: invalid UI root in contract (expected ui-v10): {ui_root}. "
-            f"V8 cannot use V7 (ui-v7) components."
+            f"v10 cannot use v7 (ui-v7) components."
         )
     if not runtime_ns_root.is_absolute():
         raise RuntimeControlError(f"invalid runtime namespace root in contract: {runtime_ns_root}")
@@ -310,7 +310,7 @@ def default_state() -> dict[str, Any]:
         "voice": "on",
         "augmentation_policy": clean_text(os.environ.get("LUCY_AUGMENTATION_POLICY")) or "fallback_only",
         "augmented_provider": "wikipedia",
-        "model": os.environ.get("LUCY_RUNTIME_MODEL") or os.environ.get("LUCY_LOCAL_MODEL") or "local-lucy-fast",
+        "model": os.environ.get("LUCY_RUNTIME_MODEL") or os.environ.get("LUCY_LOCAL_MODEL") or "local-lucy-llama31",
         "learner": _resolve_initial_learner_state(),
         "approval_required": False,
         "status": "ready",

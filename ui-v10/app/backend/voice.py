@@ -1,21 +1,4 @@
-"""
-Voice Module - Consolidated Single Source of Truth
+"""Re-export for backward compatibility — implementation lives in router_py."""
+from router_py.voice_tool import VoicePipeline, VoiceResult, VADConfig, AudioBuffer
 
-Re-exports voice components from the authoritative snapshot location.
-"""
-
-from backend import (
-    VoicePipeline,
-    VoicePipelineConfig,
-    VoiceResult,
-    VADConfig,
-    AudioBuffer,
-)
-
-__all__ = [
-    'VoicePipeline',
-    'VoicePipelineConfig',
-    'VoiceResult',
-    'VADConfig',
-    'AudioBuffer',
-]
+__all__ = ["VoicePipeline", "VoiceResult", "VADConfig", "AudioBuffer"]

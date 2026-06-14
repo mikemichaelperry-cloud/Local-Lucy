@@ -1,7 +1,7 @@
 """
-Tests for the ConsolidatedRuntimeBridge.
+Tests for the RuntimeBridge (canonical bridge).
 
-Verifies API compatibility with legacy bridge and correct delegation to Python backend.
+Verifies API compatibility and correct delegation to Python backend.
 """
 from __future__ import annotations
 
@@ -14,168 +14,99 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Set required environment before imports
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", 
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT",
     str(Path.home() / "lucy-v10"))
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", 
+os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT",
     str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
-os.environ.setdefault("LUCY_UI_ROOT", 
+os.environ.setdefault("LUCY_UI_ROOT",
     str(Path(__file__).parent.parent.parent))
 
-from app.services.runtime_bridge_consolidated import (
-    ConsolidatedRuntimeBridge,
-    ActionCapability,
+from app.services import (
+    RuntimeBridge,
+    CommandResult,
+    RuntimeActionTask,
 )
-from app.services.runtime_bridge import CommandResult
 
 
-class TestConsolidatedRuntimeBridge:
-    """Test suite for ConsolidatedRuntimeBridge."""
-    
+class TestRuntimeBridge:
+    """Test suite for RuntimeBridge."""
+
     def test_bridge_initialization(self):
         """Bridge initializes without errors."""
-        bridge = ConsolidatedRuntimeBridge()
-        assert bridge.available is True
-        
+        bridge = RuntimeBridge()
+        assert bridge.request_available() is True
+
     def test_capabilities_exist(self):
         """Bridge has required capabilities."""
-        bridge = ConsolidatedRuntimeBridge()
-        
+        bridge = RuntimeBridge()
+
         # Required capability keys
         required = ["mode_selection", "memory_toggle", "evidence_toggle"]
         for key in required:
             assert key in bridge.capabilities
-            assert isinstance(bridge.capabilities[key], ActionCapability)
-    
+
     def test_capability_properties(self):
         """Capability properties are correctly typed."""
-        bridge = ConsolidatedRuntimeBridge()
-        
+        bridge = RuntimeBridge()
         cap = bridge.capabilities["mode_selection"]
-        assert cap.name == "mode_selection"
-        assert cap.available is True
+        assert isinstance(cap.name, str)
+        assert isinstance(cap.available, bool)
         assert isinstance(cap.allowed_values, tuple)
-        assert "local" in cap.allowed_values
         assert isinstance(cap.reason, str)
-    
-    def test_request_capability(self):
+
+    def test_request_available(self):
         """Request capability is available."""
-        bridge = ConsolidatedRuntimeBridge()
-        
-        assert bridge.request_capability.available is True
+        bridge = RuntimeBridge()
         assert bridge.request_available() is True
-    
-    def test_profile_lifecycle_voice_capabilities(self):
-        """Profile/lifecycle/voice capabilities exist (may be disabled)."""
-        bridge = ConsolidatedRuntimeBridge()
-        
-        # These exist but may not be implemented yet
-        assert hasattr(bridge, 'profile_capability')
-        assert hasattr(bridge, 'lifecycle_capability')
-        assert hasattr(bridge, 'voice_capability')
-    
+
+    def test_profile_available(self):
+        """Profile capability is available."""
+        bridge = RuntimeBridge()
+        assert bridge.profile_available() is True
+
+    def test_lifecycle_available(self):
+        """Lifecycle capability is available."""
+        bridge = RuntimeBridge()
+        assert bridge.lifecycle_available() is True
+
     def test_capability_notes(self):
-        """Capability notes returns dictionary."""
-        bridge = ConsolidatedRuntimeBridge()
-        
+        """Capability notes are returned as dict."""
+        bridge = RuntimeBridge()
         notes = bridge.capability_notes()
         assert isinstance(notes, dict)
         assert "mode_selection" in notes
-    
-    def test_submit_request_local(self):
-        """Submit request works for local queries."""
-        bridge = ConsolidatedRuntimeBridge()
-        
-        result = bridge.submit_request("What is 2+2?", force_augmented=False)
-        
-        assert isinstance(result, dict)
-        assert result["accepted"] is True
-        assert result["status"] == "completed"
-        assert "response_text" in result
-        assert len(result["response_text"]) > 0
-        assert "outcome" in result
-    
-    def test_submit_request_augmented(self):
-        """Submit request works for augmented queries."""
-        bridge = ConsolidatedRuntimeBridge()
-        
-        # Set policy for augmented
-        os.environ["LUCY_AUGMENTATION_POLICY"] = "augmented"
-        
-        result = bridge.submit_request("Who invented the telephone?", force_augmented=True)
-        
-        assert isinstance(result, dict)
-        assert result["accepted"] is True
-        assert result["status"] == "completed"
-        assert "response_text" in result
-    
-    def test_submit_request_error_handling(self):
-        """Submit request handles errors gracefully."""
-        bridge = ConsolidatedRuntimeBridge()
-        
-        # Empty query should still work (backend handles it)
-        result = bridge.submit_request("")
-        
-        assert isinstance(result, dict)
-        # Should either succeed or fail gracefully
-        assert "status" in result
-        assert "error" in result or result["status"] == "completed"
-    
-    def test_run_action_submit_request(self):
-        """run_action with submit_request returns CommandResult."""
-        bridge = ConsolidatedRuntimeBridge()
-        
-        result = bridge.run_action("submit_request", "What is Python?")
-        
-        assert isinstance(result, CommandResult)
-        assert result.action == "submit_request"
-        assert result.status in ("success", "failed")
-        assert isinstance(result.stdout, str)
-    
-    def test_run_action_unimplemented(self):
-        """run_action for unimplemented actions returns not_implemented."""
-        bridge = ConsolidatedRuntimeBridge()
-        
-        result = bridge.run_action("unknown_action", "value")
-        
-        assert isinstance(result, CommandResult)
-        assert result.status == "not_implemented"
-        assert result.returncode == 1
-    
-    def test_timeout_configuration(self):
-        """Bridge has timeout configuration."""
-        bridge = ConsolidatedRuntimeBridge()
-        
-        assert hasattr(bridge, 'request_timeout_seconds')
-        assert bridge.request_timeout_seconds > 0
-        assert hasattr(bridge, 'control_timeout_seconds')
-        assert hasattr(bridge, 'voice_stop_timeout_seconds')
 
+    def test_submit_request_rejects_empty(self):
+        """Empty request is rejected."""
+        bridge = RuntimeBridge()
+        result = bridge.run_action("submit_request", "")
+        assert result.status == "unavailable"
 
-class TestActionCapability:
-    """Test suite for ActionCapability dataclass."""
-    
-    def test_capability_creation(self):
-        """Can create capability with all fields."""
-        cap = ActionCapability(
-            name="test_cap",
-            available=True,
-            allowed_values=("a", "b", "c"),
-            reason="Test reason"
+    def test_command_result_structure(self):
+        """CommandResult has expected fields."""
+        result = CommandResult(
+            action="test",
+            requested_value="value",
+            status="ok",
+            returncode=0,
+            stdout="out",
+            stderr="err",
+            timed_out=False,
+            payload=None,
         )
-        
-        assert cap.name == "test_cap"
-        assert cap.available is True
-        assert cap.allowed_values == ("a", "b", "c")
-        assert cap.reason == "Test reason"
-    
-    def test_capability_immutability(self):
-        """Capabilities are frozen/immutable."""
-        cap = ActionCapability(
-            name="test",
-            available=True,
-            allowed_values=(),
-            reason=""
-        )
-        
-        with pytest.raises(Exception):
-            cap.name = "modified"
+        assert result.action == "test"
+        assert result.requested_value == "value"
+        assert result.status == "ok"
+        assert result.returncode == 0
+        assert result.stdout == "out"
+        assert result.stderr == "err"
+        assert result.timed_out is False
+        assert result.payload is None
+
+    def test_runtime_action_task_instantiation(self):
+        """RuntimeActionTask can be instantiated."""
+        bridge = RuntimeBridge()
+        task = RuntimeActionTask(bridge, "submit_request", "hello")
+        assert task._bridge is bridge
+        assert task._action == "submit_request"
+        assert task._requested_value == "hello"

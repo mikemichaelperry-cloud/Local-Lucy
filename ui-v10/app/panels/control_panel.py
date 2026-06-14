@@ -44,8 +44,10 @@ class ControlPanel(QFrame):
 
     # Model label mapping: backend value → display label
     _MODEL_LABELS: dict[str, str] = {
+        "local-lucy-llama31": "local-lucy-llama31 (llama3.1 8B, default)",
         "local-lucy": "local-lucy (qwen3 14B)",
         "local-lucy-fast": "local-lucy-fast (qwen3 14B)",
+        "local-lucy-mistral": "local-lucy-mistral (mistral-nemo 12B)",
     }
 
     def __init__(self) -> None:

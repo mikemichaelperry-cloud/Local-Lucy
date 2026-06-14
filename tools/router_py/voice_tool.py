@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Async voice processing pipeline for Local Lucy v8.
+Async voice processing pipeline for Local Lucy v10.
 
 Replaces shell-based voice processing with a fully async Python implementation.
 
@@ -969,7 +969,7 @@ class VoicePipeline(BaseToolWrapper):
         # Create temp output directory
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
-                # Use UI-v8 Python for TTS to ensure Kokoro is available
+                # Use ui-v10 Python for TTS to ensure Kokoro is available
                 voice_python = self._resolve_voice_python()
                 
                 # Always use subprocess to avoid Python environment issues

@@ -94,8 +94,8 @@ Local_Lucy_V10_Architecture_Report.md
 # Screenshots / images from offscreen tests
 *.png
 
-# Runtime voice audio files
-voice/
+# Runtime voice audio files (root-level capture dir only, NOT tools/voice/)
+/voice/
 
 # Binary artifacts
 bin/

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Persistent whisper-server worker manager for Local Lucy v8.
+"""Persistent whisper-server worker manager for Local Lucy v10.
 
 Mirrors the Kokoro session worker pattern (PID file, health checks, stale cleanup)
 but uses HTTP instead of a Unix domain socket.

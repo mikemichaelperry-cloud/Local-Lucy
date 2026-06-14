@@ -310,7 +310,7 @@ install_piper(){
   esac
 }
 
-install_ui_v8_kokoro(){
+install_ui_v10_kokoro(){
   if [[ ! -x "${UI_VENV_PY}" ]]; then
     warn "ui-v10 python not found at ${UI_VENV_PY}; skipping kokoro install"
     return 1
@@ -363,7 +363,7 @@ main(){
   else
     warn "no piper runtime detected; voice mode will run without TTS"
   fi
-  install_ui_v8_kokoro || warn "ui-v10 Kokoro/TTS not installed; active v8 may fall back from kokoro"
+  install_ui_v10_kokoro || warn "v10 Kokoro not installed; active v8 may fall back from kokoro"
 
   [[ -x "${BIN_DIR}/whisper" ]] || die "fatal: whisper binary missing after install"
   [[ -s "${WHISPER_MODEL_PATH}" ]] || die "fatal: whisper model missing after install"

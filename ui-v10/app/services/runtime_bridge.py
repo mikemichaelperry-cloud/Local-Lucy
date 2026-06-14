@@ -131,7 +131,7 @@ class RuntimeBridge:
         ui_root = Path(ui_root_raw).expanduser().resolve()
         runtime_ns_root = Path(runtime_ns_raw).expanduser().resolve()
         bridge_file = Path(__file__).resolve()
-        if ui_root.name not in ("ui-v7", "ui-v10") or not ui_root.exists() or not ui_root.is_dir():
+        if ui_root.name != "ui-v10" or not ui_root.exists() or not ui_root.is_dir():
             raise RuntimeError(f"invalid UI root in authority contract: {ui_root}")
         if authority_root.name not in ("lucy-v10",):
             raise RuntimeError(f"invalid authority root in authority contract: {authority_root}")
@@ -152,7 +152,6 @@ class RuntimeBridge:
         adapter_tool = self.snapshot_root / "tools" / "voice" / "tts_adapter.py"
         candidates = [
             self._workspace_root() / "ui-v10" / ".venv" / "bin" / "python3",
-            self._workspace_root() / "ui-v7" / ".venv" / "bin" / "python3",
         ]
         for candidate in candidates:
             if not candidate.exists() or not candidate.is_file():
@@ -198,8 +197,8 @@ class RuntimeBridge:
         env.setdefault("LUCY_SESSION_MEMORY", os.environ.get("LUCY_SESSION_MEMORY", "0"))
         env.setdefault("LUCY_AUGMENTED_PROVIDER", self._resolve_augmented_provider())
         # Propagate model selection so subprocess paths match direct-Python path
-        env.setdefault("LUCY_MODEL", os.environ.get("LUCY_MODEL", "local-lucy-fast"))
-        env.setdefault("LUCY_LOCAL_MODEL", os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-fast"))
+        env.setdefault("LUCY_MODEL", os.environ.get("LUCY_MODEL", "local-lucy-llama31"))
+        env.setdefault("LUCY_LOCAL_MODEL", os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-llama31"))
         # Router decision logging — default to project logs directory
         default_log_dir = str(Path(__file__).resolve().parents[3] / "logs" / "router")
         env.setdefault("LUCY_ROUTER_LOG_DIR", os.environ.get("LUCY_ROUTER_LOG_DIR", default_log_dir))
@@ -269,7 +268,7 @@ class RuntimeBridge:
             "model_selection": ActionCapability(
                 name="model_selection",
                 available=available,
-                allowed_values=("local-lucy", "local-lucy-fast"),
+                allowed_values=("local-lucy-llama31", "local-lucy", "local-lucy-fast", "local-lucy-mistral"),
                 reason=reason,
             ),
             "learner_toggle": ActionCapability(
@@ -689,7 +688,7 @@ class RuntimeBridge:
             sys.path.insert(0, router_py_path)
         
         try:
-            from router_py.main import run
+            from router_py.main import execute_plan_python
             from router_py.policy import normalize_augmentation_policy
         except ImportError as e:
             return CommandResult(
@@ -711,8 +710,10 @@ class RuntimeBridge:
         start_time = os.times()[0]  # User CPU time
         
         try:
-            # Call unified entry point
-            outcome = run(
+            # Call unified entry point directly (main.run() is a thin
+            # pass-through; using execute_plan_python eliminates one
+            # wrapper hop and aligns with the consolidated bridge).
+            outcome = execute_plan_python(
                 question=request_text,
                 policy=policy,
                 timeout=self.request_timeout_seconds,

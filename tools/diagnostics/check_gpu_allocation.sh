@@ -5,7 +5,7 @@
 set -e
 
 echo "============================================================"
-echo "LOCAL LUCY v7 - GPU ALLOCATION DIAGNOSTIC"
+echo "LOCAL LUCY v10 - GPU ALLOCATION DIAGNOSTIC"
 echo "============================================================"
 echo "Timestamp: $(date)"
 echo ""

@@ -35,9 +35,10 @@ export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
 export LUCY_VOICE_CAPTURE_DIR="$SCRIPT_DIR/voice/ui_ptt"
 
 # Python path - app/ directory enables 'from backend import ...'.
-# Include /home/mike/.local because managed shells can set HOME to a sandbox
-# home, hiding PySide6 from the normal user-site lookup.
-export PYTHONPATH="${SCRIPT_DIR}/ui-v10/app:${WORKSPACE_HOME}/.local/lib/python3.10/site-packages:${PYTHONPATH:-}"
+# All dependencies (including PySide6) are installed in the venv; do NOT
+# add ~/.local/lib/python3.10/site-packages here because it causes package
+# version conflicts (e.g. system pandas shadowing venv pandas).
+export PYTHONPATH="${SCRIPT_DIR}/ui-v10/app:${PYTHONPATH:-}"
 
 # Router decision logging (enables feedback learning pipeline)
 export LUCY_ROUTER_LOG_DIR="${LUCY_RUNTIME_NAMESPACE_ROOT}/logs"
@@ -48,12 +49,12 @@ export LUCY_EXEC_PY=1
 export LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
 
 # Read model from persistent state so the HMI toggle survives restarts.
-# Falls back to local-lucy-fast if no state file exists yet.
+# Falls back to local-lucy-llama31 if no state file exists yet.
 _state_file_tmp="${LUCY_RUNTIME_NAMESPACE_ROOT}/state/current_state.json"
 if [ -f "${_state_file_tmp}" ]; then
     _state_model_tmp=$(python3 -c "import sys,json; print(json.load(open('${_state_file_tmp}')).get('model',''))" 2>/dev/null || true)
 fi
-export LUCY_LOCAL_MODEL="${_state_model_tmp:-local-lucy-fast}"
+export LUCY_LOCAL_MODEL="${_state_model_tmp:-local-lucy-llama31}"
 unset _state_file_tmp _state_model_tmp
 export LUCY_ENABLE_INTERNET=1
 export LUCY_SESSION_MEMORY=1

@@ -233,8 +233,8 @@ def serve_main(argv: list[str]) -> int:
                 try:
                     conn.sendall((json.dumps(response, sort_keys=True) + "\n").encode("utf-8"))
                 except (BrokenPipeError, ConnectionResetError):
-                    # Client disconnected (e.g., timed out), log and continue
-                    print(f"[Worker] Client disconnected while sending response", flush=True)
+                    # Client disconnected before response was fully sent — normal
+                    # race condition when client closes socket early. No action needed.
                     pass
                 if _clean_text(response.get("status")) == "bye":
                     return 0

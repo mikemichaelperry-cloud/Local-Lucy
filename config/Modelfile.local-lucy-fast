@@ -4,6 +4,8 @@ FROM qwen3:14b
 # Gives enough headroom for creative writing prompts (~500 tokens) +
 # generation budgets up to 768 tokens without truncation.
 # VRAM: ~9 GB on RTX 3060 12GB (still leaves headroom for Whisper GPU)
+# RAM fallback: Ollama auto-offloads layers to CPU/RAM when VRAM is full.
+# With 31 GB system RAM, full model execution in RAM is always possible.
 PARAMETER num_ctx 2048
 
 # Use all available CPU threads for generation

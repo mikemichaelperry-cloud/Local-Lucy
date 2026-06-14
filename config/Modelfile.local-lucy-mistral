@@ -1,9 +1,9 @@
-FROM qwen3:14b
+FROM mistral-nemo
 
-# Context window: 2048 tokens (balanced for VRAM on RTX 3060)
-# Gives enough headroom for creative writing prompts (~500 tokens) +
-# generation budgets up to 768 tokens without truncation.
-# VRAM: ~9 GB on RTX 3060 12GB (still leaves headroom for Whisper GPU)
+# Context window: 2048 tokens (balanced for VRAM on RTX 3060 12GB)
+# Mistral NeMo native context is 128k, but we limit to 2048 to leave
+# headroom for Whisper GPU on-demand and Kokoro TTS on CPU.
+# VRAM: ~8.5 GB on RTX 3060 12GB (q8_0 quantization)
 # RAM fallback: Ollama auto-offloads layers to CPU/RAM when VRAM is full.
 # With 31 GB system RAM, full model execution in RAM is always possible.
 PARAMETER num_ctx 2048

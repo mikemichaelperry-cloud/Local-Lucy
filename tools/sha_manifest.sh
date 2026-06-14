@@ -20,7 +20,7 @@ EOF
 
 collect_files() {
   if [[ "$UI_V8_MODE" -eq 1 ]]; then
-    _collect_ui_v8_files
+    _collect_ui_v10_files
   else
     _collect_root_files
   fi
@@ -76,7 +76,7 @@ _collect_root_files() {
   )
 }
 
-_collect_ui_v8_files() {
+_collect_ui_v10_files() {
   (
     cd "$ROOT"
     find \

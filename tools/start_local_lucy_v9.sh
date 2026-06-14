@@ -69,7 +69,10 @@ if [[ -x "${V8_PYTHON}" ]]; then
 elif [[ -n "${LUCY_VOICE_PYTHON_BIN:-}" ]]; then
   export LUCY_VOICE_PYTHON_BIN
 fi
-export PYTHONPATH="${UI_ROOT}/app:${WORKSPACE_HOME}/.local/lib/python3.10/site-packages:${PYTHONPATH:-}"
+# All dependencies (including PySide6) are installed in the venv; do NOT
+# add ~/.local/lib/python3.10/site-packages here because it causes package
+# version conflicts (e.g. system pandas shadowing venv pandas).
+export PYTHONPATH="${UI_ROOT}/app:${PYTHONPATH:-}"
 export LUCY_RUNTIME_CONTRACT_REQUIRED=1
 export LUCY_LAUNCHER_LABEL="lucy-v10"
 export LUCY_LAUNCHER_FAMILY="launcher v8"

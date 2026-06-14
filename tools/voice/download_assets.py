@@ -336,7 +336,7 @@ def verify_kokoro(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Download and verify voice model assets for Local Lucy v8."
+        description="Download and verify voice model assets for Local Lucy v10."
     )
     parser.add_argument(
         "--verify-only",

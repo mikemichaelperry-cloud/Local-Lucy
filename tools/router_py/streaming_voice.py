@@ -128,7 +128,7 @@ def _analyze_pcm_levels(pcm_data: bytes, sample_rate: int = 22050, chunk_duratio
     return levels
 
 
-def _get_ui_v8_python() -> str:
+def _get_ui_v10_python() -> str:
     """Get path to ui-v10 Python which has Kokoro installed."""
     root = Path(__file__).parent.parent.parent.parent.parent
     return str(root / "ui-v10" / ".venv" / "bin" / "python3")
@@ -165,7 +165,7 @@ class KokoroWorkerManager:
             
             # Start worker using ui-v10 Python which has Kokoro installed
             worker_script = Path(__file__).parent.parent / "voice" / "kokoro_session_worker.py"
-            python_exe = _get_ui_v8_python()
+            python_exe = _get_ui_v10_python()
             
             self.process = subprocess.Popen(
                 [python_exe, str(worker_script), "serve", "--socket", str(self.socket_path)],
@@ -511,7 +511,7 @@ class StreamingVoicePipeline:
                 query,
                 surface="voice",
                 timeout=300,
-                model="local-lucy-fast",  # Voice safety: fast model only
+                model="local-lucy-llama31",  # Voice: default model (low VRAM)
             )
             outcome = await asyncio.wrap_future(future)
         
@@ -859,7 +859,7 @@ class StreamingVoicePipeline:
     async def _synthesize_subprocess_to_pcm(self, text: str) -> bytes:
         """Fallback subprocess synthesis."""
         helper_path = Path(__file__).parent / "streaming_tts_helper.py"
-        voice_python = _get_ui_v8_python()
+        voice_python = _get_ui_v10_python()
         
         pcm_data = b""
         

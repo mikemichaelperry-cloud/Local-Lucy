@@ -27,7 +27,7 @@ from app.panels.conversation_panel import ConversationPanel
 from app.panels.event_log_panel import EventLogPanel
 from app.panels.status_panel import StatusPanel
 from app.services.log_watcher import LogWatcher
-from app.services.runtime_bridge import CommandResult, RuntimeActionTask, RuntimeBridge
+from app.services import CommandResult, RuntimeActionTask, RuntimeBridge
 from app.services.state_store import (
     build_request_details,
     get_state_directory,

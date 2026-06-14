@@ -299,14 +299,14 @@ def collect_patch_hint_files(task: str, root: pathlib.Path) -> list[str]:
         hints.extend(
             [
                 "codex_launcher_gui.sh",
-                "tools/start_local_lucy_opt_experimental_v7_dev.sh",
+                "tools/start_local_lucy_v9.sh",
                 "tools/start_local_lucy_opt_experimental_v3_dev.sh",
             ]
         )
     if "launcher chain" in lower_task or "local lucy" in lower_task:
         hints.extend(
             [
-                "tools/start_local_lucy_opt_experimental_v7_dev.sh",
+                "tools/start_local_lucy_v9.sh",
                 "tools/start_local_lucy_opt_experimental_v3_dev.sh",
             ]
         )
@@ -545,7 +545,7 @@ def infer_patch_surface(
     secondary_files = dedupe_keep_order(secondary_pool)[:SECONDARY_LIMIT]
 
     lower_task = cleaned_task.lower()
-    # V8 ISOLATION: Only avoid files within v8 namespace
+    # v10 ISOLATION: Only avoid files within v8 namespace
     avoid_files = [
         # No old version references - v8 is self-contained
     ]
