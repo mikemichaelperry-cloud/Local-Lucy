@@ -135,6 +135,7 @@ _CLEAR_NEWS_RE = tuple(re.compile(p) for p in (
     r"\bcurrent status\b",
     r"\blatest .{0,20}\bnews\b",
     r"\bnews .{0,20}\btoday\b",
+    r"\bcurrent events\b",
     r"\bheadlines\b",
     r"\bwhat is happening\b",
     r"\bwhat happened today\b",
@@ -420,7 +421,15 @@ def _get_router():
                 embeddings_path=str(router_dir / "comprehensive_embeddings.npy"),
                 examples_path=str(router_dir / "comprehensive_examples.json"),
             )
-        except Exception:
+        except Exception as _exc:
+            # Log the real exception so silent failures are diagnosable.
+            # Previously this was a bare except that swallowed the root cause.
+            import traceback
+            print(
+                f"[ROUTER_LOAD_FAILURE] {type(_exc).__name__}: {_exc}",
+                file=sys.stderr,
+            )
+            traceback.print_exc()
             _ROUTER = False  # Mark as failed
     return _ROUTER if _ROUTER is not False else None
 
@@ -679,31 +688,78 @@ def select_route(
     # may miss (e.g. "What's the latest world news?" sometimes routes LOCAL).
     # Skip when policy layer already identified this as live conflict (policy > guard).
     if query and (_is_clear_news_query(query) or _is_news_query_typos(query)):
-        if classification.evidence_reason == "conflict_live":
-            # Policy layer has authority for live conflict; do not override with
-            # generic news_synthesis. Fall through to embedding router path.
-            pass
-        else:
-            decision = RoutingDecision(
-                route="NEWS",
-                mode="AUTO",
-                intent_family="current_evidence",
-                confidence=1.0,
-                provider="news",
-                provider_usage_class="local",
-                evidence_mode="",
-                evidence_reason="news_synthesis",
-                requires_evidence=False,
-                policy_reason="router_news_guard",
-                ephemeral=True,
-            )
-            _log_decision(
-                query or "",
-                decision,
-                embedding_route="NEWS_KEYWORD_GUARD",
-                guards_fired=["news_keyword_guard"],
-            )
-            return decision
+        # Unambiguous news phrasing always routes to NEWS, even when the policy
+        # layer flags a live conflict. Headline requests ("latest news", "breaking
+        # news") are distinct from analysis questions ("will Russia win").
+        decision = RoutingDecision(
+            route="NEWS",
+            mode="AUTO",
+            intent_family="current_evidence",
+            confidence=1.0,
+            provider="news",
+            provider_usage_class="local",
+            evidence_mode="",
+            evidence_reason="news_synthesis",
+            requires_evidence=False,
+            policy_reason="router_news_guard",
+            ephemeral=True,
+        )
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="NEWS_KEYWORD_GUARD",
+            guards_fired=["news_keyword_guard"],
+        )
+        return decision
+
+    # Conflict analysis guard — catch prediction/analysis questions about live
+    # conflicts that the embedding router may route to LOCAL (e.g. "Will Russia
+    # win in Ukraine", "Probability of Israel-Iran war").
+    if query and _is_conflict_analysis_query(query):
+        decision = RoutingDecision(
+            route="AUGMENTED",
+            mode="AUTO",
+            intent_family="current_evidence",
+            confidence=1.0,
+            provider="openai",
+            provider_usage_class="paid",
+            evidence_mode="required",
+            evidence_reason="conflict_live",
+            requires_evidence=True,
+            policy_reason="router_conflict_analysis",
+            ephemeral=True,
+        )
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="CONFLICT_ANALYSIS_GUARD",
+            guards_fired=["conflict_analysis_guard"],
+        )
+        return decision
+
+    # Recipe query guard — catch recipe requests that the embedding router
+    # may route to LOCAL because training data labels them LOCAL.
+    if query and _is_cooking_query(query):
+        decision = RoutingDecision(
+            route="AUGMENTED",
+            mode="AUTO",
+            intent_family="background_overview",
+            confidence=1.0,
+            provider="wikipedia",
+            provider_usage_class="free",
+            evidence_mode="",
+            evidence_reason="",
+            requires_evidence=False,
+            policy_reason="router_recipe_guard",
+            ephemeral=True,
+        )
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="RECIPE_KEYWORD_GUARD",
+            guards_fired=["recipe_keyword_guard"],
+        )
+        return decision
 
     # Primary path: embedding router
     router = _get_router()
@@ -723,12 +779,17 @@ def select_route(
                 evidence_reason = classification.evidence_reason
                 evidence_mode = "required"
             
-            # Prefer classification evidence_reason for conflict/live-news and
-            # personal-finance reasoning (policy layer is more accurate).
-            if classification.evidence_reason in ("conflict_live", "personal_finance_reasoning"):
+            # Prefer classification evidence_reason for conflict/live-news,
+            # personal-finance reasoning, and financial data (policy layer is
+            # more accurate than embedding router for these).
+            if classification.evidence_reason in (
+                "conflict_live", "personal_finance_reasoning", "financial_data"
+            ):
                 evidence_reason = classification.evidence_reason
                 if classification.evidence_reason == "personal_finance_reasoning":
                     evidence_mode = ""
+                elif classification.evidence_reason in ("conflict_live", "financial_data"):
+                    evidence_mode = "required"
             
             requires_evidence = evidence_mode == "required"
             embedding_route = result.get("embedding_route", route)
@@ -736,12 +797,27 @@ def select_route(
             top_k_neighbours = result.get("top_k_neighbours", [])
             ephemeral = result.get("ephemeral", False)
 
+            # Conflict analysis override: the embedding router sometimes returns LOCAL
+            # for live-conflict analysis questions (e.g. "Will Russia win in Ukraine").
+            # Force AUGMENTED so the user gets real-time, cited information.
+            if evidence_reason == "conflict_live" and route == "LOCAL":
+                route = "AUGMENTED"
+                guards_fired = guards_fired + ["conflict_live_analysis_override"]
+
             # Medical/veterinary safety override: the embedding router sometimes
             # returns LOCAL for symptom queries. Force EVIDENCE so the user gets
             # cited, vetted information rather than parametric knowledge.
             if evidence_reason in ("medical_context", "medical_body_symptom", "veterinary_context"):
                 route = "EVIDENCE"
                 guards_fired = guards_fired + ["medical_vet_safety_override"]
+
+            # Financial data override: the embedding router sometimes returns LOCAL
+            # for live financial data queries (e.g. "current stock price of Apple",
+            # "bitcoin price today"). Force AUGMENTED so the user gets current
+            # market data rather than stale parametric knowledge.
+            if evidence_reason == "financial_data" and route == "LOCAL":
+                route = "AUGMENTED"
+                guards_fired = guards_fired + ["financial_data_override"]
 
             # Memory-aware routing gate: override live-data routes for follow-ups
             memory_gate_override = _memory_routing_gate(query, route, session_id=session_id)
@@ -841,11 +917,13 @@ def select_route(
                 )
 
             # Memory follow-up guard: if the query is an explicit memory recall or
-            # follow-up, override any embedding decision back to LOCAL.
+            # follow-up, override AUGMENTED/NEWS/TIME/WEATHER back to LOCAL.
+            # EVIDENCE routes (medical/vet/financial/legal) are preserved — a follow-up
+            # "why?" to a medical answer must stay on the evidence route, not drop to LOCAL.
             # Only active when session memory is enabled, to avoid false positives on
             # standalone queries that happen to contain follow-up words (e.g. "previous").
             if (
-                decision.route in ("AUGMENTED", "EVIDENCE", "NEWS", "TIME", "WEATHER")
+                decision.route in ("AUGMENTED", "NEWS", "TIME", "WEATHER")
                 and os.environ.get("LUCY_SESSION_MEMORY", "0") == "1"
             ):
                 q = query.strip()
@@ -903,6 +981,29 @@ def select_route(
     decision = _make_local_decision(classification, query=query)
     _log_decision(query or "", decision, embedding_route="FALLBACK_LOCAL", guards_fired=["router_failure"])
     return decision
+
+
+def _is_conflict_analysis_query(query: str) -> bool:
+    """Detect prediction/analysis questions about live conflicts.
+
+    Catches queries like "Will Russia win in Ukraine" or "Probability of
+    Israel-Iran war" that need real-time, cited information but may be
+    routed LOCAL by the embedding router.
+    """
+    if not query:
+        return False
+    q = query.lower().strip()
+    # Prediction patterns about conflicts
+    prediction_patterns = [
+        r"will\s+\w+\s+win\s+(in|the|this|a)",
+        r"probability\s+of\s+.*\bwar\b",
+        r"probability\s+of\s+.*\bconflict\b",
+        r"who\s+will\s+win\s+(the|this|a)\s+\w*\bwar\b",
+        r"outcome\s+of\s+.*\bwar\b",
+        r"outcome\s+of\s+.*\bconflict\b",
+        r"chances\s+of\s+.*\bwar\b",
+    ]
+    return any(re.search(p, q) for p in prediction_patterns)
 
 
 def _is_news_query_typos(query: str) -> bool:
@@ -997,6 +1098,35 @@ def _is_weather_query(query: str) -> bool:
         r"^(will it rain|is it raining|do i need an umbrella)",
     ]
     return any(__import__("re").search(p, q) for p in weather_patterns)
+
+
+def _is_cooking_query(query: str) -> bool:
+    """Detect cooking/recipe queries that benefit from web augmentation.
+
+    Catches recipe requests and food how-tos that the local LLM may answer
+    vaguely. Excludes dangerous/chemical contexts.
+    """
+    if not query:
+        return False
+    q = query.lower().strip()
+    # Exclude dangerous/chemical contexts first
+    if any(t in q for t in ["chemical", "explosive", "bomb", "meth", "drug recipe"]):
+        return False
+    # Direct recipe keywords
+    if "recipe" in q or "recipes" in q:
+        return True
+    # How-to cooking patterns (require a food term to avoid "how to make money")
+    if q.startswith(("how to cook ", "how to bake ", "how to make ", "how do i make ", "how do i cook ", "how do i bake ")):
+        food_terms = [
+            "bread", "pasta", "hummus", "pizza", "cake", "cookie", "cookies",
+            "pie", "meat", "chicken", "beef", "fish", "salad", "soup", "stew",
+            "curry", "rice", "egg", "eggs", "cheese", "butter", "flour",
+            "sugar", "dessert", "sourdough", "pasta", "lasagna", "taco",
+            "burger", "steak", "roast", "grill", "fry", "boil", "steam",
+        ]
+        if any(t in q for t in food_terms):
+            return True
+    return False
 
 
 def _is_financial_ephemeral(query: str) -> bool:

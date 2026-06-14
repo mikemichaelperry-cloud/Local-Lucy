@@ -1,5 +1,5 @@
 """
-Local Lucy v8 - Python Router Components
+Local Lucy v10 - Python Router Components
 
 Phase 1-5 of router migration: Utility, Policy, Classification, Main Orchestration, and Tool Wrappers.
 

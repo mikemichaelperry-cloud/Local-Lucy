@@ -173,16 +173,20 @@ _SEMANTIC_EMBEDDINGS: dict[str, "numpy.ndarray | None"] = {
 
 
 def _get_semantic_model():
-    """Lazy-load the MiniLM model; returns None if sentence_transformers is unavailable."""
+    """Lazy-load the MiniLM model; returns None if unavailable.
+
+    Uses CUDA if available (~22MB VRAM, ~10× faster than CPU).
+    Falls back to CPU gracefully.
+    """
     global _SEMANTIC_MODEL
     if _SEMANTIC_MODEL is None:
         try:
             from sentence_transformers import SentenceTransformer
-            # Force CPU — the RTX 3060 12GB is fully committed to Ollama (qwen3:14b
-            # ~9.8GB).  MiniLM-L6-v2 is tiny (22MB) and fast enough on CPU.
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
             _SEMANTIC_MODEL = SentenceTransformer(
                 "sentence-transformers/all-MiniLM-L6-v2",
-                device="cpu",
+                device=device,
             )
         except Exception:
             _SEMANTIC_MODEL = False
@@ -497,6 +501,21 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         if any(p in normalized for p in personal_pet_phrases):
             return False, "personal_family_context"
         
+        # Programming-language definition guard: "What is Python?", "Who created Java?"
+        # should not trigger veterinary context even though "python" matches
+        # the animal species list.
+        programming_languages = [
+            "python", "java", "javascript", "typescript", "go", "rust", "swift",
+            "kotlin", "scala", "golang", "dart", "julia", "ruby", "perl", "php",
+        ]
+        if any(lang in normalized for lang in programming_languages):
+            definition_phrases = [
+                "what is", "who created", "who invented", "who made", "history of",
+                "what does", "explain", "define", "meaning of",
+            ]
+            if any(p in normalized for p in definition_phrases):
+                return False, "programming_language_definition"
+
         # Programming-context negation: queries about programming languages or
         # software development should not trigger veterinary context even if they
         # contain animal-named terms (e.g. "Python", "Go", "Swift", "RabbitMQ").
@@ -645,6 +664,23 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         if not any(h in normalized for h in health_symptoms):
             return False, "weather_context"
 
+    # Art-history context negation: "painted", "painting", "sculpture", etc.
+    # should not trigger medical_context (e.g. "Who painted the Mona Lisa?").
+    art_history_terms = [
+        "painted", "painting", "sculpture", "sculpted", "artist", "artwork",
+        "masterpiece", "museum", "gallery", "portrait", "canvas", "brush",
+    ]
+    has_art_history = any(t in normalized for t in art_history_terms)
+    if has_art_history and "pain" in normalized:
+        health_symptoms = [
+            "sick", "ill", "hurt", "fever", "cough", "vomit",
+            "diarrhea", "rash", "swelling", "bleeding", "wound", "injury",
+            "symptom", "symptoms", "doctor", "hospital", "medicine",
+            "treatment", "medication", "prescription", "diagnosis",
+        ]
+        if not any(h in normalized for h in health_symptoms):
+            return False, "art_history_context"
+
     # Medical/health keywords — comprehensive coverage for safety-critical queries
     medical_keywords = [
         # General health inquiry
@@ -695,6 +731,20 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "antipsychotic", "benzodiazepine", "ssri", "snri",
     ]
     
+    # Simple age statements without health or injury context are not medical queries.
+    if ("year old" in normalized or "years old" in normalized):
+        health_and_injury_indicators = [
+            "sick", "ill", "hurt", "pain", "fever", "cough", "vomit",
+            "diarrhea", "rash", "swelling", "bleeding", "wound", "injury",
+            "symptom", "symptoms", "doctor", "hospital", "medicine",
+            "tremor", "tremors", "seizure", "collapse", "not breathing",
+            "emergency", "urgent", "poison", "toxic", "bloat",
+            "fell", "fall", "fallen", "hit", "bump", "bruise", "cut", "burn",
+            "broke", "broken", "fracture", "sprain", "swallowed", "choking",
+        ]
+        if not any(h in normalized for h in health_and_injury_indicators):
+            return False, "age_statement"
+
     for keyword in medical_keywords:
         if keyword in normalized:
             return True, "medical_context"

@@ -476,6 +476,29 @@ def delete_persistent_fact(fact_id: int) -> None:
     conn.commit()
 
 
+def get_persistent_facts_revision(category: str | None = None) -> str:
+    """Return a revision token that changes when facts are added or deleted.
+
+    Uses MAX(id), COUNT(*), and MAX(created_at) for an O(1) index scan.
+    Because there is no UPDATE API for facts today, this is sufficient to
+    detect any mutation (insert or delete).
+    """
+    conn = _get_connection()
+    if category:
+        cursor = conn.execute(
+            "SELECT COALESCE(MAX(id),0), COUNT(*), COALESCE(MAX(created_at),'') "
+            "FROM persistent_facts WHERE category = ?",
+            (category,),
+        )
+    else:
+        cursor = conn.execute(
+            "SELECT COALESCE(MAX(id),0), COUNT(*), COALESCE(MAX(created_at),'') "
+            "FROM persistent_facts"
+        )
+    max_id, count, latest = cursor.fetchone()
+    return f"{max_id}:{count}:{latest}"
+
+
 def clear_session(session_id: str = "default") -> None:
     """Delete all turns for a session."""
     conn = _get_connection()

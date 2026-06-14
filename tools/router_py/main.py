@@ -236,11 +236,11 @@ def ensure_control_env() -> None:
         os.environ["LUCY_VOICE_ENABLED"] = "1" if voice in ("on", "true", "1") else "0"
     
     if "LUCY_MODEL" not in os.environ:
-        model = state.get("model", "local-lucy-fast")
+        model = state.get("model", "local-lucy-llama31")
         os.environ["LUCY_MODEL"] = model
     
     if "LUCY_LOCAL_MODEL" not in os.environ:
-        model = state.get("model", "local-lucy-fast")
+        model = state.get("model", "local-lucy-llama31")
         os.environ["LUCY_LOCAL_MODEL"] = model
 
 

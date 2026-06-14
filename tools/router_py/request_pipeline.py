@@ -236,7 +236,7 @@ def process(
     try:
         engine = ExecutionEngine(config={
             "timeout": timeout,
-            "model": model or os.environ.get("LUCY_MODEL", "local-lucy-fast"),
+            "model": model or os.environ.get("LUCY_MODEL", "local-lucy-llama31"),
             "use_sqlite_state": True,
         })
 

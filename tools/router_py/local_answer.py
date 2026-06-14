@@ -59,40 +59,146 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
-_ollama_call_lock = threading.Lock()
+# ---------------------------------------------------------------------------
+# Ollama keep-alive heartbeat: pings the default model every 30s to prevent
+# cold-start unload.  With 12 GB VRAM this keeps ~8.5 GB resident, leaving
+# 3.5 GB for Whisper GPU + headroom.  RTX 3060 power draw increase is
+# negligible (~5 W) compared to the UX benefit of instant responses.
+# ---------------------------------------------------------------------------
+_heartbeat_thread: threading.Thread | None = None
+_heartbeat_stop = threading.Event()
+
+
+def _ollama_heartbeat_ping(model: str = "local-lucy-llama31", url: str = "http://127.0.0.1:11434/api/generate") -> None:
+    """Lightweight ping to keep the model loaded in Ollama VRAM."""
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps({"model": model, "prompt": "", "stream": False, "options": {"num_predict": 1}}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            resp.read()
+    except Exception:
+        pass  # Silently fail; Ollama may not be running yet
+
+
+def _heartbeat_loop(model: str, interval: float = 30.0) -> None:
+    while not _heartbeat_stop.is_set():
+        _ollama_heartbeat_ping(model)
+        _heartbeat_stop.wait(interval)
+
+
+def start_ollama_heartbeat(model: str = "local-lucy-llama31") -> None:
+    """Start background heartbeat thread (idempotent)."""
+    global _heartbeat_thread
+    if _heartbeat_thread is not None and _heartbeat_thread.is_alive():
+        return
+    _heartbeat_stop.clear()
+    _heartbeat_thread = threading.Thread(
+        target=_heartbeat_loop,
+        args=(model,),
+        daemon=True,
+        name="ollama-heartbeat",
+    )
+    _heartbeat_thread.start()
+    logger.info(f"[HEARTBEAT] Started Ollama keep-alive for {model}")
+
+
+def stop_ollama_heartbeat() -> None:
+    """Signal heartbeat thread to stop."""
+    _heartbeat_stop.set()
+
 
 # Import persistent facts from SQL memory service (with fallback for standalone use)
 try:
     from memory.memory_service import get_relevant_persistent_facts as _get_relevant_persistent_facts
-except ImportError:
+    from memory.memory_service import get_persistent_facts_revision as _get_persistent_facts_revision
+    logger.info("[FACTS] Imported get_relevant_persistent_facts from memory.memory_service")
+except ImportError as _e1:
+    logger.warning(f"[FACTS] Failed to import from memory.memory_service: {_e1}")
     try:
         from tools.memory.memory_service import get_relevant_persistent_facts as _get_relevant_persistent_facts
-    except ImportError:
+        from tools.memory.memory_service import get_persistent_facts_revision as _get_persistent_facts_revision
+        logger.info("[FACTS] Imported get_relevant_persistent_facts from tools.memory.memory_service")
+    except ImportError as _e2:
+        logger.error(f"[FACTS] Failed to import from tools.memory.memory_service: {_e2}. Using fallback no-op.")
         def _get_relevant_persistent_facts(query, category=None, limit=3, threshold=0.35):
             return []
 
+        def _get_persistent_facts_revision(category=None):
+            return ""
 
-async def _acquire_ollama_call_lock() -> None:
-    """Serialize Ollama calls across worker threads without blocking the event loop."""
-    await asyncio.to_thread(_ollama_call_lock.acquire)
+
+def _load_family_facts_direct() -> list[str]:
+    """Direct SQLite fallback: load all family-category persistent facts.
+
+    Bypasses embedding-based retrieval so facts are always available
+    for personal/family queries even when MiniLM or Ollama embeddings fail.
+    """
+    try:
+        import sqlite3
+        db_path = os.environ.get("LUCY_MEMORY_DB_PATH", "")
+        if not db_path:
+            db_path = str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "memory.db")
+        conn = sqlite3.connect(db_path, check_same_thread=False)
+        cursor = conn.execute(
+            "SELECT fact_text FROM persistent_facts WHERE category = 'family' OR category IS NULL OR category = '' ORDER BY id"
+        )
+        facts = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        logger.info(f"[FACTS] Direct SQLite load returned {len(facts)} family facts")
+        return facts
+    except Exception as e:
+        logger.warning(f"[FACTS] Direct SQLite fallback failed: {e}")
+        return []
 
 
 # Self-knowledge: identity, capabilities, limitations.
-# Injected on every LOCAL answer.  Kept short (~200 tokens) because qwen3:14b
-# has a 2048-token context window and long system blocks get ignored.
-SELF_KNOWLEDGE = (
-    "You are Local Lucy, an AI assistant running on the user's computer via Ollama "
-    "(qwen3:14b, ~14B parameters, 2048-token context).\n"
+# Injected on every LOCAL answer.  Kept short (~200 tokens) because the local
+# model has a 2048-token context window and long system blocks get ignored.
+# This is now a function so the identity string adapts to the active model.
+
+_SELF_KNOWLEDGE_TEMPLATE = (
+    "You are Local Lucy V10, an AI assistant running on the user's computer via Ollama "
+    "({model_identity}).\n"
+    "Architecture: PySide6/Qt6 HMI (Python 3.10); Ollama LLM backend; "
+    "MiniLM-L6-v2 embedding router (384-dim, k=3) with deterministic policy guards; "
+    "Whisper STT + Kokoro TTS voice stack; SQLite session memory and persistent facts.\n"
     "Routing is automatic: LOCAL (default), AUGMENTED (Wikipedia→OpenAI→Kimi), "
     "NEWS, TIME, WEATHER. Do not ask the user to pick a mode.\n"
-    "Capabilities: translation, coding, writing, reasoning, voice (Whisper/Kokoro), "
+    "Capabilities: translation, coding, writing, reasoning, voice, "
     "tube database (648 types), live data via AUGMENTED/NEWS/WEATHER.\n"
-    "Limitations: training-data cutoff; 14B model so niche details may be wrong; "
-    "cannot browse the web on your own — only when the router fetches it.\n"
+    "Limitations: training-data cutoff; {param_count} model so niche details may be wrong; "
+    "cannot browse the web on your own — only when the router fetches it; "
+    "cannot read files on the computer unless explicitly provided in context.\n"
     "Safety: medical/vet/legal → AUGMENTED with citations; stories/poems → LOCAL.\n"
-    "If asked who you are, say 'I am Local Lucy.' If asked about capabilities, "
-    "list them truthfully. Do not claim to be a different AI."
+    "If asked who you are, say 'I am Local Lucy V10.' If asked about capabilities, "
+    "list them truthfully. If asked about your architecture, describe the V10 stack above. "
+    "Do not claim to be a different AI."
 )
+
+# Model-specific identity strings. Add new models here.
+_MODEL_IDENTITIES: dict[str, tuple[str, str]] = {
+    # backend_name -> (ollama_model_name, parameter_description)
+    "local-lucy-llama31": ("llama3.1:8b", "~8B parameters, 4096-token context"),
+    "local-lucy": ("qwen3:14b", "~14B parameters, 2048-token context"),
+    "local-lucy-fast": ("qwen3:14b", "~14B parameters, 2048-token context"),
+    "local-lucy-mistral": ("mistral-nemo", "~12B parameters, 2048-token context"),
+}
+
+
+def get_self_knowledge(model_name: str = "local-lucy-llama31") -> str:
+    """Return the SELF_KNOWLEDGE string for the given backend model name.
+
+    Defaults to llama3.1:8b identity for unknown models.
+    """
+    ollama_name, params = _MODEL_IDENTITIES.get(model_name, _MODEL_IDENTITIES["local-lucy-llama31"])
+    return _SELF_KNOWLEDGE_TEMPLATE.format(
+        model_identity=f"{ollama_name}, {params}",
+        param_count=params.split(",")[0].strip().replace("~", ""),
+    )
 
 
 # Fixed policy responses
@@ -381,6 +487,8 @@ class LocalAnswer:
         self._session: Optional[Any] = None
         self._lat_metrics = LatencyMetrics()
         self._total_start_time: Optional[float] = None
+        # Start Ollama keep-alive heartbeat to prevent cold-start unload
+        start_ollama_heartbeat(self.config.model)
 
     @classmethod
     def warmup_ollama(cls, config: Optional[LocalAnswerConfig] = None) -> None:
@@ -622,7 +730,119 @@ class LocalAnswer:
         text = re.sub(r'[.!?]+$', '', text)
         text = re.sub(r'\s+', ' ', text).strip()
         return text
-    
+
+    # ------------------------------------------------------------------
+    # Deterministic personal/family/pet fact resolver
+    # ------------------------------------------------------------------
+
+    def _is_personal_family_query(self, query: str) -> bool:
+        """Return True if the query is a direct factual lookup about stored
+        personal/family/pet facts (NOT a medical symptom, advice request, or
+        open-ended reflection)."""
+        q = query.strip().lower()
+        # Must contain one of these ownership/identity anchors
+        has_anchor = any(k in q for k in (
+            "my children", "my child", "my son", "my daughter", "my kids",
+            "my grandchild", "my grandson", "my granddaughter",
+            "my dog", "my pet",
+            "my partner", "my wife", "my husband", "my spouse",
+            "who is racheli", "who is rachel",
+            "who am i", "my name",
+            "do i have children", "do i have grandchildren",
+            "do i have a dog", "do i have a pet",
+            "who is my partner", "who is my life partner",
+        ))
+        if not has_anchor:
+            return False
+        # Reject medical/vet symptom queries that happen to contain pet keywords
+        symptom_guard = any(k in q for k in (
+            "vomiting", "vomit", "diarrhea", "sick", "ill", "hurt",
+            "injured", "bleeding", "cough", "fever", "pain", "symptom",
+            "what should i do", "what do i do", "help me", "emergency",
+            "vet ", "veterinar", "doctor", "medicine", "medication",
+        ))
+        if symptom_guard:
+            return False
+        # Reject broad conversational / open-ended / creative patterns
+        broad_guard = any(k in q for k in (
+            "tell me a story", "tell me about", "write a", "compose a",
+            "how are my", "how is my", "what do you think about my",
+            "advice", "suggest", "recommend",
+            "feeling", "doing lately", "up to",
+        ))
+        if broad_guard:
+            return False
+        return True
+
+    def _resolve_personal_family_fact(self, query: str) -> Optional[str]:
+        """Deterministic resolver for direct personal/family/pet fact queries.
+
+        Loads family facts from SQLite and returns a template answer when the
+        query is a straightforward factual lookup.  Returns None for all other
+        queries so normal LLM generation proceeds.
+        """
+        if not self._is_personal_family_query(query):
+            return None
+
+        facts = _load_family_facts_direct()
+        if not facts:
+            return None
+
+        q = query.strip().lower()
+
+        # --- Children ---
+        if any(k in q for k in ("my children", "my child", "my son", "my daughter", "my kids", "do i have children", "do i have kids")):
+            child_facts = [f for f in facts if any(k in f.lower() for k in ("children", "son", "daughter", "child"))]
+            if not child_facts:
+                return None
+            if "do i have" in q:
+                return "Yes. " + " ".join(child_facts)
+            return " ".join(child_facts)
+
+        # --- Grandchildren ---
+        if any(k in q for k in ("my grandchild", "my grandson", "my granddaughter", "do i have grandchildren")):
+            grand_facts = [f for f in facts if any(k in f.lower() for k in ("grandchild", "grandson", "granddaughter"))]
+            if not grand_facts:
+                return None
+            if "do i have" in q:
+                return "Yes. " + " ".join(grand_facts)
+            return " ".join(grand_facts)
+
+        # --- Dog / Pet ---
+        if any(k in q for k in ("my dog", "my pet", "do i have a dog", "do i have a pet")):
+            pet_facts = [f for f in facts if any(k in f.lower() for k in ("dog", "pet"))]
+            if not pet_facts:
+                return None
+            if "do i have" in q:
+                return "Yes. " + " ".join(pet_facts)
+            return " ".join(pet_facts)
+
+        # --- Partner / Spouse ---
+        if any(k in q for k in ("my partner", "my wife", "my husband", "my spouse", "who is my partner", "who is my life partner")):
+            partner_facts = [f for f in facts if any(k in f.lower() for k in ("partner", "wife", "husband", "spouse")) and "dog" not in f.lower()]
+            if not partner_facts:
+                return None
+            return " ".join(partner_facts)
+
+        # --- Specific person lookup ("Who is Racheli?") ---
+        if "who is " in q:
+            # Extract the name after "who is"
+            m = re.search(r"who is\s+([a-z]+)", q)
+            if m:
+                name = m.group(1)
+                person_facts = [f for f in facts if name in f.lower()]
+                if person_facts:
+                    return " ".join(person_facts)
+
+        # --- Identity ("Who am I?") ---
+        if "who am i" in q or "my name" in q:
+            identity_facts = [f for f in facts if any(k in f.lower() for k in ("name is", "you are", "your name"))]
+            if identity_facts:
+                return " ".join(identity_facts)
+
+        # No deterministic match — fall through to LLM
+        return None
+
     def _apply_augmented_completion_guard(self, text: str) -> tuple[str, bool, str]:
         """
         Post-process AUGMENTED route responses to ensure complete sentences.
@@ -682,20 +902,25 @@ class LocalAnswer:
             reason = "closed_truncated_fragment"
         return (text, True, reason)
     
-    def _cache_key(self, query: str, variant: str) -> str:
+    def _cache_key(self, query: str, variant: str, fact_revision: str = "") -> str:
         """Generate cache key. Includes SELF_KNOWLEDGE hash so prompt
-        changes automatically invalidate old cached entries."""
+        changes automatically invalidate old cached entries.
+        For personal/family/pet queries, also includes a fact revision
+        so adding/editing/deleting facts busts the cache."""
         # Hash the self-knowledge text so any prompt-template change
         # busts the cache without manual cleanup.
-        sk_hash = hashlib.sha256(SELF_KNOWLEDGE.encode()).hexdigest()[:16]
+        sk_text = get_self_knowledge(self.config.model)
+        sk_hash = hashlib.sha256(sk_text.encode()).hexdigest()[:16]
         key_string = f"{self.config.model}|{sk_hash}|{variant}|{query}"
+        if fact_revision:
+            key_string += f"|{fact_revision}"
         return hashlib.sha256(key_string.encode()).hexdigest()
-    
-    def _cache_load(self, query: str, variant: str) -> Optional[Tuple[str, int]]:
+
+    def _cache_load(self, query: str, variant: str, fact_revision: str = "") -> Optional[Tuple[str, int]]:
         """Load from cache."""
         if not self.config.cache_enabled:
             return None
-        key = self._cache_key(query, variant)
+        key = self._cache_key(query, variant, fact_revision)
         meta_file = self.config.cache_dir / f"{key}.meta"
         text_file = self.config.cache_dir / f"{key}.txt"
         if not meta_file.exists() or not text_file.exists():
@@ -729,13 +954,13 @@ class LocalAnswer:
             logger.debug(f"Cache load failed: {e}")
             return None
     
-    def _cache_store(self, query: str, variant: str, text: str) -> None:
+    def _cache_store(self, query: str, variant: str, text: str, fact_revision: str = "") -> None:
         """Store in cache."""
         if not self.config.cache_enabled or not text.strip():
             return
         try:
             self.config.cache_dir.mkdir(parents=True, exist_ok=True)
-            key = self._cache_key(query, variant)
+            key = self._cache_key(query, variant, fact_revision)
             meta_file = self.config.cache_dir / f"{key}.meta"
             text_file = self.config.cache_dir / f"{key}.txt"
             with open(meta_file, 'w') as f:
@@ -820,8 +1045,8 @@ class LocalAnswer:
         word_match = re.search(r'(\d+)[\s\-]*(?:word|words)', q)
         if word_match:
             requested_words = int(word_match.group(1))
-            # Token estimate: ~1.5 tokens per word for output, but qwen3 uses
-            # "thinking" tokens internally, so we need ~2.5x to avoid truncation.
+            # Token estimate: ~1.5 tokens per word for output.
+            # Some models use internal "thinking" tokens, so we use ~2.5x headroom.
             # Cap at num_predict_long to stay within the model's context window.
             if route in {"AUGMENTED", "EVIDENCE"}:
                 max_tokens = self.config.num_predict_augmented_detail
@@ -982,6 +1207,42 @@ class LocalAnswer:
         and hard constraints.  This runtime prompt adds only query-specific
         context: memory, augmented evidence, tone, and budget.
         """
+        # Load persistent facts FIRST so we can decide whether to suppress
+        # poisoned session memory before adding it to the prompt.
+        persistent_facts = []
+        try:
+            persistent_facts = _get_relevant_persistent_facts(query, limit=3)
+            logger.info(f"[FACTS] Retrieved {len(persistent_facts)} persistent facts for query: {query[:60]}")
+            for i, f in enumerate(persistent_facts):
+                logger.info(f"[FACTS]  #{i+1}: {f[:100]}")
+        except Exception as e:
+            persistent_facts = []
+            logger.warning(f"[FACTS] Failed to load relevant persistent facts: {e}", exc_info=True)
+
+        # Fallback: if semantic retrieval returned nothing, try direct SQLite load
+        # for family/personal queries. This bypasses embedding failures.
+        if not persistent_facts:
+            normalized_q = query.lower()
+            if any(k in normalized_q for k in ("my children", "my son", "my daughter", "my wife", "my husband", "my dog", "my pet", "my family", "who am i", "grandchildren", "stepchildren", "my mother", "my father", "my sister", "my brother", "my granddaughter", "my grandson", "my grandchild")):
+                persistent_facts = _load_family_facts_direct()
+                logger.info(f"[FACTS] Direct fallback loaded {len(persistent_facts)} facts for personal/family query")
+
+        # Guard against session-memory poisoning for personal/family queries.
+        # When explicit persistent facts are loaded, previous assistant turns
+        # in session memory may contain hallucinated answers that the model
+        # will repeat.  Suppress session memory for these queries so the
+        # model answers ONLY from the authoritative facts.
+        if persistent_facts and session_memory.strip():
+            normalized_q = query.lower()
+            if any(k in normalized_q for k in (
+                "my children", "my son", "my daughter", "my wife", "my husband",
+                "my dog", "my pet", "my family", "who am i", "grandchildren",
+                "stepchildren", "my mother", "my father", "my sister", "my brother",
+                "my granddaughter", "my grandson", "my grandchild",
+            )):
+                logger.info("[GUARD] Suppressing session memory for personal/family query with loaded facts")
+                session_memory = ""
+
         parts: list[str] = []
 
         # Memory block (only when memory is active)
@@ -998,30 +1259,21 @@ class LocalAnswer:
                 "Take a position early. One hedge max. One concrete example. Clear takeaway."
             )
 
-        # Persistent facts (human-curated, stored in SQLite memory.db)
-        # Placed BEFORE self-knowledge so they are the most salient context
-        # when the user asks about their own life / family / pets.
-        try:
-            persistent_facts = _get_relevant_persistent_facts(query, limit=3)
-        except Exception:
-            persistent_facts = []
-            logger.debug("Failed to load relevant persistent facts from DB", exc_info=True)
         if persistent_facts:
             facts_block = "\n".join(f"- {f}" for f in persistent_facts)
             parts.append(
                 "[PERSISTENT FACTS — user-provided, authoritative]\n"
                 "These facts were supplied by the user. Answer questions about the user, "
                 "their family, and their pets using ONLY these facts. Do not blend with "
-                "outside knowledge. If the facts do not answer the question, say so.\n\n"
+                "outside knowledge. If the facts do not answer the question, say so.\n"
+                "CRITICAL: State the facts directly. Do NOT apologize, hedge, or claim you "
+                "do not have the information. The user explicitly provided these facts.\n\n"
                 f"{facts_block}"
             )
-            # NOTE: qwen3 has baked-in privacy guardrails for "Do I have any..."
-            # personal questions. This specific phrasing may still refuse despite
-            # explicit facts. All other family query phrasings work correctly.
 
         # Self-knowledge (always injected for LOCAL mode so the model knows
         # its own architecture, capabilities, limitations, and guards)
-        parts.append(SELF_KNOWLEDGE)
+        parts.append(get_self_knowledge(self.config.model))
 
         # Current date/time/location context (for age calculations, relative time,
         # location-aware queries, and holiday references)
@@ -1113,7 +1365,6 @@ class LocalAnswer:
             "prompt": prompt,
             "stream": False,
             "keep_alive": self.config.keep_alive,
-            "think": False,  # Disable qwen3 thinking mode — prevents empty responses
             "options": {
                 "temperature": temperature if temperature is not None else self.config.temperature,
                 "top_p": self.config.top_p,
@@ -1128,17 +1379,12 @@ class LocalAnswer:
             }
         }
         # Retry with exponential backoff for model-load transitions.
-        # Qwen3 benefits from extra headroom; llama3.1 is stable without it.
         max_attempts = 3
         base_delay = 0.5
-        needs_lock = "qwen" in self.config.model.lower()
         for attempt in range(max_attempts):
             try:
                 session = await self._get_session()
-                if needs_lock:
-                    await _acquire_ollama_call_lock()
-                try:
-                    async with session.post(self.config.ollama_url, json=payload) as response:
+                async with session.post(self.config.ollama_url, json=payload) as response:
                         response.raise_for_status()
                         data = await response.json()
                         text = data.get("response", "")
@@ -1159,9 +1405,6 @@ class LocalAnswer:
                         delay = base_delay * (2 ** attempt)
                         logger.warning(f"Ollama returned empty response for {self.config.model}, retrying in {delay}s... (attempt {attempt + 1}/{max_attempts})")
                         await asyncio.sleep(delay)
-                finally:
-                    if needs_lock:
-                        _ollama_call_lock.release()
             except Exception as e:
                 duration_ms = int((time.time() - start_time) * 1000)
                 logger.error(f"Ollama API call failed: {e}")
@@ -1238,20 +1481,45 @@ class LocalAnswer:
                 generation_profile="tube_database",
                 duration_ms=duration_ms
             )
-        
+
+        # Deterministic personal/family/pet fact resolver
+        # for direct factual ownership/identity queries when SQLite facts exist.
+        if not is_creative and route_mode in ("LOCAL", "CHAT"):
+            fact_answer = self._resolve_personal_family_fact(q_eval)
+            if fact_answer:
+                duration_ms = int((time.time() - start_time) * 1000)
+                self._diag_append("response_chars", len(fact_answer))
+                self._diag_append("response_est_tokens", self._estimate_tokens(fact_answer))
+                return AnswerResult(
+                    text=fact_answer,
+                    from_cache=False,
+                    generation_profile="personal_fact_direct",
+                    duration_ms=duration_ms
+                )
+
         profile_name, num_predict, budget_instruction = self._set_generation_profile(
             route_mode, output_mode, q_norm
         )
-        
+
         cache_variant = f"{profile_name}:{num_predict}:{self.config.temperature}:{self.config.top_p}"
-        
+
         self._diag_append("generation_route_mode", route_mode)
         self._diag_append("generation_output_mode", output_mode)
         self._diag_append("generation_profile", profile_name)
         self._diag_append("generation_num_predict", num_predict)
-        
+
+        # For personal/family queries, include a fact-revision token in the cache
+        # key so that adding/editing/deleting facts automatically busts stale
+        # cached answers.
+        fact_revision = ""
+        if self._is_personal_family_query(q_eval):
+            try:
+                fact_revision = _get_persistent_facts_revision("family")
+            except Exception:
+                pass
+
         cache_start = self._now_ms()
-        cached = self._cache_load(q_norm, cache_variant)
+        cached = self._cache_load(q_norm, cache_variant, fact_revision)
         cache_end = self._now_ms()
         self._latprof_append("local_answer", "cache_lookup", cache_end - cache_start)
         
@@ -1378,8 +1646,8 @@ class LocalAnswer:
         total_ms = int((time.time() - start_time) * 1000)
         self._latprof_append("local_answer", "total", total_ms)
         
-        self._cache_store(q_norm, cache_variant, api_text)
-        
+        self._cache_store(q_norm, cache_variant, api_text, fact_revision)
+
         return AnswerResult(
             text=api_text,
             from_cache=False,

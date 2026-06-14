@@ -2149,6 +2149,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         # Step 4: Call appropriate provider
         session_memory = ""
         memory_telemetry: dict[str, Any] = {}
+        api_fallback_telemetry: dict[str, Any] = {}
         if route.provider == "wikipedia":
             # Wikipedia routes do not consume session memory; skip the load
             # to avoid throwing away embedding/DB work.
@@ -2163,7 +2164,6 @@ them according to the route type (bypass, provisional, or full). It handles:
 
             if route.provider == "local":
                 response = await self._call_local_model_async(prompt, context, session_memory, route_mode=route.route)
-            api_fallback_telemetry: dict[str, Any] = {}
             if route.provider in ("openai", "kimi"):
                 # Prepend session memory to the prompt so API providers also see it
                 api_prompt = prompt

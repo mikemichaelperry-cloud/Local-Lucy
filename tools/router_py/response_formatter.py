@@ -45,14 +45,21 @@ def validate_response(response: str, route: RoutingDecision | None = None) -> st
 
 
 def is_local_generation_failure_output(body: str) -> bool:
-    """Check if output indicates local generation failure."""
+    """Check if output indicates local generation failure.
+
+    Only matches actual connection / permission error strings.
+    The standalone word "ollama" is intentionally excluded — it appears
+    in valid identity responses ("I run via Ollama") and causes false
+    positives that replace good answers with fallback text.
+    """
     n = guard_normalize(body)
     failure_patterns = [
         "127.0.0.1:11434",
-        "ollama",
         "connection refused",
         "operation not permitted",
         "dial tcp",
+        "ollama is not running",
+        "could not connect to ollama",
     ]
     return any(pattern in n for pattern in failure_patterns)
 
@@ -79,7 +86,7 @@ def render_chat_fast_from_raw(raw: str) -> str:
 
     text = " ".join(lines) if lines else raw.strip()
 
-    # Strip common model-generated error prefixes (qwen3 thinking artifacts)
+    # Strip common model-generated error prefixes
     error_prefixes = [
         "Error:", "error:", "ERROR:",
         "Sorry, I cannot", "sorry, i cannot",

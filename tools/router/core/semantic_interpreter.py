@@ -26,7 +26,7 @@ ALLOWED_INTENT_FAMILIES = {
     "clarify",
     "unknown",
 }
-DEFAULT_MODEL = "local-lucy"
+DEFAULT_MODEL = "local-lucy-llama31"
 DEFAULT_API_URL = "http://127.0.0.1:11434/api/generate"
 DEFAULT_TIMEOUT_S = 8.0
 DEFAULT_BACKEND_FAILURE_TTL_S = 300.0

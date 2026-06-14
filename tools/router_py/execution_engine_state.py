@@ -296,6 +296,24 @@ class StateWriter:
 
         # Outcome block
         metadata = result.metadata or {}
+
+        # Derive human-readable answer path for HMI display
+        _route = result.route or route.route or "LOCAL"
+        _trust = metadata.get("trust_class", "local")
+        if _route in ("AUGMENTED", "EVIDENCE") or _trust == "evidence_backed":
+            _answer_path = "Evidence-backed answer"
+        elif _route == "CLARIFY":
+            _answer_path = "Clarification requested"
+        elif _route == "SELF_REVIEW":
+            _answer_path = "Self-review answer"
+        elif _route == "NEWS":
+            _answer_path = "News (RSS)"
+        elif _route == "TIME":
+            _answer_path = "Time lookup"
+        elif _route == "WEATHER":
+            _answer_path = "Weather lookup"
+        else:
+            _answer_path = "Local answer"
         outcome_block: dict[str, Any] = {
             "action_hint": metadata.get("action_hint", ""),
             "requested_mode": "",
@@ -303,7 +321,7 @@ class StateWriter:
             "answer_class": "",
             "provider_authorization": "not_applicable",
             "operator_trust_label": metadata.get("trust_class", "local"),
-            "operator_answer_path": "unknown",
+            "operator_answer_path": _answer_path,
             "operator_note": "",
             "fallback_used": "true" if metadata.get("fallback_used") else "false",
             "fallback_reason": metadata.get("fallback_reason", ""),
