@@ -90,12 +90,13 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v9-dev  ⚠️  (needs GitHub admin to set default to v10-dev)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 3
+Commits since tag: 4
 Working tree: clean
 ```
 
-### Recent Commits (last 12)
+### Recent Commits (last 13)
 ```
+c7ec43d docs: create AGENTS.md and SESSION_CONTEXT.md for automatic session context
 2fc14dd feat(security): fix medical follow-up gap and migrate to XDG paths
 1e70996 feat(ops): XDG paths, DB migration, and operational runbooks
 f0a2184 feat(ops): health check CLI and circuit breakers for search backends
@@ -195,5 +196,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-14T20:30:00Z*
-*Session: production hardening for v10.0.0-beta.1 — AGENTS.md and SESSION_CONTEXT.md created*
+*Last updated: 2026-06-14T21:30:00Z*
+*Session: production hardening for v10.0.0-beta.1 — complete, handoff created*
