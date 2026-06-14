@@ -2,6 +2,17 @@
 Local Lucy v10 - Python Router Components
 
 Phase 1-5 of router migration: Utility, Policy, Classification, Main Orchestration, and Tool Wrappers.
+"""
+
+from pathlib import Path
+
+__version__ = "10.0.0-beta.1"
+
+# Root of the Lucy repository — derived from this file's location
+# so the codebase works when cloned to any directory.
+LUCY_ROOT = Path(__file__).resolve().parent.parent.parent
+
+"""
 
 Usage:
     # Direct Python API (Phase 4)
