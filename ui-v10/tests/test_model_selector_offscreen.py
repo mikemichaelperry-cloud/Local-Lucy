@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 import os
 import sys
-import tempfile
 from pathlib import Path
+
+import pytest
 
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
 
-def main() -> int:
+def test_model_selector():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
     os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
@@ -29,7 +30,7 @@ def main() -> int:
     state_file.write_text(
         json.dumps({
             "schema_version": 1,
-            "profile": "opt-experimental-v9-dev",
+            "profile": "lucy-v10",
             "mode": "auto",
             "conversation": "on",
             "memory": "on",
@@ -94,7 +95,6 @@ def main() -> int:
     window.deleteLater()
     app.processEvents()
     print("MODEL_SELECTOR_OFFSCREEN_OK")
-    return 0
 
 
 def assert_ok(condition: bool, message: str) -> None:
@@ -102,6 +102,10 @@ def assert_ok(condition: bool, message: str) -> None:
         return
     print(f"ASSERTION FAILED: {message}", file=sys.stderr)
     raise SystemExit(1)
+
+
+def main() -> int:
+    return pytest.main([__file__, "-v"])
 
 
 if __name__ == "__main__":

@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_UI_ROOT))
 
@@ -52,8 +54,14 @@ def test_staleness_indicators():
 
 def test_ptt_timeout_value():
     """Test that PTT stop timeout accommodates transcription + LLM + TTS + news digest overhead."""
+    import os
     from app.services.runtime_bridge import RuntimeBridge
     
+    # RuntimeBridge requires authority contract env vars
+    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(REPO_UI_ROOT.parent))
+    os.environ.setdefault("LUCY_UI_ROOT", str(REPO_UI_ROOT))
+    os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(REPO_UI_ROOT.parent / "runtime"))
+
     bridge = RuntimeBridge()
     
     assert_ok(bridge.voice_stop_timeout_seconds == 300, 
@@ -131,7 +139,7 @@ def test_direct_request_ids_are_unique():
     from app.services.runtime_bridge import RuntimeBridge
 
     bridge = RuntimeBridge()
-    fake_result = SimpleNamespace(
+    fake_result1 = SimpleNamespace(
         route="AUGMENTED",
         provider="openai",
         provider_usage_class="paid",
@@ -140,24 +148,39 @@ def test_direct_request_ids_are_unique():
         error_message="",
         response_text="synthetic answer",
         metadata={},
+        request_id="req-12345",
+        intent_family="background_overview",
+        confidence=0.95,
+        evidence_reason="",
+        policy_reason="router_augmented",
+    )
+    fake_result2 = SimpleNamespace(
+        route="AUGMENTED",
+        provider="openai",
+        provider_usage_class="paid",
+        outcome_code="answered",
+        status="completed",
+        error_message="",
+        response_text="synthetic answer",
+        metadata={},
+        request_id="req-67890",
+        intent_family="background_overview",
+        confidence=0.95,
+        evidence_reason="",
+        policy_reason="router_augmented",
     )
 
-    payload1 = bridge._build_payload_from_result(
-        result=fake_result,
-        route_data={"strategy": "AUGMENTED", "metadata": {}},
-        outcome_data={},
-        request_text="repeat request",
-        execution_time_ms=1,
+    payload1 = bridge._build_payload_from_outcome(
+        fake_result1, "repeat request", 1
     )
-    payload2 = bridge._build_payload_from_result(
-        result=fake_result,
-        route_data={"strategy": "AUGMENTED", "metadata": {}},
-        outcome_data={},
-        request_text="repeat request",
-        execution_time_ms=1,
+    payload2 = bridge._build_payload_from_outcome(
+        fake_result2, "repeat request", 1
     )
 
-    assert_ok(payload1["request_id"] != payload2["request_id"], "direct submit request IDs must be unique")
+    # The bridge is a display layer — it must faithfully preserve the core's request_id
+    assert_ok(payload1["request_id"] == "req-12345", "bridge must preserve core request_id")
+    assert_ok(payload2["request_id"] == "req-67890", "bridge must preserve core request_id")
+    assert_ok(payload1["request_id"] != payload2["request_id"], "different core outcomes have different request_ids")
     print("  ✓ Direct HMI request IDs are unique across repeated identical prompts")
 
 
@@ -248,47 +271,7 @@ def test_strict_contract_boundary_violation():
 
 
 def main() -> int:
-    print("Running verification tests for code review changes...")
-    print()
-    
-    # Set up required environment for tests that need it
-    os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
-    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
-    os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v10")
-    os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
-    
-    print("Test 1: Staleness indicators")
-    test_staleness_indicators()
-    
-    print("Test 2: PTT timeout value")
-    test_ptt_timeout_value()
-    
-    print("Test 3: Fail-loud behavior (no env vars)")
-    test_fail_loud_no_env_vars()
-    
-    print("Test 4: Legacy namespace detection")
-    test_legacy_namespace_detection()
-    
-    print("Test 5: GPU detection")
-    test_gpu_detection()
-    
-    print("Test 6: Direct request IDs are unique")
-    test_direct_request_ids_are_unique()
-
-    print("Test 7: Operator response preserves blank separators")
-    test_operator_response_preserves_blank_line_separators()
-
-    print("Test 8: StatusPanel freshness indicator")
-    test_status_panel_freshness_indicator()
-    
-    print("Test 9: Strict contract boundary violation")
-    test_strict_contract_boundary_violation()
-    
-    print()
-    print("=" * 50)
-    print("ALL VERIFICATION TESTS PASSED")
-    print("=" * 50)
-    return 0
+    return pytest.main([__file__, "-v"])
 
 
 if __name__ == "__main__":
