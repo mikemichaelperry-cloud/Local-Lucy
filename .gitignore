@@ -1,13 +1,5 @@
-# Local Lucy v8 - Git Ignore
-# Local /home/mike/lucy-v9 is the definitive alpha source.
-
-# Legacy shell tools (kept locally, not on GitHub)
-
-# Snapshots (large archives, kept locally)
-/snapshots/
-
-# Archives
-/archive_snapshots/
+# Local Lucy v10 — Git Ignore
+# ============================================
 
 # Python cache
 __pycache__/
@@ -15,13 +7,28 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+.pytest_cache/
 
 # Logs
 *.log
+ui_debug.log
+logs/
+burn_in_logs/
 
-# Local state
+# Local / runtime state (generated during execution)
 cache/
 state/*.db
+state/evidence_session_*.json
+state/voice_runtime.json
+state/namespaces/
+state/*.jsonl
+state/*.jsonl.lock
+state/state_ARCHIVE_*/
+state/voice_audio_levels.json
+state/current_state.json
+state/*.json.lock
+feedback_buffer.json
+runtime/
 
 # Virtual env
 .venv/
@@ -37,11 +44,6 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
-state/evidence_session_*.json
-
-# Runtime state files (generated during execution)
-state/voice_runtime.json
-ui_debug.log
 
 # Generated router artifacts
 models/router/*.npy
@@ -49,61 +51,55 @@ models/router/*.jsonl
 models/router/*.json
 models/router/*.processed
 models/router/*.log
-models/router/*.json
-models/router/*.log
-models/router/*.processed
 models/router/v2_evaluation.txt
 models/router/.learner_lock
 models/router/checkpoints/
 models/router/data/
 models/router/__pycache__/
-
-# Runtime state
-state/namespaces/
-state/*.jsonl
-state/*.jsonl.lock
-state/state_ARCHIVE_*/
-state/voice_audio_levels.json
-
-# Local reports
-burn_in_report*.json
-thrash_report*.json
-
-# Additional runtime artifacts
-state/current_state.json
-feedback_buffer.json
-logs/
 models/router/*.tmp
 models/router/*.bak
+models/router/versions/
+models/router/*.npy.backup.*
+
+# Local reports & ad-hoc dumps
+burn_in_report*.json
+thrash_report*.json
+/reports/
+archive_reports/
+test_reports/
 
 # Build and temporary artifacts
-/tmp/
 tmp/
 *.bak
 *.orig
 
-# Generated reports (moved from root)
-/reports/
-
-# Runtime downloads
-runtime/voice/models/
-
-# Router versioned backups
-models/router/versions/
-
 # Deprecated tools
 tools/deprecated/
 
-# Lock files for JSON state files
-state/*.json.lock
+# Desktop backup files
+desktop_backups/
+
+# Secrets
+.env
+*.env
+.env.*
+services/searxng/searxng/settings.yml
+
+# Session handoff dumps & generated docs
+SESSION_HANDOFF_*.md
+CODE_REVIEW_MANIFEST.md
+MODEL_COMPARISON_REPORT.md
+Local_Lucy_V10_Architecture_Report.md
+
+# Screenshots / images from offscreen tests
+*.png
 
 # Runtime voice audio files
 voice/
 
-# Desktop backup files
-desktop_backups/
-.env
-*.env
-.env.*
+# Binary artifacts
 bin/
-burn_in_logs/
+
+# Generated benchmark / test scripts at root
+run_all_tests.py
+generate_test_report.py

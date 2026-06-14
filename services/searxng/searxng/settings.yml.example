@@ -2,7 +2,9 @@ use_default_settings: true
 
 server:
   limiter: false
-  secret_key: "816b7fc03a95fc4fa76b8e788debb125605d4b80b989ceb2a827bcdabbea74e5"
+  # Generate a fresh secret before first use:
+  #   openssl rand -hex 32
+  secret_key: "CHANGE_ME"
 
 search:
   formats: [html, json, rss, csv]

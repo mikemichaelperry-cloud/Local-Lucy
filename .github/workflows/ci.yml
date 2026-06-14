@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, v10-dev]
   pull_request:
-    branches: [main, develop]
+    branches: [main, v10-dev]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -28,8 +28,8 @@ jobs:
 
       - name: Run Ruff
         run: |
-          ruff check tools/router_py/ models/router/ || true
-          ruff check ui-v10/app/ || true
+          ruff check tools/router_py/ models/router/
+          ruff check ui-v10/app/
 
   test-router-py:
     runs-on: ubuntu-latest
@@ -48,7 +48,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('ui-v10/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-lock.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -79,7 +79,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('ui-v10/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-lock.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -109,7 +109,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('ui-v10/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-lock.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -124,7 +124,7 @@ jobs:
       - name: Run E2E tests
         run: |
           cd tools/tests
-          python -m pytest test_end_to_end_comprehensive.py -q || true
+          python -m pytest test_end_to_end_comprehensive.py -q
 
   # ---------------------------------------------------------------------------
   # HMI offscreen tests — PySide6 headless GUI validation
@@ -147,7 +147,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('ui-v10/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-lock.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 

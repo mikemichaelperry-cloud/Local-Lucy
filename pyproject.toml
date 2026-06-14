@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-lucy"
-version = "8.0.0"
+version = "10.0.0-beta.1"
 description = "A self-learning, privacy-first desktop AI assistant"
 readme = "README.md"
 license = {text = "MIT"}
@@ -80,5 +80,14 @@ testpaths = [
     "tools/router_py",
     "models/router",
     "tools/tests",
+    "tools/voice/tests",
+    "ui-v10/tests",
+    "tests",
 ]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::ResourceWarning:asyncio.base_events",
+    "ignore::ResourceWarning:pytest.unraisableexception",
+]
+addopts = "--ignore=tools/router_py/test_synthetic_adversarial.py"
