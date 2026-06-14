@@ -28,6 +28,29 @@ import os
 import threading
 from html import unescape
 
+try:
+    from tools.internet.circuit_breaker import CircuitBreaker
+except ImportError:
+    # Fallback when run as standalone script without PYTHONPATH set
+    _cb_path = os.path.join(os.path.dirname(__file__), "circuit_breaker.py")
+    if os.path.exists(_cb_path):
+        import importlib.util
+        _spec = importlib.util.spec_from_file_location("circuit_breaker", _cb_path)
+        _cb_mod = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_cb_mod)
+        CircuitBreaker = _cb_mod.CircuitBreaker
+    else:
+        # Stub if circuit_breaker.py is missing
+        class CircuitBreaker:
+            def is_open(self, _):
+                return False
+            def record_success(self, _):
+                pass
+            def record_failure(self, _):
+                pass
+
+_SEARCH_CB = CircuitBreaker(failure_threshold=3, cooldown_sec=300)
+
 TOOL_VERSION = 2
 
 # ---------------------------------------------------------------------------
@@ -334,16 +357,21 @@ def multi_backend_search(query: str, max_results: int):
         order = [b for b in order if b not in ("searxng_json", "searxng_html")]
 
     for backend_name in order:
+        if _SEARCH_CB.is_open(backend_name):
+            errors[backend_name] = "circuit_open: cooling down"
+            continue
         func = BACKENDS.get(backend_name)
         if func is None:
             continue
         try:
             results = func(query, max_results=max_results * 2)
             if results:
+                _SEARCH_CB.record_success(backend_name)
                 _set_cached(query, backend_name, max_results, results)
                 return backend_name, results
             errors[backend_name] = "empty_results"
         except Exception as exc:
+            _SEARCH_CB.record_failure(backend_name)
             errors[backend_name] = _categorize_error(exc)
 
     raise RuntimeError(f"all_backends_failed: {errors}")
