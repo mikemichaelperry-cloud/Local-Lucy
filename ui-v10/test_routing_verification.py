@@ -17,6 +17,12 @@ Test Categories:
 
 from __future__ import annotations
 
+# This module is a standalone script, not a pytest test suite.
+# Its functions are named test_* for internal consistency only.
+# Run directly: python ui-v10/test_routing_verification.py
+# Do NOT run with pytest — it will fail with "fixture 'r' not found".
+__test__ = False
+
 import argparse
 import json
 import os

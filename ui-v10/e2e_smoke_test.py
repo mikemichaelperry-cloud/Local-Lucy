@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local Lucy v8 — End-to-End Smoke Test
+Local Lucy v10 — End-to-End Smoke Test
 Small but representative set of full-pipeline queries.
 Pre-warms Ollama to keep model loaded.
 """

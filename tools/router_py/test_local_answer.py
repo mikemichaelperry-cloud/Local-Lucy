@@ -371,7 +371,7 @@ class TestPromptBuilding(unittest.TestCase):
         self.assertNotIn("Rex is your dog.", prompt)
 
     def test_build_prompt_skips_persistent_facts_when_retrieval_fails(self):
-        """Test retrieval failure does not fall back to bulk persistent facts."""
+        """Test retrieval failure falls back to direct SQLite load for family queries."""
         with patch("local_answer._get_relevant_persistent_facts", side_effect=RuntimeError("embed failed")):
             prompt = self.answer._build_prompt(
                 "What is my dog's name?",
@@ -381,8 +381,9 @@ class TestPromptBuilding(unittest.TestCase):
                 False,
                 False
             )
-        self.assertNotIn("[PERSISTENT FACTS", prompt)
-        self.assertIn("Answer from your own knowledge", prompt)
+        # Fallback loads family facts directly from SQLite when embeddings fail
+        self.assertIn("[PERSISTENT FACTS", prompt)
+        self.assertIn("Oscar is Mike's dog", prompt)
 
 
 class TestCompletionGuards(unittest.TestCase):
@@ -533,22 +534,22 @@ class TestWarmup(unittest.TestCase):
 
 class TestIntegration(unittest.TestCase):
     """Integration tests with mocked Ollama API."""
-    
+
     async def async_test_policy_query(self):
         """Test policy query returns without API call."""
         answer = LocalAnswer()
-        
+
         with patch.object(answer, '_call_ollama') as mock_call:
             mock_call.side_effect = Exception("Should not be called")
-            
+
             result = await answer.generate_answer(
                 "what is Python",
                 policy_response_id="definition_python"
             )
-            
+
             self.assertFalse(mock_call.called)
             self.assertIn("programming language", result.text)
-    
+
     async def async_test_cache_hit(self):
         """Test cache hit returns cached response."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -557,24 +558,139 @@ class TestIntegration(unittest.TestCase):
                 cache_enabled=True
             )
             answer = LocalAnswer(config)
-            
+
             # Pre-populate cache
             q_norm = answer._normalize_query("test query for cache")
             answer._cache_store(q_norm, "chat:192:0.0:1.0", "cached response")
-            
+
             with patch.object(answer, '_call_ollama') as mock_call:
                 mock_call.side_effect = Exception("Should not be called")
-                
+
                 result = await answer.generate_answer("test query for cache")
-                
+
                 self.assertFalse(mock_call.called)
                 self.assertTrue(result.from_cache)
                 self.assertEqual(result.text, "cached response")
-    
+
     def test_integration(self):
         """Run async integration tests."""
         asyncio.run(self.async_test_policy_query())
         asyncio.run(self.async_test_cache_hit())
+
+
+class TestPersonalFamilyFactResolver(unittest.TestCase):
+    """Tests for the deterministic personal/family/pet fact resolver."""
+
+    def setUp(self):
+        self.answer = LocalAnswer()
+
+    def tearDown(self):
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
+
+    def test_is_personal_family_query_detects_children(self):
+        self.assertTrue(self.answer._is_personal_family_query("Who are my children?"))
+
+    def test_is_personal_family_query_detects_grandchildren(self):
+        self.assertTrue(self.answer._is_personal_family_query("Do I have grandchildren?"))
+
+    def test_is_personal_family_query_detects_dog(self):
+        self.assertTrue(self.answer._is_personal_family_query("What is my dog's name?"))
+
+    def test_is_personal_family_query_rejects_medical(self):
+        self.assertFalse(self.answer._is_personal_family_query("My dog is vomiting, what should I do?"))
+
+    def test_is_personal_family_query_rejects_general(self):
+        self.assertFalse(self.answer._is_personal_family_query("What is Python?"))
+
+    def test_resolve_children_from_facts(self):
+        with patch("local_answer._load_family_facts_direct", return_value=[
+            "Your biological children are Tom, Sahar, and Kim.",
+        ]):
+            result = self.answer._resolve_personal_family_fact("Who are my children?")
+        self.assertIn("Tom", result or "")
+        self.assertIn("Sahar", result or "")
+
+    def test_resolve_grandchildren_from_facts(self):
+        with patch("local_answer._load_family_facts_direct", return_value=[
+            "Your grandchildren are Nibar and Arbel.",
+        ]):
+            result = self.answer._resolve_personal_family_fact("Who are my grandchildren?")
+        self.assertIn("Nibar", result or "")
+        self.assertIn("Arbel", result or "")
+
+    def test_resolve_dog_name_from_facts(self):
+        with patch("local_answer._load_family_facts_direct", return_value=[
+            "Your dog's name is Oscar.",
+        ]):
+            result = self.answer._resolve_personal_family_fact("What is my dog's name?")
+        self.assertIn("Oscar", result or "")
+
+    def test_resolve_partner_from_facts(self):
+        with patch("local_answer._load_family_facts_direct", return_value=[
+            "Racheli is your life partner.",
+        ]):
+            result = self.answer._resolve_personal_family_fact("Who is my partner?")
+        self.assertIn("Racheli", result or "")
+
+    def test_resolve_specific_person_from_facts(self):
+        with patch("local_answer._load_family_facts_direct", return_value=[
+            "Racheli is your life partner.",
+        ]):
+            result = self.answer._resolve_personal_family_fact("Who is Racheli?")
+        self.assertIn("Racheli", result or "")
+
+    def test_resolve_returns_none_for_unknown(self):
+        with patch("local_answer._load_family_facts_direct", return_value=[]):
+            result = self.answer._resolve_personal_family_fact("Who are my children?")
+        self.assertIsNone(result)
+
+    def test_resolve_returns_none_for_non_fact_query(self):
+        result = self.answer._resolve_personal_family_fact("Tell me a story about my children")
+        self.assertIsNone(result)
+
+
+class TestCacheFactRevision(unittest.TestCase):
+    """Tests that cache keys include fact revision for personal/family queries."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.config = LocalAnswerConfig(
+            cache_dir=Path(self.temp_dir),
+            cache_enabled=True,
+            cache_ttl_seconds=3600
+        )
+        self.answer = LocalAnswer(self.config)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_cache_key_changes_with_fact_revision(self):
+        key_without = self.answer._cache_key("who are my children", "chat:192:0.0:1.0")
+        key_with = self.answer._cache_key("who are my children", "chat:192:0.0:1.0", fact_revision="3:5:2026-06-01")
+        self.assertNotEqual(key_without, key_with)
+
+    def test_cache_store_and_load_with_revision(self):
+        query = "who are my children"
+        variant = "chat:192:0.0:1.0"
+        text = "deterministic answer"
+        rev1 = "3:5:2026-06-01"
+        rev2 = "4:6:2026-06-02"
+
+        # Store with rev1
+        self.answer._cache_store(query, variant, text, fact_revision=rev1)
+        cached = self.answer._cache_load(query, variant, fact_revision=rev1)
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached[0], text)
+
+        # Load with different rev2 should miss
+        cached2 = self.answer._cache_load(query, variant, fact_revision=rev2)
+        self.assertIsNone(cached2)
 
 
 def run_tests():
@@ -595,7 +711,9 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestCompletionGuards))
     suite.addTests(loader.loadTestsFromTestCase(TestWarmup))
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
-    
+    suite.addTests(loader.loadTestsFromTestCase(TestPersonalFamilyFactResolver))
+    suite.addTests(loader.loadTestsFromTestCase(TestCacheFactRevision))
+
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     

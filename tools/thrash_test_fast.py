@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local Lucy V8 — Fast Thrash Test (Routing Layer Only)
+Local Lucy V10 — Fast Thrash Test (Routing Layer Only)
 Hammers classification, routing, provider selection, and memory gate.
 No LLM inference — sub-second per query.
 """

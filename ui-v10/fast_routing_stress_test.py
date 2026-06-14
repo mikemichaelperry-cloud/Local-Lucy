@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local Lucy v8 — FAST ROUTING STRESS TEST
+Local Lucy v10 — FAST ROUTING STRESS TEST
 Tests hybrid router directly (no LLM, no network). ~100 queries in <10 seconds.
 """
 import gc, json, os, sys, time

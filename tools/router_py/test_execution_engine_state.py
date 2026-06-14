@@ -472,14 +472,17 @@ class TestJsonStateFiles:
         assert entry["outcome"]["outcome_code"] == "answered"
         assert "request_id" in entry
 
-    def test_history_deduplication(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch):
+    def test_history_appends_each_write(self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch):
+        """Each write appends to history; deduplication removed because
+        request_id now includes nanosecond timestamp for uniqueness."""
         monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
         # First write
         writer.write_json_state_files(sample_route, sample_result, sample_context)
-        # Second write with same request_id
+        # Second write with same request_id (simulates edge case)
         writer.write_json_state_files(sample_route, sample_result, sample_context)
         lines = (tmp_path / "request_history.jsonl").read_text(encoding="utf-8").strip().splitlines()
-        assert len(lines) == 1
+        # Both entries are preserved (deduplication removed)
+        assert len(lines) == 2
 
     def test_augmented_route_provider(self, writer, sample_context, tmp_path, monkeypatch):
         monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))

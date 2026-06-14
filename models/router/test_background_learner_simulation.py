@@ -5,7 +5,7 @@ End-to-end simulation test for the background learner pipeline.
 Runs entirely in a temp directory — never touches production router files.
 
 What it tests:
-  1. learn_once() ingests user feedback and auto-feedback
+  1. learn_once() ingests user feedback only (auto-feedback is telemetry)
   2. Deduplication works (same query overwritten)
   3. Version snapshots are created before mutation
   4. Index, embeddings, and examples are updated
@@ -51,7 +51,7 @@ def isolated_learner(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(bl, "EMBEDDINGS_PATH", tmp_path / "comprehensive_embeddings.npy")
     monkeypatch.setattr(bl, "EXAMPLES_PATH", tmp_path / "comprehensive_examples.json")
     monkeypatch.setattr(bl, "FEEDBACK_PATH", tmp_path / "user_feedback.jsonl")
-    monkeypatch.setattr(bl, "LEARNED_PATH", tmp_path / "learned_examples.jsonl")
+    monkeypatch.setattr(bl, "PENDING_REVIEW_PATH", tmp_path / "pending_review.jsonl")
     monkeypatch.setattr(bl, "LOCK_PATH", tmp_path / ".learner_lock")
     monkeypatch.setattr(bl, "DISABLE_FLAG", tmp_path / ".learner_disable")
     monkeypatch.setattr(bl, "VERSIONS_DIR", tmp_path / "versions")
@@ -178,10 +178,10 @@ class TestLearnOnce:
         assert not bl.FEEDBACK_PATH.exists()
         assert bl.FEEDBACK_PATH.with_suffix(".processed").exists()
 
-    def test_ingests_auto_feedback(
+    def test_auto_feedback_is_telemetry_only(
         self, isolated_learner, mock_embedding_router, starter_index
     ):
-        """Auto-feedback is read and ingested."""
+        """Auto-feedback is NOT ingested into the training index."""
         bl = isolated_learner
         import auto_feedback as af
 
@@ -204,13 +204,13 @@ class TestLearnOnce:
 
         result = bl.learn_once(verbose=False)
 
-        assert result["added"] == 1
-        assert result["new_from_auto"] == 1
+        # Auto-feedback must NOT be ingested
+        assert result["added"] == 0
+        assert result["new_from_auto"] == 0
 
         index = bl.load_index()
-        assert any(
+        assert not any(
             ex["query"] == "What is the capital of Germany?"
-            and ex["labels"]["route"] == "AUGMENTED"
             for ex in index
         )
 
@@ -254,7 +254,7 @@ class TestLearnOnce:
 
         assert result["added"] == 0
         assert result["new_from_feedback"] == 0
-        assert result["new_from_auto"] == 0
+        assert result["new_from_auto"] == 0  # telemetry only
         # No version snapshot when nothing changed
         versions = list(bl.VERSIONS_DIR.glob("v_*"))
         assert len(versions) == 0
@@ -337,22 +337,25 @@ class TestMaybeAutoLearn:
 
         assert result is False
 
-    def test_counts_user_plus_auto_feedback(
+    def test_counts_user_feedback_only(
         self, isolated_learner, mock_embedding_router, starter_index
     ):
-        """Counts both user_feedback and auto_feedback toward threshold."""
+        """Only user_feedback counts toward threshold; auto_feedback is ignored."""
         bl = isolated_learner
         import auto_feedback as af
 
-        # 1 user + 2 auto = 3 total
+        # 3 user entries — auto_feedback must NOT count
         bl.FEEDBACK_PATH.write_text(
-            json.dumps(
-                {
-                    "timestamp": "2026-05-13T10:00:00Z",
-                    "query": "User feedback",
-                    "correct_route": "LOCAL",
-                    "feedback_type": "correction",
-                }
+            "\n".join(
+                json.dumps(
+                    {
+                        "timestamp": "2026-05-13T10:00:00Z",
+                        "query": f"User feedback {i}",
+                        "correct_route": "LOCAL",
+                        "feedback_type": "correction",
+                    }
+                )
+                for i in range(3)
             )
             + "\n"
         )
@@ -390,12 +393,11 @@ class TestEndToEnd:
         """
         Simulate a realistic scenario:
         - 2 seed examples in the index
-        - 2 user corrections + 1 auto-feedback
-        - learn_once() processes all, deduplicates, versions, rebuilds
+        - 2 user corrections
+        - learn_once() processes user feedback only, deduplicates, versions, rebuilds
         - Verify final state
         """
         bl = isolated_learner
-        import auto_feedback as af
 
         # Seed feedback
         user_entries = [
@@ -416,29 +418,13 @@ class TestEndToEnd:
             "\n".join(json.dumps(e) for e in user_entries) + "\n"
         )
 
-        auto_entries = [
-            {
-                "timestamp": "2026-05-13T10:02:00Z",
-                "source": "auto_feedback",
-                "query": "What is quantum computing?",
-                "correct_route": "AUGMENTED",
-                "reason": "augmented_answer_incomplete",
-                "confidence": 0.75,
-                "details": "Local answer was too short",
-                "feedback_type": "auto_correction",
-            }
-        ]
-        af.AUTO_FEEDBACK_PATH.write_text(
-            "\n".join(json.dumps(e) for e in auto_entries) + "\n"
-        )
-
         result = bl.learn_once(verbose=False)
 
-        # 2 seed + 2 user + 1 auto = 5 total
-        assert result["added"] == 3
-        assert result["total"] == 5
+        # 2 seed + 2 user = 4 total
+        assert result["added"] == 2
+        assert result["total"] == 4
         assert result["new_from_feedback"] == 2
-        assert result["new_from_auto"] == 1
+        assert result["new_from_auto"] == 0
 
         # Verify all expected queries are in the final index
         index = bl.load_index()
@@ -448,18 +434,16 @@ class TestEndToEnd:
             "What is the weather in Paris?",
             "What is the capital of France?",
             "Tell me the news",
-            "What is quantum computing?",
         }
 
         # Verify routes are correct
         route_map = {ex["query"]: ex["labels"]["route"] for ex in index}
         assert route_map["What is the capital of France?"] == "AUGMENTED"
         assert route_map["Tell me the news"] == "NEWS"
-        assert route_map["What is quantum computing?"] == "AUGMENTED"
 
         # Verify embeddings shape
         embeddings = np.load(bl.EMBEDDINGS_PATH)
-        assert embeddings.shape == (5, 384)
+        assert embeddings.shape == (4, 384)
         assert embeddings.dtype == np.float32
 
         # Verify version snapshot

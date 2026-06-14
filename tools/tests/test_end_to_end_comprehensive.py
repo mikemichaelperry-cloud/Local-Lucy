@@ -159,14 +159,14 @@ def test_infrastructure():
 
     # 1e. Router index files
     print("\n  1e. Router embedding index...")
-    index_path = ROOT / "models" / "router" / "comprehensive_index.jsonl"
+    examples_path = ROOT / "models" / "router" / "comprehensive_examples.json"
     embeddings_path = ROOT / "models" / "router" / "comprehensive_embeddings.npy"
-    test("Router index exists", index_path.exists(), f"path={index_path}")
+    test("Router examples exist", examples_path.exists(), f"path={examples_path}")
     test("Router embeddings exist", embeddings_path.exists(), f"path={embeddings_path}")
-    if index_path.exists():
-        with open(index_path) as f:
-            count = sum(1 for _ in f)
-        test("Router index has examples", count > 400, f"count={count}")
+    if examples_path.exists():
+        with open(examples_path) as f:
+            count = len(json.load(f))
+        test("Router examples has entries", count > 400, f"count={count}")
 
 
 # ============================================================================

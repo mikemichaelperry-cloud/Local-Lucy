@@ -257,6 +257,30 @@ class TestMemoryServiceUnit(unittest.TestCase):
         ).fetchone()
         self.assertIsNotNone(row[0])
 
+    # ------------------------------------------------------------------
+    # get_persistent_facts_revision
+    # ------------------------------------------------------------------
+
+    def test_get_persistent_facts_revision_changes_on_insert(self):
+        rev0 = ms.get_persistent_facts_revision("family")
+        ms.store_persistent_fact("Your son is Tom.", category="family")
+        rev1 = ms.get_persistent_facts_revision("family")
+        self.assertNotEqual(rev0, rev1)
+
+    def test_get_persistent_facts_revision_stable_when_unchanged(self):
+        ms.store_persistent_fact("Your daughter is Anna.", category="family")
+        rev1 = ms.get_persistent_facts_revision("family")
+        rev2 = ms.get_persistent_facts_revision("family")
+        self.assertEqual(rev1, rev2)
+
+    def test_get_persistent_facts_revision_isolated_by_category(self):
+        rev_family_before = ms.get_persistent_facts_revision("family")
+        ms.store_persistent_fact("I drive a Tesla.", category="car")
+        rev_family_after = ms.get_persistent_facts_revision("family")
+        self.assertEqual(rev_family_before, rev_family_after)
+        rev_car = ms.get_persistent_facts_revision("car")
+        self.assertNotEqual(rev_car, rev_family_before)
+
 
 if __name__ == "__main__":
     unittest.main()

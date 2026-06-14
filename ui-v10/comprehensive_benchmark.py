@@ -22,7 +22,7 @@ os.environ["LUCY_UI_ROOT"] = str(UI_ROOT)
 os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_NS)
 os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
 
-REPORT_FILE = Path.home() / "Desktop" / "lucy_v8_benchmark_report.json"
+REPORT_FILE = Path.home() / "Desktop" / "lucy_v10_benchmark_report.json"
 
 
 def run_command(cmd, timeout=300, env=None):
@@ -216,7 +216,7 @@ def generate_report(prereqs, text_results, tts_results, voice_checks):
 
 def main():
     print("\n" + "=" * 60)
-    print("LOCAL LUCY v7 COMPREHENSIVE BENCHMARK")
+    print("LOCAL LUCY v10 COMPREHENSIVE BENCHMARK")
     print("=" * 60)
     print(f"Started: {datetime.now().strftime('%H:%M:%S')}")
     print(f"Report will be saved to: {REPORT_FILE}")
