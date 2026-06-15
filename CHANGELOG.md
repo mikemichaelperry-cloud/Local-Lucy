@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Dedicated `FINANCE` route with live market-data fetchers and source citations.
+  - Exchange rates via `exchangerate-api.com`
+  - Crypto prices via CoinGecko
+  - Stock/index quotes via Yahoo Finance with web-search fallback on rate-limit
+  - Net-worth lookups via web search restricted to trusted finance sources
+- `tools/router_py/test_finance_routing.py` covering route detection, provider helpers, and execution labeling.
+
+### Changed
+- `SESSION_CONTEXT.md` and `ARCHITECTURE.md` now document the `FINANCE` route and its data sources.
+
 ## [10.0.0-beta.1] - 2026-06-14
 
 ### Added

@@ -102,27 +102,41 @@ Rules:
 ```
 User Query
     ↓
-[Keyword Guards] — Medical? Vet? News? Weather? → Hard route
+[Keyword Guards] — Medical? Vet? News? Weather? Finance? → Hard route
     ↓
 [HybridRouterV2] — MiniLM embedding k-NN (k=3) + keyword boost
     ↓
-RoutingDecision: LOCAL | AUGMENTED | NEWS | WEATHER | EVIDENCE | URL_REFERENCE | CLARIFY | UNKNOWN
+RoutingDecision: LOCAL | AUGMENTED | NEWS | WEATHER | EVIDENCE | FINANCE | URL_REFERENCE | CLARIFY | UNKNOWN
     ↓
 [ExecutionEngine] — Route-specific handler
     ↓
 Response
 ```
 
+### FINANCE Route (Added 2026-06-15)
+
+Live market-data route with source citations, distinct from `LOCAL` personal-finance reasoning.
+
+| Query Type | Primary Source | Fallback |
+|---|---|---|
+| Exchange rates (`EUR to USD`) | `exchangerate-api.com` | — |
+| Crypto (`Bitcoin price`) | CoinGecko | — |
+| Stocks/indices (`TSLA`, `S&P 500`) | Yahoo Finance | Web search |
+| Net worth (`Elon Musk net worth`) | Web search (trusted finance sources) | — |
+
+Personal-finance reasoning queries (budgeting, investing advice, tax planning) continue to route `LOCAL`.
+
+
 ### Router Loading (Fixed 2026-06-08)
 - `_get_router()` in `classify.py` now logs all exceptions to stderr
 - Previously had bare `except Exception:` that silently swallowed errors
 - Common failure: missing `pytz` → `sentence_transformers` import chain fails
 
-### Safety Layers (Medical/Vet)
-1. **Keyword guard** — Pre-router regex catches critical medical/vet terms
+### Safety Layers (Medical/Vet/Finance)
+1. **Keyword guard** — Pre-router regex catches critical medical/vet/finance terms
 2. **Policy check** — `policy.requires_evidence_mode()` for medical_context, body_symptom, etc.
-3. **Embedding override** — If router misroutes, evidence mode is forced
-4. **Provider hardcoding** — Medical queries always route to trusted evidence
+3. **Embedding override** — If router misroutes, evidence/finance mode is forced
+4. **Provider hardcoding** — Medical queries always route to trusted evidence; finance market-data queries route to `FINANCE` with source citations
 
 ### Memory Follow-up Guard (Fixed 2026-06-07)
 - Short follow-ups like "why?" after medical answers no longer override EVIDENCE back to LOCAL
@@ -133,7 +147,7 @@ Response
 ## 5. Search Architecture (Multi-Backend, 2026-06-08)
 
 ```
-User Query (AUGMENTED/NEWS/WEATHER/EVIDENCE)
+User Query (AUGMENTED/NEWS/WEATHER/EVIDENCE/FINANCE)
     ↓
 [search_web.py]
     ├─→ DuckDuckGo direct (free, no API key) ← PRIMARY

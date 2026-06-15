@@ -26,7 +26,7 @@
 | `response_formatter.py` | ~175 | Pure formatting/validation utilities: `validate_response`, `render_chat_fast_from_raw`, `build_augmented_prompt`, `guard_normalize`. |
 | `classify.py` | ~850 | Intent classification (`classify_intent`), route selection (`select_route`), memory routing gate. |
 | `execution_engine.py` | ~3,700 | Route dispatch, evidence fetching, provider calls, local worker calls, state file writing. |
-| `providers/` | 8 files | Extracted provider modules: wikipedia, openai, kimi, weather, time, news, evidence, local. |
+| `providers/` | 9 files | Extracted provider modules: wikipedia, openai, kimi, weather, time, news, evidence, local, finance (live market data). |
 
 ## Entry Points (all go through `main.run()`)
 
@@ -55,7 +55,7 @@
 2. **Frozen dataclasses**: `ClassificationResult`, `RoutingDecision`, `ExecutionResult`, `RouterOutcome` are immutable. Use `dataclasses.replace()`.
 3. **Provider resolution centralized**: Only `provider_resolver.py` reads `LUCY_AUGMENTED_PROVIDER`.
 4. **Medical safety hardcoded**: `medical_context` → wikipedia, cannot be overridden.
-5. **Route preservation on failure**: WEATHER stays WEATHER even if wttr.in fails.
+5. **Route preservation on failure**: WEATHER stays WEATHER even if wttr.in fails; FINANCE stays FINANCE even if a quote source rate-limits and falls back to web search.
 6. **Memory persistence centralized**: Only `main._persist_memory_turn()` writes memory.
 7. **Pure formatting**: `response_formatter.py` has no side effects, no I/O.
 
