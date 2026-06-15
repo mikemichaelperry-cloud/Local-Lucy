@@ -90,12 +90,13 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v9-dev  ⚠️  (needs GitHub admin to set default to v10-dev)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 7
+Commits since tag: 8
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+5af7769 feat(finance): add dedicated FINANCE route with live market data fetchers
 6e4ac39 feat(evidence): label EVIDENCE responses when fallback to non-trusted providers is used
 61d7429 fix(evidence): reject TOC landing pages and off-topic content in trusted provider
 17be065 docs: session handoff 2026-06-14 — production hardening complete
@@ -197,5 +198,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-15T16:47:00Z*
-*Session: verified AUGMENTED/EVIDENCE routing and added fallback-source labeling for EVIDENCE responses*
+*Last updated: 2026-06-15T17:32:00Z*
+*Session: added dedicated FINANCE route with live stock, FX, and net-worth fetchers plus source citations*
