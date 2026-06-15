@@ -81,12 +81,10 @@ def provider_usage_class_for(provider: str | None) -> str:
     match provider.lower():
         case "openai" | "kimi":
             return "paid"
-        case "wikipedia":
+        case "wikipedia" | "finance" | "trusted":
             return "free"
         case "local":
             return "local"
-        case "trusted":
-            return "free"  # Trusted sources are free (no paid API)
         case _:
             return "none"
 

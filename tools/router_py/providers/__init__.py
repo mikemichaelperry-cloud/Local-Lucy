@@ -12,6 +12,7 @@ from router_py.providers.evidence import (
     fetch_weather_evidence,
     fetch_news_evidence,
     fetch_trusted_evidence,
+    fetch_finance_evidence,
     format_time_response,
 )
 from router_py.providers.wikipedia import format_wikipedia_response
@@ -26,6 +27,7 @@ __all__ = [
     "fetch_weather_evidence",
     "fetch_news_evidence",
     "fetch_trusted_evidence",
+    "fetch_finance_evidence",
     "format_time_response",
     "format_wikipedia_response",
     "call_openai_for_response",

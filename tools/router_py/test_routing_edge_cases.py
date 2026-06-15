@@ -92,7 +92,7 @@ ROUTING_TEST_CASES = [
     # ---- Capital city vs financial capital ----
     ("What is the capital of France?", "AUGMENTED", "capital_ambiguity"),
     ("Capital of Japan", "LOCAL", "capital_ambiguity"),  # fine-tuned MiniLM correctly routes factual queries to LOCAL
-    ("Current stock price of Apple", "AUGMENTED", "capital_ambiguity"),
+    ("Current stock price of Apple", "FINANCE", "capital_ambiguity"),
     ("Working capital ratio explained", "AUGMENTED", "capital_ambiguity"),
     ("Capital gains tax rules", "AUGMENTED", "capital_ambiguity"),  # general tax knowledge, safe for augmentation
 

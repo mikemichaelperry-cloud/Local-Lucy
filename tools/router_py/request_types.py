@@ -30,13 +30,14 @@ RouteType = Literal[
     "NEWS",
     "WEATHER",
     "TIME",
+    "FINANCE",
     "EVIDENCE",
     "MEMORY_RECALL",
 ]
 
 ModeType = Literal["AUTO", "FORCED_OFFLINE", "FORCED_ONLINE", "FORCED"]
 
-ProviderType = Literal["local", "wikipedia", "openai", "kimi", "news", "weather", "time"]
+ProviderType = Literal["local", "wikipedia", "openai", "kimi", "news", "weather", "time", "finance", "trusted"]
 
 ProviderUsageClass = Literal["local", "free", "paid"]
 
@@ -341,5 +342,7 @@ def provider_usage_class_for(provider: str) -> str:
         "news": "free",
         "weather": "free",
         "time": "free",
+        "finance": "free",
+        "trusted": "free",
     }
     return mapping.get(provider, "local")

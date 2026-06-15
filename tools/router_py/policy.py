@@ -933,7 +933,7 @@ def provider_usage_class_for(provider: str) -> Literal["paid", "free", "local", 
     
     if normalized in ("openai", "kimi"):
         return "paid"
-    if normalized == "wikipedia":
+    if normalized in ("wikipedia", "finance", "trusted"):
         return "free"
     if normalized == "local":
         return "local"

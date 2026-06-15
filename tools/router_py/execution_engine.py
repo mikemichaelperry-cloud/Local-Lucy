@@ -195,6 +195,7 @@ try:
         fetch_weather_evidence,
         fetch_news_evidence,
         fetch_trusted_evidence,
+        fetch_finance_evidence,
         format_time_response,
         format_wikipedia_response,
         call_openai_for_response,
@@ -796,7 +797,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         # Use Python-native path by default for all routes (shell-free)
         # Following burn-in certification (2,221+ queries, 100% success)
-        if use_python_path and route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "LOCAL", "TIME", "WEATHER"):
+        if use_python_path and route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "LOCAL", "TIME", "WEATHER", "FINANCE"):
             self._logger.info("Using Python-native execution path (shell-free)")
             # Run the async version in a new event loop
             try:
@@ -1147,6 +1148,8 @@ them according to the route type (bypass, provisional, or full). It handles:
         wikipedia/kimi/openai instead, the response must be clearly marked so
         the user knows the source is not from the trusted allowlist.
         """
+        if result.route != "EVIDENCE":
+            return result
         if not evidence or not evidence.get("fallback_used"):
             return result
         successful_backend = evidence.get("successful_backend", "")
@@ -1892,7 +1895,7 @@ them according to the route type (bypass, provisional, or full). It handles:
             route_type = self._determine_route_type(route, intent, context)
             
             # Use Python-native execution based on route type
-            if route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "TIME", "WEATHER"):
+            if route.route in ("FULL", "EVIDENCE", "NEWS", "AUGMENTED", "TIME", "WEATHER", "FINANCE"):
                 result = await self._execute_full_route_python(intent, route, context)
             elif route_type == "provisional":
                 # Provisional: local first with fallback to augmentation
@@ -2014,7 +2017,7 @@ them according to the route type (bypass, provisional, or full). It handles:
         
         # Step 1: Fetch evidence if needed
         evidence = None
-        if route.route in ("EVIDENCE", "NEWS", "FULL", "AUGMENTED", "TIME", "WEATHER"):
+        if route.route in ("EVIDENCE", "NEWS", "FULL", "AUGMENTED", "TIME", "WEATHER", "FINANCE"):
             # Check if this is a voice query for voice-optimized content
             for_voice = context.get("surface") == "voice" if context else False
             evidence = await self._fetch_evidence(question, route, for_voice=for_voice)
@@ -2145,6 +2148,49 @@ them according to the route type (bypass, provisional, or full). It handles:
                     "real_route_preserved": True,
                 },
             )
+        
+        # Special handling for FINANCE route: return market data directly
+        if route.route == "FINANCE":
+            if evidence and evidence.get("ok"):
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="answered",
+                    route="FINANCE",
+                    provider="finance",
+                    provider_usage_class="free",
+                    response_text=evidence["formatted"],
+                    error_message="",
+                    metadata={
+                        "route_type": "finance_lookup",
+                        "finance_type": evidence.get("class"),
+                        "symbol": evidence.get("symbol"),
+                        "base": evidence.get("base"),
+                        "target": evidence.get("target"),
+                        "person": evidence.get("person"),
+                        "source": evidence.get("source"),
+                        "real_route_preserved": True,
+                    },
+                )
+            else:
+                error_msg = evidence.get("error", "Unable to retrieve data") if evidence else "Could not fetch finance data"
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="error",
+                    route="FINANCE",
+                    provider="finance",
+                    provider_usage_class="free",
+                    response_text=(
+                        "Sorry, I couldn't fetch live financial data for that query. "
+                        "I can look up stock prices, exchange rates, and net-worth estimates "
+                        "from public sources. Please try a specific query like "
+                        "'Tesla stock price' or 'EUR to USD'."
+                    ),
+                    error_message=error_msg,
+                    metadata={
+                        "route_type": "finance_lookup_failed",
+                        "real_route_preserved": True,
+                    },
+                )
         
         # Step 2: Check for bounded response from trusted provider
         # Trusted medical/vet/finance providers return pre-formatted responses
@@ -2305,6 +2351,10 @@ them according to the route type (bypass, provisional, or full). It handles:
         if route.route == "NEWS":
             return await self._fetch_news_evidence(question, for_voice=for_voice)
         
+        # For FINANCE route, fetch live market data
+        if route.route == "FINANCE":
+            return await self._fetch_finance_evidence(question)
+        
         # For AUGMENTED news-synthesis requests, fetch news headlines as evidence
         # then fall back to the standard provider chain if news is unavailable
         if route.route == "AUGMENTED" and route.evidence_reason == "news_synthesis":
@@ -2459,6 +2509,26 @@ them according to the route type (bypass, provisional, or full). It handles:
         except Exception as e:
             breaker._on_failure(e)
             self._logger.warning(f"Weather evidence fetch failed: {e}")
+            return None
+    
+    async def _fetch_finance_evidence(self, question: str) -> dict[str, Any] | None:
+        """Fetch live finance/market data (delegated to provider module)."""
+        breaker = get_breaker("finance_api")
+        try:
+            breaker._before_call()
+        except CircuitBreakerOpen:
+            self._logger.warning("Circuit breaker open for finance_api")
+            return None
+        try:
+            if HAS_PROVIDER_MODULES:
+                result = await fetch_finance_evidence(question)
+                breaker._on_success()
+                return result
+            self._logger.warning("Provider modules not available")
+            return None
+        except Exception as e:
+            breaker._on_failure(e)
+            self._logger.warning(f"Finance evidence fetch failed: {e}")
             return None
     
     async def _fetch_trusted_evidence(

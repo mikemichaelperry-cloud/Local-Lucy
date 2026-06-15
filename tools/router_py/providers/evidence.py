@@ -11,8 +11,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import sys
 import time
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -421,3 +423,255 @@ async def fetch_trusted_evidence(
     except Exception as e:
         logger.warning(f"Trusted evidence fetch failed: {e}")
         return None
+
+
+# ---------------------------------------------------------------------------
+# Finance data fetcher
+# ---------------------------------------------------------------------------
+
+_FINANCE_COMMON_TICKERS = {
+    "apple": "AAPL",
+    "microsoft": "MSFT",
+    "amazon": "AMZN",
+    "google": "GOOGL",
+    "alphabet": "GOOGL",
+    "nvidia": "NVDA",
+    "tesla": "TSLA",
+    "meta": "META",
+    "facebook": "META",
+    "netflix": "NFLX",
+    "bitcoin": "BTC-USD",
+    "ethereum": "ETH-USD",
+    "s&p 500": "^GSPC",
+    "nasdaq": "^IXIC",
+    "dow jones": "^DJI",
+    "ftse": "^FTSE",
+    "nikkei": "^N225",
+}
+
+_FINANCE_CURRENCY_CODES = {
+    "dollar": "USD", "usd": "USD", "$": "USD",
+    "euro": "EUR", "eur": "EUR", "€": "EUR",
+    "pound": "GBP", "gbp": "GBP", "£": "GBP",
+    "yen": "JPY", "jpy": "JPY", "¥": "JPY",
+    "shekel": "ILS", "ils": "ILS", "₪": "ILS",
+    "canadian dollar": "CAD", "cad": "CAD", "c$": "CAD",
+    "australian dollar": "AUD", "aud": "AUD", "a$": "AUD",
+    "swiss franc": "CHF", "chf": "CHF",
+}
+
+
+def _match_exchange_rate(question: str) -> dict[str, str] | None:
+    """Detect exchange-rate queries like 'EUR to USD' or 'euro to dollar'."""
+    q = question.lower()
+    # Pattern: <code/word> to <code/word>
+    match = re.search(r"(\b[a-z$€£¥₪]+\b)\s+to\s+(\b[a-z$€£¥₪]+\b)", q)
+    if not match:
+        return None
+    base_word, target_word = match.group(1), match.group(2)
+    base = _FINANCE_CURRENCY_CODES.get(base_word, base_word.upper())
+    target = _FINANCE_CURRENCY_CODES.get(target_word, target_word.upper())
+    if len(base) == 3 and len(target) == 3:
+        return {"base": base, "target": target}
+    return None
+
+
+def _extract_stock_symbol(question: str) -> str | None:
+    """Extract a ticker symbol or mapped company name from a finance query."""
+    q = question.lower()
+
+    # Explicit ticker in uppercase (e.g., "TSLA", "AAPL")
+    ticker_match = re.search(r"\b([A-Z]{1,5}(?:-USD)?)\b", question)
+    if ticker_match and ticker_match.group(1).upper() not in {"I", "A", "USD", "EUR", "GBP"}:
+        return ticker_match.group(1).upper()
+
+    # Known company / index names
+    for name, ticker in _FINANCE_COMMON_TICKERS.items():
+        if name in q:
+            return ticker
+
+    # "X stock price" / "X share price" / "X stock"
+    for pattern in [r"([a-z]+)\s+stock\s+price", r"([a-z]+)\s+share\s+price", r"([a-z]+)\s+stock\b"]:
+        match = re.search(pattern, q)
+        if match:
+            name = match.group(1)
+            if name in _FINANCE_COMMON_TICKERS:
+                return _FINANCE_COMMON_TICKERS[name]
+    return None
+
+
+def _extract_net_worth_person(question: str) -> str | None:
+    """Extract a person's name from net-worth queries."""
+    q = question.lower()
+    patterns = [
+        r"how much is ([a-z]+(?:\s+[a-z]+){0,2}) worth",
+        r"how much is ([a-z]+(?:\s+[a-z]+){0,2}) valued at",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, q)
+        if match:
+            person = match.group(1).strip()
+            if person and person not in {"it", "he", "she", "they", "this", "that"}:
+                return person.title()
+    return None
+
+
+def _fetch_exchange_rate(base: str, target: str) -> dict[str, Any] | None:
+    """Fetch exchange rate from exchangerate-api.com (free, no key)."""
+    url = f"https://api.exchangerate-api.com/v4/latest/{base}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Local-Lucy/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        rate = data.get("rates", {}).get(target)
+        if rate is None:
+            return None
+        formatted = f"1 {base} = {rate:.4f} {target} (as of {data.get('date', 'unknown')})"
+        return {
+            "ok": True,
+            "context": formatted,
+            "formatted": formatted,
+            "title": f"{base}/{target} Exchange Rate",
+            "url": url,
+            "provider": "finance",
+            "source": "exchangerate-api.com",
+            "base": base,
+            "target": target,
+            "rate": rate,
+            "class": "finance_exchange_rate",
+        }
+    except Exception as e:
+        logger.warning(f"Exchange rate fetch failed: {e}")
+    return None
+
+
+def _fetch_yahoo_finance(symbol: str) -> dict[str, Any] | None:
+    """Fetch latest price from Yahoo Finance chart API (unofficial endpoint)."""
+    encoded = urllib.parse.quote(symbol)
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{encoded}?interval=1d&range=1d"
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        result = data.get("chart", {}).get("result", [None])[0]
+        if not result:
+            return None
+        meta = result.get("meta", {})
+        price = meta.get("regularMarketPrice")
+        prev_close = meta.get("previousClose") or meta.get("chartPreviousClose")
+        currency = meta.get("currency", "USD")
+        exchange = meta.get("exchangeName", "")
+        if price is None:
+            return None
+        change = price - prev_close if prev_close else 0
+        pct = (change / prev_close * 100) if prev_close else 0
+        change_str = f"{change:+.2f} ({pct:+.2f}%)" if prev_close else "n/a"
+        formatted = f"{symbol}: {price:.2f} {currency} ({change_str})"
+        if exchange:
+            formatted += f" on {exchange}"
+        return {
+            "ok": True,
+            "context": formatted,
+            "formatted": formatted,
+            "title": f"{symbol} Quote",
+            "url": f"https://finance.yahoo.com/quote/{encoded}",
+            "provider": "finance",
+            "source": "Yahoo Finance",
+            "symbol": symbol,
+            "price": price,
+            "currency": currency,
+            "class": "finance_quote",
+        }
+    except Exception as e:
+        logger.warning(f"Yahoo Finance fetch failed for {symbol}: {e}")
+    return None
+
+
+async def _fetch_net_worth(person: str) -> dict[str, Any] | None:
+    """Fetch net-worth estimate via web search restricted to trusted finance sources."""
+    search_script = ROOT_DIR / "tools" / "internet" / "search_web.py"
+    if not search_script.exists():
+        return None
+    query = f"{person} net worth"
+    try:
+        payload = json.dumps({"query": query, "max_results": 5})
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, str(search_script),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(ROOT_DIR),
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(payload.encode("utf-8")), timeout=20.0)
+        if proc.returncode != 0:
+            logger.warning(f"Net-worth search failed: {stderr.decode()[:200]}")
+            return None
+        data = json.loads(stdout.decode("utf-8"))
+        results = data.get("results", [])
+        if not results:
+            return None
+        # Use the first result's snippet as evidence; include source URL
+        top = results[0]
+        snippet = top.get("snippet", "").strip()
+        title = top.get("title", "")
+        url = top.get("url", "")
+        if not snippet:
+            return None
+        formatted = f"{person} net worth (from search): {snippet}\n\nSource: {title}\n{url}"
+        return {
+            "ok": True,
+            "context": formatted,
+            "formatted": formatted,
+            "title": f"{person} Net Worth",
+            "url": url,
+            "provider": "finance",
+            "source": "web search",
+            "person": person,
+            "class": "finance_net_worth",
+        }
+    except Exception as e:
+        logger.warning(f"Net-worth fetch failed for {person}: {e}")
+    return None
+
+
+async def fetch_finance_evidence(question: str) -> dict[str, Any] | None:
+    """Fetch live finance/market data for a question.
+
+    Tries, in order:
+      1. Exchange-rate queries (e.g. "EUR to USD")
+      2. Stock / index / crypto quotes (e.g. "Tesla stock price")
+      3. Individual net-worth queries (e.g. "How much is Elon Musk worth?")
+
+    Returns an evidence dict with a formatted answer and source citation,
+    or None if no live data could be retrieved.
+    """
+    logger.debug(f"Fetching finance evidence for: {question[:50]}...")
+
+    # 1. Exchange rate
+    fx = _match_exchange_rate(question)
+    if fx:
+        result = _fetch_exchange_rate(fx["base"], fx["target"])
+        if result:
+            return result
+
+    # 2. Stock / index / crypto quote
+    symbol = _extract_stock_symbol(question)
+    if symbol:
+        result = _fetch_yahoo_finance(symbol)
+        if result:
+            return result
+
+    # 3. Net worth / billionaire query
+    person = _extract_net_worth_person(question)
+    if person:
+        result = await _fetch_net_worth(person)
+        if result:
+            return result
+
+    logger.info(f"No finance fetcher matched question: {question[:50]}")
+    return None

@@ -181,13 +181,13 @@ class TestAugmentedAutoRouting(unittest.TestCase):
     # Finance / live data — must route to AUGMENTED (or EVIDENCE for high-stakes)
     # ------------------------------------------------------------------
 
-    def test_stock_price_augmented(self):
+    def test_stock_price_finance(self):
         route, _ = self._route("What is the current Apple stock price?")
-        self.assertIn(route, ("AUGMENTED", "EVIDENCE"), f"Expected AUGMENTED/EVIDENCE for finance query, got {route}")
+        self.assertEqual(route, "FINANCE", f"Expected FINANCE for finance query, got {route}")
 
-    def test_exchange_rate_augmented(self):
+    def test_exchange_rate_finance(self):
         route, _ = self._route("What is the EUR to USD exchange rate?")
-        self.assertIn(route, ("AUGMENTED", "EVIDENCE"), f"Expected AUGMENTED/EVIDENCE for exchange rate, got {route}")
+        self.assertEqual(route, "FINANCE", f"Expected FINANCE for exchange rate, got {route}")
 
     # ------------------------------------------------------------------
     # Math / coding — should stay LOCAL (local LLM handles these well)

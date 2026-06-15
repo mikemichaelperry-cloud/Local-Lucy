@@ -42,10 +42,10 @@ class TestPersonalFinanceReasoning:
         "NASDAQ index right now",
         "Federal Reserve interest rate today",
     ])
-    def test_live_financial_data_routes_augmented(self, query):
-        """Live financial data lookups should still route to AUGMENTED."""
+    def test_live_financial_data_routes_finance(self, query):
+        """Live financial data lookups should route to FINANCE."""
         classification = classify_intent(query)
         decision = select_route(classification, query=query)
-        assert decision.route == "AUGMENTED", (
-            f"{query!r} should route to AUGMENTED, got {decision.route}"
+        assert decision.route == "FINANCE", (
+            f"{query!r} should route to FINANCE, got {decision.route}"
         )

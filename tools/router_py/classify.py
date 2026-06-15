@@ -287,7 +287,7 @@ _TECH_THEORY_RE = tuple(re.compile(p) for p in (
 # Pre-compiled financial ephemeral short-pattern regexes
 _FINANCIAL_SHORT_RE = tuple(re.compile(p) for p in (
     r"\b(shares|stock|price|rate)\s+(now|today)\b",
-    r"\b(current\s+)?(price|value)\s+of\b",
+    r"\b(current\s+)?(price|value)\s+of\s+(a|the|one)?\s*(bitcoin|btc|ethereum|eth|gold|silver|oil|gas|stock|share|crypto|currency|tesla|apple|aapl|tsla|microsoft|msft|amazon|amzn|google|googl|nvidia|nvda|meta|facebook)\b",
     r"\b(market value|market cap)\b",
     r"\bhow much is (one|a|the)\s+(bitcoin|btc|ethereum|eth)\b",
     r"\b(trading at|worth now)\b",
@@ -545,6 +545,31 @@ def select_route(
     # Shared lowercased query for the embedding path — compute once, reuse everywhere
     q_lower = query.lower()
 
+    # Finance query guard — catch unambiguous live-market queries BEFORE the
+    # short-query guard so that brief queries like "EUR to USD" or "TSLA" are
+    # treated as live data requests, not social utterances.
+    if query and _is_financial_ephemeral(query):
+        decision = RoutingDecision(
+            route="FINANCE",
+            mode="AUTO",
+            intent_family="current_evidence",
+            confidence=1.0,
+            provider="finance",
+            provider_usage_class="free",
+            evidence_mode="",
+            evidence_reason="financial_data",
+            requires_evidence=False,
+            policy_reason="router_finance_guard",
+            ephemeral=True,
+        )
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="FINANCE_KEYWORD_GUARD",
+            guards_fired=["finance_keyword_guard"],
+        )
+        return decision
+
     # Short-query guard: very short utterances that look like feedback,
     # confirmations, or follow-ups should stay LOCAL regardless of embedding,
     # UNLESS the prior exchange required evidence AND the current query is an
@@ -570,7 +595,7 @@ def select_route(
                     _exchanges = _data.get("exchanges", [])
                     if _exchanges:
                         _last_route = str(_exchanges[-1].get("route", "")).upper()
-                        if _last_route in ("AUGMENTED", "EVIDENCE", "NEWS", "TIME", "WEATHER"):
+                        if _last_route in ("AUGMENTED", "EVIDENCE", "NEWS", "TIME", "WEATHER", "FINANCE"):
                             # Informational follow-up to an evidence route: inherit
                             return _make_augmented_decision(classification, prefer_paid=False, query=query)
             except Exception:
@@ -934,6 +959,20 @@ def select_route(
                     policy_reason="router_weather",
                     ephemeral=True,
                 )
+            elif route == "FINANCE":
+                decision = RoutingDecision(
+                    route="FINANCE",
+                    mode="AUTO",
+                    intent_family=intent_family,
+                    confidence=confidence,
+                    provider="finance",
+                    provider_usage_class="free",
+                    evidence_mode=evidence_mode,
+                    evidence_reason=evidence_reason,
+                    requires_evidence=requires_evidence,
+                    policy_reason="router_finance",
+                    ephemeral=True,
+                )
             else:  # AUGMENTED or EVIDENCE
                 from router_py import provider_resolver
                 provider = provider_resolver.resolve_provider(classification)
@@ -976,7 +1015,7 @@ def select_route(
             # Only active when session memory is enabled, to avoid false positives on
             # standalone queries that happen to contain follow-up words (e.g. "previous").
             if (
-                decision.route in ("AUGMENTED", "NEWS", "TIME", "WEATHER")
+                decision.route in ("AUGMENTED", "NEWS", "TIME", "WEATHER", "FINANCE")
                 and os.environ.get("LUCY_SESSION_MEMORY", "0") == "1"
             ):
                 q = query.strip()
@@ -1214,11 +1253,12 @@ def _is_financial_ephemeral(query: str) -> bool:
         "euro to dollar", "dollar to euro", "gbp to usd", "usd to gbp",
         "usd to eur", "eur to usd", "yen to dollar",
         "cpi", "consumer price index", "gdp", "gross domestic product",
+        "net worth", "billionaire", "trillionaire", "richest person", "richest man",
     ]
     live_qualifiers = [
         "current", "today", "now", "live", "latest", "real-time",
         "current value", "current price", "price now", "rate now",
-        "shares now", "trading at", "worth now",
+        "shares now", "trading at", "worth now", "rate", "exchange rate",
     ]
 
     has_instrument = any(inst in q for inst in financial_instruments)
@@ -1227,6 +1267,13 @@ def _is_financial_ephemeral(query: str) -> bool:
     # Either explicit live qualifier + financial instrument,
     # or very short ticker+now patterns (e.g. "Tesla shares now")
     if has_instrument and has_live:
+        return True
+
+    # Currency conversion patterns are inherently live (e.g. "EUR to USD", "euro to dollar")
+    if re.search(
+        r"\b(eur|usd|gbp|jpy|ils|cad|aud|chf|euro|dollar|pound|yen|shekel)\s+to\s+(eur|usd|gbp|jpy|ils|cad|aud|chf|euro|dollar|pound|yen|shekel)\b",
+        q,
+    ):
         return True
 
     if any(p.search(q) for p in _FINANCIAL_SHORT_RE):
@@ -1240,6 +1287,16 @@ def _is_financial_ephemeral(query: str) -> bool:
         "netflix", "nflx", "bitcoin", "btc", "ethereum", "eth",
     ]
     if any(t in q for t in company_tickers) and any(p in q for p in ["stock price", "share price", "stock value"]):
+        return True
+
+    # Individual net-worth / billionaire queries (e.g. "How much is Elon Musk worth today?")
+    net_worth_patterns = [
+        r"how much is .+ worth",
+        r"how much is .+ valued at",
+        r"is .+ a trillionaire",
+        r"is .+ a billionaire",
+    ]
+    if any(re.search(p, q) for p in net_worth_patterns):
         return True
 
     return False

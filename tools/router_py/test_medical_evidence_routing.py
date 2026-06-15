@@ -193,8 +193,8 @@ class TestAugmentedRouting(unittest.TestCase):
                     f"{query!r}: expected LOCAL or AUGMENTED, got {decision.route}",
                 )
 
-    def test_financial_routes_local_or_augmented(self) -> None:
-        """Financial queries route to LOCAL or AUGMENTED (not EVIDENCE)."""
+    def test_financial_routes_to_finance(self) -> None:
+        """Live financial queries route to FINANCE (not EVIDENCE or LOCAL)."""
         queries = [
             "current stock price of Apple",
             "bitcoin price today",
@@ -203,15 +203,15 @@ class TestAugmentedRouting(unittest.TestCase):
             with self.subTest(query=query):
                 classification = classify_intent(query)
                 decision = select_route(classification, policy="fallback_only", query=query)
-                self.assertIn(
+                self.assertEqual(
                     decision.route,
-                    ("LOCAL", "AUGMENTED"),
-                    f"{query!r}: expected LOCAL or AUGMENTED, got {decision.route}",
+                    "FINANCE",
+                    f"{query!r}: expected FINANCE, got {decision.route}",
                 )
-                self.assertNotEqual(
+                self.assertEqual(
                     decision.provider,
-                    "trusted",
-                    f"{query!r}: financial should not use trusted provider",
+                    "finance",
+                    f"{query!r}: financial should use finance provider",
                 )
 
     def test_stable_financial_knowledge_routes_local(self) -> None:
