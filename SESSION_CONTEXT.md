@@ -90,12 +90,14 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v9-dev  ⚠️  (needs GitHub admin to set default to v10-dev)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 4
+Commits since tag: 6
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+61d7429 fix(evidence): reject TOC landing pages and off-topic content in trusted provider
+17be065 docs: session handoff 2026-06-14 — production hardening complete
 c7ec43d docs: create AGENTS.md and SESSION_CONTEXT.md for automatic session context
 2fc14dd feat(security): fix medical follow-up gap and migrate to XDG paths
 1e70996 feat(ops): XDG paths, DB migration, and operational runbooks
@@ -107,8 +109,6 @@ b95656e chore(prod): add Makefile, environment validator, VERSION, and LUCY_ROOT
 ac40607 test: update expectations for new model defaults, routing behavior, and bridge architecture
 bff0e38 feat(ui): consolidate HMI backend wrappers and remove legacy runtime bridge
 709b1a0 feat(models): make background learning user-feedback-only and validate embedding index
-da4b55b feat(router): improve routing guards, local answer reliability, and memory integration
-380060c chore(infra): production hardening — CI, gitignore, version, secrets, pytest config
 ```
 
 ---
@@ -196,5 +196,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-14T21:30:00Z*
+*Last updated: 2026-06-15T15:00:00Z*
 *Session: production hardening for v10.0.0-beta.1 — complete, handoff created*
