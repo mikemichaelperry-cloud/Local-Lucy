@@ -90,12 +90,13 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v9-dev  ⚠️  (needs GitHub admin to set default to v10-dev)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 6
+Commits since tag: 7
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+6e4ac39 feat(evidence): label EVIDENCE responses when fallback to non-trusted providers is used
 61d7429 fix(evidence): reject TOC landing pages and off-topic content in trusted provider
 17be065 docs: session handoff 2026-06-14 — production hardening complete
 c7ec43d docs: create AGENTS.md and SESSION_CONTEXT.md for automatic session context
@@ -196,5 +197,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-15T15:00:00Z*
-*Session: production hardening for v10.0.0-beta.1 — complete, handoff created*
+*Last updated: 2026-06-15T16:47:00Z*
+*Session: verified AUGMENTED/EVIDENCE routing and added fallback-source labeling for EVIDENCE responses*
