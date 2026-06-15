@@ -69,6 +69,59 @@ def _strip_toc_nav(text: str) -> str:
     return text.strip()
 
 
+def _is_substantive_content(text: str, min_sentences: int = 3, max_bullet_ratio: float = 0.55) -> bool:
+    """Return True if text appears to be substantive article content, not just TOC/nav.
+
+    Detects landing pages and navigation indexes that masquerade as long content
+    (e.g. merckvetmanual.com/dog-owners) by looking for:
+    - Very few sentences combined with a high ratio of short/bullet-like lines
+    - Absence of paragraph-like lines (long lines containing periods)
+    """
+    if not text or len(text) < 200:
+        return False
+
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    if not lines:
+        return False
+
+    total_lines = len(lines)
+
+    # Count sentences (rough heuristic: .!? followed by space or end of string)
+    sentence_count = len(re.findall(r"[.!?](?:\s+|$)", text))
+
+    # Count bullet-like lines: short (< 40 chars) or starting with bullet/dash/arrow
+    bullet_like = 0
+    for line in lines:
+        if len(line) < 40:
+            bullet_like += 1
+        elif line.startswith(("-", "•", "▸", "›", "*", "→", "–", "—")):
+            bullet_like += 1
+
+    bullet_ratio = bullet_like / total_lines if total_lines else 0
+
+    # Count paragraph-like lines: long lines with periods
+    paragraph_like = sum(1 for l in lines if len(l) > 60 and "." in l)
+
+    # Repeated TOC pattern (e.g. "For More Information" appearing many times)
+    toc_ref_count = text.lower().count("for more information")
+
+    # Reject TOC-heavy pages
+    if sentence_count < min_sentences and bullet_ratio > max_bullet_ratio:
+        return False
+
+    if bullet_ratio > 0.70 and paragraph_like < 2:
+        return False
+
+    if toc_ref_count >= 4 and sentence_count < 5:
+        return False
+
+    # Reject if very few sentences overall
+    if sentence_count < 2:
+        return False
+
+    return True
+
+
 # Simple noise lines — matched case-insensitively against stripped line content.
 _NOISE_LINES: set[str] = {
     # MedlinePlus nav sections

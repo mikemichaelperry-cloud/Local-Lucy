@@ -25,10 +25,12 @@ from typing import Any
 # Web extraction adapter (webclaw → fallback)
 sys.path.insert(0, str(Path(__file__).resolve().parent / "internet"))
 try:
-    from web_extract import extract_webpage
+    from web_extract import extract_webpage, _is_substantive_content
     HAS_WEB_EXTRACT = True
 except Exception:
     HAS_WEB_EXTRACT = False
+    def _is_substantive_content(text: str, **_: Any) -> bool:  # type: ignore[misc]
+        return bool(text and len(text) > 300)
 
 
 def _print_fail(reason: str) -> int:
@@ -539,11 +541,15 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
         try:
             content = extract_webpage(url, max_chars=2500, timeout=15)
             # Reject "sorry" / error / redirect pages
-            if content and len(content) > 300:
-                lower = content.lower()
-                if any(bad in lower for bad in ["we're sorry", "page not found", "404", "sorrypages", "no results"]):
-                    continue
-                return content, name
+            if not content or len(content) <= 300:
+                continue
+            lower = content.lower()
+            if any(bad in lower for bad in ["we're sorry", "page not found", "404", "sorrypages", "no results"]):
+                continue
+            # Reject table-of-contents / navigation-only landing pages
+            if not _is_substantive_content(content):
+                continue
+            return content, name
         except Exception:
             continue
 
@@ -591,6 +597,42 @@ def _with_trusted_metadata(
     return content
 
 
+# Stop words for relevance checking — includes common auxiliaries and animal names
+# because veterinary sources are inherently about dogs/cats.
+_RELEVANCE_STOP_WORDS: set[str] = {
+    "the", "and", "are", "for", "dogs", "dog", "cats", "cat", "puppy", "puppies",
+    "what", "how", "when", "where", "why", "who", "which", "this", "that",
+    "these", "those", "with", "from", "have", "has", "had", "was", "were",
+    "been", "being", "will", "would", "could", "should", "may", "might", "can",
+    "about", "into", "over", "under", "again", "further", "then", "once",
+    "here", "there", "all", "any", "both", "each", "few", "more", "most",
+    "other", "some", "such", "only", "own", "same", "so", "than", "too",
+    "very", "just", "now", "get", "you", "your", "his", "her", "its", "our",
+    "their", "them", "they", "she", "he", "we", "us", "me", "my", "i", "am",
+    "is", "are", "was", "be", "being", "do", "does", "did", "done", "a", "an",
+    "to", "of", "in", "on", "at", "by", "as", "or", "if", "it", "not", "no",
+    "but", "up", "out", "down", "off", "healthy", "safe", "good", "bad",
+    "best", "better", "well", "animal", "animals", "pet", "pets", "owner",
+    "owners", "tell", "know", "like", "need", "should", "use", "using",
+}
+
+
+def _is_content_relevant(question: str, content: str, min_matches: int = 1) -> bool:
+    """Return True if content contains at least min_matches query keywords.
+
+    Prevents returning unrelated article snippets when a search engine or
+    landing page returns content that is substantive but off-topic.
+    """
+    content_lower = content.lower()
+    words = re.findall(r"[a-z]{3,}", question.lower())
+    keywords = [w for w in words if w not in _RELEVANCE_STOP_WORDS]
+    if not keywords:
+        # Question has no discernible keywords — be permissive
+        return True
+    matches = sum(1 for kw in keywords if kw in content_lower)
+    return matches >= min_matches
+
+
 def _format_medical_response(
     domains: list[str],
     question: str,
@@ -611,7 +653,7 @@ def _format_medical_response(
         top_title = search_results[0].get("title", "")
         if top_url:
             content = _fetch_article_content(top_url, max_chars=5000, _telemetry_out=extract_telemetry)
-            if content and len(content) > 200:
+            if content and len(content) > 200 and _is_substantive_content(content) and _is_content_relevant(question, content):
                 lines = [
                     f"Source: {top_title or top_url}",
                     "",
@@ -635,19 +677,20 @@ def _format_medical_response(
         direct = _try_direct_fetch(question, "medical")
         if direct:
             content, source_name = direct
-            lines = [
-                f"Source: {source_name}",
-                "",
-                content,
-                "",
-                "Consult a healthcare professional for personal medical advice.",
-            ]
-            return _with_trusted_metadata(
-                "\n".join(lines),
-                include_metadata=include_metadata,
-                answer_basis="live_trusted_source",
-                live_fetch_status="success",
-                confidence="normal",
+            if _is_content_relevant(question, content):
+                lines = [
+                    f"Source: {source_name}",
+                    "",
+                    content,
+                    "",
+                    "Consult a healthcare professional for personal medical advice.",
+                ]
+                return _with_trusted_metadata(
+                    "\n".join(lines),
+                    include_metadata=include_metadata,
+                    answer_basis="live_trusted_source",
+                    live_fetch_status="success",
+                    confidence="normal",
             )
 
     # Check for specific medication
@@ -765,7 +808,7 @@ def _format_vet_response(
         top_title = search_results[0].get("title", "")
         if top_url:
             content = _fetch_article_content(top_url, max_chars=5000, _telemetry_out=extract_telemetry)
-            if content and len(content) > 200:
+            if content and len(content) > 200 and _is_substantive_content(content) and _is_content_relevant(question, content):
                 lines = []
                 if is_emergency:
                     lines.append("This may be a veterinary emergency. Contact a veterinarian or emergency animal hospital immediately.")
@@ -791,22 +834,23 @@ def _format_vet_response(
         direct = _try_direct_fetch(question, "vet")
         if direct:
             content, source_name = direct
-            lines = []
-            if is_emergency:
-                lines.append("This may be a veterinary emergency. Contact a veterinarian or emergency animal hospital immediately.")
+            if _is_content_relevant(question, content):
+                lines = []
+                if is_emergency:
+                    lines.append("This may be a veterinary emergency. Contact a veterinarian or emergency animal hospital immediately.")
+                    lines.append("")
+                lines.append(f"Source: {source_name}")
                 lines.append("")
-            lines.append(f"Source: {source_name}")
-            lines.append("")
-            lines.append(content)
-            lines.append("")
-            lines.append("Always consult a licensed veterinarian for diagnosis and treatment.")
-            return _with_trusted_metadata(
-                "\n".join(lines),
-                include_metadata=include_metadata,
-                answer_basis="live_trusted_source",
-                live_fetch_status="success",
-                confidence="normal",
-            )
+                lines.append(content)
+                lines.append("")
+                lines.append("Always consult a licensed veterinarian for diagnosis and treatment.")
+                return _with_trusted_metadata(
+                    "\n".join(lines),
+                    include_metadata=include_metadata,
+                    answer_basis="live_trusted_source",
+                    live_fetch_status="success",
+                    confidence="normal",
+                )
 
     if is_emergency:
         return _with_trusted_metadata(
