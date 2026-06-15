@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import sys
 import time
@@ -440,13 +441,27 @@ _FINANCE_COMMON_TICKERS = {
     "meta": "META",
     "facebook": "META",
     "netflix": "NFLX",
-    "bitcoin": "BTC-USD",
-    "ethereum": "ETH-USD",
     "s&p 500": "^GSPC",
     "nasdaq": "^IXIC",
     "dow jones": "^DJI",
     "ftse": "^FTSE",
     "nikkei": "^N225",
+}
+
+# CoinGecko id mapping for common crypto names/tickers
+_FINANCE_CRYPTO_IDS = {
+    "bitcoin": "bitcoin",
+    "btc": "bitcoin",
+    "ethereum": "ethereum",
+    "eth": "ethereum",
+    "solana": "solana",
+    "sol": "solana",
+    "ripple": "ripple",
+    "xrp": "ripple",
+    "cardano": "cardano",
+    "ada": "cardano",
+    "dogecoin": "dogecoin",
+    "doge": "dogecoin",
 }
 
 _FINANCE_CURRENCY_CODES = {
@@ -497,20 +512,37 @@ def _extract_stock_symbol(question: str) -> str | None:
             name = match.group(1)
             if name in _FINANCE_COMMON_TICKERS:
                 return _FINANCE_COMMON_TICKERS[name]
+            if name in _FINANCE_CRYPTO_IDS:
+                return name.upper()
+
+    # Crypto-only patterns: "X price" / "X crypto"
+    for pattern in [r"\b(bitcoin|ethereum|solana|ripple|cardano|dogecoin|btc|eth|sol|xrp|ada|doge)\s+price\b",
+                    r"\b(bitcoin|ethereum|solana|ripple|cardano|dogecoin|btc|eth|sol|xrp|ada|doge)\s+crypto\b"]:
+        match = re.search(pattern, q)
+        if match:
+            return match.group(1).upper()
     return None
 
 
 def _extract_net_worth_person(question: str) -> str | None:
     """Extract a person's name from net-worth queries."""
-    q = question.lower()
+    q = question.lower().replace("'s", "")
     patterns = [
         r"how much is ([a-z]+(?:\s+[a-z]+){0,2}) worth",
         r"how much is ([a-z]+(?:\s+[a-z]+){0,2}) valued at",
+        r"(?:^|\b(?:what|who|where|when|how much)\s+is\s+)?([a-z]+(?:\s+[a-z]+){0,2})\s+net worth",
+        r"net worth of ([a-z]+(?:\s+[a-z]+){0,2})",
     ]
     for pattern in patterns:
         match = re.search(pattern, q)
         if match:
             person = match.group(1).strip()
+            # Drop any leading interrogative/auxiliary words that bled into the capture.
+            stop_leaders = {"is", "what", "who", "where", "when", "how", "much"}
+            parts = person.split()
+            while parts and parts[0] in stop_leaders:
+                parts.pop(0)
+            person = " ".join(parts)
             if person and person not in {"it", "he", "she", "they", "this", "that"}:
                 return person.title()
     return None
@@ -592,6 +624,92 @@ def _fetch_yahoo_finance(symbol: str) -> dict[str, Any] | None:
     return None
 
 
+def _fetch_coingecko(symbol: str) -> dict[str, Any] | None:
+    """Fetch latest crypto price from CoinGecko (free, no key)."""
+    coin_id = _FINANCE_CRYPTO_IDS.get(symbol.lower())
+    if not coin_id:
+        return None
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd&include_24hr_change=true"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Local-Lucy/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        info = data.get(coin_id)
+        if not info:
+            return None
+        price = info.get("usd")
+        change_pct = info.get("usd_24h_change")
+        if price is None:
+            return None
+        change_str = f"{change_pct:+.2f}% (24h)" if change_pct is not None else "n/a"
+        formatted = f"{symbol.upper()}: ${price:,.2f} USD ({change_str})"
+        return {
+            "ok": True,
+            "context": formatted,
+            "formatted": formatted,
+            "title": f"{symbol.upper()} Price",
+            "url": f"https://www.coingecko.com/en/coins/{coin_id}",
+            "provider": "finance",
+            "source": "CoinGecko",
+            "symbol": symbol.upper(),
+            "price": price,
+            "currency": "USD",
+            "class": "finance_quote",
+        }
+    except Exception as e:
+        logger.warning(f"CoinGecko fetch failed for {symbol}: {e}")
+    return None
+
+
+async def _fetch_stock_via_search(symbol: str) -> dict[str, Any] | None:
+    """Fallback stock quote via web search when Yahoo Finance rate-limits."""
+    search_script = ROOT_DIR / "tools" / "internet" / "search_web.py"
+    if not search_script.exists():
+        return None
+    query = f"{symbol} stock price"
+    try:
+        payload = json.dumps({"query": query, "max_results": 5})
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(ROOT_DIR) + os.pathsep + env.get("PYTHONPATH", "")
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, str(search_script),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(ROOT_DIR),
+            env=env,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(payload.encode("utf-8")), timeout=20.0)
+        if proc.returncode != 0:
+            logger.warning(f"Stock search failed: {stderr.decode()[:200]}")
+            return None
+        data = json.loads(stdout.decode("utf-8"))
+        results = data.get("results", [])
+        if not results:
+            return None
+        top = results[0]
+        snippet = top.get("snippet", "").strip()
+        title = top.get("title", "")
+        url = top.get("url", "")
+        if not snippet:
+            return None
+        formatted = f"{symbol} stock (from search): {snippet}\n\nSource: {title}\n{url}"
+        return {
+            "ok": True,
+            "context": formatted,
+            "formatted": formatted,
+            "title": f"{symbol} Quote",
+            "url": url,
+            "provider": "finance",
+            "source": "web search",
+            "symbol": symbol,
+            "class": "finance_quote",
+        }
+    except Exception as e:
+        logger.warning(f"Stock search fallback failed for {symbol}: {e}")
+    return None
+
+
 async def _fetch_net_worth(person: str) -> dict[str, Any] | None:
     """Fetch net-worth estimate via web search restricted to trusted finance sources."""
     search_script = ROOT_DIR / "tools" / "internet" / "search_web.py"
@@ -600,12 +718,15 @@ async def _fetch_net_worth(person: str) -> dict[str, Any] | None:
     query = f"{person} net worth"
     try:
         payload = json.dumps({"query": query, "max_results": 5})
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(ROOT_DIR) + os.pathsep + env.get("PYTHONPATH", "")
         proc = await asyncio.create_subprocess_exec(
             sys.executable, str(search_script),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(ROOT_DIR),
+            env=env,
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(payload.encode("utf-8")), timeout=20.0)
         if proc.returncode != 0:
@@ -662,7 +783,16 @@ async def fetch_finance_evidence(question: str) -> dict[str, Any] | None:
     # 2. Stock / index / crypto quote
     symbol = _extract_stock_symbol(question)
     if symbol:
+        # Try CoinGecko first for known crypto
+        result = _fetch_coingecko(symbol)
+        if result:
+            return result
+        # Then Yahoo Finance for stocks/indices
         result = _fetch_yahoo_finance(symbol)
+        if result:
+            return result
+        # Fallback to web search if Yahoo rate-limits
+        result = await _fetch_stock_via_search(symbol)
         if result:
             return result
 

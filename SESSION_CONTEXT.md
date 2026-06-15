@@ -135,9 +135,9 @@ Local Lucy v10 is a **privacy-first, self-learning desktop AI assistant**.
 └──────────────┬──────────────────────────┘
                │
     ┌──────────┼──────────┬──────────┐
-    ▼          ▼          ▼          ▼
-  LOCAL     AUGMENTED   WEATHER     NEWS
- (Ollama)  (Web+LLM)   (API)     (RSS)
+    ▼          ▼          ▼          ▼          ▼
+  LOCAL     AUGMENTED   WEATHER     NEWS     FINANCE
+ (Ollama)  (Web+LLM)   (API)     (RSS)   (Live data)
 ```
 
 ### Four-Stage Routing Pipeline
@@ -147,12 +147,21 @@ Local Lucy v10 is a **privacy-first, self-learning desktop AI assistant**.
 4. **Confidence fallback** → `CLARIFY` or `UNKNOWN`
 
 ### Routes
-`LOCAL` | `AUGMENTED` | `EVIDENCE` | `NEWS` | `WEATHER` | `TIME` | `URL_REFERENCE` | `CLARIFY` | `UNKNOWN`
+`LOCAL` | `AUGMENTED` | `EVIDENCE` | `NEWS` | `WEATHER` | `TIME` | `FINANCE` | `URL_REFERENCE` | `CLARIFY` | `UNKNOWN`
+
+### FINANCE Route
+Live market-data fetcher with source citations:
+- **FX**: `exchangerate-api.com` (free, no key)
+- **Crypto**: `CoinGecko` (free, no key)
+- **Stocks/indices**: Yahoo Finance primary; web-search fallback if rate-limited
+- **Net worth**: web search restricted to trusted finance sources
+- Personal-finance reasoning (advice/planning) continues to route `LOCAL`
 
 ### Safety Critical
 - Medical/vet queries **must** route to `EVIDENCE` with trusted sources
 - Follow-ups after medical EVIDENCE are guarded to not fall back to LOCAL
 - High-stakes feedback (medical/vet/finance/legal) → `pending_review.jsonl`
+- `FINANCE` answers include source citations; web-search fallbacks are labelled accordingly
 
 ---
 
@@ -198,5 +207,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-15T17:32:00Z*
-*Session: added dedicated FINANCE route with live stock, FX, and net-worth fetchers plus source citations*
+*Last updated: 2026-06-15T18:10:00Z*
+*Session: hardened FINANCE route — added CoinGecko crypto, stock web-search fallback, fixed net-worth parsing, added provider tests*

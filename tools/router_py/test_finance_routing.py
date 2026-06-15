@@ -114,6 +114,18 @@ class TestFinanceProviderHelpers(unittest.TestCase):
     def test_extract_net_worth_rejects_pronouns(self):
         self.assertIsNone(_extract_net_worth_person("How much is he worth?"))
 
+    def test_extract_net_worth_from_phrase(self):
+        self.assertEqual(_extract_net_worth_person("Elon Musk net worth"), "Elon Musk")
+
+    def test_extract_net_worth_possessive(self):
+        self.assertEqual(_extract_net_worth_person("What is Jeff Bezos's net worth?"), "Jeff Bezos")
+
+    def test_extract_crypto_symbol_from_name(self):
+        self.assertEqual(_extract_stock_symbol("Bitcoin price"), "BITCOIN")
+
+    def test_extract_crypto_symbol_from_ticker(self):
+        self.assertEqual(_extract_stock_symbol("ETH price"), "ETH")
+
 
 class TestFinanceExecutionLabeling(unittest.TestCase):
     """EVIDENCE fallback labeling must not apply to FINANCE route."""
