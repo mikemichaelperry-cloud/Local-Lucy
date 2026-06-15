@@ -1135,6 +1135,37 @@ them according to the route type (bypass, provisional, or full). It handles:
             metadata=new_metadata,
         )
 
+    def _label_evidence_fallback(
+        self,
+        result: ExecutionResult,
+        evidence: dict[str, Any] | None,
+    ) -> ExecutionResult:
+        """
+        Label EVIDENCE-route responses that fell back to non-trusted providers.
+
+        When the trusted provider fails and EVIDENCE fetches evidence from
+        wikipedia/kimi/openai instead, the response must be clearly marked so
+        the user knows the source is not from the trusted allowlist.
+        """
+        if not evidence or not evidence.get("fallback_used"):
+            return result
+        successful_backend = evidence.get("successful_backend", "")
+        if successful_backend == "trusted":
+            return result
+        fallback_to = evidence.get("fallback_to", successful_backend) or "an alternative source"
+        label = (
+            f"[Note: designated trusted sources were unavailable. "
+            f"This EVIDENCE response was sourced from {fallback_to} instead.]\n\n"
+        )
+        new_metadata = dict(result.metadata or {})
+        new_metadata["trust_class"] = "trusted_fallback"
+        new_metadata["evidence_fallback_label_applied"] = True
+        return dataclasses.replace(
+            result,
+            response_text=label + result.response_text,
+            metadata=new_metadata,
+        )
+
     def _context_indicates_medical_query(self, context: dict[str, Any]) -> bool:
         """Return True when execution context already carries a medical signal."""
         for key in ("is_medical_query", "medical_context", "routing_signal_medical_context"):
@@ -2231,6 +2262,9 @@ them according to the route type (bypass, provisional, or full). It handles:
             error_message="",
             metadata=base_metadata,
         )
+
+        if route.route == "EVIDENCE" and result.response_text:
+            result = self._label_evidence_fallback(result, evidence)
 
         if is_medical_query and result.route == "AUGMENTED" and result.response_text:
             result = self._append_medical_sources(result, context)

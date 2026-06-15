@@ -28,6 +28,8 @@ from router_py.classify import (
     _make_augmented_decision,
 )
 from router_py.policy import requires_evidence_mode, provider_usage_class_for
+from router_py.execution_engine import ExecutionEngine
+from router_py.request_types import ExecutionResult
 
 
 class TestMedicalRouting(unittest.TestCase):
@@ -434,6 +436,54 @@ class TestMedicalFollowUpRouting(unittest.TestCase):
                     os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = old_ns
                 else:
                     os.environ.pop("LUCY_RUNTIME_NAMESPACE_ROOT", None)
+
+
+class TestEvidenceFallbackLabeling(unittest.TestCase):
+    """EVIDENCE-route fallback to non-trusted providers must be labelled."""
+
+    def setUp(self):
+        self.engine = ExecutionEngine(config={"timeout": 30})
+        self.base_result = ExecutionResult(
+            status="completed",
+            outcome_code="answered",
+            route="EVIDENCE",
+            provider="local",
+            provider_usage_class="local",
+            response_text="This is the generated answer.",
+            error_message="",
+            metadata={"trust_class": "unverified"},
+        )
+
+    def test_label_added_for_wikipedia_fallback(self):
+        evidence = {
+            "fallback_used": True,
+            "fallback_reason": "primary_provider_failed:trusted",
+            "primary_failed": "trusted",
+            "fallback_to": "wikipedia",
+            "successful_backend": "wikipedia",
+        }
+        result = self.engine._label_evidence_fallback(self.base_result, evidence)
+        self.assertTrue(result.response_text.startswith("[Note:"))
+        self.assertIn("wikipedia", result.response_text)
+        self.assertEqual(result.metadata.get("trust_class"), "trusted_fallback")
+        self.assertTrue(result.metadata.get("evidence_fallback_label_applied"))
+
+    def test_no_label_when_trusted_succeeds(self):
+        evidence = {
+            "fallback_used": False,
+            "successful_backend": "trusted",
+        }
+        result = self.engine._label_evidence_fallback(self.base_result, evidence)
+        self.assertEqual(result.response_text, "This is the generated answer.")
+        self.assertEqual(result.metadata.get("trust_class"), "unverified")
+
+    def test_no_label_when_no_fallback(self):
+        evidence = {
+            "fallback_used": False,
+            "successful_backend": "wikipedia",
+        }
+        result = self.engine._label_evidence_fallback(self.base_result, evidence)
+        self.assertEqual(result.response_text, "This is the generated answer.")
 
 
 if __name__ == "__main__":
