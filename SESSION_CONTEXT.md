@@ -90,27 +90,25 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v9-dev  ⚠️  (needs GitHub admin to set default to v10-dev)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 8
+Commits since tag: 13
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+90f075a docs: update architecture, changelog, and router docs for FINANCE route
+a4b33c2 feat(finance): harden FINANCE route with CoinGecko, stock search fallback, and net-worth parsing fixes
+1670684 docs: update SESSION_CONTEXT.md
 5af7769 feat(finance): add dedicated FINANCE route with live market data fetchers
+9167b3b docs: update SESSION_CONTEXT.md
 6e4ac39 feat(evidence): label EVIDENCE responses when fallback to non-trusted providers is used
+fdca6a7 docs: update SESSION_CONTEXT.md
 61d7429 fix(evidence): reject TOC landing pages and off-topic content in trusted provider
 17be065 docs: session handoff 2026-06-14 — production hardening complete
 c7ec43d docs: create AGENTS.md and SESSION_CONTEXT.md for automatic session context
 2fc14dd feat(security): fix medical follow-up gap and migrate to XDG paths
 1e70996 feat(ops): XDG paths, DB migration, and operational runbooks
 f0a2184 feat(ops): health check CLI and circuit breakers for search backends
-6fe47b7 docs: add CHANGELOG.md for v10.0.0-beta.1
-a19a0aa feat(security): add Ollama health probe and SQLite permission hardening
-b95656e chore(prod): add Makefile, environment validator, VERSION, and LUCY_ROOT
-3285850 docs: rewrite architecture report for v10 and remove stale session handoffs
-ac40607 test: update expectations for new model defaults, routing behavior, and bridge architecture
-bff0e38 feat(ui): consolidate HMI backend wrappers and remove legacy runtime bridge
-709b1a0 feat(models): make background learning user-feedback-only and validate embedding index
 ```
 
 ---
@@ -207,5 +205,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-15T18:10:00Z*
-*Session: hardened FINANCE route — added CoinGecko crypto, stock web-search fallback, fixed net-worth parsing, added provider tests*
+*Last updated: 2026-06-16T15:07:35Z*
+*Session: synchronized context with latest FINANCE-route docs commits; remaining TODOs still open*
