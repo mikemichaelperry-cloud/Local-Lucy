@@ -90,25 +90,25 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v9-dev  ⚠️  (needs GitHub admin to set default to v10-dev)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 13
-Working tree: clean
+Commits since tag: 22
+Working tree: local_answer.py modified (test-failure fix in progress)
 ```
 
 ### Recent Commits (last 13)
 ```
+f2efa6d ci: add release workflow and Debian packaging
+53b2882 refactor(tests): remove hardcoded absolute paths and use env-driven runtime root
+9aa193e feat(logging): add logging_config wrapper and replace print statements
+eee7ee6 chore: add ruff config with per-file ignores for legacy code
+97af56e chore: ignore egg-info build artifacts
+b73f776 docs: add Ollama security runbook and ADRs
+fadeb62 chore: add pre-commit config
+13e788f chore: add requirements-lock.txt
+2e6dc69 docs: update SESSION_CONTEXT.md
 90f075a docs: update architecture, changelog, and router docs for FINANCE route
 a4b33c2 feat(finance): harden FINANCE route with CoinGecko, stock search fallback, and net-worth parsing fixes
 1670684 docs: update SESSION_CONTEXT.md
 5af7769 feat(finance): add dedicated FINANCE route with live market data fetchers
-9167b3b docs: update SESSION_CONTEXT.md
-6e4ac39 feat(evidence): label EVIDENCE responses when fallback to non-trusted providers is used
-fdca6a7 docs: update SESSION_CONTEXT.md
-61d7429 fix(evidence): reject TOC landing pages and off-topic content in trusted provider
-17be065 docs: session handoff 2026-06-14 — production hardening complete
-c7ec43d docs: create AGENTS.md and SESSION_CONTEXT.md for automatic session context
-2fc14dd feat(security): fix medical follow-up gap and migrate to XDG paths
-1e70996 feat(ops): XDG paths, DB migration, and operational runbooks
-f0a2184 feat(ops): health check CLI and circuit breakers for search backends
 ```
 
 ---
@@ -179,14 +179,15 @@ Live market-data fetcher with source citations:
 
 ## Known Risks / TODOs
 
-1. **Origin default branch** is still `v9-dev` — change in GitHub settings
-2. **Dependency lockfile** (`requirements-lock.txt`) not yet generated
-3. **Pre-commit hooks** (`.pre-commit-config.yaml`) exist as plan but not installed
-4. **GitHub release workflow** (`.github/workflows/release.yml`) not yet created
-5. **Structured logging** — `print()` statements still in codebase; JSON logger planned
-6. **AppImage / .deb packaging** planned but not implemented
-7. **Ollama** runs unauthenticated on localhost — document hardening for multi-user machines
-8. **Hardcoded absolute paths** still exist in tests and benchmarks (low priority — non-production code)
+1. **Origin default branch** is still `v9-dev` — change in GitHub settings (requires `gh auth login`)
+2. ~~Dependency lockfile~~ ✅ `requirements-lock.txt` generated
+3. ~~Pre-commit hooks~~ ✅ `.pre-commit-config.yaml` created and installed
+4. ~~GitHub release workflow~~ ✅ `.github/workflows/release.yml` created; `.deb` packaging added
+5. ~~Structured logging~~ ✅ `tools/router_py/logging_config.py` added; starter print replacements in `main.py`/`classify.py`
+6. ~~.deb packaging~~ ✅ `packaging/debian/build_deb.sh` builds installable package; AppImage still future work
+7. ~~Ollama localhost auth~~ ✅ hardening runbook added to `docs/runbooks/OLLAMA_SECURITY.md`
+8. ~~Hardcoded absolute paths~~ ✅ tests/benchmarks now derive paths from `__file__` or env vars
+9. **Local-model regression tests** — 10 of 20 response/semantic regression cases still fail `first_person_only` check; subagent still investigating
 
 ---
 
@@ -205,5 +206,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T15:07:35Z*
-*Session: synchronized context with latest FINANCE-route docs commits; remaining TODOs still open*
+*Last updated: 2026-06-16T15:20:00Z*
+*Session: cleared P1/P2 backlog — context updated, lockfile, pre-commit, ruff, logging, hardcoded paths, release workflow/.deb; regression-test fix and GitHub default-branch change remain*
