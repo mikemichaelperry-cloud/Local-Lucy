@@ -1,0 +1,42 @@
+#!/bin/bash
+# DEBIAN/postinst — Finalize Local Lucy v10 installation.
+#
+# The application is shipped without its Python venv to keep the .deb small.
+# This script creates the venv on the target machine and installs the
+# required dependencies from the bundled requirements files.
+
+set -e
+
+APP_DIR="/opt/local-lucy"
+VENV_DIR="${APP_DIR}/ui-v10/.venv"
+
+# Ensure the launchers are executable
+chmod 0755 "${APP_DIR}/START_LUCY.sh"
+chmod 0755 "${APP_DIR}/lucy_chat.sh"
+
+# Create the virtual environment if it does not already exist
+if [ ! -d "${VENV_DIR}/bin" ]; then
+    python3 -m venv "${VENV_DIR}"
+fi
+
+"${VENV_DIR}/bin/pip" install --upgrade pip
+
+if [ -f "${APP_DIR}/ui-v10/requirements.txt" ]; then
+    "${VENV_DIR}/bin/pip" install --no-cache-dir -r "${APP_DIR}/ui-v10/requirements.txt"
+fi
+
+if [ -f "${APP_DIR}/models/router/requirements.txt" ]; then
+    "${VENV_DIR}/bin/pip" install --no-cache-dir -r "${APP_DIR}/models/router/requirements.txt"
+fi
+
+# Defensive symlink creation (the package already provides these, but ensure
+# they exist after upgrades or manual removals)
+if [ ! -e "/usr/local/bin/local-lucy" ]; then
+    ln -sf "${APP_DIR}/START_LUCY.sh" "/usr/local/bin/local-lucy"
+fi
+
+if [ ! -e "/usr/local/bin/local-lucy-chat" ]; then
+    ln -sf "${APP_DIR}/lucy_chat.sh" "/usr/local/bin/local-lucy-chat"
+fi
+
+exit 0
