@@ -21,13 +21,13 @@ def main() -> int:
     home = Path.home()
     os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(home / "lucy" / "runtime")
     # Set required authority contract variables
-    os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(home / "lucy-v10")
+    os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(REPO_UI_ROOT.parent)
     os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
     os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
     sys.path.insert(0, str(REPO_UI_ROOT))
 
-    from PySide6.QtWidgets import QApplication
     from app.main_window import OperatorConsoleWindow
+    from PySide6.QtWidgets import QApplication
 
     app = QApplication([])
     window = OperatorConsoleWindow()
@@ -35,7 +35,10 @@ def main() -> int:
     app.processEvents()
 
     control = window.control_panel
-    assert_ok(not hasattr(control, "_voice_tts_pause_selector"), "voice ptt pause selector should be absent")
+    assert_ok(
+        not hasattr(control, "_voice_tts_pause_selector"),
+        "voice ptt pause selector should be absent",
+    )
     assert_ok(control._voice_ptt_group is not None, "voice ptt group should initialize")
     assert_ok(control._voice_ptt_button is not None, "voice ptt button should initialize")
 

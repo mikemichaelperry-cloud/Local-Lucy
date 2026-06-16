@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offscreen test for augmented controls and session counters (v8 direct payload injection)."""
+
 from __future__ import annotations
 
 import os
@@ -11,17 +12,17 @@ REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
-    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
+    os.environ.setdefault(
+        "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+    )
+    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(REPO_UI_ROOT.parent))
     os.environ.setdefault("LUCY_UI_ROOT", str(REPO_UI_ROOT))
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "0")
     sys.path.insert(0, str(REPO_UI_ROOT))
 
-    import json
-
+    from app.main_window import OperatorConsoleWindow
     from app.services.state_store import REQUEST_HISTORY_FILE, REQUEST_RESULT_FILE
     from PySide6.QtWidgets import QApplication, QFrame
-    from app.main_window import OperatorConsoleWindow
 
     # Clean history and last-result files for isolated test
     REQUEST_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -38,9 +39,18 @@ def main() -> int:
     labels = window.status_panel._runtime_summary_labels
 
     # Layout assertions
-    assert_ok(window.conversation_panel.objectName() == "shellCard", "conversation panel should keep shell card container styling")
-    assert_ok(window.conversation_panel.layout().contentsMargins().top() == 14, "conversation shell margins should match card layout spacing")
-    assert_ok(window.conversation_panel._scroll_area is not None, "conversation panel should contain an internal scroll area")
+    assert_ok(
+        window.conversation_panel.objectName() == "shellCard",
+        "conversation panel should keep shell card container styling",
+    )
+    assert_ok(
+        window.conversation_panel.layout().contentsMargins().top() == 14,
+        "conversation shell margins should match card layout spacing",
+    )
+    assert_ok(
+        window.conversation_panel._scroll_area is not None,
+        "conversation panel should contain an internal scroll area",
+    )
     assert_ok(
         window.conversation_panel._scroll_area.parent() is window.conversation_panel,
         "scroll area should be nested inside conversation panel shell",
@@ -55,38 +65,63 @@ def main() -> int:
     )
 
     # Inject local payload
-    inject_payload(window, app, {
-        "request_id": "req-local-1",
-        "status": "completed",
-        "request_text": "plain local request",
-        "response_text": "local answer",
-        "route": {"mode": "LOCAL", "reason": "factual_query", "confidence": "0.92"},
-        "outcome": {"outcome_code": "answered", "final_mode": "LOCAL", "trust_class": "local", "augmented_provider_used": "none"},
-    })
+    inject_payload(
+        window,
+        app,
+        {
+            "request_id": "req-local-1",
+            "status": "completed",
+            "request_text": "plain local request",
+            "response_text": "local answer",
+            "route": {"mode": "LOCAL", "reason": "factual_query", "confidence": "0.92"},
+            "outcome": {
+                "outcome_code": "answered",
+                "final_mode": "LOCAL",
+                "trust_class": "local",
+                "augmented_provider_used": "none",
+            },
+        },
+    )
 
-    assert_ok(labels["Last Request Provider"].text() == "none", "status should show none for local request")
-    assert_ok(labels["Last Request Paid"].text() == "no", "status should show no paid provider for local request")
+    assert_ok(
+        labels["Last Request Provider"].text() == "none",
+        "status should show none for local request",
+    )
+    assert_ok(
+        labels["Last Request Paid"].text() == "no",
+        "status should show no paid provider for local request",
+    )
 
     # Inject forced augmented payload (OpenAI)
-    inject_payload(window, app, {
-        "request_id": "req-augmented-1",
-        "status": "completed",
-        "request_text": "plain local request with no external context",
-        "response_text": "augmented answer",
-        "route": {"mode": "AUGMENTED", "reason": "forced_direct", "confidence": "0.85"},
-        "outcome": {
-            "outcome_code": "augmented_answer",
-            "final_mode": "AUGMENTED",
-            "trust_class": "unverified",
-            "augmented_provider_used": "openai",
-            "augmented_provider_call_reason": "direct",
-            "augmented_paid_provider_invoked": "true",
-            "augmented_direct_request": "1",
+    inject_payload(
+        window,
+        app,
+        {
+            "request_id": "req-augmented-1",
+            "status": "completed",
+            "request_text": "plain local request with no external context",
+            "response_text": "augmented answer",
+            "route": {"mode": "AUGMENTED", "reason": "forced_direct", "confidence": "0.85"},
+            "outcome": {
+                "outcome_code": "augmented_answer",
+                "final_mode": "AUGMENTED",
+                "trust_class": "unverified",
+                "augmented_provider_used": "openai",
+                "augmented_provider_call_reason": "direct",
+                "augmented_paid_provider_invoked": "true",
+                "augmented_direct_request": "1",
+            },
         },
-    })
+    )
 
-    assert_ok(labels["Last Request Provider"].text() == "openai", "status should show openai as last request provider")
-    assert_ok(labels["Last Request Paid"].text() == "yes", "status should show paid invocation for direct openai request")
+    assert_ok(
+        labels["Last Request Provider"].text() == "openai",
+        "status should show openai as last request provider",
+    )
+    assert_ok(
+        labels["Last Request Paid"].text() == "yes",
+        "status should show paid invocation for direct openai request",
+    )
     request_labels = window.status_panel._request_detail_labels
     assert_ok(
         request_labels["Augmented Direct Request"].text() == "1",
@@ -98,39 +133,57 @@ def main() -> int:
     )
 
     # Inject Wikipedia fallback payload
-    inject_payload(window, app, {
-        "request_id": "req-wiki-1",
-        "status": "completed",
-        "request_text": "need internet context for this question",
-        "response_text": "wikipedia answer",
-        "route": {"mode": "AUGMENTED", "reason": "fallback", "confidence": "0.78"},
-        "outcome": {
-            "outcome_code": "augmented_fallback_answer",
-            "final_mode": "AUGMENTED",
-            "trust_class": "evidence_backed",
-            "augmented_provider_used": "wikipedia",
-            "augmented_provider_call_reason": "fallback",
-            "augmented_paid_provider_invoked": "false",
-            "augmented_direct_request": "0",
+    inject_payload(
+        window,
+        app,
+        {
+            "request_id": "req-wiki-1",
+            "status": "completed",
+            "request_text": "need internet context for this question",
+            "response_text": "wikipedia answer",
+            "route": {"mode": "AUGMENTED", "reason": "fallback", "confidence": "0.78"},
+            "outcome": {
+                "outcome_code": "augmented_fallback_answer",
+                "final_mode": "AUGMENTED",
+                "trust_class": "evidence_backed",
+                "augmented_provider_used": "wikipedia",
+                "augmented_provider_call_reason": "fallback",
+                "augmented_paid_provider_invoked": "false",
+                "augmented_direct_request": "0",
+            },
         },
-    })
+    )
 
-    assert_ok(labels["Last Request Provider"].text() == "wikipedia", "status should show wikipedia as last request provider")
-    assert_ok(labels["Last Request Paid"].text() == "no", "status should show unpaid last request fallback")
+    assert_ok(
+        labels["Last Request Provider"].text() == "wikipedia",
+        "status should show wikipedia as last request provider",
+    )
+    assert_ok(
+        labels["Last Request Paid"].text() == "no",
+        "status should show unpaid last request fallback",
+    )
     assert_ok(
         labels["Session Augmented Calls"].text() == "2",
         f"fallback submit should increment augmented counter, got={labels['Session Augmented Calls'].text()!r}",
     )
-    assert_ok(labels["Session Paid Augmented Calls"].text() == "1", "only paid openai call should increment paid counter")
+    assert_ok(
+        labels["Session Paid Augmented Calls"].text() == "1",
+        "only paid openai call should increment paid counter",
+    )
 
     # Advanced view layout assertions
     window._handle_interface_level_selected("advanced")
     app.processEvents()
     window.resize(980, 360)
     app.processEvents()
-    assert_ok(window.height() <= 620, "window should be allowed to reduce below the previous oversized minimum height")
+    assert_ok(
+        window.height() <= 620,
+        "window should be allowed to reduce below the previous oversized minimum height",
+    )
     scroll_area = window.conversation_panel._scroll_area
-    assert_ok(scroll_area is not None, "conversation panel should expose a scroll area for short windows")
+    assert_ok(
+        scroll_area is not None, "conversation panel should expose a scroll area for short windows"
+    )
     assert_ok(
         scroll_area.verticalScrollBar().maximum() > 0,
         "reduced height should enable scrolling so bottom controls remain reachable",
@@ -143,7 +196,8 @@ def main() -> int:
     top_left = checkbox.mapTo(scroll_area.viewport(), checkbox.rect().topLeft())
     bottom_left = checkbox.mapTo(scroll_area.viewport(), checkbox.rect().bottomLeft())
     assert_ok(
-        top_left.y() > scroll_area.viewport().height() or bottom_left.y() > scroll_area.viewport().height(),
+        top_left.y() > scroll_area.viewport().height()
+        or bottom_left.y() > scroll_area.viewport().height(),
         "before scrolling, reduced-height layout should place the bottom control below viewport",
     )
     scroll_area.ensureWidgetVisible(window.conversation_panel._force_augmented_once_checkbox)
@@ -174,7 +228,9 @@ def main() -> int:
 def inject_payload(window, app, payload: dict) -> None:
     """Inject a request payload directly into the UI (v8: bypass subprocess submit)."""
     import json
+
     from app.services.state_store import REQUEST_HISTORY_FILE
+
     REQUEST_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(REQUEST_HISTORY_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(payload) + "\n")

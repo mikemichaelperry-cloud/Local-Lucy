@@ -16,18 +16,16 @@ Coverage:
 6. Voice timeout propagation (300s)
 
 Run with:
-    cd /home/mike/lucy-v10 && source ui-v10/.venv/bin/activate
+    cd <project-root> && source ui-v10/.venv/bin/activate
     python3 -m pytest tools/router_py/test_e2e_hmi_voice.py -v
 """
 
 from __future__ import annotations
 
 import json
-import logging
 import os
 import sys
 import tempfile
-import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -37,16 +35,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pytest
 
 from router_py.execution_engine import ExecutionEngine
-from router_py.execution_engine_state import StateWriter
-from router_py.request_types import ClassificationResult, RoutingDecision, ExecutionResult
-
+from router_py.request_types import ClassificationResult, ExecutionResult, RoutingDecision
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_classification(intent_family: str = "local_answer", confidence: float = 0.95) -> ClassificationResult:
+def _make_classification(
+    intent_family: str = "local_answer", confidence: float = 0.95
+) -> ClassificationResult:
     return ClassificationResult(
         intent="answer",
         intent_family=intent_family,
@@ -94,10 +92,12 @@ def engine(tmp_state_dir, monkeypatch):
     """Real ExecutionEngine with mocked external dependencies."""
     monkeypatch.setenv("LUCY_EXEC_PY", "1")
     monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
-    eng = ExecutionEngine(config={
-        "state_dir": str(tmp_state_dir),
-        "use_sqlite_state": True,
-    })
+    eng = ExecutionEngine(
+        config={
+            "state_dir": str(tmp_state_dir),
+            "use_sqlite_state": True,
+        }
+    )
     # Override state dir to temp path
     eng._state_dir = tmp_state_dir
     eng.state_writer._state_dir = tmp_state_dir
@@ -155,7 +155,8 @@ class TestVoiceLocalRoute:
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
             result = engine.execute(
-                intent, route,
+                intent,
+                route,
                 context={"question": "Hello", "surface": "voice"},
                 use_python_path=True,
             )
@@ -173,7 +174,9 @@ class TestVoiceLocalRoute:
 class TestHmiTimeRoute:
     def test_hmi_time_state_files(self, engine, tmp_state_dir):
         """HMI submit to TIME should write state with time provider."""
-        with patch.object(engine, "_fetch_evidence", return_value={"ok": True, "formatted": "10:30 AM UTC"}):
+        with patch.object(
+            engine, "_fetch_evidence", return_value={"ok": True, "formatted": "10:30 AM UTC"}
+        ):
             intent = _make_classification("time", confidence=0.99)
             route = _make_route("TIME", "time", "free", confidence=0.99)
             ctx = {"question": "What time is it?", "surface": "hmi"}
@@ -189,10 +192,17 @@ class TestHmiTimeRoute:
 
     def test_hmi_time_sqlite_outcome(self, engine):
         """HMI TIME route should write outcome to SQLite."""
-        with patch.object(engine, "_fetch_evidence", return_value={"ok": True, "formatted": "10:30 AM UTC"}):
+        with patch.object(
+            engine, "_fetch_evidence", return_value={"ok": True, "formatted": "10:30 AM UTC"}
+        ):
             intent = _make_classification("time", confidence=0.99)
             route = _make_route("TIME", "time", "free", confidence=0.99)
-            engine.execute(intent, route, context={"question": "What time is it?", "surface": "hmi"}, use_python_path=True)
+            engine.execute(
+                intent,
+                route,
+                context={"question": "What time is it?", "surface": "hmi"},
+                use_python_path=True,
+            )
 
         route_args, outcome_args = engine.state_manager.write_batch.call_args[0]
         payload = outcome_args
@@ -288,10 +298,16 @@ class TestTerminalOutcome:
         """CLARIFY route should record terminal outcome in files and SQLite."""
         intent = _make_classification("local_answer")
         intent = ClassificationResult(
-            intent="clarify", intent_family="conversational",
-            confidence=0.80, needs_web=False, needs_memory=False,
-            needs_synthesis=False, clarify_required=True,
-            evidence_mode="", augmentation_recommended=False, force_local=False,
+            intent="clarify",
+            intent_family="conversational",
+            confidence=0.80,
+            needs_web=False,
+            needs_memory=False,
+            needs_synthesis=False,
+            clarify_required=True,
+            evidence_mode="",
+            augmentation_recommended=False,
+            force_local=False,
         )
         route = _make_route("CLARIFY", "local", "local", confidence=0.80)
         ctx = {"question": "What?", "surface": "voice"}
@@ -331,7 +347,9 @@ class TestStateConsistency:
         with patch.object(engine, "_call_single_provider", return_value="Answer."):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
-            engine.execute(intent, route, context={"question": "Hello", "surface": "hmi"}, use_python_path=True)
+            engine.execute(
+                intent, route, context={"question": "Hello", "surface": "hmi"}, use_python_path=True
+            )
 
         engine.state_manager.read_last_route.return_value = {"strategy": "LOCAL"}
         assert engine.verify_state_consistency() is True
@@ -341,7 +359,9 @@ class TestStateConsistency:
         with patch.object(engine, "_call_single_provider", return_value="Answer."):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
-            engine.execute(intent, route, context={"question": "Hello", "surface": "hmi"}, use_python_path=True)
+            engine.execute(
+                intent, route, context={"question": "Hello", "surface": "hmi"}, use_python_path=True
+            )
 
         engine.state_manager.read_last_route.return_value = {"strategy": "AUGMENTED"}
         assert engine.verify_state_consistency() is False
@@ -357,15 +377,22 @@ class TestMainRunVoiceSurface:
         """main.run(surface='voice', timeout=300) should propagate timeout."""
         with patch("router_py.request_pipeline.process") as mock_process:
             from router_py.request_types import RouterOutcome
+
             mock_process.return_value = (
                 RouterOutcome(
-                    status="completed", outcome_code="answered", route="LOCAL",
-                    provider="local", provider_usage_class="local",
-                    response_text="42", execution_time_ms=100,
+                    status="completed",
+                    outcome_code="answered",
+                    route="LOCAL",
+                    provider="local",
+                    provider_usage_class="local",
+                    response_text="42",
+                    execution_time_ms=100,
                 ),
-                None, None,
+                None,
+                None,
             )
             from router_py.main import run
+
             outcome = run("What is 2+2?", surface="voice", timeout=300)
             assert outcome.route == "LOCAL"
             _, kwargs = mock_process.call_args
@@ -376,15 +403,22 @@ class TestMainRunVoiceSurface:
         """main.run(surface='hmi') should propagate surface."""
         with patch("router_py.request_pipeline.process") as mock_process:
             from router_py.request_types import RouterOutcome
+
             mock_process.return_value = (
                 RouterOutcome(
-                    status="completed", outcome_code="answered", route="LOCAL",
-                    provider="local", provider_usage_class="local",
-                    response_text="42", execution_time_ms=100,
+                    status="completed",
+                    outcome_code="answered",
+                    route="LOCAL",
+                    provider="local",
+                    provider_usage_class="local",
+                    response_text="42",
+                    execution_time_ms=100,
                 ),
-                None, None,
+                None,
+                None,
             )
             from router_py.main import run
+
             outcome = run("What is 2+2?", surface="hmi")
             assert outcome.route == "LOCAL"
             _, kwargs = mock_process.call_args
@@ -404,10 +438,12 @@ class TestFullVoiceTurn:
         """
         os.environ["LUCY_EXEC_PY"] = "1"
         os.environ["LUCY_UI_STATE_DIR"] = str(tmp_state_dir)
-        engine = ExecutionEngine(config={
-            "state_dir": str(tmp_state_dir),
-            "use_sqlite_state": True,
-        })
+        engine = ExecutionEngine(
+            config={
+                "state_dir": str(tmp_state_dir),
+                "use_sqlite_state": True,
+            }
+        )
         engine._state_dir = tmp_state_dir
         engine.state_writer._state_dir = tmp_state_dir
         engine.state_manager = MagicMock()
@@ -417,7 +453,8 @@ class TestFullVoiceTurn:
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
             result = engine.execute(
-                intent, route,
+                intent,
+                route,
                 context={"question": "What is 2+2?", "surface": "voice"},
                 use_python_path=True,
             )
@@ -442,20 +479,27 @@ class TestFullVoiceTurn:
         """
         os.environ["LUCY_EXEC_PY"] = "1"
         os.environ["LUCY_UI_STATE_DIR"] = str(tmp_state_dir)
-        engine = ExecutionEngine(config={
-            "state_dir": str(tmp_state_dir),
-            "use_sqlite_state": True,
-        })
+        engine = ExecutionEngine(
+            config={
+                "state_dir": str(tmp_state_dir),
+                "use_sqlite_state": True,
+            }
+        )
         engine._state_dir = tmp_state_dir
         engine.state_writer._state_dir = tmp_state_dir
         engine.state_manager = MagicMock()
         engine.state_writer.state_manager = engine.state_manager
 
-        with patch.object(engine, "_fetch_evidence", return_value={"ok": True, "formatted": "Sunny, 22°C in Paris"}):
+        with patch.object(
+            engine,
+            "_fetch_evidence",
+            return_value={"ok": True, "formatted": "Sunny, 22°C in Paris"},
+        ):
             intent = _make_classification("weather", confidence=0.97)
             route = _make_route("WEATHER", "weather", "free", confidence=0.97)
             result = engine.execute(
-                intent, route,
+                intent,
+                route,
                 context={"question": "Weather in Paris?", "surface": "voice"},
                 use_python_path=True,
             )

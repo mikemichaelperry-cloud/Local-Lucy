@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offscreen test for decision trace display (v8 direct payload injection)."""
+
 from __future__ import annotations
 
 import os
@@ -11,16 +12,18 @@ REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
-    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
+    os.environ.setdefault(
+        "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+    )
+    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(REPO_UI_ROOT.parent))
     os.environ.setdefault("LUCY_UI_ROOT", str(REPO_UI_ROOT))
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "0")
     sys.path.insert(0, str(REPO_UI_ROOT))
 
     import json
 
-    from app.services.state_store import REQUEST_HISTORY_FILE, REQUEST_RESULT_FILE
     from app.main_window import OperatorConsoleWindow
+    from app.services.state_store import REQUEST_HISTORY_FILE, REQUEST_RESULT_FILE
     from PySide6.QtWidgets import QApplication
 
     # Clean history and last-result files for isolated test
@@ -35,8 +38,13 @@ def main() -> int:
     app.processEvents()
 
     summary_button = window.conversation_panel._decision_trace_summary_button
-    assert_ok(not summary_button.isEnabled(), "decision trace summary should start disabled without request metadata")
-    assert_ok(window._decision_trace_panel.isHidden(), "decision trace drawer should start collapsed")
+    assert_ok(
+        not summary_button.isEnabled(),
+        "decision trace summary should start disabled without request metadata",
+    )
+    assert_ok(
+        window._decision_trace_panel.isHidden(), "decision trace drawer should start collapsed"
+    )
 
     # Inject payload directly (v8: bypass subprocess submit)
     payload = {
@@ -100,8 +108,14 @@ def main() -> int:
     app.processEvents()
 
     summary_text = summary_button.text()
-    assert_ok(summary_button.isEnabled(), "decision trace summary should enable after request metadata arrives")
-    assert_ok("AUGMENTED -> OPENAI" in summary_text, f"summary should show requested/effective path, got={summary_text!r}")
+    assert_ok(
+        summary_button.isEnabled(),
+        "decision trace summary should enable after request metadata arrives",
+    )
+    assert_ok(
+        "AUGMENTED -> OPENAI" in summary_text,
+        f"summary should show requested/effective path, got={summary_text!r}",
+    )
     assert_ok(
         "trust=unverified_with_extended_context_for_operator_review" in summary_text,
         f"summary should expose trust class, got={summary_text!r}",
@@ -114,18 +128,30 @@ def main() -> int:
         summary_button.toolTip() == summary_text,
         "summary tooltip should expose the full unclipped decision trace summary",
     )
-    assert_ok(window._decision_trace_panel.isHidden(), "decision trace drawer should remain collapsed until activated")
+    assert_ok(
+        window._decision_trace_panel.isHidden(),
+        "decision trace drawer should remain collapsed until activated",
+    )
 
     summary_button.click()
     app.processEvents()
 
-    assert_ok(not window._decision_trace_panel.isHidden(), "activating summary should reveal decision trace drawer")
+    assert_ok(
+        not window._decision_trace_panel.isHidden(),
+        "activating summary should reveal decision trace drawer",
+    )
     trace_text = window._decision_trace_view.toPlainText()
     assert_ok("Requested Mode: AUGMENTED" in trace_text, "drawer should render requested mode")
     assert_ok("Effective Mode: AUGMENTED" in trace_text, "drawer should render effective mode")
-    assert_ok("Requested Route:" not in trace_text, "drawer should omit requested route when payload does not provide one")
+    assert_ok(
+        "Requested Route:" not in trace_text,
+        "drawer should omit requested route when payload does not provide one",
+    )
     assert_ok("Selected Route: AUGMENTED" in trace_text, "drawer should render selected route")
-    assert_ok("Intent Classification: policy_ai" in trace_text, "drawer should render intent classification")
+    assert_ok(
+        "Intent Classification: policy_ai" in trace_text,
+        "drawer should render intent classification",
+    )
     assert_ok("Evidence Mode: validated" in trace_text, "drawer should render evidence mode")
     assert_ok("Augmented Provider: openai" in trace_text, "drawer should render augmented provider")
     assert_ok(
@@ -133,7 +159,8 @@ def main() -> int:
         "drawer should render provider selection reason when available",
     )
     assert_ok(
-        "Provider Selection Query: explain entropy in plain english with engineering intuition" in trace_text,
+        "Provider Selection Query: explain entropy in plain english with engineering intuition"
+        in trace_text,
         "drawer should render normalized provider selection query when available",
     )
     assert_ok(
@@ -158,7 +185,10 @@ def main() -> int:
     )
     assert_ok("Outcome Code: augmented_answer" in trace_text, "drawer should render outcome code")
     assert_ok("Route Confidence: 0.87" in trace_text, "drawer should render route confidence")
-    assert_ok("Reason: offscreen decision trace test" in trace_text, "drawer should render available reason text")
+    assert_ok(
+        "Reason: offscreen decision trace test" in trace_text,
+        "drawer should render available reason text",
+    )
 
     window.close()
     window.deleteLater()

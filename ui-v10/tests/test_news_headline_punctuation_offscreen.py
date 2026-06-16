@@ -8,9 +8,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
-REPO_TOOLS_ROOT = Path("/home/mike/lucy-v10/tools")
+REPO_TOOLS_ROOT = REPO_UI_ROOT.parent / "tools"
 
 
 def main() -> int:
@@ -22,8 +21,8 @@ def main() -> int:
         sandbox.write_runtime_lifecycle()
         sandbox.write_request_result()
 
-        from PySide6.QtWidgets import QApplication
         from app.main_window import OperatorConsoleWindow
+        from PySide6.QtWidgets import QApplication
 
         app = QApplication([])
         window = OperatorConsoleWindow()

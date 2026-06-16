@@ -3,7 +3,7 @@
 Tests for resilience.py (circuit breaker).
 
 Run with:
-    cd /home/mike/lucy-v10 && source ui-v10/.venv/bin/activate
+    cd <project-root> && source ui-v10/.venv/bin/activate
     python3 -m pytest tools/router_py/test_resilience.py -v
 """
 
@@ -28,10 +28,10 @@ from router_py.resilience import (
     reset_breaker,
 )
 
-
 # ---------------------------------------------------------------------------
 # Unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestCircuitBreakerBasics:
     def test_closed_initial_state(self):
@@ -248,6 +248,7 @@ class TestDecorator:
 # ---------------------------------------------------------------------------
 # Async tests
 # ---------------------------------------------------------------------------
+
 
 class TestAsyncCircuitBreaker:
     def test_async_success(self):

@@ -7,7 +7,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -35,20 +34,23 @@ def main() -> int:
                 "last_updated": "2026-03-25T00:00:00Z",
             },
         )
-        write_json(state_dir / "runtime_lifecycle.json", {"running": True, "status": "running", "pid": 12345})
+        write_json(
+            state_dir / "runtime_lifecycle.json",
+            {"running": True, "status": "running", "pid": 12345},
+        )
 
         os.environ["HOME"] = str(home)
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(Path("/home/mike/lucy-v10"))
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(REPO_UI_ROOT.parent)
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
 
-        from PySide6.QtWidgets import QApplication
         from app.main_window import OperatorConsoleWindow
+        from PySide6.QtWidgets import QApplication
 
         app = QApplication([])
         window = OperatorConsoleWindow()
@@ -56,14 +58,33 @@ def main() -> int:
         app.processEvents()
 
         labels = window.status_panel._runtime_summary_labels
-        assert_ok(labels["Augmented Policy"].text() == "disabled", "augmented policy should reflect runtime truth")
+        assert_ok(
+            labels["Augmented Policy"].text() == "disabled",
+            "augmented policy should reflect runtime truth",
+        )
         assert_ok(labels["Model"].text() == "local-lucy", "model should reflect runtime truth")
-        assert_ok(labels["Configured Provider"].text() == "wikipedia", "configured provider should reflect runtime truth")
-        assert_ok(labels["Configured Provider Paid"].text() == "Free", "configured provider paid flag should reflect provider class")
-        assert_ok(labels["Last Request Provider"].text() == "unknown", "last request provider should be unknown before any request")
-        assert_ok(labels["Last Request Paid"].text() == "unknown", "last request paid status should be unknown before any request")
-        assert_ok(labels["Session Augmented Calls"].text() == "0", "initial total counter should be 0")
-        assert_ok(labels["Session Paid Augmented Calls"].text() == "0", "initial paid counter should be 0")
+        assert_ok(
+            labels["Configured Provider"].text() == "wikipedia",
+            "configured provider should reflect runtime truth",
+        )
+        assert_ok(
+            labels["Configured Provider Paid"].text() == "Free",
+            "configured provider paid flag should reflect provider class",
+        )
+        assert_ok(
+            labels["Last Request Provider"].text() == "unknown",
+            "last request provider should be unknown before any request",
+        )
+        assert_ok(
+            labels["Last Request Paid"].text() == "unknown",
+            "last request paid status should be unknown before any request",
+        )
+        assert_ok(
+            labels["Session Augmented Calls"].text() == "0", "initial total counter should be 0"
+        )
+        assert_ok(
+            labels["Session Paid Augmented Calls"].text() == "0", "initial paid counter should be 0"
+        )
         assert_ok(
             labels["Session Provider Counts"].text() == "openai=0 kimi=0 wikipedia=0",
             "initial provider counters should be zeroed",
@@ -104,10 +125,22 @@ def main() -> int:
         window.refresh_runtime_state()
         app.processEvents()
 
-        assert_ok(labels["Last Request Provider"].text() == "unknown", "status should not fabricate provider usage from counters alone")
-        assert_ok(labels["Last Request Paid"].text() == "unknown", "status should not fabricate paid usage from counters alone")
-        assert_ok(labels["Session Augmented Calls"].text() == "2", "total counter should include only valid augmented usage")
-        assert_ok(labels["Session Paid Augmented Calls"].text() == "1", "paid counter should increment only on explicit paid flag")
+        assert_ok(
+            labels["Last Request Provider"].text() == "unknown",
+            "status should not fabricate provider usage from counters alone",
+        )
+        assert_ok(
+            labels["Last Request Paid"].text() == "unknown",
+            "status should not fabricate paid usage from counters alone",
+        )
+        assert_ok(
+            labels["Session Augmented Calls"].text() == "2",
+            "total counter should include only valid augmented usage",
+        )
+        assert_ok(
+            labels["Session Paid Augmented Calls"].text() == "1",
+            "paid counter should increment only on explicit paid flag",
+        )
         assert_ok(
             labels["Session Provider Counts"].text() == "openai=1 kimi=0 wikipedia=1",
             "provider counters should reflect counted usage",

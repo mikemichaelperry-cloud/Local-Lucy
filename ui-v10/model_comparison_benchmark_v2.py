@@ -12,6 +12,7 @@ Models tested:
   - local-lucy-fast   (qwen3:14b, optimized)
   - local-lucy-mistral (mistral-nemo 12B)
 """
+
 import json
 import os
 import statistics
@@ -24,15 +25,22 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-SNAPSHOT_ROOT = Path("/home/mike/lucy-v10")
-RUNTIME_NS = Path("/home/mike/.codex-api-home/lucy/runtime-v10")
+SNAPSHOT_ROOT = Path(__file__).resolve().parent.parent
+RUNTIME_NS = Path(
+    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
+    or (Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+)
 REQUEST_TOOL = SNAPSHOT_ROOT / "tools/runtime_request.py"
-REPORT_FILE = Path.home() / "Desktop" / f"lucy_v10_model_benchmark_clean_{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.json"
+REPORT_FILE = (
+    Path.home()
+    / "Desktop"
+    / f"lucy_v10_model_benchmark_clean_{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.json"
+)
 
 MODELS = [
     ("local-lucy-llama31", "llama3.1 8B default"),
-    ("local-lucy",         "qwen3:14b standard"),
-    ("local-lucy-fast",    "qwen3:14b optimized"),
+    ("local-lucy", "qwen3:14b standard"),
+    ("local-lucy-fast", "qwen3:14b optimized"),
     ("local-lucy-mistral", "mistral-nemo 12B"),
 ]
 
@@ -51,6 +59,7 @@ UNLOAD_WAIT_S = 15  # Time for Ollama to fully unload from VRAM
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def log(msg):
     ts = datetime.now().strftime("%H:%M:%S")
     print(f"[{ts}] {msg}", flush=True)
@@ -61,9 +70,17 @@ def unload_ollama_all():
     try:
         # unload by requesting a non-existent model with keep_alive=0
         subprocess.run(
-            ["curl", "-s", "-X", "POST", "http://127.0.0.1:11434/api/generate",
-             "-d", '{"model":"__unload__","prompt":"","keep_alive":0,"stream":false}'],
-            capture_output=True, timeout=10
+            [
+                "curl",
+                "-s",
+                "-X",
+                "POST",
+                "http://127.0.0.1:11434/api/generate",
+                "-d",
+                '{"model":"__unload__","prompt":"","keep_alive":0,"stream":false}',
+            ],
+            capture_output=True,
+            timeout=10,
         )
     except Exception:
         pass
@@ -78,7 +95,10 @@ def get_vram():
     try:
         r = subprocess.run(
             ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5, check=False
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
         return int(r.stdout.strip().split("\n")[0])
     except Exception:
@@ -99,8 +119,11 @@ def run_query(prompt, model, timeout=130):
     try:
         r = subprocess.run(
             [sys.executable, str(REQUEST_TOOL), "submit", "--text", prompt],
-            capture_output=True, text=True, timeout=timeout, env=env,
-            cwd=str(SNAPSHOT_ROOT)
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+            cwd=str(SNAPSHOT_ROOT),
         )
         elapsed = time.time() - start
         if r.stdout:
@@ -196,7 +219,7 @@ def main():
     log("=" * 60)
     log(f"Models: {', '.join(m[0] for m in MODELS)}")
     log(f"Prompts: {len(PROMPTS)} x {RUNS_PER_PROMPT} runs")
-    log(f"Cache: DISABLED")
+    log("Cache: DISABLED")
     log(f"Unload wait: {UNLOAD_WAIT_S}s between models")
     log(f"Report: {REPORT_FILE}")
     log("=" * 60)
@@ -205,7 +228,9 @@ def main():
     for alias, label in MODELS:
         r = benchmark_one(alias, label)
         results.append(r)
-        log(f"Summary for {alias}: median={r['overall_median']}s, mean={r['overall_mean']}s, failed={r['failed']}/{r['total_queries']}")
+        log(
+            f"Summary for {alias}: median={r['overall_median']}s, mean={r['overall_mean']}s, failed={r['failed']}/{r['total_queries']}"
+        )
 
     # Report
     report = {
@@ -225,7 +250,9 @@ def main():
     log(f"{'Model':<25} {'Cold':<8} {'Median':<8} {'Mean':<8} {'Min':<8} {'Max':<8} {'VRAM':<8}")
     log("-" * 80)
     for r in results:
-        log(f"{r['model_alias']:<25} {r['cold_start_ttc']:<8} {r['overall_median'] or 'N/A':<8} {r['overall_mean'] or 'N/A':<8} {r['overall_min'] or 'N/A':<8} {r['overall_max'] or 'N/A':<8} {r.get('vram_during_mb') or 'N/A':<8}")
+        log(
+            f"{r['model_alias']:<25} {r['cold_start_ttc']:<8} {r['overall_median'] or 'N/A':<8} {r['overall_mean'] or 'N/A':<8} {r['overall_min'] or 'N/A':<8} {r['overall_max'] or 'N/A':<8} {r.get('vram_during_mb') or 'N/A':<8}"
+        )
 
     log(f"\nFull report: {REPORT_FILE}")
 

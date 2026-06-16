@@ -7,7 +7,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -34,7 +33,10 @@ def main() -> int:
                 "last_updated": "2026-04-03T20:00:00Z",
             },
         )
-        write_json(state_dir / "runtime_lifecycle.json", {"running": True, "status": "running", "pid": 12345})
+        write_json(
+            state_dir / "runtime_lifecycle.json",
+            {"running": True, "status": "running", "pid": 12345},
+        )
         (state_dir / "last_route.json").write_text("{invalid json\n", encoding="utf-8")
 
         os.environ["HOME"] = str(home)
@@ -43,13 +45,13 @@ def main() -> int:
         # Set required runtime namespace root (parent of state_dir)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(state_dir.parent)
         # Set required authority contract variables
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(Path("/home/mike/lucy-v10"))
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(REPO_UI_ROOT.parent)
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
 
-        from PySide6.QtWidgets import QApplication
         from app.main_window import OperatorConsoleWindow
+        from PySide6.QtWidgets import QApplication
 
         app = QApplication([])
         window = OperatorConsoleWindow()

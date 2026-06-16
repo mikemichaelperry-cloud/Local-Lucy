@@ -9,15 +9,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pytest
-
 from keel_loader import load_keel_status, load_keel_text
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class TestKeelLoader:
     def test_load_keel_status_valid(self):
         status = load_keel_status()
         # In the test environment, keel/keel.yaml should exist
-        if Path("/home/mike/lucy-v10/keel/keel.yaml").exists():
+        if (REPO_ROOT / "keel" / "keel.yaml").exists():
             assert status["loaded"] is True
             assert status["path"].endswith("keel/keel.yaml")
             assert status["sha256"] is not None
@@ -34,6 +35,7 @@ class TestKeelLoader:
     def test_load_keel_status_missing_file(self, monkeypatch, tmp_path):
         # Force a missing keel by overriding root candidates
         import keel_loader as kl
+
         orig_candidates = kl._ROOT_CANDIDATES
         try:
             kl._ROOT_CANDIDATES = [tmp_path]
@@ -46,6 +48,7 @@ class TestKeelLoader:
 
     def test_load_keel_status_malformed_yaml(self, monkeypatch, tmp_path):
         import keel_loader as kl
+
         orig_candidates = kl._ROOT_CANDIDATES
         try:
             fake_keel = tmp_path / "keel" / "keel.yaml"
@@ -60,6 +63,7 @@ class TestKeelLoader:
 
     def test_load_keel_status_empty_dict(self, monkeypatch, tmp_path):
         import keel_loader as kl
+
         orig_candidates = kl._ROOT_CANDIDATES
         try:
             fake_keel = tmp_path / "keel" / "keel.yaml"

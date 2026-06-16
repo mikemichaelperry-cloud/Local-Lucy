@@ -13,7 +13,7 @@ This test exercises:
   7. Re-running the router and verifying the corrected route
 
 Run with pytest:
-    cd /home/mike/lucy-v10/tools/router_py
+    cd <project-root>/tools/router_py
     python -m pytest test_feedback_loop_integration.py -v
 """
 
@@ -29,21 +29,17 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "models" / "router"))
 
-from hybrid_router_v2 import HybridRouterV2
-from feedback_parser import parse_feedback, FeedbackType, log_user_feedback, _infer_corrected_route
-from feedback_buffer import get_buffer
-import background_learner
-from background_learner import (
-    learn_once,
-    FEEDBACK_PATH,
-    EXAMPLES_PATH,
-    EMBEDDINGS_PATH,
-    INDEX_PATH,
-    load_index,
-    save_index,
-    rebuild_embeddings,
-)
 import feedback_parser as fp
+from background_learner import (
+    EMBEDDINGS_PATH,
+    EXAMPLES_PATH,
+    FEEDBACK_PATH,
+    INDEX_PATH,
+    learn_once,
+)
+from feedback_buffer import get_buffer
+from feedback_parser import FeedbackType, _infer_corrected_route, log_user_feedback, parse_feedback
+from hybrid_router_v2 import HybridRouterV2
 
 
 @pytest.fixture(scope="module")
@@ -91,8 +87,13 @@ class TestFeedbackLoop:
     def test_negative_feedback_parsed(self):
         """parse_feedback must detect standalone 'Incorrect'."""
         buf = get_buffer()
-        buf.append(query="Who is my dog?", route="TIME", response_text="3:45 PM",
-                   intent_family="time_query", confidence=0.9874)
+        buf.append(
+            query="Who is my dog?",
+            route="TIME",
+            response_text="3:45 PM",
+            intent_family="time_query",
+            confidence=0.9874,
+        )
 
         fb = parse_feedback("Incorrect, my dog is Oscar")
         assert fb is not None
@@ -103,10 +104,16 @@ class TestFeedbackLoop:
     def test_route_inference_for_time_misroute(self):
         """_infer_corrected_route should infer LOCAL when no time keywords present."""
         buf = get_buffer()
-        buf.append(query="Who is my dog?", route="TIME", response_text="3:45 PM",
-                   intent_family="time_query", confidence=0.9874)
+        buf.append(
+            query="Who is my dog?",
+            route="TIME",
+            response_text="3:45 PM",
+            intent_family="time_query",
+            confidence=0.9874,
+        )
 
         from feedback_parser import FeedbackResult
+
         result = FeedbackResult(
             feedback_type=FeedbackType.ANSWER_NEGATIVE,
             target_query="Who is my dog?",
@@ -119,8 +126,13 @@ class TestFeedbackLoop:
     def test_feedback_logged_to_jsonl(self):
         """log_user_feedback must write an entry to user_feedback.jsonl."""
         buf = get_buffer()
-        buf.append(query="Who is my dog?", route="TIME", response_text="3:45 PM",
-                   intent_family="time_query", confidence=0.9874)
+        buf.append(
+            query="Who is my dog?",
+            route="TIME",
+            response_text="3:45 PM",
+            intent_family="time_query",
+            confidence=0.9874,
+        )
 
         fb = parse_feedback("Incorrect, my dog is Oscar")
         assert fb is not None
@@ -129,12 +141,19 @@ class TestFeedbackLoop:
         assert ok is True
 
         # Verify file content
-        lines = [json.loads(line) for line in FEEDBACK_PATH.read_text(encoding="utf-8").strip().split("\n")]
-        assert any(entry["query"] == "Who is my dog?" and entry["correct_route"] == "LOCAL" for entry in lines)
+        lines = [
+            json.loads(line)
+            for line in FEEDBACK_PATH.read_text(encoding="utf-8").strip().split("\n")
+        ]
+        assert any(
+            entry["query"] == "Who is my dog?" and entry["correct_route"] == "LOCAL"
+            for entry in lines
+        )
 
     def test_background_learner_processes_feedback(self):
         """learn_once must ingest user feedback and grow the index."""
         import tempfile
+
         import background_learner as bl
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -165,8 +184,13 @@ class TestFeedbackLoop:
 
                 # Seed feedback (use a query not already in the index)
                 buf = get_buffer()
-                buf.append(query="Who is my pet rabbit?", route="TIME", response_text="3:45 PM",
-                           intent_family="time_query", confidence=0.9874)
+                buf.append(
+                    query="Who is my pet rabbit?",
+                    route="TIME",
+                    response_text="3:45 PM",
+                    intent_family="time_query",
+                    confidence=0.9874,
+                )
                 fb = parse_feedback("Incorrect, my pet rabbit is Fluffy")
                 assert fb is not None
                 log_user_feedback(fb)
@@ -192,7 +216,7 @@ class TestFeedbackLoop:
     def test_full_loop_corrects_routing(self, router):
         """
         End-to-end: misroute → feedback → learn → verify corrected routing.
-        
+
         This uses a temporary copy of the index so we don't pollute production.
         """
         # Use the current production index but create a temp workspace
@@ -210,6 +234,7 @@ class TestFeedbackLoop:
 
             # Monkey-patch background_learner paths for this test
             import background_learner as bl
+
             orig_examples_path = bl.EXAMPLES_PATH
             orig_embeddings_path = bl.EMBEDDINGS_PATH
             orig_index_path = bl.INDEX_PATH
@@ -235,8 +260,13 @@ class TestFeedbackLoop:
 
                 # 2. Seed feedback buffer and log feedback
                 buf = get_buffer()
-                buf.append(query="Who is my dog?", route="TIME", response_text="3:45 PM",
-                           intent_family="time_query", confidence=0.9874)
+                buf.append(
+                    query="Who is my dog?",
+                    route="TIME",
+                    response_text="3:45 PM",
+                    intent_family="time_query",
+                    confidence=0.9874,
+                )
                 fb = parse_feedback("Incorrect, my dog is Oscar")
                 assert fb is not None
                 log_user_feedback(fb)

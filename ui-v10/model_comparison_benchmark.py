@@ -15,16 +15,17 @@ Measures:
   - VRAM footprint (via nvidia-smi when available)
 
 Usage:
-    cd /home/mike/lucy-v10/ui-v10
+    cd <project-root>/ui-v10
     ../../ui-v10/.venv/bin/python model_comparison_benchmark.py
 """
+
 import json
 import os
 import statistics
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -33,15 +34,22 @@ from typing import Optional
 # Configuration
 # ---------------------------------------------------------------------------
 
-SNAPSHOT_ROOT = Path("/home/mike/lucy-v10")
-RUNTIME_NS = Path("/home/mike/.codex-api-home/lucy/runtime-v10")
+SNAPSHOT_ROOT = Path(__file__).resolve().parent.parent
+RUNTIME_NS = Path(
+    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
+    or (Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+)
 REQUEST_TOOL = SNAPSHOT_ROOT / "tools/runtime_request.py"
-REPORT_FILE = Path.home() / "Desktop" / f"lucy_v10_model_benchmark_{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.json"
+REPORT_FILE = (
+    Path.home()
+    / "Desktop"
+    / f"lucy_v10_model_benchmark_{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.json"
+)
 
 MODELS = [
     ("local-lucy-llama31", "llama3.1 8B default"),
-    ("local-lucy",         "qwen3:14b standard"),
-    ("local-lucy-fast",    "qwen3:14b optimized"),
+    ("local-lucy", "qwen3:14b standard"),
+    ("local-lucy-fast", "qwen3:14b optimized"),
     ("local-lucy-mistral", "mistral-nemo 12B"),
 ]
 
@@ -60,6 +68,7 @@ RUNS_PER_PROMPT = 3
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RunResult:
     prompt: str
@@ -75,7 +84,10 @@ def get_vram_usage() -> Optional[float]:
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5, check=False
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
         if result.returncode != 0:
             return None
@@ -97,9 +109,15 @@ def unload_ollama_models() -> None:
     try:
         # Sending empty prompt with keep_alive=0 unloads the model
         subprocess.run(
-            ["curl", "-s", "http://127.0.0.1:11434/api/generate",
-             "-d", '{"model":"local-lucy","prompt":"","keep_alive":0,"stream":false}'],
-            capture_output=True, timeout=10
+            [
+                "curl",
+                "-s",
+                "http://127.0.0.1:11434/api/generate",
+                "-d",
+                '{"model":"local-lucy","prompt":"","keep_alive":0,"stream":false}',
+            ],
+            capture_output=True,
+            timeout=10,
         )
         time.sleep(2)
     except Exception:
@@ -121,8 +139,11 @@ def run_query(prompt: str, model: str, timeout: int = 130) -> tuple[float, bool,
     try:
         result = subprocess.run(
             [sys.executable, str(REQUEST_TOOL), "submit", "--text", prompt],
-            capture_output=True, text=True, timeout=timeout, env=env,
-            cwd=str(SNAPSHOT_ROOT)
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+            cwd=str(SNAPSHOT_ROOT),
         )
         elapsed = time.time() - start
 
@@ -202,14 +223,21 @@ def benchmark_model(model_alias: str, model_label: str) -> dict:
         "overall_max": round(max(all_times), 2) if all_times else None,
         "per_prompt": per_prompt,
         "raw_results": [
-            {"prompt": r.prompt, "run": r.run, "ttc": round(r.ttc, 2),
-             "accepted": r.accepted, "error": r.error}
+            {
+                "prompt": r.prompt,
+                "run": r.run,
+                "ttc": round(r.ttc, 2),
+                "accepted": r.accepted,
+                "error": r.error,
+            }
             for r in results
         ],
     }
 
-    print(f"\n  Summary: median={summary['overall_median']}s, mean={summary['overall_mean']}s, "
-          f"failed={failed}/{len(results)}")
+    print(
+        f"\n  Summary: median={summary['overall_median']}s, mean={summary['overall_mean']}s, "
+        f"failed={failed}/{len(results)}"
+    )
     return summary
 
 
@@ -221,7 +249,7 @@ def main():
     print(f"Models: {', '.join(m[0] for m in MODELS)}")
     print(f"Prompts: {len(PROMPTS)}")
     print(f"Runs per prompt: {RUNS_PER_PROMPT}")
-    print(f"Cache: DISABLED for fair comparison")
+    print("Cache: DISABLED for fair comparison")
     print(f"Report: {REPORT_FILE}")
     print("=" * 70)
 
@@ -229,7 +257,9 @@ def main():
     try:
         result = subprocess.run(
             ["curl", "-s", "http://127.0.0.1:11434/api/tags"],
-            capture_output=True, text=True, timeout=5
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode != 0:
             print("ERROR: Ollama not reachable at :11434")
@@ -242,7 +272,7 @@ def main():
 
     for model_alias, model_label in MODELS:
         # Unload previous model to get clean cold-start for first prompt
-        print(f"\n[Unloading previous models...]")
+        print("\n[Unloading previous models...]")
         unload_ollama_models()
         time.sleep(3)
 
@@ -269,13 +299,15 @@ def main():
     print(f"{'Model':<25} {'Median':<10} {'Mean':<10} {'Min':<10} {'Max':<10} {'VRAM MB':<10}")
     print("-" * 70)
     for r in all_results:
-        vram = f"{r['vram_mb']:.0f}" if r.get('vram_mb') else "N/A"
-        print(f"{r['model_alias']:<25} "
-              f"{r['overall_median'] or 'N/A':<10} "
-              f"{r['overall_mean'] or 'N/A':<10} "
-              f"{r['overall_min'] or 'N/A':<10} "
-              f"{r['overall_max'] or 'N/A':<10} "
-              f"{vram:<10}")
+        vram = f"{r['vram_mb']:.0f}" if r.get("vram_mb") else "N/A"
+        print(
+            f"{r['model_alias']:<25} "
+            f"{r['overall_median'] or 'N/A':<10} "
+            f"{r['overall_mean'] or 'N/A':<10} "
+            f"{r['overall_min'] or 'N/A':<10} "
+            f"{r['overall_max'] or 'N/A':<10} "
+            f"{vram:<10}"
+        )
 
     print(f"\nFull report saved to: {REPORT_FILE}")
     print("=" * 70)

@@ -11,8 +11,10 @@ from PySide6.QtWidgets import QApplication
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
+os.environ.setdefault(
+    "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+)
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(REPO_UI_ROOT.parent))
 os.environ.setdefault("LUCY_UI_ROOT", str(REPO_UI_ROOT))
 os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
 

@@ -12,7 +12,7 @@ Measures:
   - Cold vs warm comparison (LOCAL only, 3 runs)
 
 Usage:
-    cd /home/mike/lucy-v10
+    cd <project-root>
     source ui-v10/.venv/bin/activate
     LUCY_LATENCY_PROFILE=1 python tools/router_py/benchmark_e2e_latency.py
 
@@ -20,6 +20,7 @@ Requirements:
     Ollama running with local-lucy loaded
     Internet connectivity for WEATHER/TIME/NEWS/AUGMENTED
 """
+
 from __future__ import annotations
 
 import json
@@ -44,7 +45,6 @@ os.environ.setdefault("LUCY_EXEC_PY", "1")
 os.environ.setdefault("LUCY_SESSION_MEMORY", "0")  # Disable memory for pure benchmark
 
 from router_py.main import run
-
 
 # ---------------------------------------------------------------------------
 # Test cases by expected route
@@ -99,6 +99,7 @@ BENCHMARK_CASES: list[dict[str, Any]] = [
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RunResult:
     wall_ms: int
@@ -146,6 +147,7 @@ class CaseResult:
 # Benchmark runner
 # ---------------------------------------------------------------------------
 
+
 def _extract_profile(outcome) -> dict[str, int]:
     """Extract latency profile from outcome metadata."""
     meta = getattr(outcome, "metadata", {}) or {}
@@ -174,13 +176,21 @@ def _run_case(case: dict[str, Any]) -> CaseResult:
             )
         except Exception as exc:
             print(f"ERROR: {exc}")
-            result.runs.append(RunResult(
-                wall_ms=0, reported_ms=0,
-                classify_ms=None, route_ms=None,
-                provider_resolve_ms=None, context_build_ms=None,
-                execute_ms=None, overhead_ms=None,
-                actual_route="ERROR", status="exception", success=False,
-            ))
+            result.runs.append(
+                RunResult(
+                    wall_ms=0,
+                    reported_ms=0,
+                    classify_ms=None,
+                    route_ms=None,
+                    provider_resolve_ms=None,
+                    context_build_ms=None,
+                    execute_ms=None,
+                    overhead_ms=None,
+                    actual_route="ERROR",
+                    status="exception",
+                    success=False,
+                )
+            )
             continue
 
         wall_ms = int((time.perf_counter() - t0) * 1000)
@@ -203,7 +213,9 @@ def _run_case(case: dict[str, Any]) -> CaseResult:
 
         status_icon = "✓" if run_result.success else "✗"
         route_ok = "✓" if outcome.route == case["expected_route"] else f"!{outcome.route}"
-        print(f"{status_icon} wall={wall_ms}ms reported={run_result.reported_ms}ms route={route_ok}")
+        print(
+            f"{status_icon} wall={wall_ms}ms reported={run_result.reported_ms}ms route={route_ok}"
+        )
 
         # Brief pause between runs
         if i < case["runs"] - 1:
@@ -245,14 +257,16 @@ def _print_summary(results: list[CaseResult]) -> None:
     for case in results:
         for run in case.runs:
             if run.success and run.execute_ms is not None:
-                all_profiles.append({
-                    "classify": run.classify_ms or 0,
-                    "route": run.route_ms or 0,
-                    "provider_resolve": run.provider_resolve_ms or 0,
-                    "context_build": run.context_build_ms or 0,
-                    "execute": run.execute_ms or 0,
-                    "overhead": run.overhead_ms or 0,
-                })
+                all_profiles.append(
+                    {
+                        "classify": run.classify_ms or 0,
+                        "route": run.route_ms or 0,
+                        "provider_resolve": run.provider_resolve_ms or 0,
+                        "context_build": run.context_build_ms or 0,
+                        "execute": run.execute_ms or 0,
+                        "overhead": run.overhead_ms or 0,
+                    }
+                )
 
     if all_profiles:
         stages = ["classify", "route", "provider_resolve", "context_build", "execute", "overhead"]

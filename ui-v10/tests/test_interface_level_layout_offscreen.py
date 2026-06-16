@@ -7,7 +7,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -36,7 +35,10 @@ def main() -> int:
                 "last_updated": "2026-03-25T00:00:00Z",
             },
         )
-        write_json(state_dir / "runtime_lifecycle.json", {"running": True, "status": "running", "pid": 12345})
+        write_json(
+            state_dir / "runtime_lifecycle.json",
+            {"running": True, "status": "running", "pid": 12345},
+        )
         write_json(
             state_dir / "voice_runtime.json",
             {"available": True, "status": "idle", "listening": False, "processing": False},
@@ -55,13 +57,13 @@ def main() -> int:
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(state_dir.parent)
         # Set required authority contract variables
         # Use real repo path so backend can import router_py
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(Path("/home/mike/lucy-v10"))
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(REPO_UI_ROOT.parent)
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
 
-        from PySide6.QtWidgets import QApplication, QScrollArea, QWidget
         from app.main_window import OperatorConsoleWindow
+        from PySide6.QtWidgets import QApplication
 
         app = QApplication([])
         window = OperatorConsoleWindow()
@@ -70,7 +72,10 @@ def main() -> int:
         app.processEvents()
 
         # Current 3-level structure: simple, power, engineering
-        assert_ok(set(window._level_buttons.keys()) == {"simple", "power", "engineering"}, "simple/power/engineering levels should be exposed")
+        assert_ok(
+            set(window._level_buttons.keys()) == {"simple", "power", "engineering"},
+            "simple/power/engineering levels should be exposed",
+        )
 
         for level in ("engineering",):
             window._handle_interface_level_selected(level)
@@ -79,10 +84,17 @@ def main() -> int:
 
             control_scroll = window.control_panel._scroll_area
             status_scroll = window.status_panel._scroll_area
-            assert_ok(control_scroll is not None, f"{level}: control panel should expose an internal scroll area")
-            assert_ok(status_scroll is not None, f"{level}: status panel should expose an internal scroll area")
             assert_ok(
-                window.status_panel._runtime_summary_labels["Current Route"].text() == "not yet populated",
+                control_scroll is not None,
+                f"{level}: control panel should expose an internal scroll area",
+            )
+            assert_ok(
+                status_scroll is not None,
+                f"{level}: status panel should expose an internal scroll area",
+            )
+            assert_ok(
+                window.status_panel._runtime_summary_labels["Current Route"].text()
+                == "not yet populated",
                 f"{level}: optional route state should read as not yet populated",
             )
             # Preprocess Active field removed in Stream 1 (dead field cleanup)
@@ -91,13 +103,20 @@ def main() -> int:
             #     f"{level}: optional preprocess state should read as not yet populated",
             # )
             assert_ok(
-                "file missing" not in window.status_panel._runtime_detail_labels["Voice Backend"].text().lower(),
+                "file missing"
+                not in window.status_panel._runtime_detail_labels["Voice Backend"].text().lower(),
                 f"{level}: voice backend should avoid raw file-missing wording",
             )
 
             if level == "advanced":
-                assert_ok(control_scroll.verticalScrollBar().maximum() > 0, "advanced: control panel should overflow vertically")
-                assert_ok(status_scroll.verticalScrollBar().maximum() > 0, "advanced: status panel should overflow vertically")
+                assert_ok(
+                    control_scroll.verticalScrollBar().maximum() > 0,
+                    "advanced: control panel should overflow vertically",
+                )
+                assert_ok(
+                    status_scroll.verticalScrollBar().maximum() > 0,
+                    "advanced: status panel should overflow vertically",
+                )
                 assert_section_usable(
                     app,
                     control_scroll,
@@ -126,7 +145,9 @@ def main() -> int:
                     window.status_panel._history_maintenance_view,
                     "advanced: history retention summary",
                 )
-                assert_ok(not window.event_log_panel.isHidden(), "advanced: event log should be visible")
+                assert_ok(
+                    not window.event_log_panel.isHidden(), "advanced: event log should be visible"
+                )
         window.close()
         window.deleteLater()
         app.processEvents()
@@ -169,8 +190,13 @@ def assert_section_usable(
 ) -> None:
     assert_ok(section_widget is not None, f"{label}: section should exist")
     assert_ok(target_widget is not None, f"{label}: target widget should exist")
-    assert_ok(section_widget.isVisible(), f"{label}: section should be visible at this interface level")
-    assert_ok(target_widget.isVisible(), f"{label}: target widget should be visible at this interface level")
+    assert_ok(
+        section_widget.isVisible(), f"{label}: section should be visible at this interface level"
+    )
+    assert_ok(
+        target_widget.isVisible(),
+        f"{label}: target widget should be visible at this interface level",
+    )
 
     minimum_height = section_widget.minimumSizeHint().height()
     assert_ok(

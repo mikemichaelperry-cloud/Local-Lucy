@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import os
 import sys
-import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 # Qt needs offscreen platform for headless testing
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -24,9 +23,11 @@ sys.path.insert(0, str(REPO_UI_ROOT))
 from PySide6.QtWidgets import QApplication
 
 # Ensure required env vars for state_store
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
-os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
-os.environ.setdefault("LUCY_UI_ROOT", "/home/mike/lucy-v10/ui-v10")
+os.environ.setdefault(
+    "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+)
+os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(REPO_UI_ROOT.parent))
+os.environ.setdefault("LUCY_UI_ROOT", str(REPO_UI_ROOT))
 os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "1")
 
 from app.main_window import OperatorConsoleWindow as MainWindow

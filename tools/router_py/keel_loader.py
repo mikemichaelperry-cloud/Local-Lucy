@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -16,12 +17,22 @@ logger = logging.getLogger(__name__)
 # Project root candidates (tries repo first, then explicit fallback)
 _ROOT_CANDIDATES = [
     Path(__file__).resolve().parent.parent.parent,  # tools/router_py/../../
-    Path("/home/mike/lucy-v10"),
 ]
 
 
+def _authority_root() -> Path | None:
+    authority = os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", "").strip()
+    if authority:
+        return Path(authority).expanduser()
+    return None
+
+
 def _find_keel_path() -> Path | None:
-    for root in _ROOT_CANDIDATES:
+    candidates = list(_ROOT_CANDIDATES)
+    authority = _authority_root()
+    if authority is not None:
+        candidates.append(authority)
+    for root in candidates:
         keel_path = root / "keel" / "keel.yaml"
         if keel_path.exists():
             return keel_path

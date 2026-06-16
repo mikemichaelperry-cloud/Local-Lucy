@@ -7,7 +7,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -34,7 +33,10 @@ def main() -> int:
                 "last_updated": "2026-04-08T00:00:00Z",
             },
         )
-        write_json(state_dir / "runtime_lifecycle.json", {"running": True, "status": "running", "pid": 12345})
+        write_json(
+            state_dir / "runtime_lifecycle.json",
+            {"running": True, "status": "running", "pid": 12345},
+        )
         write_json(
             state_dir / "voice_runtime.json",
             {"available": True, "status": "idle", "listening": False, "processing": False},
@@ -50,14 +52,16 @@ def main() -> int:
         os.environ["HOME"] = str(home)
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
         # Set required runtime namespace root
-        os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(home / ".codex-api-home" / "lucy" / "runtime-v10")
-        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = "/home/mike/lucy-v10"
+        os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(
+            home / ".codex-api-home" / "lucy" / "runtime-v10"
+        )
+        os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(REPO_UI_ROOT.parent)
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
         sys.path.insert(0, str(REPO_UI_ROOT))
 
-        from PySide6.QtWidgets import QApplication
         from app.main_window import OperatorConsoleWindow
+        from PySide6.QtWidgets import QApplication
 
         app = QApplication([])
         window = OperatorConsoleWindow()

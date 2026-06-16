@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offscreen visual and functional verification of MemoryManagerDialog."""
+
 from __future__ import annotations
 
 import os
@@ -12,8 +13,10 @@ REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
-    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", "/home/mike/lucy-v10")
+    os.environ.setdefault(
+        "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+    )
+    os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(REPO_UI_ROOT.parent))
     os.environ.setdefault("LUCY_UI_ROOT", str(REPO_UI_ROOT))
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "0")
     sys.path.insert(0, str(REPO_UI_ROOT))
@@ -27,13 +30,13 @@ def main() -> int:
 
     # Ensure memory_service reloads its connection cache for this temp DB
     import memory.memory_service as memory_service
+
     memory_service._close_connection()
     memory_service._CONN_CACHE = None
 
-    from PySide6.QtWidgets import QApplication, QListWidget, QLineEdit, QPushButton, QMessageBox
-    from PySide6.QtCore import Qt
-    from PySide6.QtGui import QPixmap
     from app.widgets.memory_manager_dialog import MemoryManagerDialog
+    from PySide6.QtGui import QPixmap
+    from PySide6.QtWidgets import QApplication, QLineEdit, QListWidget, QMessageBox, QPushButton
 
     app = QApplication.instance() or QApplication([])
 
@@ -93,7 +96,9 @@ def main() -> int:
 
     assert_ok(list_widget.count() == 1, f"after delete, count={list_widget.count()}")
     remaining_text = list_widget.item(0).text()
-    assert_ok("Sarah is allergic to peanuts" in remaining_text, f"remaining item={remaining_text!r}")
+    assert_ok(
+        "Sarah is allergic to peanuts" in remaining_text, f"remaining item={remaining_text!r}"
+    )
 
     # --- Phase 4: Reject empty add ---
     input_field.setText("   ")
