@@ -88,9 +88,9 @@ lucy-v10/
 ```bash
 # Current state (auto-generated)
 Branch: v10-dev
-Origin HEAD: v9-dev  ⚠️  (needs GitHub admin to set default to v10-dev)
+Origin HEAD: v10-dev ✅
 Latest tag: v10.0.0-beta.1
-Commits since tag: 28
+Commits since tag: 29
 Working tree: clean
 ```
 
@@ -179,7 +179,7 @@ Live market-data fetcher with source citations:
 
 ## Known Risks / TODOs
 
-1. **Origin default branch** is still `v9-dev` — change in GitHub settings (requires `gh auth login`)
+1. ~~Origin default branch~~ ✅ now `v10-dev`
 2. ~~Dependency lockfile~~ ✅ `requirements-lock.txt` generated
 3. ~~Pre-commit hooks~~ ✅ `.pre-commit-config.yaml` created and installed
 4. ~~GitHub release workflow~~ ✅ `.github/workflows/release.yml` created; `.deb` packaging added
@@ -206,5 +206,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T15:40:00Z*
-*Session: priority list complete except GitHub default-branch change (needs auth); AppImage packaging starter added*
+*Last updated: 2026-06-16T15:45:00Z*
+*Session: all 11 priority items complete; GitHub default branch set to v10-dev*
