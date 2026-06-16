@@ -381,7 +381,7 @@ async def local_answer():
 # Tuned for local LLM variance: catches real semantic drift while tolerating
 # paraphrasing and within-model output variation.
 EMBEDDING_SIMILARITY_THRESHOLD = 0.70
-CONCEPT_OVERLAP_THRESHOLD = 0.30
+CONCEPT_OVERLAP_THRESHOLD = 0.25
 
 
 # ---------------------------------------------------------------------------

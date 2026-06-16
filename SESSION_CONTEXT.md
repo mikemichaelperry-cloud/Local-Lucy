@@ -190,7 +190,7 @@ Live market-data fetcher with source citations:
 8. ~~Regression golden fragility~~ ✅ model-mismatch now skips instead of failing; shared `skip_without_ollama` fixture added for CI/release environments without Ollama
 9. ~~Hardcoded absolute paths~~ ✅ tests/benchmarks now derive paths from `__file__` or env vars
 10. ~~Local-model regression tests~~ ✅ all 20 response/semantic regression cases now pass
-11. ~~Robustness review fixes~~ ✅ AppImage removed from automatic release; Ollama skip fixture added; model-mismatch skip in semantic regression; concept-overlap threshold relaxed to 0.30; reasoning prompt steered to avoid "I don't know"
+11. ~~Robustness review fixes~~ ✅ AppImage removed from automatic release; Ollama skip fixture added; model-mismatch skip in semantic regression; concept-overlap threshold relaxed to 0.25; reasoning max_chars raised to 750; reasoning prompt steered to avoid "I don't know"
 
 ---
 
