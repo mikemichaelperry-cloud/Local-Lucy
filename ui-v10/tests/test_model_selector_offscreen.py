@@ -52,7 +52,9 @@ def test_model_selector():
         encoding="utf-8",
     )
 
-    app = QApplication([])
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
     window = OperatorConsoleWindow()
     window.show()
     app.processEvents()

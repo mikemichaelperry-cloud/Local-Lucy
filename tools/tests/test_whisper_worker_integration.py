@@ -11,7 +11,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from runtime_voice import transcribe_with_whisper, resolve_whisper_model_path, bundled_whisper_binary, resolve_root
+from runtime_voice import (
+    bundled_whisper_binary,
+    resolve_root,
+    resolve_whisper_model_path,
+    transcribe_with_whisper,
+)
+
 from voice.whisper_worker import stop_whisper_worker
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,6 +31,10 @@ def test_worker_fast_path() -> None:
         print(f"⚠ SKIP: test wav not found at {TEST_WAV}")
         return
 
+    if not Path(WHISPER_BIN).is_file():
+        print(f"⚠ SKIP: whisper binary not found at {WHISPER_BIN}")
+        return
+
     # Ensure clean state
     stop_whisper_worker()
 
@@ -33,7 +43,7 @@ def test_worker_fast_path() -> None:
         print(f"⚠ SKIP: model not found at {model_path}")
         return
 
-    result = transcribe_with_whisper("whisper", TEST_WAV)
+    result = transcribe_with_whisper(WHISPER_BIN, TEST_WAV)
     assert result.backend == "gpu", f"expected gpu backend, got {result.backend}"
     assert result.fallback_used is False, "expected no fallback on first attempt"
     print(f"✓ Worker fast-path returned: {repr(result.text)} (backend={result.backend})")

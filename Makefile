@@ -26,18 +26,14 @@ install:
 
 test:
 	@echo "[test] Running pytest suite..."
-	cd ui-v10 && QT_QPA_PLATFORM=offscreen $(PYTHON) -m pytest .. -q \
-		--ignore=../tools/router_py/test_synthetic_adversarial.py
+	QT_QPA_PLATFORM=offscreen $(PYTHON) -m pytest -q \
+		--ignore=tools/router_py/test_synthetic_adversarial.py
 
 lint:
 	@echo "[lint] Running ruff..."
 	ruff check tools/router_py/ models/router/ ui-v10/app/
-	@if command -v mypy >/dev/null 2>&1; then \
-		echo "[lint] Running mypy..."; \
-		mypy tools/router_py/ --ignore-missing-imports; \
-	else \
-		echo "[lint] mypy not installed; skipping"; \
-	fi
+	@echo "[lint] Running mypy..."
+	mypy tools/router_py/ --ignore-missing-imports
 
 check-env:
 	@echo "[check-env] Validating Local Lucy environment..."

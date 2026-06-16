@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Direct test of whisper GPU→CPU fallback logic in runtime_voice.py."""
+
 from __future__ import annotations
 
 import os
 import stat
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from runtime_voice import transcribe_with_whisper, _GPU_ERROR_KEYWORDS, TranscriptionResult
+from runtime_voice import _GPU_ERROR_KEYWORDS, TranscriptionResult, transcribe_with_whisper
 
 
 def test_gpu_error_detection():
@@ -24,14 +24,18 @@ def test_gpu_error_detection():
 
 def test_gpu_fallback():
     """Mock whisper that fails on GPU, succeeds on CPU fallback."""
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        whisper_bin = tmp / "whisper"
-        capture = tmp / "capture.wav"
-        capture.write_bytes(b"RIFF" + b"\x00" * 100)
+    old_disable = os.environ.get("LUCY_WHISPER_SERVER_DISABLE")
+    os.environ["LUCY_WHISPER_SERVER_DISABLE"] = "1"
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            whisper_bin = tmp / "whisper"
+            capture = tmp / "capture.wav"
+            capture.write_bytes(b"RIFF" + b"\x00" * 100)
 
-        # Mock whisper: fail without --no-gpu, succeed with it
-        whisper_bin.write_text("""#!/usr/bin/env python3
+            # Mock whisper: fail without --no-gpu, succeed with it
+            whisper_bin.write_text(
+                """#!/usr/bin/env python3
 import sys
 if "--no-gpu" not in sys.argv:
     print("CUDA out of memory", file=sys.stderr)
@@ -41,65 +45,96 @@ idx = sys.argv.index("-of")
 prefix = sys.argv[idx + 1]
 with open(prefix + ".txt", "w") as f:
     f.write("cpu fallback transcript")
-""", encoding="utf-8")
-        whisper_bin.chmod(whisper_bin.stat().st_mode | stat.S_IXUSR)
+""",
+                encoding="utf-8",
+            )
+            whisper_bin.chmod(whisper_bin.stat().st_mode | stat.S_IXUSR)
 
-        result = transcribe_with_whisper(str(whisper_bin), capture)
-        assert isinstance(result, TranscriptionResult)
-        assert result.text == "cpu fallback transcript", f"Expected 'cpu fallback transcript', got {result.text!r}"
-        assert result.backend == "cpu"
-        assert result.fallback_used is True
-        assert "cuda" in result.fallback_reason.lower()
-        print("PASS: GPU fail → CPU fallback")
+            result = transcribe_with_whisper(str(whisper_bin), capture)
+            assert isinstance(result, TranscriptionResult)
+            assert (
+                result.text == "cpu fallback transcript"
+            ), f"Expected 'cpu fallback transcript', got {result.text!r}"
+            assert result.backend == "cpu"
+            assert result.fallback_used is True
+            assert "cuda" in result.fallback_reason.lower()
+            print("PASS: GPU fail → CPU fallback")
+    finally:
+        if old_disable is None:
+            os.environ.pop("LUCY_WHISPER_SERVER_DISABLE", None)
+        else:
+            os.environ["LUCY_WHISPER_SERVER_DISABLE"] = old_disable
 
 
 def test_gpu_success():
     """Mock whisper that succeeds on first GPU attempt."""
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        whisper_bin = tmp / "whisper"
-        capture = tmp / "capture.wav"
-        capture.write_bytes(b"RIFF" + b"\x00" * 100)
+    old_disable = os.environ.get("LUCY_WHISPER_SERVER_DISABLE")
+    os.environ["LUCY_WHISPER_SERVER_DISABLE"] = "1"
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            whisper_bin = tmp / "whisper"
+            capture = tmp / "capture.wav"
+            capture.write_bytes(b"RIFF" + b"\x00" * 100)
 
-        whisper_bin.write_text("""#!/usr/bin/env python3
+            whisper_bin.write_text(
+                """#!/usr/bin/env python3
 import sys
 idx = sys.argv.index("-of")
 prefix = sys.argv[idx + 1]
 with open(prefix + ".txt", "w") as f:
     f.write("gpu success transcript")
-""", encoding="utf-8")
-        whisper_bin.chmod(whisper_bin.stat().st_mode | stat.S_IXUSR)
+""",
+                encoding="utf-8",
+            )
+            whisper_bin.chmod(whisper_bin.stat().st_mode | stat.S_IXUSR)
 
-        result = transcribe_with_whisper(str(whisper_bin), capture)
-        assert isinstance(result, TranscriptionResult)
-        assert result.text == "gpu success transcript"
-        assert result.backend == "gpu"
-        assert result.fallback_used is False
-        assert result.fallback_reason == ""
-        print("PASS: GPU success on first attempt")
+            result = transcribe_with_whisper(str(whisper_bin), capture)
+            assert isinstance(result, TranscriptionResult)
+            assert result.text == "gpu success transcript"
+            assert result.backend == "gpu"
+            assert result.fallback_used is False
+            assert result.fallback_reason == ""
+            print("PASS: GPU success on first attempt")
+    finally:
+        if old_disable is None:
+            os.environ.pop("LUCY_WHISPER_SERVER_DISABLE", None)
+        else:
+            os.environ["LUCY_WHISPER_SERVER_DISABLE"] = old_disable
 
 
 def test_non_gpu_error_no_fallback():
     """Non-GPU errors should not trigger CPU fallback."""
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        whisper_bin = tmp / "whisper"
-        capture = tmp / "capture.wav"
-        capture.write_bytes(b"RIFF" + b"\x00" * 100)
+    old_disable = os.environ.get("LUCY_WHISPER_SERVER_DISABLE")
+    os.environ["LUCY_WHISPER_SERVER_DISABLE"] = "1"
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            whisper_bin = tmp / "whisper"
+            capture = tmp / "capture.wav"
+            capture.write_bytes(b"RIFF" + b"\x00" * 100)
 
-        whisper_bin.write_text("""#!/usr/bin/env python3
+            whisper_bin.write_text(
+                """#!/usr/bin/env python3
 import sys
 print("Model file not found", file=sys.stderr)
 raise SystemExit(1)
-""", encoding="utf-8")
-        whisper_bin.chmod(whisper_bin.stat().st_mode | stat.S_IXUSR)
+""",
+                encoding="utf-8",
+            )
+            whisper_bin.chmod(whisper_bin.stat().st_mode | stat.S_IXUSR)
 
-        try:
-            transcribe_with_whisper(str(whisper_bin), capture)
-            raise AssertionError("Should have raised RuntimeVoiceExit")
-        except Exception as exc:
-            assert "Model file not found" in str(exc)
-        print("PASS: Non-GPU error does not trigger fallback")
+            try:
+                transcribe_with_whisper(str(whisper_bin), capture)
+                raise AssertionError("Should have raised RuntimeVoiceExit")
+            except Exception as exc:
+                assert "Model file not found" in str(exc)
+            print("PASS: Non-GPU error does not trigger fallback")
+    finally:
+        if old_disable is None:
+            os.environ.pop("LUCY_WHISPER_SERVER_DISABLE", None)
+        else:
+            os.environ["LUCY_WHISPER_SERVER_DISABLE"] = old_disable
 
 
 def main() -> int:

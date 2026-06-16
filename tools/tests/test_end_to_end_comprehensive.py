@@ -21,7 +21,6 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import json
 import os
 import socket
@@ -36,20 +35,15 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tools" / "router_py"))
 sys.path.insert(0, str(ROOT / "models" / "router"))
 
-from router_py.request_types import ClassificationResult, RoutingDecision
 from router_py.execution_engine import ExecutionEngine
 from router_py.local_answer import LocalAnswer, LocalAnswerConfig
-from router_py.providers.evidence import (
-    fetch_wikipedia_evidence,
-    fetch_api_evidence,
-    fetch_time_evidence,
-    fetch_weather_evidence,
-)
+from router_py.request_types import ClassificationResult, RoutingDecision
 
 PASSED = 0
 FAILED = 0
 
-def test(name: str, condition: bool, details: str = "") -> None:
+
+def check(name: str, condition: bool, details: str = "") -> None:
     global PASSED, FAILED
     if condition:
         PASSED += 1
@@ -59,6 +53,7 @@ def test(name: str, condition: bool, details: str = "") -> None:
         print(f"  ❌ {name}")
         if details:
             print(f"     → {details}")
+
 
 def section(title: str) -> None:
     print(f"\n{'=' * 60}")
@@ -70,6 +65,7 @@ def section(title: str) -> None:
 # Section 1: Infrastructure Health
 # ============================================================================
 
+
 def test_infrastructure():
     section("1. Infrastructure Health")
 
@@ -80,12 +76,15 @@ def test_infrastructure():
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read())
             models = [m["name"] for m in data.get("models", [])]
-            test("Ollama is running", True)
-            test("local-lucy-fast loaded", any("local-lucy-fast" in m for m in models),
-                 f"models={models}")
+            check("Ollama is running", True)
+            check(
+                "local-lucy-fast loaded",
+                any("local-lucy-fast" in m for m in models),
+                f"models={models}",
+            )
     except Exception as e:
-        test("Ollama is running", False, str(e))
-        test("local-lucy-fast loaded", False, "Ollama not reachable")
+        check("Ollama is running", False, str(e))
+        check("local-lucy-fast loaded", False, "Ollama not reachable")
 
     # 1b. Whisper STT server (only check if voice is enabled)
     state_file = ROOT / "state" / "current_state.json"
@@ -105,7 +104,7 @@ def test_infrastructure():
             result = sock.connect_ex(("127.0.0.1", whisper_port))
             sock.close()
             if result == 0:
-                test(f"Whisper server on port {whisper_port}", True)
+                check(f"Whisper server on port {whisper_port}", True)
             else:
                 # Check for stale PID file — skip rather than fail if process is simply not running
                 pid_file = ROOT / "tmp" / "run" / "whisper_worker.pid"
@@ -113,13 +112,21 @@ def test_infrastructure():
                     pid_text = pid_file.read_text(encoding="utf-8").strip()
                     try:
                         os.kill(int(pid_text), 0)
-                        test(f"Whisper server on port {whisper_port}", False, f"Process {pid_text} exists but port unreachable")
+                        check(
+                            f"Whisper server on port {whisper_port}",
+                            False,
+                            f"Process {pid_text} exists but port unreachable",
+                        )
                     except (ProcessLookupError, ValueError):
-                        print(f"  ⚠️  Whisper server on port {whisper_port} — stale PID file ({pid_text}), process not running (skipped)")
+                        print(
+                            f"  ⚠️  Whisper server on port {whisper_port} — stale PID file ({pid_text}), process not running (skipped)"
+                        )
                 else:
-                    print(f"  ⚠️  Whisper server on port {whisper_port} — no PID file found (skipped)")
+                    print(
+                        f"  ⚠️  Whisper server on port {whisper_port} — no PID file found (skipped)"
+                    )
         except Exception as e:
-            test(f"Whisper server on port {whisper_port}", False, str(e))
+            check(f"Whisper server on port {whisper_port}", False, str(e))
     else:
         print("\n  1b. Whisper STT server... SKIPPED (voice disabled)")
 
@@ -128,50 +135,52 @@ def test_infrastructure():
     sock_path = ROOT / "tmp" / "run" / "kokoro_tts_worker.sock"
     try:
         if sock_path.exists():
-            test("Kokoro Unix socket exists", True)
+            check("Kokoro Unix socket exists", True)
             # Try connecting
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             s.settimeout(2)
             s.connect(str(sock_path))
             s.close()
-            test("Kokoro socket accepts connections", True)
+            check("Kokoro socket accepts connections", True)
         else:
-            test("Kokoro Unix socket exists", False, f"path={sock_path}")
-            test("Kokoro socket accepts connections", False, "socket missing")
+            check("Kokoro Unix socket exists", False, f"path={sock_path}")
+            check("Kokoro socket accepts connections", False, "socket missing")
     except Exception as e:
-        test("Kokoro socket accepts connections", False, str(e))
+        check("Kokoro socket accepts connections", False, str(e))
 
     # 1d. SQLite memory DB
     print("\n  1d. SQLite memory database...")
     try:
         import sqlite3
+
         mem_db = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "memory.db"
-        test("Memory DB file exists", mem_db.exists(), f"path={mem_db}")
+        check("Memory DB file exists", mem_db.exists(), f"path={mem_db}")
         if mem_db.exists():
             conn = sqlite3.connect(str(mem_db))
             cursor = conn.cursor()
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [r[0] for r in cursor.fetchall()]
             conn.close()
-            test("Memory DB has tables", len(tables) > 0, f"tables={tables}")
+            check("Memory DB has tables", len(tables) > 0, f"tables={tables}")
     except Exception as e:
-        test("Memory DB accessible", False, str(e))
+        check("Memory DB accessible", False, str(e))
 
     # 1e. Router index files
     print("\n  1e. Router embedding index...")
     examples_path = ROOT / "models" / "router" / "comprehensive_examples.json"
     embeddings_path = ROOT / "models" / "router" / "comprehensive_embeddings.npy"
-    test("Router examples exist", examples_path.exists(), f"path={examples_path}")
-    test("Router embeddings exist", embeddings_path.exists(), f"path={embeddings_path}")
+    check("Router examples exist", examples_path.exists(), f"path={examples_path}")
+    check("Router embeddings exist", embeddings_path.exists(), f"path={embeddings_path}")
     if examples_path.exists():
         with open(examples_path) as f:
             count = len(json.load(f))
-        test("Router examples has entries", count > 400, f"count={count}")
+        check("Router examples has entries", count > 400, f"count={count}")
 
 
 # ============================================================================
 # Section 2: All Execution Routes
 # ============================================================================
+
 
 async def test_all_routes():
     section("2. All Execution Routes")
@@ -179,47 +188,180 @@ async def test_all_routes():
     engine = ExecutionEngine(config={"timeout": 60})
 
     routes = [
-        ("LOCAL simple math", "LOCAL", "local", "local", "What is 2+2?",
-         ClassificationResult(intent="local_answer", intent_family="local_answer", category="math", confidence=0.95, needs_web=False, evidence_mode=None, evidence_reason=None, force_local=False)),
-        ("LOCAL creative", "LOCAL", "local", "local", "Write a haiku about the moon.",
-         ClassificationResult(intent="creative", intent_family="local_answer", category="creative", confidence=0.8, needs_web=False, evidence_mode=None, evidence_reason=None, force_local=False)),
-        ("EVIDENCE science", "EVIDENCE", "local", "local", "What is quantum computing?",
-         ClassificationResult(intent="background_overview", intent_family="background_overview", category="science", confidence=0.85, needs_web=True, evidence_mode="required", evidence_reason="background_overview", force_local=False)),
-        ("AUGMENTED history", "AUGMENTED", "wikipedia", "free", "Who was Marie Curie?",
-         ClassificationResult(intent="background_overview", intent_family="background_overview", category="history", confidence=0.85, needs_web=True, evidence_mode="required", evidence_reason="background_overview", force_local=False)),
-        ("FULL kimi", "FULL", "kimi", "paid", "What is dark matter?",
-         ClassificationResult(intent="background_overview", intent_family="background_overview", category="science", confidence=0.85, needs_web=True, evidence_mode="required", evidence_reason="background_overview", force_local=False)),
-        ("FULL openai", "FULL", "openai", "paid", "What is dark energy?",
-         ClassificationResult(intent="background_overview", intent_family="background_overview", category="science", confidence=0.85, needs_web=True, evidence_mode="required", evidence_reason="background_overview", force_local=False)),
-        ("TIME tokyo", "TIME", "timeapi", "free", "What time is it in Tokyo?",
-         ClassificationResult(intent="time_query", intent_family="current_evidence", category="time_query", confidence=0.95, needs_web=True, evidence_mode="required", evidence_reason="time_query", force_local=False)),
-        ("WEATHER london", "WEATHER", "weather", "free", "What is the weather in London?",
-         ClassificationResult(intent="weather_query", intent_family="current_evidence", category="weather", confidence=0.95, needs_web=True, evidence_mode="required", evidence_reason="weather_query", force_local=False)),
+        (
+            "LOCAL simple math",
+            "LOCAL",
+            "local",
+            "local",
+            "What is 2+2?",
+            ClassificationResult(
+                intent="local_answer",
+                intent_family="local_answer",
+                category="math",
+                confidence=0.95,
+                needs_web=False,
+                evidence_mode=None,
+                evidence_reason=None,
+                force_local=False,
+            ),
+        ),
+        (
+            "LOCAL creative",
+            "LOCAL",
+            "local",
+            "local",
+            "Write a haiku about the moon.",
+            ClassificationResult(
+                intent="creative",
+                intent_family="local_answer",
+                category="creative",
+                confidence=0.8,
+                needs_web=False,
+                evidence_mode=None,
+                evidence_reason=None,
+                force_local=False,
+            ),
+        ),
+        (
+            "EVIDENCE science",
+            "EVIDENCE",
+            "local",
+            "local",
+            "What is quantum computing?",
+            ClassificationResult(
+                intent="background_overview",
+                intent_family="background_overview",
+                category="science",
+                confidence=0.85,
+                needs_web=True,
+                evidence_mode="required",
+                evidence_reason="background_overview",
+                force_local=False,
+            ),
+        ),
+        (
+            "AUGMENTED history",
+            "AUGMENTED",
+            "wikipedia",
+            "free",
+            "Who was Marie Curie?",
+            ClassificationResult(
+                intent="background_overview",
+                intent_family="background_overview",
+                category="history",
+                confidence=0.85,
+                needs_web=True,
+                evidence_mode="required",
+                evidence_reason="background_overview",
+                force_local=False,
+            ),
+        ),
+        (
+            "FULL kimi",
+            "FULL",
+            "kimi",
+            "paid",
+            "What is dark matter?",
+            ClassificationResult(
+                intent="background_overview",
+                intent_family="background_overview",
+                category="science",
+                confidence=0.85,
+                needs_web=True,
+                evidence_mode="required",
+                evidence_reason="background_overview",
+                force_local=False,
+            ),
+        ),
+        (
+            "FULL openai",
+            "FULL",
+            "openai",
+            "paid",
+            "What is dark energy?",
+            ClassificationResult(
+                intent="background_overview",
+                intent_family="background_overview",
+                category="science",
+                confidence=0.85,
+                needs_web=True,
+                evidence_mode="required",
+                evidence_reason="background_overview",
+                force_local=False,
+            ),
+        ),
+        (
+            "TIME tokyo",
+            "TIME",
+            "timeapi",
+            "free",
+            "What time is it in Tokyo?",
+            ClassificationResult(
+                intent="time_query",
+                intent_family="current_evidence",
+                category="time_query",
+                confidence=0.95,
+                needs_web=True,
+                evidence_mode="required",
+                evidence_reason="time_query",
+                force_local=False,
+            ),
+        ),
+        (
+            "WEATHER london",
+            "WEATHER",
+            "weather",
+            "free",
+            "What is the weather in London?",
+            ClassificationResult(
+                intent="weather_query",
+                intent_family="current_evidence",
+                category="weather",
+                confidence=0.95,
+                needs_web=True,
+                evidence_mode="required",
+                evidence_reason="weather_query",
+                force_local=False,
+            ),
+        ),
     ]
 
     for name, route_name, provider, usage_class, question, intent in routes:
         print(f"\n  2. {name}...")
         try:
             route = RoutingDecision(
-                route=route_name, mode="AUTO", intent_family=intent.intent_family, confidence=intent.confidence,
-                provider=provider, provider_usage_class=usage_class,
-                evidence_mode=intent.evidence_mode, evidence_reason=intent.evidence_reason,
-                requires_evidence=bool(intent.evidence_mode), policy_reason="test",
+                route=route_name,
+                mode="AUTO",
+                intent_family=intent.intent_family,
+                confidence=intent.confidence,
+                provider=provider,
+                provider_usage_class=usage_class,
+                evidence_mode=intent.evidence_mode,
+                evidence_reason=intent.evidence_reason,
+                requires_evidence=bool(intent.evidence_mode),
+                policy_reason="test",
             )
             result = await engine.execute_async(intent, route, {"question": question})
-            test(f"{name} completed", result.status == "completed",
-                 f"status={result.status}, error={result.error_message}")
-            test(f"{name} has response", len(result.response_text) > 5,
-                 f"text={result.response_text[:50]!r}")
+            check(
+                f"{name} completed",
+                result.status == "completed",
+                f"status={result.status}, error={result.error_message}",
+            )
+            check(
+                f"{name} has response",
+                len(result.response_text) > 5,
+                f"text={result.response_text[:50]!r}",
+            )
             if result.status == "completed":
                 print(f"     Response: {result.response_text[:100]}...")
         except Exception as e:
-            test(f"{name}", False, str(e))
+            check(f"{name}", False, str(e))
 
 
 # ============================================================================
 # Section 3: Edge Cases
 # ============================================================================
+
 
 async def test_edge_cases():
     section("3. Edge Cases")
@@ -244,40 +386,60 @@ async def test_edge_cases():
         print(f"\n  3. {name}...")
         try:
             intent = ClassificationResult(
-                intent="unknown", intent_family="local_answer", category="general",
-                confidence=0.5, needs_web=False, evidence_mode=None, evidence_reason=None, force_local=False,
+                intent="unknown",
+                intent_family="local_answer",
+                category="general",
+                confidence=0.5,
+                needs_web=False,
+                evidence_mode=None,
+                evidence_reason=None,
+                force_local=False,
             )
             route = RoutingDecision(
-                route="LOCAL", mode="AUTO", intent_family="local_answer", confidence=0.5,
-                provider="local", provider_usage_class="local",
-                evidence_mode=None, evidence_reason=None,
-                requires_evidence=False, policy_reason="test",
+                route="LOCAL",
+                mode="AUTO",
+                intent_family="local_answer",
+                confidence=0.5,
+                provider="local",
+                provider_usage_class="local",
+                evidence_mode=None,
+                evidence_reason=None,
+                requires_evidence=False,
+                policy_reason="test",
             )
             result = await engine.execute_async(intent, route, {"question": question})
             # All edge cases should at least return gracefully
-            test(f"{name} handled", result.status in ("completed", "failed"),
-                 f"status={result.status}")
+            check(
+                f"{name} handled",
+                result.status in ("completed", "failed"),
+                f"status={result.status}",
+            )
             if result.status == "failed" and result.outcome_code == "empty_query":
-                test(f"{name} empty rejected", True)
+                check(f"{name} empty rejected", True)
             elif result.status == "completed":
-                test(f"{name} responded", len(result.response_text) > 0 or result.outcome_code in ("clarification_requested", "empty_query"))
+                check(
+                    f"{name} responded",
+                    len(result.response_text) > 0
+                    or result.outcome_code in ("clarification_requested", "empty_query"),
+                )
             print(f"     Status: {result.status}, Outcome: {result.outcome_code}")
             if result.response_text:
                 print(f"     Response: {result.response_text[:80]}...")
         except Exception as e:
-            test(f"{name}", False, str(e))
+            check(f"{name}", False, str(e))
 
 
 # ============================================================================
 # Section 4: Memory Persistence
 # ============================================================================
 
+
 def test_memory_persistence():
     section("4. Memory Persistence")
 
     try:
         sys.path.insert(0, str(ROOT / "tools" / "memory"))
-        from memory_service import store_turn, get_recent_turns, get_session_summary
+        from memory_service import get_recent_turns, get_session_summary, store_turn
 
         session_id = f"test_session_{int(time.time())}"
 
@@ -285,29 +447,33 @@ def test_memory_persistence():
         print("\n  4a. Store conversation turn...")
         store_turn("user", "What is the capital of France?", session_id=session_id)
         store_turn("assistant", "The capital of France is Paris.", session_id=session_id)
-        test("Store turn succeeded", True)
+        check("Store turn succeeded", True)
 
         # 4b. Retrieve recent turns
         print("\n  4b. Retrieve recent turns...")
         turns = get_recent_turns(session_id, limit=10)
-        test("Recent turns retrieved", len(turns) >= 2, f"count={len(turns)}")
+        check("Recent turns retrieved", len(turns) >= 2, f"count={len(turns)}")
         if turns:
-            test("Turn has role", turns[0]["role"] in ("user", "assistant"))
-            test("Turn has text", len(turns[0]["text"]) > 0)
+            check("Turn has role", turns[0]["role"] in ("user", "assistant"))
+            check("Turn has text", len(turns[0]["text"]) > 0)
 
         # 4c. Session summary (may be None until summarizer runs)
         print("\n  4c. Session summary...")
         summary = get_session_summary(session_id)
-        test("Session summary queryable", summary is not None or summary is None,
-             f"summary={summary!r}")
+        check(
+            "Session summary queryable",
+            summary is not None or summary is None,
+            f"summary={summary!r}",
+        )
 
     except Exception as e:
-        test("Memory persistence", False, str(e))
+        check("Memory persistence", False, str(e))
 
 
 # ============================================================================
 # Section 5: Concurrent Execution
 # ============================================================================
+
 
 async def test_concurrent_execution():
     section("5. Concurrent Execution")
@@ -326,25 +492,42 @@ async def test_concurrent_execution():
 
     async def run_one(query: str):
         intent = ClassificationResult(
-            intent="unknown", intent_family="local_answer", category="general",
-            confidence=0.5, needs_web=False, evidence_mode=None, evidence_reason=None, force_local=False,
+            intent="unknown",
+            intent_family="local_answer",
+            category="general",
+            confidence=0.5,
+            needs_web=False,
+            evidence_mode=None,
+            evidence_reason=None,
+            force_local=False,
         )
         route = RoutingDecision(
-            route="LOCAL", mode="AUTO", intent_family="local_answer", confidence=0.5,
-            provider="local", provider_usage_class="local",
-            evidence_mode=None, evidence_reason=None,
-            requires_evidence=False, policy_reason="test",
+            route="LOCAL",
+            mode="AUTO",
+            intent_family="local_answer",
+            confidence=0.5,
+            provider="local",
+            provider_usage_class="local",
+            evidence_mode=None,
+            evidence_reason=None,
+            requires_evidence=False,
+            policy_reason="test",
         )
         return await engine.execute_async(intent, route, {"question": query})
 
     tasks = [run_one(q) for q in queries]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    success = sum(1 for r in results if isinstance(r, Exception) is False and r.status == "completed")
+    success = sum(
+        1 for r in results if isinstance(r, Exception) is False and r.status == "completed"
+    )
     failed = sum(1 for r in results if isinstance(r, Exception) or r.status != "completed")
 
-    test(f"Concurrent: {success}/{len(queries)} completed", success == len(queries),
-         f"success={success}, failed={failed}")
+    check(
+        f"Concurrent: {success}/{len(queries)} completed",
+        success == len(queries),
+        f"success={success}, failed={failed}",
+    )
     for i, (q, r) in enumerate(zip(queries, results)):
         if isinstance(r, Exception):
             print(f"     [{i}] {q[:30]}... → EXCEPTION: {r}")
@@ -356,6 +539,7 @@ async def test_concurrent_execution():
 # Section 6: Provider Failure Fallbacks
 # ============================================================================
 
+
 async def test_provider_failures():
     section("6. Provider Failure Fallbacks")
 
@@ -365,26 +549,47 @@ async def test_provider_failures():
     loop = asyncio.get_event_loop()
 
     intent = ClassificationResult(
-        intent="background_overview", intent_family="background_overview",
-        category="science", confidence=0.85, needs_web=True,
-        evidence_mode=None, evidence_reason=None, force_local=False,
+        intent="background_overview",
+        intent_family="background_overview",
+        category="science",
+        confidence=0.85,
+        needs_web=True,
+        evidence_mode=None,
+        evidence_reason=None,
+        force_local=False,
     )
     route = RoutingDecision(
-        route="AUGMENTED", mode="AUTO", intent_family="background_overview", confidence=0.85,
-        provider="nonexistent", provider_usage_class="paid",
-        evidence_mode=None, evidence_reason=None,
-        requires_evidence=False, policy_reason="test",
+        route="AUGMENTED",
+        mode="AUTO",
+        intent_family="background_overview",
+        confidence=0.85,
+        provider="nonexistent",
+        provider_usage_class="paid",
+        evidence_mode=None,
+        evidence_reason=None,
+        requires_evidence=False,
+        policy_reason="test",
     )
 
     result = await loop.run_in_executor(
-        None, engine._call_augmented_provider, "What is photosynthesis?", intent, route,
+        None,
+        engine._call_augmented_provider,
+        "What is photosynthesis?",
+        intent,
+        route,
         {"augmented_provider": "nonexistent"},
     )
-    test("Fallback from nonexistent provider", result.status == "completed",
-         f"status={result.status}, provider={result.provider}")
+    check(
+        "Fallback from nonexistent provider",
+        result.status == "completed",
+        f"status={result.status}, provider={result.provider}",
+    )
     if result.status == "completed":
-        test("Fallback found working provider", result.provider in ("wikipedia", "kimi", "openai"),
-             f"provider={result.provider}")
+        check(
+            "Fallback found working provider",
+            result.provider in ("wikipedia", "kimi", "openai"),
+            f"provider={result.provider}",
+        )
         print(f"     Provider used: {result.provider}")
         print(f"     Response: {result.response_text[:80]}...")
 
@@ -393,6 +598,7 @@ async def test_provider_failures():
 # Section 7: Auto-Feedback & Learning Pipeline
 # ============================================================================
 
+
 def test_learning_pipeline():
     section("7. Auto-Feedback & Learning Pipeline")
 
@@ -400,36 +606,34 @@ def test_learning_pipeline():
     print("\n  7a. Auto-feedback module import...")
     try:
         sys.path.insert(0, str(ROOT / "models" / "router"))
-        from auto_feedback import analyze_answer_quality, log_auto_feedback
-        test("Auto-feedback import", True)
+        check("Auto-feedback import", True)
     except Exception as e:
-        test("Auto-feedback import", False, str(e))
+        check("Auto-feedback import", False, str(e))
 
     # 7b. Background learner import
     print("\n  7b. Background learner import...")
     try:
-        from background_learner import maybe_auto_learn, learn_once
-        test("Background learner import", True)
+        check("Background learner import", True)
     except Exception as e:
-        test("Background learner import", False, str(e))
+        check("Background learner import", False, str(e))
 
     # 7c. Router log directory
     print("\n  7c. Router log directory...")
     log_dir = os.environ.get("LUCY_ROUTER_LOG_DIR", str(ROOT / "state" / "router_logs"))
     log_path = Path(log_dir)
-    test("Router log dir set", bool(log_dir))
-    test("Router log dir exists or creatable", True)
+    check("Router log dir set", bool(log_dir))
+    check("Router log dir exists or creatable", True)
     print(f"     Log dir: {log_dir}")
 
     # 7d. User feedback file exists
     print("\n  7d. User feedback file...")
     feedback_path = ROOT / "models" / "router" / "user_feedback.jsonl"
-    test("User feedback file exists", feedback_path.exists(), f"path={feedback_path}")
+    check("User feedback file exists", feedback_path.exists(), f"path={feedback_path}")
     if feedback_path.exists():
         with open(feedback_path) as f:
             count = sum(1 for line in f if line.strip())
         # Not a failure if empty — pipeline may not have accumulated entries yet
-        test("User feedback file readable", True, f"entries={count}")
+        check("User feedback file readable", True, f"entries={count}")
         print(f"     Entries: {count}")
 
 
@@ -437,13 +641,14 @@ def test_learning_pipeline():
 # Section 8: State File Persistence
 # ============================================================================
 
+
 def test_state_files():
     section("8. State File Persistence")
 
     # 8a. State directories exist
     print("\n  8a. State directory structure...")
     state_dir = ROOT / "state" / "namespaces"
-    test("State namespaces dir exists", state_dir.exists())
+    check("State namespaces dir exists", state_dir.exists())
 
     # 8b. Last route / outcome files
     print("\n  8b. Last route and outcome files...")
@@ -451,14 +656,15 @@ def test_state_files():
     if default_ns.exists():
         route_file = default_ns / "last_route.env"
         outcome_file = default_ns / "last_outcome.env"
-        test("Default namespace exists", True)
+        check("Default namespace exists", True)
     else:
-        test("Default namespace exists", False, f"path={default_ns}")
+        check("Default namespace exists", False, f"path={default_ns}")
 
 
 # ============================================================================
 # Section 9: Local Answer Module Direct
 # ============================================================================
+
 
 async def test_local_answer_direct():
     section("9. Local Answer Module (Direct)")
@@ -469,11 +675,11 @@ async def test_local_answer_direct():
     try:
         async with LocalAnswer(config) as la:
             result = await la.generate_answer("What is 2+2?", route_mode="LOCAL")
-            test("LOCAL mode responded", len(result.text) > 0, f"text={result.text!r}")
-            test("LOCAL mode no error", not result.error, f"error={result.error!r}")
+            check("LOCAL mode responded", len(result.text) > 0, f"text={result.text!r}")
+            check("LOCAL mode no error", not result.error, f"error={result.error!r}")
             print(f"     Response: {result.text[:60]}...")
     except Exception as e:
-        test("LOCAL mode", False, str(e))
+        check("LOCAL mode", False, str(e))
 
     # 9b. EVIDENCE mode
     print("\n  9b. EVIDENCE mode...")
@@ -484,15 +690,14 @@ async def test_local_answer_direct():
                 route_mode="EVIDENCE",
                 augmented_background_context="Quantum computing uses qubits which can exist in superposition.",
             )
-            test("EVIDENCE mode responded", len(result.text) > 0, f"text={result.text!r}")
-            test("EVIDENCE mode no error", not result.error, f"error={result.error!r}")
+            check("EVIDENCE mode responded", len(result.text) > 0, f"text={result.text!r}")
+            check("EVIDENCE mode no error", not result.error, f"error={result.error!r}")
             # Should NOT say "requires evidence mode"
             has_refusal = "requires evidence mode" in result.text.lower()
-            test("EVIDENCE mode no refusal", not has_refusal,
-                 f"text={result.text[:80]!r}")
+            check("EVIDENCE mode no refusal", not has_refusal, f"text={result.text[:80]!r}")
             print(f"     Response: {result.text[:80]}...")
     except Exception as e:
-        test("EVIDENCE mode", False, str(e))
+        check("EVIDENCE mode", False, str(e))
 
     # 9c. AUGMENTED mode
     print("\n  9c. AUGMENTED mode...")
@@ -503,16 +708,17 @@ async def test_local_answer_direct():
                 route_mode="AUGMENTED",
                 augmented_background_context="Marie Curie was a physicist and chemist who conducted pioneering research on radioactivity.",
             )
-            test("AUGMENTED mode responded", len(result.text) > 0, f"text={result.text!r}")
-            test("AUGMENTED mode no error", not result.error, f"error={result.error!r}")
+            check("AUGMENTED mode responded", len(result.text) > 0, f"text={result.text!r}")
+            check("AUGMENTED mode no error", not result.error, f"error={result.error!r}")
             print(f"     Response: {result.text[:80]}...")
     except Exception as e:
-        test("AUGMENTED mode", False, str(e))
+        check("AUGMENTED mode", False, str(e))
 
 
 # ============================================================================
 # Main
 # ============================================================================
+
 
 async def main():
     print("=" * 60)
@@ -536,7 +742,7 @@ async def main():
     if FAILED == 0:
         print("  🎉 ALL TESTS PASSED")
     else:
-        print(f"  ⚠️  {FAILED} test(s) failed")
+        print(f"  ⚠️  {FAILED} check(s) failed")
     print("=" * 60)
     return FAILED == 0
 

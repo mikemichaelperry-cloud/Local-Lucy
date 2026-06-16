@@ -15,7 +15,7 @@
 | **Model** | `local-lucy-llama31` (llama3.1:8b via Ollama) |
 | **Handoff file** | `~/Desktop/Local_Lucy_v10_Session_Handoff_<date>.md` |
 | **Default branch on origin** | `v10-dev` ✅ |
-| **Working tree** | Clean after ruff/lint cleanup commit |
+| **Working tree** | Clean after production-readiness fixes |
 
 ---
 
@@ -191,7 +191,8 @@ Live market-data fetcher with source citations:
 9. ~~Hardcoded absolute paths~~ ✅ tests/benchmarks now derive paths from `__file__` or env vars
 10. ~~Local-model regression tests~~ ✅ all 20 response/semantic regression cases now pass
 11. ~~Robustness review fixes~~ ✅ AppImage removed from automatic release; Ollama skip fixture added; model-mismatch skip in semantic regression; concept-overlap threshold relaxed to 0.25; reasoning max_chars raised to 800; reasoning prompt steered to avoid "I don't know"
-12. ~~Ruff / lint~~ ✅ ruff installed in venv; `make lint` passes; mypy is optional/skipped if not installed
+12. ~~Ruff / lint~~ ✅ ruff installed in venv; mypy installed and enforced; `make lint` passes
+13. ~~Full test suite~~ ✅ `make test` passes: 929 passed, 19 skipped
 
 ---
 
@@ -210,5 +211,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T18:20:00Z*
-*Session: Robustness review fixes + ruff lint cleanup committed and pushed to origin/v10-dev*
+*Last updated: 2026-06-16T19:05:00Z*
+*Session: Production-readiness fixes; full test suite green; committed and pushed to origin/v10-dev*

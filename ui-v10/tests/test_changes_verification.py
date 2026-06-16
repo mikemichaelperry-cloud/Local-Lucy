@@ -81,7 +81,8 @@ def test_fail_loud_no_env_vars():
     import subprocess
 
     # Test that state_store loads successfully without LUCY_RUNTIME_NAMESPACE_ROOT
-    # (it now has sensible fallback defaults)
+    # (it now has sensible fallback defaults). Disable strict contract validation
+    # so the default-derived paths are accepted.
     result = subprocess.run(
         [
             "python3",
@@ -92,10 +93,18 @@ def test_fail_loud_no_env_vars():
         capture_output=True,
         text=True,
         env={
-            k: v
-            for k, v in os.environ.items()
-            if k
-            not in ["LUCY_RUNTIME_NAMESPACE_ROOT", "LUCY_RUNTIME_AUTHORITY_ROOT", "LUCY_UI_ROOT"]
+            **{
+                k: v
+                for k, v in os.environ.items()
+                if k
+                not in [
+                    "LUCY_RUNTIME_NAMESPACE_ROOT",
+                    "LUCY_RUNTIME_AUTHORITY_ROOT",
+                    "LUCY_UI_ROOT",
+                    "LUCY_UI_STATE_DIR",
+                ]
+            },
+            "LUCY_RUNTIME_CONTRACT_REQUIRED": "0",
         },
     )
 

@@ -33,48 +33,57 @@ class TestKeelLoader:
         assert isinstance(text, str)
 
     def test_load_keel_status_missing_file(self, monkeypatch, tmp_path):
-        # Force a missing keel by overriding root candidates
+        # Force a missing keel by overriding root candidates and authority root
         import keel_loader as kl
 
         orig_candidates = kl._ROOT_CANDIDATES
+        orig_authority = kl._authority_root
         try:
             kl._ROOT_CANDIDATES = [tmp_path]
+            kl._authority_root = lambda: None
             status = kl.load_keel_status()
             assert status["loaded"] is False
             assert status["error"] == "keel.yaml not found"
             assert status["rendered_text"] == ""
         finally:
             kl._ROOT_CANDIDATES = orig_candidates
+            kl._authority_root = orig_authority
 
     def test_load_keel_status_malformed_yaml(self, monkeypatch, tmp_path):
         import keel_loader as kl
 
         orig_candidates = kl._ROOT_CANDIDATES
+        orig_authority = kl._authority_root
         try:
             fake_keel = tmp_path / "keel" / "keel.yaml"
             fake_keel.parent.mkdir(parents=True, exist_ok=True)
             fake_keel.write_text("{not valid yaml: [", encoding="utf-8")
             kl._ROOT_CANDIDATES = [tmp_path]
+            kl._authority_root = lambda: None
             status = kl.load_keel_status()
             assert status["loaded"] is False
             assert "Malformed YAML" in (status["error"] or "")
         finally:
             kl._ROOT_CANDIDATES = orig_candidates
+            kl._authority_root = orig_authority
 
     def test_load_keel_status_empty_dict(self, monkeypatch, tmp_path):
         import keel_loader as kl
 
         orig_candidates = kl._ROOT_CANDIDATES
+        orig_authority = kl._authority_root
         try:
             fake_keel = tmp_path / "keel" / "keel.yaml"
             fake_keel.parent.mkdir(parents=True, exist_ok=True)
             fake_keel.write_text("", encoding="utf-8")
             kl._ROOT_CANDIDATES = [tmp_path]
+            kl._authority_root = lambda: None
             status = kl.load_keel_status()
             assert status["loaded"] is False
             assert "empty or malformed" in (status["error"] or "")
         finally:
             kl._ROOT_CANDIDATES = orig_candidates
+            kl._authority_root = orig_authority
 
 
 if __name__ == "__main__":
