@@ -90,12 +90,14 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v9-dev  ⚠️  (needs GitHub admin to set default to v10-dev)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 22
-Working tree: local_answer.py modified (test-failure fix in progress)
+Commits since tag: 24
+Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+8e6c152 fix(local): steer first-person and reasoning prompts; re-record semantic golden responses
+b480477 chore: ignore pre-existing F841 issues in local_answer.py
 f2efa6d ci: add release workflow and Debian packaging
 53b2882 refactor(tests): remove hardcoded absolute paths and use env-driven runtime root
 9aa193e feat(logging): add logging_config wrapper and replace print statements
@@ -107,8 +109,6 @@ fadeb62 chore: add pre-commit config
 2e6dc69 docs: update SESSION_CONTEXT.md
 90f075a docs: update architecture, changelog, and router docs for FINANCE route
 a4b33c2 feat(finance): harden FINANCE route with CoinGecko, stock search fallback, and net-worth parsing fixes
-1670684 docs: update SESSION_CONTEXT.md
-5af7769 feat(finance): add dedicated FINANCE route with live market data fetchers
 ```
 
 ---
@@ -187,7 +187,7 @@ Live market-data fetcher with source citations:
 6. ~~.deb packaging~~ ✅ `packaging/debian/build_deb.sh` builds installable package; AppImage still future work
 7. ~~Ollama localhost auth~~ ✅ hardening runbook added to `docs/runbooks/OLLAMA_SECURITY.md`
 8. ~~Hardcoded absolute paths~~ ✅ tests/benchmarks now derive paths from `__file__` or env vars
-9. **Local-model regression tests** — 10 of 20 response/semantic regression cases still fail `first_person_only` check; subagent still investigating
+9. ~~Local-model regression tests~~ ✅ all 20 response/semantic regression cases now pass
 
 ---
 
@@ -206,5 +206,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T15:20:00Z*
-*Session: cleared P1/P2 backlog — context updated, lockfile, pre-commit, ruff, logging, hardcoded paths, release workflow/.deb; regression-test fix and GitHub default-branch change remain*
+*Last updated: 2026-06-16T15:35:00Z*
+*Session: regression tests now pass (20/20); remaining items are GitHub default-branch change and optional AppImage packaging*
