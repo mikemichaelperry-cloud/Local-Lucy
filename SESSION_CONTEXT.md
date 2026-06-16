@@ -90,12 +90,15 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v9-dev  ⚠️  (needs GitHub admin to set default to v10-dev)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 24
+Commits since tag: 28
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+e3fe120 ci: add experimental AppImage packaging
+f6ffe1a test: update default model expectation to local-lucy-llama31
+332c097 docs: update SESSION_CONTEXT.md
 8e6c152 fix(local): steer first-person and reasoning prompts; re-record semantic golden responses
 b480477 chore: ignore pre-existing F841 issues in local_answer.py
 f2efa6d ci: add release workflow and Debian packaging
@@ -106,9 +109,6 @@ eee7ee6 chore: add ruff config with per-file ignores for legacy code
 b73f776 docs: add Ollama security runbook and ADRs
 fadeb62 chore: add pre-commit config
 13e788f chore: add requirements-lock.txt
-2e6dc69 docs: update SESSION_CONTEXT.md
-90f075a docs: update architecture, changelog, and router docs for FINANCE route
-a4b33c2 feat(finance): harden FINANCE route with CoinGecko, stock search fallback, and net-worth parsing fixes
 ```
 
 ---
@@ -184,7 +184,7 @@ Live market-data fetcher with source citations:
 3. ~~Pre-commit hooks~~ ✅ `.pre-commit-config.yaml` created and installed
 4. ~~GitHub release workflow~~ ✅ `.github/workflows/release.yml` created; `.deb` packaging added
 5. ~~Structured logging~~ ✅ `tools/router_py/logging_config.py` added; starter print replacements in `main.py`/`classify.py`
-6. ~~.deb packaging~~ ✅ `packaging/debian/build_deb.sh` builds installable package; AppImage still future work
+6. ~~.deb / AppImage packaging~~ ✅ `.deb` build verified; experimental AppImage build script + CI job added
 7. ~~Ollama localhost auth~~ ✅ hardening runbook added to `docs/runbooks/OLLAMA_SECURITY.md`
 8. ~~Hardcoded absolute paths~~ ✅ tests/benchmarks now derive paths from `__file__` or env vars
 9. ~~Local-model regression tests~~ ✅ all 20 response/semantic regression cases now pass
@@ -206,5 +206,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T15:35:00Z*
-*Session: regression tests now pass (20/20); remaining items are GitHub default-branch change and optional AppImage packaging*
+*Last updated: 2026-06-16T15:40:00Z*
+*Session: priority list complete except GitHub default-branch change (needs auth); AppImage packaging starter added*
