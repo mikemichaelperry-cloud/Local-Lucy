@@ -91,3 +91,26 @@ filterwarnings = [
     "ignore::ResourceWarning:pytest.unraisableexception",
 ]
 addopts = "--ignore=tools/router_py/test_synthetic_adversarial.py"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# main.py mutates sys.path before importing router_py modules; this is intentional.
+"tools/router_py/main.py" = ["E402"]
+# Pre-existing style issues in legacy structured-logging tests.
+"tools/router_py/test_structured_logging.py" = ["E741", "F841"]
+# Benchmarks and offscreen tests contain deliberate unused variables / short names.
+"tools/router_py/benchmark_*.py" = ["F841", "E402", "F402"]
+"ui-v10/benchmark_*.py" = ["F841"]
+"ui-v10/tests/test_*_offscreen.py" = ["F841", "E741", "E402", "F821"]
+"ui-v10/tests/test_comprehensive_hmi_inspection.py" = ["E402"]
+"ui-v10/tests/test_state_store_last_request_provider_truth.py" = ["E402"]
+"ui-v10/tests/test_status_panel_trusted_metadata.py" = ["E402"]
+"ui-v10/tests/test_voice_ptt_state_machine.py" = ["F841", "E402"]
+"ui-v10/tests/test_changes_verification.py" = ["F841"]
+"tools/router_py/test_feedback_loop_integration.py" = ["F841"]
