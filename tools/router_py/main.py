@@ -28,6 +28,7 @@ outcome telemetry are handled in the wrapper, not in the engine.
 from __future__ import annotations
 
 from dotenv import load_dotenv
+
 load_dotenv()  # Load .env file for API keys
 
 import argparse
@@ -38,7 +39,6 @@ import os
 import re
 import sys
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -46,14 +46,14 @@ from typing import Any
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
-from router_py.request_types import RouterOutcome
-from router_py.utils import sha256_text
-from router_py.execution_engine import DEFAULT_CHAT_MEMORY_FILE
 from router_py import request_pipeline
+from router_py.execution_engine import DEFAULT_CHAT_MEMORY_FILE
+from router_py.logging_config import setup_logging
+from router_py.request_types import RouterOutcome
 from router_py.security_guard import validate_input
 from router_py.shutdown_handler import install as install_shutdown_handler
 from router_py.structured_logging import get_structured_logger
-
+from router_py.utils import sha256_text
 
 # Configuration
 DEFAULT_TIMEOUT = 130
@@ -62,6 +62,7 @@ DEFAULT_TIMEOUT = 130
 # ============================================================================
 # Unified Entry Point
 # ============================================================================
+
 
 def run(
     question: str,
@@ -114,8 +115,8 @@ def resolve_state_dir(root: Path) -> Path:
     namespace = os.environ.get("LUCY_SHARED_STATE_NAMESPACE", "")
     if namespace:
         # Sanitize: s/[^A-Za-z0-9._-]+/_/g; s/^_+|_+$//
-        sanitized = re.sub(r'[^A-Za-z0-9._-]+', '_', namespace)
-        sanitized = sanitized.strip('_')
+        sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", namespace)
+        sanitized = sanitized.strip("_")
         if sanitized:
             return root / "state" / "namespaces" / sanitized
     # Default: use "default" namespace (consistent with shell behavior)
@@ -201,55 +202,55 @@ def ensure_control_env() -> None:
     if os.environ.get("LUCY_EVIDENCE_ENABLED") and os.environ.get("LUCY_AUGMENTATION_POLICY"):
         # Already set, nothing to do
         return
-    
+
     state = load_state_from_file()
     if not state:
         return
-    
+
     # Set from state file if not already in environment
     if "LUCY_EVIDENCE_ENABLED" not in os.environ:
         evidence = state.get("evidence", "off")
         os.environ["LUCY_EVIDENCE_ENABLED"] = "1" if evidence in ("on", "true", "1") else "0"
-    
+
     if "LUCY_ENABLE_INTERNET" not in os.environ:
         # Mirror LUCY_EVIDENCE_ENABLED
         os.environ["LUCY_ENABLE_INTERNET"] = os.environ.get("LUCY_EVIDENCE_ENABLED", "0")
-    
+
     if "LUCY_AUGMENTATION_POLICY" not in os.environ:
         policy = state.get("augmentation_policy", "disabled")
         os.environ["LUCY_AUGMENTATION_POLICY"] = policy
-    
+
     if "LUCY_AUGMENTED_PROVIDER" not in os.environ:
         provider = state.get("augmented_provider", "wikipedia")
         os.environ["LUCY_AUGMENTED_PROVIDER"] = provider
-    
+
     if "LUCY_CONVERSATION_MODE_FORCE" not in os.environ:
         conv = state.get("conversation", "off")
         os.environ["LUCY_CONVERSATION_MODE_FORCE"] = "1" if conv in ("on", "true", "1") else "0"
-    
+
     if "LUCY_SESSION_MEMORY" not in os.environ:
         mem = state.get("memory", "off")
         os.environ["LUCY_SESSION_MEMORY"] = "1" if mem in ("on", "true", "1") else "0"
-    
+
     if "LUCY_VOICE_ENABLED" not in os.environ:
         voice = state.get("voice", "off")
         os.environ["LUCY_VOICE_ENABLED"] = "1" if voice in ("on", "true", "1") else "0"
-    
+
     if "LUCY_MODEL" not in os.environ:
         model = state.get("model", "local-lucy-llama31")
         os.environ["LUCY_MODEL"] = model
-    
+
     if "LUCY_LOCAL_MODEL" not in os.environ:
         model = state.get("model", "local-lucy-llama31")
         os.environ["LUCY_LOCAL_MODEL"] = model
-
 
 
 def _persist_memory_turn(question: str, response_text: str, session_id: str = "default") -> None:
     """Persist a conversation turn to chat memory (SQLite + text file)."""
     # Dual-write: SQLite first (best effort)
     try:
-        from memory.memory_service import store_turn, maybe_summarize_session
+        from memory.memory_service import maybe_summarize_session, store_turn
+
         store_turn("user", question, session_id=session_id)
         store_turn("assistant", response_text, session_id=session_id)
         maybe_summarize_session(session_id=session_id)
@@ -386,7 +387,12 @@ def execute_plan_python(
     try:
         lock_file.parent.mkdir(parents=True, exist_ok=True)
         lock_fd = open(lock_file, "w")
-        if os.environ.get("LUCY_SHARED_STATE_PARALLEL_ALLOW", "").lower() not in ("1", "on", "true", "yes"):
+        if os.environ.get("LUCY_SHARED_STATE_PARALLEL_ALLOW", "").lower() not in (
+            "1",
+            "on",
+            "true",
+            "yes",
+        ):
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
             lock_acquired = True
     except Exception:
@@ -395,10 +401,21 @@ def execute_plan_python(
     try:
         # --- Feedback detection: check if user is correcting a prior response ---
         try:
-            from router_py.feedback_parser import parse_feedback, log_user_feedback, trigger_background_learning
+            from router_py.feedback_parser import (
+                log_user_feedback,
+                parse_feedback,
+                trigger_background_learning,
+            )
+
             fb = parse_feedback(question)
             if fb is not None:
-                print(f"[Feedback detected] {fb.feedback_type.name}: {question}")
+                logger.info(
+                    "feedback_detected",
+                    extra={
+                        "feedback_type": fb.feedback_type.name,
+                        "question": question,
+                    },
+                )
                 logged = log_user_feedback(fb)
                 if logged:
                     trigger_background_learning()
@@ -431,7 +448,11 @@ def execute_plan_python(
                     policy_reason="feedback_acknowledged",
                 )
         except Exception as e:
-            print(f"[Feedback check warning] {e}")
+            logger.warning(
+                "feedback_check_failed",
+                extra={"error": str(e)},
+                exc_info=True,
+            )
 
         # --- Delegate to unified pipeline ---
         pipeline_context = dict(context or {})
@@ -457,6 +478,7 @@ def execute_plan_python(
         if classification:
             try:
                 from router_py.feedback_buffer import record_exchange
+
                 record_exchange(
                     query=question,
                     route=result.route,
@@ -532,13 +554,15 @@ def execute_plan_python(
 
 def main() -> int:
     """Main entry point."""
+    setup_logging(level=logging.INFO, json=True)
+
     parser = argparse.ArgumentParser(description="Local Lucy Router (Python)")
     parser.add_argument("question", nargs="?", help="User question")
     parser.add_argument("--policy", default="fallback_only", help="Augmentation policy")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="Request timeout")
     parser.add_argument("--json", action="store_true", help="Output JSON")
     args = parser.parse_args()
-    
+
     # Get question from args or stdin
     question = args.question
     if not question:
@@ -547,15 +571,15 @@ def main() -> int:
         else:
             parser.print_help()
             return 1
-    
+
     # Determine policy: command line arg > environment variable > default
     policy = args.policy
     if policy == "fallback_only" and os.environ.get("LUCY_AUGMENTATION_POLICY"):
         policy = os.environ.get("LUCY_AUGMENTATION_POLICY")
-    
+
     # Execute via Python-native path (shell path removed in Stage 9)
     result = execute_plan_python(question, policy, args.timeout)
-    
+
     # Output
     if args.json:
         print(json.dumps(result.to_dict(), indent=2))
@@ -565,9 +589,8 @@ def main() -> int:
         else:
             print(f"Error: {result.error_message}", file=sys.stderr)
             return 1
-    
-    return 0
 
+    return 0
 
 
 # Install graceful shutdown handlers once at module load
@@ -577,6 +600,7 @@ install_shutdown_handler()
 # This is a no-op if LUCY_WARMUP_ENABLED is not "1" or if Ollama is unreachable.
 try:
     from router_py.local_answer import LocalAnswer
+
     LocalAnswer.start_recurring_warmup()
 except Exception:
     pass

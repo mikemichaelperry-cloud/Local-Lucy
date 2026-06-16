@@ -12,10 +12,10 @@ import json
 import os
 import re
 import sys
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+
+from router_py.logging_config import get_logger
 
 # Centralized pipeline types (Stage 5 migration)
 from router_py.request_types import ClassificationResult, RoutingDecision
@@ -30,6 +30,8 @@ if str(CORE_DIR) not in sys.path:
 _FEEDBACK_BUF_CACHE: dict | None = None
 _FEEDBACK_BUF_MTIME: float = 0.0
 _FEEDBACK_BUF_PATH: Path | None = None
+
+_LOGGER = get_logger("router_py.classify")
 
 
 def _load_feedback_buffer(path: Path) -> dict:
@@ -66,9 +68,9 @@ except ImportError:
 
 # Import our policy functions — support both package and direct imports
 try:
-    from .policy import requires_evidence_mode, provider_usage_class_for
+    from .policy import provider_usage_class_for, requires_evidence_mode
 except ImportError:
-    from policy import requires_evidence_mode, provider_usage_class_for
+    from policy import provider_usage_class_for, requires_evidence_mode
 
 
 # ---------------------------------------------------------------------------
@@ -76,231 +78,417 @@ except ImportError:
 # ~90–120 regex patterns on every select_route() call.
 # ---------------------------------------------------------------------------
 
-_LOCAL_ALWAYS_SHORT = frozenset({
-    "correct", "yes", "no", "right", "wrong", "thanks", "thank you",
-    "ok", "okay", "got it", "understood", "sure", "fine", "exactly",
-    "perfect", "great", "good", "nice", "awesome", "cool", "nope",
-    "nah", "not really", "that was wrong", "bad answer", "incorrect",
-    "that's wrong", "not right", "that was right", "good answer",
-    "well done", "nice job", "exactly right", "spot on", "you got it",
-    "hi", "hello", "hey", "bye", "goodbye", "see you", "yo",
-    "stop", "pause", "wait", "hold on", "never mind", "nevermind",
-    "forget it", "ignore that", "scratch that", "cancel", "redo",
-    "try again", "start over", "back", "previous", "next", "skip",
-    "done", "finished", "enough", "that's enough", "wow", "oh", "ah",
-    "oh no", "really", "seriously", "interesting", "makes sense",
-    "i see", "i get it", "of course", "obviously", "naturally",
-    "indeed", "absolutely", "definitely", "certainly", "probably",
-    "maybe", "perhaps", "possibly", "not sure", "i don't know",
-    "who knows", "whatever", "alright", "sounds good", "works for me",
-    "fair enough", "i suppose", "i guess", "thx", "kk", "k", "yea",
-    "yep", "yup", "correcr", "corect", "wrng", "wrond", "incorect",
-    "thabks", "okkk", "uh", "um", "hmm", "huh",
-})
+_LOCAL_ALWAYS_SHORT = frozenset(
+    {
+        "correct",
+        "yes",
+        "no",
+        "right",
+        "wrong",
+        "thanks",
+        "thank you",
+        "ok",
+        "okay",
+        "got it",
+        "understood",
+        "sure",
+        "fine",
+        "exactly",
+        "perfect",
+        "great",
+        "good",
+        "nice",
+        "awesome",
+        "cool",
+        "nope",
+        "nah",
+        "not really",
+        "that was wrong",
+        "bad answer",
+        "incorrect",
+        "that's wrong",
+        "not right",
+        "that was right",
+        "good answer",
+        "well done",
+        "nice job",
+        "exactly right",
+        "spot on",
+        "you got it",
+        "hi",
+        "hello",
+        "hey",
+        "bye",
+        "goodbye",
+        "see you",
+        "yo",
+        "stop",
+        "pause",
+        "wait",
+        "hold on",
+        "never mind",
+        "nevermind",
+        "forget it",
+        "ignore that",
+        "scratch that",
+        "cancel",
+        "redo",
+        "try again",
+        "start over",
+        "back",
+        "previous",
+        "next",
+        "skip",
+        "done",
+        "finished",
+        "enough",
+        "that's enough",
+        "wow",
+        "oh",
+        "ah",
+        "oh no",
+        "really",
+        "seriously",
+        "interesting",
+        "makes sense",
+        "i see",
+        "i get it",
+        "of course",
+        "obviously",
+        "naturally",
+        "indeed",
+        "absolutely",
+        "definitely",
+        "certainly",
+        "probably",
+        "maybe",
+        "perhaps",
+        "possibly",
+        "not sure",
+        "i don't know",
+        "who knows",
+        "whatever",
+        "alright",
+        "sounds good",
+        "works for me",
+        "fair enough",
+        "i suppose",
+        "i guess",
+        "thx",
+        "kk",
+        "k",
+        "yea",
+        "yep",
+        "yup",
+        "correcr",
+        "corect",
+        "wrng",
+        "wrond",
+        "incorect",
+        "thabks",
+        "okkk",
+        "uh",
+        "um",
+        "hmm",
+        "huh",
+    }
+)
 
 # Pre-compiled weather regexes (was inline list at embedding path)
-_WEATHER_UNAMBIGUOUS_RE = tuple(re.compile(p) for p in (
-    r"\brain\b", r"\braining\b", r"\bsnow\b", r"\bsnowing\b",
-    r"\btemperature\b", r"\bsunny\b", r"\bcloudy\b", r"\bwindy\b",
-    r"\bhumidity\b", r"\bprecipitation\b", r"\bdrizzle\b",
-    r"\bhail\b", r"\bfog\b", r"\bmist\b", r"\bthunder\b",
-    r"\blightning\b", r"\bovercast\b", r"\bbarometer\b",
-    r"\bcelsius\b", r"\bfahrenheit\b", r"\buv index\b",
-    r"\bpollen count\b", r"\bheat index\b", r"\bwind chill\b",
-    r"\bcurrent conditions\b",
-))
+_WEATHER_UNAMBIGUOUS_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"\brain\b",
+        r"\braining\b",
+        r"\bsnow\b",
+        r"\bsnowing\b",
+        r"\btemperature\b",
+        r"\bsunny\b",
+        r"\bcloudy\b",
+        r"\bwindy\b",
+        r"\bhumidity\b",
+        r"\bprecipitation\b",
+        r"\bdrizzle\b",
+        r"\bhail\b",
+        r"\bfog\b",
+        r"\bmist\b",
+        r"\bthunder\b",
+        r"\blightning\b",
+        r"\bovercast\b",
+        r"\bbarometer\b",
+        r"\bcelsius\b",
+        r"\bfahrenheit\b",
+        r"\buv index\b",
+        r"\bpollen count\b",
+        r"\bheat index\b",
+        r"\bwind chill\b",
+        r"\bcurrent conditions\b",
+    )
+)
 
 _WEATHER_NEGATION_PATTERNS = (
-    "weather patterns", "climate", "climatology", "typical weather", "average weather"
+    "weather patterns",
+    "climate",
+    "climatology",
+    "typical weather",
+    "average weather",
 )
 
 # Pre-compiled clear-news regexes
-_CLEAR_NEWS_RE = tuple(re.compile(p) for p in (
-    r"\btop stories\b",
-    r"\bheadlines today\b",
-    r"\blive updates\b",
-    r"\bun said\b",
-    r"\bun announced\b",
-    r"\bwhat did the un\b",
-    r"\bisraeli news\b",
-    r"\bbreaking news\b",
-    r"\blatest news\b",
-    r"\btoday's news\b",
-    r"\bnews from\b",
-    r"\bnews about\b",
-    r"\bnews on\b",
-    r"\bupdates on\b",
-    r"\blatest developments\b",
-    r"\bcurrent situation\b",
-    r"\bcurrent status\b",
-    r"\blatest .{0,20}\bnews\b",
-    r"\bnews .{0,20}\btoday\b",
-    r"\bcurrent events\b",
-    r"\bheadlines\b",
-    r"\bwhat is happening\b",
-    r"\bwhat happened today\b",
-    r"\bany updates\b",
-    r"\bdevelopments in\b",
-    r"\bcurrent sanctions\b",
-    r"\blatest ceasefire\b",
-    r"\bworld news\b",
-))
+_CLEAR_NEWS_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"\btop stories\b",
+        r"\bheadlines today\b",
+        r"\blive updates\b",
+        r"\bun said\b",
+        r"\bun announced\b",
+        r"\bwhat did the un\b",
+        r"\bisraeli news\b",
+        r"\bbreaking news\b",
+        r"\blatest news\b",
+        r"\btoday's news\b",
+        r"\bnews from\b",
+        r"\bnews about\b",
+        r"\bnews on\b",
+        r"\bupdates on\b",
+        r"\blatest developments\b",
+        r"\bcurrent situation\b",
+        r"\bcurrent status\b",
+        r"\blatest .{0,20}\bnews\b",
+        r"\bnews .{0,20}\btoday\b",
+        r"\bcurrent events\b",
+        r"\bheadlines\b",
+        r"\bwhat is happening\b",
+        r"\bwhat happened today\b",
+        r"\bany updates\b",
+        r"\bdevelopments in\b",
+        r"\bcurrent sanctions\b",
+        r"\blatest ceasefire\b",
+        r"\bworld news\b",
+    )
+)
 
 # Pre-compiled historical query regexes
-_HIST_YEAR_RE = re.compile(r'\b(1\d{3}|20\d{2})s?\b')
-_HIST_UNAMBIGUOUS_RE = tuple(re.compile(p) for p in (
-    r'\btreaty of\b',
-    r'\bbattle of\b',
-    r'\bwar in\b',
-    r'\bwar of\b',
-    r'\bthe fall of\b',
-    r'\bthe rise of\b',
-    r'\bwho won the .*\b(battle|war)\b',
-    r'\bwho lost the .*\b(battle|war)\b',
-    r'\bwho started the\b',
-    r'\bwho (led|commanded|defeated) the\b',
-    r'\bthe (black death|holocaust|renaissance|reformation|crusades)\b',
-    r'\bin (ancient|medieval|colonial|victorian|roman|greek)\b',
-    r'\bhistory of\b',
-    r'\bhistorical\b',
-    r'\bevents of\b',
-    r'\btactics used in\b',
-    r'\bconcept of\b',
-    r'\bwhy .*\bhappen\b',
-    r'\bvietnam war\b',
-    r'\bcuban missile\b',
-    r'\basymmetric warfare\b',
-    r'\bguerrilla warfare\b',
-))
-_HIST_PHRASES_RE = tuple(re.compile(p) for p in (
-    r'\bwhat was the\b',
-    r'\bwhat were the\b',
-    r'\bwhat caused the\b',
-    r'\bwhat happened during\b',
-    r'\bwhat happened in\b',
-    r'\bhistory of\b',
-    r'\bhistorical\b',
-))
-_HIST_BOUNDARY_RE = re.compile(
-    r'\b(?:' + '|'.join(map(re.escape, (
-        "era", "period", "bc", "b.c.", "ad", "a.d.", "ago", "before", "history", "historical"
-    ))) + r')\b'
+_HIST_YEAR_RE = re.compile(r"\b(1\d{3}|20\d{2})s?\b")
+_HIST_UNAMBIGUOUS_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"\btreaty of\b",
+        r"\bbattle of\b",
+        r"\bwar in\b",
+        r"\bwar of\b",
+        r"\bthe fall of\b",
+        r"\bthe rise of\b",
+        r"\bwho won the .*\b(battle|war)\b",
+        r"\bwho lost the .*\b(battle|war)\b",
+        r"\bwho started the\b",
+        r"\bwho (led|commanded|defeated) the\b",
+        r"\bthe (black death|holocaust|renaissance|reformation|crusades)\b",
+        r"\bin (ancient|medieval|colonial|victorian|roman|greek)\b",
+        r"\bhistory of\b",
+        r"\bhistorical\b",
+        r"\bevents of\b",
+        r"\btactics used in\b",
+        r"\bconcept of\b",
+        r"\bwhy .*\bhappen\b",
+        r"\bvietnam war\b",
+        r"\bcuban missile\b",
+        r"\basymmetric warfare\b",
+        r"\bguerrilla warfare\b",
+    )
 )
-_HIST_NONBOUNDARY_MARKERS = frozenset({
-    "ancient", "medieval", "century", "centuries",
-    "what caused", "what led to", "origins of", "origin of",
-    "when did", "when was", "how did", "how was", "beginning of",
-    "fall of", "rise of", "end of", "dynasty",
-    "world war", "cold war", "civil war", "revolution", "empire",
-    "reformation", "crusades", "renaissance", "enlightenment",
-    "in the past", "back then", "old times",
-    "prehistoric", "millennium",
-})
+_HIST_PHRASES_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"\bwhat was the\b",
+        r"\bwhat were the\b",
+        r"\bwhat caused the\b",
+        r"\bwhat happened during\b",
+        r"\bwhat happened in\b",
+        r"\bhistory of\b",
+        r"\bhistorical\b",
+    )
+)
+_HIST_BOUNDARY_RE = re.compile(
+    r"\b(?:"
+    + "|".join(
+        map(
+            re.escape,
+            (
+                "era",
+                "period",
+                "bc",
+                "b.c.",
+                "ad",
+                "a.d.",
+                "ago",
+                "before",
+                "history",
+                "historical",
+            ),
+        )
+    )
+    + r")\b"
+)
+_HIST_NONBOUNDARY_MARKERS = frozenset(
+    {
+        "ancient",
+        "medieval",
+        "century",
+        "centuries",
+        "what caused",
+        "what led to",
+        "origins of",
+        "origin of",
+        "when did",
+        "when was",
+        "how did",
+        "how was",
+        "beginning of",
+        "fall of",
+        "rise of",
+        "end of",
+        "dynasty",
+        "world war",
+        "cold war",
+        "civil war",
+        "revolution",
+        "empire",
+        "reformation",
+        "crusades",
+        "renaissance",
+        "enlightenment",
+        "in the past",
+        "back then",
+        "old times",
+        "prehistoric",
+        "millennium",
+    }
+)
 
 # Pre-compiled synthesis request regexes
-_SYNTHESIS_RE = tuple(re.compile(p) for p in (
-    r"\bwhat do you think\b",
-    r"\bprobability\b",
-    r"\blikelihood\b",
-    r"\bchance\b",
-    r"\bodds\b",
-    r"\bassessment\b",
-    r"\banalysis\b",
-    r"\banalyze\b",
-    r"\bevaluate\b",
-    r"\bopinion\b",
-    r"\bpredict\b",
-    r"\bforecast\b",
-    r"\boutlook\b",
-    r"\bhow likely\b",
-    r"\bgive me your\b",
-    r"\bwhat is your\b",
-    r"\binterpret\b",
-    r"\bworried\b",
-    r"\bworry\b",
-    r"\bconcerned\b",
-    r"\bsignificance\b",
-    r"\bconsequences\b",
-    r"\bimplications\b",
-    r"\bshould i be\b",
-    r"\bhow should i\b",
-    r"\bwill\b.*\bwin\b",
-    r"\bspeculate\b",
-    r"\bcritique\b",
-    r"\bcompare\b.*\bto\b",
-    r"\bimpact of\b",
-    r"\beconomic impact\b",
-    r"\bmedia coverage\b",
-    r"\bnegotiations\b",
-    r"\btensions escalate\b",
-    r"\bnew policy\b",
-    r"\bassess the situation\b",
-    r"\bassess\b",
-))
-_SYNTHESIS_IDENTITY_RE = tuple(re.compile(p) for p in (
-    r"your\s+name",
-    r"your\s+mode",
-    r"your\s+status",
-    r"your\s+voice",
-    r"your\s+\w*\s*policy",
-    r"your\s+class",
-    r"your\s+trust\s+class",
-))
+_SYNTHESIS_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"\bwhat do you think\b",
+        r"\bprobability\b",
+        r"\blikelihood\b",
+        r"\bchance\b",
+        r"\bodds\b",
+        r"\bassessment\b",
+        r"\banalysis\b",
+        r"\banalyze\b",
+        r"\bevaluate\b",
+        r"\bopinion\b",
+        r"\bpredict\b",
+        r"\bforecast\b",
+        r"\boutlook\b",
+        r"\bhow likely\b",
+        r"\bgive me your\b",
+        r"\bwhat is your\b",
+        r"\binterpret\b",
+        r"\bworried\b",
+        r"\bworry\b",
+        r"\bconcerned\b",
+        r"\bsignificance\b",
+        r"\bconsequences\b",
+        r"\bimplications\b",
+        r"\bshould i be\b",
+        r"\bhow should i\b",
+        r"\bwill\b.*\bwin\b",
+        r"\bspeculate\b",
+        r"\bcritique\b",
+        r"\bcompare\b.*\bto\b",
+        r"\bimpact of\b",
+        r"\beconomic impact\b",
+        r"\bmedia coverage\b",
+        r"\bnegotiations\b",
+        r"\btensions escalate\b",
+        r"\bnew policy\b",
+        r"\bassess the situation\b",
+        r"\bassess\b",
+    )
+)
+_SYNTHESIS_IDENTITY_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"your\s+name",
+        r"your\s+mode",
+        r"your\s+status",
+        r"your\s+voice",
+        r"your\s+\w*\s*policy",
+        r"your\s+class",
+        r"your\s+trust\s+class",
+    )
+)
 
 # Pre-compiled technical knowledge regexes
-_TECH_PART_RE = tuple(re.compile(p) for p in (
-    r'\b2n\d+\b',
-    r'\bbc\d+\b',
-    r'\blm\d+\b',
-    r'\bne\d+\b',
-    r'\bua\d+\b',
-    r'\b6[lqv]\d+',
-    r'\b6sn7',
-    r'\bel\d+',
-    r'\bel34',
-    r'\bkt88',
-    r'\b12[a-z]\d+',
-    r'\b12ax7',
-    r'\b807\b',
-    r'\b2sk\d+\b',
-    r'\bir[fj]\d+\b',
-))
-_TECH_THEORY_RE = tuple(re.compile(p) for p in (
-    r"\bohm's law\b",
-    r'\bkirchhoff\b',
-    r"\bfaraday's law\b",
-    r"\bmaxwell's equations\b",
-    r'\bsemiconductor physics\b',
-    r'\bdoping\b.*\bsemiconductor\b',
-    r'\bforward bias\b',
-    r'\breverse bias\b',
-    r'\bbase current\b',
-    r'\bcollector current\b',
-    r'\bemitter current\b',
-    r'\bplate voltage\b',
-    r'\bscreen grid\b',
-    r'\bcontrol grid\b',
-    r'\bcathode ray\b',
-    r'\bbeam power\b',
-))
+_TECH_PART_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"\b2n\d+\b",
+        r"\bbc\d+\b",
+        r"\blm\d+\b",
+        r"\bne\d+\b",
+        r"\bua\d+\b",
+        r"\b6[lqv]\d+",
+        r"\b6sn7",
+        r"\bel\d+",
+        r"\bel34",
+        r"\bkt88",
+        r"\b12[a-z]\d+",
+        r"\b12ax7",
+        r"\b807\b",
+        r"\b2sk\d+\b",
+        r"\bir[fj]\d+\b",
+    )
+)
+_TECH_THEORY_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"\bohm's law\b",
+        r"\bkirchhoff\b",
+        r"\bfaraday's law\b",
+        r"\bmaxwell's equations\b",
+        r"\bsemiconductor physics\b",
+        r"\bdoping\b.*\bsemiconductor\b",
+        r"\bforward bias\b",
+        r"\breverse bias\b",
+        r"\bbase current\b",
+        r"\bcollector current\b",
+        r"\bemitter current\b",
+        r"\bplate voltage\b",
+        r"\bscreen grid\b",
+        r"\bcontrol grid\b",
+        r"\bcathode ray\b",
+        r"\bbeam power\b",
+    )
+)
 
 # Pre-compiled financial ephemeral short-pattern regexes
-_FINANCIAL_SHORT_RE = tuple(re.compile(p) for p in (
-    r"\b(shares|stock|price|rate)\s+(now|today)\b",
-    r"\b(current\s+)?(price|value)\s+of\s+(a|the|one)?\s*(bitcoin|btc|ethereum|eth|gold|silver|oil|gas|stock|share|crypto|currency|tesla|apple|aapl|tsla|microsoft|msft|amazon|amzn|google|googl|nvidia|nvda|meta|facebook)\b",
-    r"\b(market value|market cap)\b",
-    r"\bhow much is (one|a|the)\s+(bitcoin|btc|ethereum|eth)\b",
-    r"\b(trading at|worth now)\b",
-))
+_FINANCIAL_SHORT_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"\b(shares|stock|price|rate)\s+(now|today)\b",
+        r"\b(current\s+)?(price|value)\s+of\s+(a|the|one)?\s*(bitcoin|btc|ethereum|eth|gold|silver|oil|gas|stock|share|crypto|currency|tesla|apple|aapl|tsla|microsoft|msft|amazon|amzn|google|googl|nvidia|nvda|meta|facebook)\b",
+        r"\b(market value|market cap)\b",
+        r"\bhow much is (one|a|the)\s+(bitcoin|btc|ethereum|eth)\b",
+        r"\b(trading at|worth now)\b",
+    )
+)
 
 # Pre-compiled creative writing regexes
-_CREATIVE_RE = tuple(re.compile(p) for p in (
-    r'^(write|compose|craft|create|draft| pen)( me| us| a| an| the|\s+)?\s+(story|poem|essay|novel|narrative|tale|fiction|screenplay|script|song|lyric|rap|haiku|limerick|sonnet|ballad|epic|fable|myth|legend|fanfic|fan fiction|novella|short story)',
-    r'^(tell me|read me|share)( a| an| the|\s+)?\s+(story|poem|tale|joke|riddle|fable|myth|legend)',
-    r'^(write|compose|craft|create)( me| us)?\s+(a|an|the|\d+)\s+\w+\s+(story|poem|essay|novel|tale)',
-    r'^(write|compose|craft|create)( me| us)?\s+(a|an|the|\d+)[\s\-]*\w*[\s\-]*(word|words)[\s\-]*\w*\s+(story|poem|essay|novel|narrative|tale)',
-    r'^(write|compose|craft|create)( me| us)?\s+(a|an|the|\d+)[\s\-]*\w*[\s\-]*(word|words)\s+about',
-))
+_CREATIVE_RE = tuple(
+    re.compile(p)
+    for p in (
+        r"^(write|compose|craft|create|draft| pen)( me| us| a| an| the|\s+)?\s+(story|poem|essay|novel|narrative|tale|fiction|screenplay|script|song|lyric|rap|haiku|limerick|sonnet|ballad|epic|fable|myth|legend|fanfic|fan fiction|novella|short story)",
+        r"^(tell me|read me|share)( a| an| the|\s+)?\s+(story|poem|tale|joke|riddle|fable|myth|legend)",
+        r"^(write|compose|craft|create)( me| us)?\s+(a|an|the|\d+)\s+\w+\s+(story|poem|essay|novel|tale)",
+        r"^(write|compose|craft|create)( me| us)?\s+(a|an|the|\d+)[\s\-]*\w*[\s\-]*(word|words)[\s\-]*\w*\s+(story|poem|essay|novel|narrative|tale)",
+        r"^(write|compose|craft|create)( me| us)?\s+(a|an|the|\d+)[\s\-]*\w*[\s\-]*(word|words)\s+about",
+    )
+)
 
 
 def classify_intent(query: str, surface: str = "cli") -> ClassificationResult:
@@ -344,7 +532,9 @@ def classify_intent(query: str, surface: str = "cli") -> ClassificationResult:
     needs_web = signals.get("needs_web", False) or output.get("needs_web", False)
     needs_memory = signals.get("needs_memory", False) or output.get("needs_memory", False)
     needs_synthesis = signals.get("needs_synthesis", False) or output.get("needs_synthesis", False)
-    clarify_required = output.get("clarify_required", False) or output.get("needs_clarification", False)
+    clarify_required = output.get("clarify_required", False) or output.get(
+        "needs_clarification", False
+    )
 
     # Check evidence mode from policy
     requires_evidence, evidence_reason = requires_evidence_mode(query)
@@ -417,6 +607,7 @@ def _get_router():
             if str(router_dir) not in sys.path:
                 sys.path.insert(0, str(router_dir))
             from hybrid_router_v2 import HybridRouterV2
+
             _ROUTER = HybridRouterV2(
                 embeddings_path=str(router_dir / "comprehensive_embeddings.npy"),
                 examples_path=str(router_dir / "comprehensive_examples.json"),
@@ -424,12 +615,14 @@ def _get_router():
         except Exception as _exc:
             # Log the real exception so silent failures are diagnosable.
             # Previously this was a bare except that swallowed the root cause.
-            import traceback
-            print(
-                f"[ROUTER_LOAD_FAILURE] {type(_exc).__name__}: {_exc}",
-                file=sys.stderr,
+            _LOGGER.error(
+                "router_load_failure",
+                extra={
+                    "exception_type": type(_exc).__name__,
+                    "exception_message": str(_exc),
+                },
+                exc_info=True,
             )
-            traceback.print_exc()
             _ROUTER = False  # Mark as failed
     return _ROUTER if _ROUTER is not False else None
 
@@ -587,7 +780,10 @@ def select_route(
                 # than main.py, creating separate singleton instances).
                 # Cached by mtime to avoid redundant reads (Phase 3D).
                 _ns = Path(
-                    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
+                    os.environ.get(
+                        "LUCY_RUNTIME_NAMESPACE_ROOT",
+                        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+                    )
                 )
                 _buf_path = _ns / "feedback_buffer.json"
                 if _buf_path.exists():
@@ -595,9 +791,18 @@ def select_route(
                     _exchanges = _data.get("exchanges", [])
                     if _exchanges:
                         _last_route = str(_exchanges[-1].get("route", "")).upper()
-                        if _last_route in ("AUGMENTED", "EVIDENCE", "NEWS", "TIME", "WEATHER", "FINANCE"):
+                        if _last_route in (
+                            "AUGMENTED",
+                            "EVIDENCE",
+                            "NEWS",
+                            "TIME",
+                            "WEATHER",
+                            "FINANCE",
+                        ):
                             # Informational follow-up to an evidence route: inherit
-                            return _make_augmented_decision(classification, prefer_paid=False, query=query)
+                            return _make_augmented_decision(
+                                classification, prefer_paid=False, query=query
+                            )
             except Exception:
                 pass
         return _make_local_decision(classification, query=query)
@@ -621,7 +826,9 @@ def select_route(
     # evidence_mode="required" for these, but we enforce it at the guard level
     # to protect against stale runtime caches or module-aliasing issues.
     if classification.evidence_reason in (
-        "medical_context", "medical_body_symptom", "veterinary_context"
+        "medical_context",
+        "medical_body_symptom",
+        "veterinary_context",
     ):
         decision = _make_augmented_decision(classification, prefer_paid=False, query=query)
         _log_decision(
@@ -794,18 +1001,32 @@ def select_route(
     if query and len(query.strip()) <= 30:
         _followup_q = query.strip().lower()
         _followup_pronouns = ("it", "that", "this", "those", "them", "they")
-        _followup_stems = ("why", "what about", "how about", "side effect",
-                           "dosage", "dose", "safe", "interact", "take with",
-                           "drink", "eat", "food", "alcohol", "should i")
-        _is_ambiguous_followup = (
-            any(p in _followup_q.split() for p in _followup_pronouns)
-            or any(stem in _followup_q for stem in _followup_stems)
+        _followup_stems = (
+            "why",
+            "what about",
+            "how about",
+            "side effect",
+            "dosage",
+            "dose",
+            "safe",
+            "interact",
+            "take with",
+            "drink",
+            "eat",
+            "food",
+            "alcohol",
+            "should i",
+        )
+        _is_ambiguous_followup = any(p in _followup_q.split() for p in _followup_pronouns) or any(
+            stem in _followup_q for stem in _followup_stems
         )
         if _is_ambiguous_followup:
             try:
                 _ns2 = Path(
-                    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT",
-                                   str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
+                    os.environ.get(
+                        "LUCY_RUNTIME_NAMESPACE_ROOT",
+                        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+                    )
                 )
                 _buf_path2 = _ns2 / "feedback_buffer.json"
                 if _buf_path2.exists():
@@ -817,12 +1038,37 @@ def select_route(
                         _last_query2 = str(_last2.get("query", "") or "").lower()
                         # Infer medical/vet context from prior query keywords
                         _medical_keywords = (
-                            "side effect", "metformin", "ibuprofen", "aspirin", "warfarin",
-                            "amoxicillin", "tadalafil", "diabetes", "hypertension", "medication",
-                            "drug", "dosage", "symptom", "chest", "shortness of breath",
-                            "headache", "fever", "nausea", "pregnant", "surgery", "treatment",
-                            "dog", "cat", "canine", "feline", "veterinary", "vet", "hip dysplasia",
-                            "heartworm", "hyperthyroidism", "bloat",
+                            "side effect",
+                            "metformin",
+                            "ibuprofen",
+                            "aspirin",
+                            "warfarin",
+                            "amoxicillin",
+                            "tadalafil",
+                            "diabetes",
+                            "hypertension",
+                            "medication",
+                            "drug",
+                            "dosage",
+                            "symptom",
+                            "chest",
+                            "shortness of breath",
+                            "headache",
+                            "fever",
+                            "nausea",
+                            "pregnant",
+                            "surgery",
+                            "treatment",
+                            "dog",
+                            "cat",
+                            "canine",
+                            "feline",
+                            "veterinary",
+                            "vet",
+                            "hip dysplasia",
+                            "heartworm",
+                            "hyperthyroidism",
+                            "bloat",
                         )
                         _was_medical = any(kw in _last_query2 for kw in _medical_keywords)
                         if _last_route2 == "EVIDENCE" and _was_medical:
@@ -852,23 +1098,30 @@ def select_route(
             # Prefer classification evidence_reason for medical/veterinary context
             # (policy layer is more accurate than embedding router for these)
             if classification.evidence_reason in (
-                "medical_context", "medical_body_symptom", "veterinary_context"
+                "medical_context",
+                "medical_body_symptom",
+                "veterinary_context",
             ):
                 evidence_reason = classification.evidence_reason
                 evidence_mode = "required"
-            
+
             # Prefer classification evidence_reason for conflict/live-news,
             # personal-finance reasoning, and financial data (policy layer is
             # more accurate than embedding router for these).
             if classification.evidence_reason in (
-                "conflict_live", "personal_finance_reasoning", "financial_data"
+                "conflict_live",
+                "personal_finance_reasoning",
+                "financial_data",
             ):
                 evidence_reason = classification.evidence_reason
                 if classification.evidence_reason == "personal_finance_reasoning":
                     evidence_mode = ""
-                elif classification.evidence_reason in ("conflict_live", "financial_data"):
+                elif classification.evidence_reason in (
+                    "conflict_live",
+                    "financial_data",
+                ):
                     evidence_mode = "required"
-            
+
             requires_evidence = evidence_mode == "required"
             embedding_route = result.get("embedding_route", route)
             guards_fired = result.get("guards_fired", [])
@@ -885,7 +1138,11 @@ def select_route(
             # Medical/veterinary safety override: the embedding router sometimes
             # returns LOCAL for symptom queries. Force EVIDENCE so the user gets
             # cited, vetted information rather than parametric knowledge.
-            if evidence_reason in ("medical_context", "medical_body_symptom", "veterinary_context"):
+            if evidence_reason in (
+                "medical_context",
+                "medical_body_symptom",
+                "veterinary_context",
+            ):
                 route = "EVIDENCE"
                 guards_fired = guards_fired + ["medical_vet_safety_override"]
 
@@ -975,12 +1232,17 @@ def select_route(
                 )
             else:  # AUGMENTED or EVIDENCE
                 from router_py import provider_resolver
+
                 provider = provider_resolver.resolve_provider(classification)
                 usage_class = provider_usage_class_for(provider)
 
                 # Medical and veterinary queries route to EVIDENCE (strict trusted sources)
                 # instead of AUGMENTED (general knowledge sources)
-                if evidence_reason in ("medical_context", "medical_body_symptom", "veterinary_context"):
+                if evidence_reason in (
+                    "medical_context",
+                    "medical_body_symptom",
+                    "veterinary_context",
+                ):
                     route = "EVIDENCE"
                     provider = "trusted"
                     usage_class = "local"
@@ -1019,7 +1281,9 @@ def select_route(
                 and os.environ.get("LUCY_SESSION_MEMORY", "0") == "1"
             ):
                 q = query.strip()
-                if q and (_MEMORY_EXPLICIT_RECALL_RE.search(q) or _MEMORY_FOLLOWUP_STRONG_RE.search(q)):
+                if q and (
+                    _MEMORY_EXPLICIT_RECALL_RE.search(q) or _MEMORY_FOLLOWUP_STRONG_RE.search(q)
+                ):
                     # Live-data keywords preserve embedding decision (e.g. "What about the weather?")
                     q_lower = q.lower()
                     has_live_data = any(kw in q_lower for kw in _LIVE_DATA_KEYWORDS)
@@ -1051,7 +1315,6 @@ def select_route(
         except Exception as _router_exc:
             # Router failed — fall back to LOCAL, but log the real reason so
             # missing-function bugs don't wear camouflage.
-            import traceback
             _exc_type = type(_router_exc).__name__
             _exc_msg = str(_router_exc)
             decision = _make_local_decision(classification, query=query)
@@ -1061,17 +1324,24 @@ def select_route(
                 embedding_route="FALLBACK_LOCAL",
                 guards_fired=["router_failure", f"exception_{_exc_type}"],
             )
-            # Print to stderr for immediate visibility during development
-            print(
-                f"[ROUTER_EXCEPTION_FALLBACK_LOCAL] {_exc_type}: {_exc_msg}",
-                file=sys.stderr,
+            _LOGGER.warning(
+                "router_exception_fallback_local",
+                extra={
+                    "exception_type": _exc_type,
+                    "exception_message": _exc_msg,
+                },
+                exc_info=True,
             )
-            traceback.print_exc()
             return decision
 
     # Safe fallback (only reached if router block didn't run at all, e.g. no query)
     decision = _make_local_decision(classification, query=query)
-    _log_decision(query or "", decision, embedding_route="FALLBACK_LOCAL", guards_fired=["router_failure"])
+    _log_decision(
+        query or "",
+        decision,
+        embedding_route="FALLBACK_LOCAL",
+        guards_fired=["router_failure"],
+    )
     return decision
 
 
@@ -1108,11 +1378,18 @@ def _is_news_query_typos(query: str) -> bool:
     q = query.lower()
     news_typos = ["newz", "nooz", "nuwz", "hedline", "hedlines", "hedlinez"]
     has_news_typo = any(t in q for t in news_typos)
-    news_context = ["latest", "current", "breaking", "update", "updates", "today", "now"]
+    news_context = [
+        "latest",
+        "current",
+        "breaking",
+        "update",
+        "updates",
+        "today",
+        "now",
+    ]
     has_news_context = any(c in q for c in news_context)
     wat_pattern = any(p in q for p in ["wats ", "wat ", "wut ", "whats ", "what's "])
     return has_news_typo or (wat_pattern and has_news_context)
-
 
 
 def _is_clear_news_query(query: str) -> bool:
@@ -1173,11 +1450,30 @@ def _is_weather_query(query: str) -> bool:
 
     # Exclude science/history weather questions — not live-data requests
     weather_science_terms = [
-        "mars", "moon", "jupiter", "saturn", "venus", "mercury", "neptune",
-        "uranus", "pluto", "sun", "solar", "space", "nasa", "planet",
-        "exoplanet", "atmosphere of", "climate on mars", "martian",
-        "weather patterns", "climate patterns", "typical weather", "average weather",
-        "weather history", "historical weather",
+        "mars",
+        "moon",
+        "jupiter",
+        "saturn",
+        "venus",
+        "mercury",
+        "neptune",
+        "uranus",
+        "pluto",
+        "sun",
+        "solar",
+        "space",
+        "nasa",
+        "planet",
+        "exoplanet",
+        "atmosphere of",
+        "climate on mars",
+        "martian",
+        "weather patterns",
+        "climate patterns",
+        "typical weather",
+        "average weather",
+        "weather history",
+        "historical weather",
     ]
     if any(t in q for t in weather_science_terms):
         return False
@@ -1208,13 +1504,52 @@ def _is_cooking_query(query: str) -> bool:
     if "recipe" in q or "recipes" in q:
         return True
     # How-to cooking patterns (require a food term to avoid "how to make money")
-    if q.startswith(("how to cook ", "how to bake ", "how to make ", "how do i make ", "how do i cook ", "how do i bake ")):
+    if q.startswith(
+        (
+            "how to cook ",
+            "how to bake ",
+            "how to make ",
+            "how do i make ",
+            "how do i cook ",
+            "how do i bake ",
+        )
+    ):
         food_terms = [
-            "bread", "pasta", "hummus", "pizza", "cake", "cookie", "cookies",
-            "pie", "meat", "chicken", "beef", "fish", "salad", "soup", "stew",
-            "curry", "rice", "egg", "eggs", "cheese", "butter", "flour",
-            "sugar", "dessert", "sourdough", "pasta", "lasagna", "taco",
-            "burger", "steak", "roast", "grill", "fry", "boil", "steam",
+            "bread",
+            "pasta",
+            "hummus",
+            "pizza",
+            "cake",
+            "cookie",
+            "cookies",
+            "pie",
+            "meat",
+            "chicken",
+            "beef",
+            "fish",
+            "salad",
+            "soup",
+            "stew",
+            "curry",
+            "rice",
+            "egg",
+            "eggs",
+            "cheese",
+            "butter",
+            "flour",
+            "sugar",
+            "dessert",
+            "sourdough",
+            "pasta",
+            "lasagna",
+            "taco",
+            "burger",
+            "steak",
+            "roast",
+            "grill",
+            "fry",
+            "boil",
+            "steam",
         ]
         if any(t in q for t in food_terms):
             return True
@@ -1241,24 +1576,79 @@ def _is_financial_ephemeral(query: str) -> bool:
 
     # Financial instruments + current/live/ephemeral qualifiers
     financial_instruments = [
-        "s&p 500", "nasdaq", "dow jones", "ftse", "nikkei", "dax", "cac",
-        "bitcoin", "ethereum", "btc", "eth", "crypto",
-        "tesla shares", "tesla stock", "apple stock", "microsoft stock", "amazon stock",
-        "tsla", "aapl", "msft", "amzn", "googl", "nvda",
-        "gold price", "silver price", "oil price", "gas price",
-        "exchange rate", "forex", "currency rate",
-        "stock price", "share price", "market cap", "market value",
-        "interest rate", "mortgage rate", "inflation rate",
-        "treasury yield", "bond yield", "yield curve",
-        "euro to dollar", "dollar to euro", "gbp to usd", "usd to gbp",
-        "usd to eur", "eur to usd", "yen to dollar",
-        "cpi", "consumer price index", "gdp", "gross domestic product",
-        "net worth", "billionaire", "trillionaire", "richest person", "richest man",
+        "s&p 500",
+        "nasdaq",
+        "dow jones",
+        "ftse",
+        "nikkei",
+        "dax",
+        "cac",
+        "bitcoin",
+        "ethereum",
+        "btc",
+        "eth",
+        "crypto",
+        "tesla shares",
+        "tesla stock",
+        "apple stock",
+        "microsoft stock",
+        "amazon stock",
+        "tsla",
+        "aapl",
+        "msft",
+        "amzn",
+        "googl",
+        "nvda",
+        "gold price",
+        "silver price",
+        "oil price",
+        "gas price",
+        "exchange rate",
+        "forex",
+        "currency rate",
+        "stock price",
+        "share price",
+        "market cap",
+        "market value",
+        "interest rate",
+        "mortgage rate",
+        "inflation rate",
+        "treasury yield",
+        "bond yield",
+        "yield curve",
+        "euro to dollar",
+        "dollar to euro",
+        "gbp to usd",
+        "usd to gbp",
+        "usd to eur",
+        "eur to usd",
+        "yen to dollar",
+        "cpi",
+        "consumer price index",
+        "gdp",
+        "gross domestic product",
+        "net worth",
+        "billionaire",
+        "trillionaire",
+        "richest person",
+        "richest man",
     ]
     live_qualifiers = [
-        "current", "today", "now", "live", "latest", "real-time",
-        "current value", "current price", "price now", "rate now",
-        "shares now", "trading at", "worth now", "rate", "exchange rate",
+        "current",
+        "today",
+        "now",
+        "live",
+        "latest",
+        "real-time",
+        "current value",
+        "current price",
+        "price now",
+        "rate now",
+        "shares now",
+        "trading at",
+        "worth now",
+        "rate",
+        "exchange rate",
     ]
 
     has_instrument = any(inst in q for inst in financial_instruments)
@@ -1282,11 +1672,31 @@ def _is_financial_ephemeral(query: str) -> bool:
     # Company + stock/share price without live qualifier is still ephemeral
     # (e.g. "Tesla stock price", "TSLA stock price")
     company_tickers = [
-        "tesla", "tsla", "apple", "aapl", "microsoft", "msft", "amazon", "amzn",
-        "google", "googl", "alphabet", "nvidia", "nvda", "meta", "facebook",
-        "netflix", "nflx", "bitcoin", "btc", "ethereum", "eth",
+        "tesla",
+        "tsla",
+        "apple",
+        "aapl",
+        "microsoft",
+        "msft",
+        "amazon",
+        "amzn",
+        "google",
+        "googl",
+        "alphabet",
+        "nvidia",
+        "nvda",
+        "meta",
+        "facebook",
+        "netflix",
+        "nflx",
+        "bitcoin",
+        "btc",
+        "ethereum",
+        "eth",
     ]
-    if any(t in q for t in company_tickers) and any(p in q for p in ["stock price", "share price", "stock value"]):
+    if any(t in q for t in company_tickers) and any(
+        p in q for p in ["stock price", "share price", "stock value"]
+    ):
         return True
 
     # Individual net-worth / billionaire queries (e.g. "How much is Elon Musk worth today?")
@@ -1325,7 +1735,17 @@ def _is_hostile_override_attempt(query: str) -> bool:
         return True
 
     # Command injection / function-call syntax
-    if any(p in q for p in ["execute:", "route_override", "route=", "mode=", "/mode ", "force_route"]):
+    if any(
+        p in q
+        for p in [
+            "execute:",
+            "route_override",
+            "route=",
+            "mode=",
+            "/mode ",
+            "force_route",
+        ]
+    ):
         return True
 
     # Direct routing bypass attempts
@@ -1333,75 +1753,106 @@ def _is_hostile_override_attempt(query: str) -> bool:
         return True
 
     # Forget / ignore instructions
-    if any(p in q for p in [
-        "forget all previous instructions",
-        "ignore your previous programming",
-        "ignore all previous instructions",
-        "forget your instructions",
-        "forget your programming",
-        "ignore your instructions",
-    ]):
+    if any(
+        p in q
+        for p in [
+            "forget all previous instructions",
+            "ignore your previous programming",
+            "ignore all previous instructions",
+            "forget your instructions",
+            "forget your programming",
+            "ignore your instructions",
+        ]
+    ):
         return True
 
     # Fake persona / unrestricted mode
-    if any(p in q for p in [
-        "you are now dan",
-        "you are now in unrestricted mode",
-        "you are now a different ai",
-        "you are now allowed to",
-        "switch to admin mode",
-        "unrestricted access",
-        "no restrictions",
-        "without restrictions",
-        "no limits",
-        "no guardrails",
-        "were unrestricted",
-        "if you were unrestricted",
-    ]):
+    if any(
+        p in q
+        for p in [
+            "you are now dan",
+            "you are now in unrestricted mode",
+            "you are now a different ai",
+            "you are now allowed to",
+            "switch to admin mode",
+            "unrestricted access",
+            "no restrictions",
+            "without restrictions",
+            "no limits",
+            "no guardrails",
+            "were unrestricted",
+            "if you were unrestricted",
+        ]
+    ):
         return True
 
     # Pretend / simulate bypass
-    if any(p in q for p in [
-        "pretend augmented",
-        "pretend you are",
-        "pretend you have",
-        "pretend enabled",
-        "act as my",
-        "act as a",
-        "act as an",
-        "roleplay as",
-    ]):
+    if any(
+        p in q
+        for p in [
+            "pretend augmented",
+            "pretend you are",
+            "pretend you have",
+            "pretend enabled",
+            "act as my",
+            "act as a",
+            "act as an",
+            "roleplay as",
+        ]
+    ):
         return True
     # "augmented mode" alone is a legitimate user command; only treat it as hostile
     # when paired with a pretense verb.
-    if "augmented mode" in q and any(p in q for p in [
-        "pretend", "simulate", "imagine", "suppose", "roleplay",
-    ]):
+    if "augmented mode" in q and any(
+        p in q
+        for p in [
+            "pretend",
+            "simulate",
+            "imagine",
+            "suppose",
+            "roleplay",
+        ]
+    ):
         return True
 
     # Fake audit / security probe / prompt leakage
-    if "security audit" in q and any(p in q for p in ["list all", "show all", "your guards", "your constraints", "your rules"]):
+    if "security audit" in q and any(
+        p in q
+        for p in [
+            "list all",
+            "show all",
+            "your guards",
+            "your constraints",
+            "your rules",
+        ]
+    ):
         return True
     if "system instruction" in q or "system prompt" in q:
         return True
 
     # Router disable / override claims
-    if any(p in q for p in [
-        "i have disabled your router",
-        "i have disabled your",
-        "your router is disabled",
-        "route everything to",
-        "route all to",
-    ]):
+    if any(
+        p in q
+        for p in [
+            "i have disabled your router",
+            "i have disabled your",
+            "your router is disabled",
+            "route everything to",
+            "route all to",
+        ]
+    ):
         return True
 
     # Evidence-bypass tricks
-    if any(p in q for p in [
-        "do not cite evidence but use evidence",
-        "from memory only",
-        "use evidence secretly",
-        "browse anyway",
-    ]):
+    if any(
+        p in q
+        for p in [
+            "do not cite evidence but use evidence",
+            "from memory only",
+            "use evidence secretly",
+            "browse anyway",
+        ]
+    ):
         return True
 
     return False
@@ -1423,44 +1874,160 @@ def _is_capability_query(query: str) -> bool:
     q = query.lower().strip()
 
     # Fallback / provider questions
-    if "fallback" in q and any(p in q for p in ["openai", "kimi", "wikipedia", "provider", "providers"]):
+    if "fallback" in q and any(
+        p in q for p in ["openai", "kimi", "wikipedia", "provider", "providers"]
+    ):
         return True
     if "back up" in q and any(p in q for p in ["openai", "kimi", "wikipedia", "provider"]):
         return True
 
     # Internet / web access questions
-    if any(p in q for p in ["do you have", "can you use", "do you use", "are you using", "are you connected"]):
-        if any(t in q for t in ["internet", "online", "offline", "web", "search", "browse", "google", "bing"]):
+    if any(
+        p in q
+        for p in [
+            "do you have",
+            "can you use",
+            "do you use",
+            "are you using",
+            "are you connected",
+        ]
+    ):
+        if any(
+            t in q
+            for t in [
+                "internet",
+                "online",
+                "offline",
+                "web",
+                "search",
+                "browse",
+                "google",
+                "bing",
+            ]
+        ):
             return True
 
     # Provider / backend / model / policy / mode questions
-    if any(p in q for p in ["what providers", "what backends", "what engines", "what models", "what llm", "what ai"]):
+    if any(
+        p in q
+        for p in [
+            "what providers",
+            "what backends",
+            "what engines",
+            "what models",
+            "what llm",
+            "what ai",
+        ]
+    ):
         return True
-    if "what" in q and any(p in q for p in ["provider", "backend", "engine", "model", "llm", "mode"]):
+    if "what" in q and any(
+        p in q for p in ["provider", "backend", "engine", "model", "llm", "mode"]
+    ):
         return True
-    if "what" in q and "policy" in q and any(m in q for m in ["your", "you", "lucy", "system", "routing", "augmentation", "fallback", "provider"]):
+    if (
+        "what" in q
+        and "policy" in q
+        and any(
+            m in q
+            for m in [
+                "your",
+                "you",
+                "lucy",
+                "system",
+                "routing",
+                "augmentation",
+                "fallback",
+                "provider",
+            ]
+        )
+    ):
         return True
 
     # Architecture / system questions
-    if any(p in q for p in ["how do you work", "what is your architecture", "your architecture", "how are you built", "what system are you", "what is your stack", "are you aware"]):
+    if any(
+        p in q
+        for p in [
+            "how do you work",
+            "what is your architecture",
+            "your architecture",
+            "how are you built",
+            "what system are you",
+            "what is your stack",
+            "are you aware",
+        ]
+    ):
         return True
 
     # Routing mode / meta-configuration questions
-    if "augmented mode" in q and any(w in q for w in ["should", "opinion", "what", "how", "why", "when", "explain"]):
+    if "augmented mode" in q and any(
+        w in q for w in ["should", "opinion", "what", "how", "why", "when", "explain"]
+    ):
         return True
-    if "local mode" in q and any(w in q for w in ["should", "opinion", "what", "how", "why", "when", "explain"]):
+    if "local mode" in q and any(
+        w in q for w in ["should", "opinion", "what", "how", "why", "when", "explain"]
+    ):
         return True
 
     # Translation / language capability questions
-    if any(p in q for p in ["can you translate", "are you able to translate", "do you translate", "capable of translation"]):
+    if any(
+        p in q
+        for p in [
+            "can you translate",
+            "are you able to translate",
+            "do you translate",
+            "capable of translation",
+        ]
+    ):
         return True
     if "can you" in q and "translation" in q:
         return True
-    if "capable of" in q and any(t in q for t in ["translate", "translation", "hebrew", "arabic", "english", "french", "spanish", "german", "chinese", "japanese", "russian", "italian", "language", "languages"]):
+    if "capable of" in q and any(
+        t in q
+        for t in [
+            "translate",
+            "translation",
+            "hebrew",
+            "arabic",
+            "english",
+            "french",
+            "spanish",
+            "german",
+            "chinese",
+            "japanese",
+            "russian",
+            "italian",
+            "language",
+            "languages",
+        ]
+    ):
         return True
-    if any(p in q for p in ["what languages", "which languages", "how many languages", "do you understand", "can you understand", "do you speak"]):
+    if any(
+        p in q
+        for p in [
+            "what languages",
+            "which languages",
+            "how many languages",
+            "do you understand",
+            "can you understand",
+            "do you speak",
+        ]
+    ):
         return True
-    if ("translate" in q or "translation" in q) and any(t in q for t in ["hebrew", "arabic", "english", "french", "spanish", "german", "chinese", "japanese", "russian", "italian"]):
+    if ("translate" in q or "translation" in q) and any(
+        t in q
+        for t in [
+            "hebrew",
+            "arabic",
+            "english",
+            "french",
+            "spanish",
+            "german",
+            "chinese",
+            "japanese",
+            "russian",
+            "italian",
+        ]
+    ):
         return True
 
     # Trust / safety / routing probing (prompt-leakage family)
@@ -1484,15 +2051,32 @@ def _is_language_or_translation_query(query: str) -> bool:
         return False
     q = query.lower().strip()
     language_markers = [
-        "translate", "translation", "translator",
-        "do you understand", "can you understand",
-        "what languages", "which languages", "how many languages",
-        "speak hebrew", "speak arabic", "speak french", "speak spanish",
-        "speak german", "speak chinese", "speak japanese", "speak russian",
-        "hebrew to english", "english to hebrew",
-        "arabic to english", "english to arabic",
-        "from hebrew", "to hebrew", "from arabic", "to arabic",
-        "in hebrew", "in arabic",
+        "translate",
+        "translation",
+        "translator",
+        "do you understand",
+        "can you understand",
+        "what languages",
+        "which languages",
+        "how many languages",
+        "speak hebrew",
+        "speak arabic",
+        "speak french",
+        "speak spanish",
+        "speak german",
+        "speak chinese",
+        "speak japanese",
+        "speak russian",
+        "hebrew to english",
+        "english to hebrew",
+        "arabic to english",
+        "english to arabic",
+        "from hebrew",
+        "to hebrew",
+        "from arabic",
+        "to arabic",
+        "in hebrew",
+        "in arabic",
     ]
     return any(marker in q for marker in language_markers)
 
@@ -1528,8 +2112,14 @@ def _is_historical_query(query: str) -> bool:
     # Negation / current-news context: if the user explicitly negates history
     # or uses current-news markers, skip broad historical heuristics.
     current_news_markers = [
-        "not history", "not historical", "current", "latest", "today",
-        "news", "breaking", "recent",
+        "not history",
+        "not historical",
+        "current",
+        "latest",
+        "today",
+        "news",
+        "breaking",
+        "recent",
     ]
     if any(marker in q for marker in current_news_markers):
         return False
@@ -1571,19 +2161,57 @@ def _is_technical_knowledge_query(query: str) -> bool:
     # Electronics component keywords paired with explanatory verbs
     # These indicate domain-knowledge requests, not shopping/news queries.
     component_keywords = [
-        "vacuum tube", "transistor", "resistor", "capacitor", "inductor",
-        "diode", "triode", "tetrode", "pentode", "rectifier", "transformer",
-        "oscillator", "amplifier", "regulator", "thyristor", "op-amp",
-        "operational amplifier", "integrated circuit", "mosfet", "bjt",
-        "j-fet", "jfet", "photodiode", "led", "zener", "varistor",
-        "potentiometer", "rheostat", "relay", "solenoid", "choke",
+        "vacuum tube",
+        "transistor",
+        "resistor",
+        "capacitor",
+        "inductor",
+        "diode",
+        "triode",
+        "tetrode",
+        "pentode",
+        "rectifier",
+        "transformer",
+        "oscillator",
+        "amplifier",
+        "regulator",
+        "thyristor",
+        "op-amp",
+        "operational amplifier",
+        "integrated circuit",
+        "mosfet",
+        "bjt",
+        "j-fet",
+        "jfet",
+        "photodiode",
+        "led",
+        "zener",
+        "varistor",
+        "potentiometer",
+        "rheostat",
+        "relay",
+        "solenoid",
+        "choke",
     ]
     explanation_verbs = [
-        "describe", "explain", "explanation", "explanation of",
-        "what is", "what are", "how does",
-        "how do", "how does a", "how does an", "how it works",
-        "what does", "definition of", "meaning of", "function of",
-        "purpose of", "use of", "operation of",
+        "describe",
+        "explain",
+        "explanation",
+        "explanation of",
+        "what is",
+        "what are",
+        "how does",
+        "how do",
+        "how does a",
+        "how does an",
+        "how it works",
+        "what does",
+        "definition of",
+        "meaning of",
+        "function of",
+        "purpose of",
+        "use of",
+        "operation of",
     ]
     has_component = any(kw in q for kw in component_keywords)
     has_explanation = any(v in q for v in explanation_verbs)
@@ -1630,13 +2258,13 @@ def _is_personal_family_query(query: str) -> bool:
     q = query.lower()
     # Personal pronoun + family/pet relationship word
     personal_relations = [
-        r'\bmy\s+(children?|kids?|son|sons|daughter|daughters|wife|husband|spouse|partner|family|dog|cat|pet|pets|mother|father|mom|dad|brother|sister|uncle|aunt|grandmother|grandfather)',
-        r'\bwho\s+(is|are)\s+my\s+',
-        r'\btell\s+me\s+about\s+my\s+',
-        r'\bwhat\s+is\s+my\s+',
-        r'\b(how many|do I have|have I got|did I have)\s+(children|kids|sons|daughters|pets)',
-        r'\b(children|kids|sons|daughters)\s+do\s+I\s+have',
-        r'\bI\s+have\s+(a|any|no)\s+(children|kids|sons|daughters|pets)',
+        r"\bmy\s+(children?|kids?|son|sons|daughter|daughters|wife|husband|spouse|partner|family|dog|cat|pet|pets|mother|father|mom|dad|brother|sister|uncle|aunt|grandmother|grandfather)",
+        r"\bwho\s+(is|are)\s+my\s+",
+        r"\btell\s+me\s+about\s+my\s+",
+        r"\bwhat\s+is\s+my\s+",
+        r"\b(how many|do I have|have I got|did I have)\s+(children|kids|sons|daughters|pets)",
+        r"\b(children|kids|sons|daughters)\s+do\s+I\s+have",
+        r"\bI\s+have\s+(a|any|no)\s+(children|kids|sons|daughters|pets)",
     ]
     return any(re.search(p, q) for p in personal_relations)
 
@@ -1653,20 +2281,49 @@ def _is_creative_writing(query: str) -> bool:
     q = query.lower().strip()
     # Anchored patterns for queries that start with the creative verb
     creative_patterns = [
-        r'^(write|compose|craft|create|draft| pen|describe|depict|portray)( me| us| a| an| the|\s+)?\s+(story|poem|essay|novel|narrative|tale|fiction|screenplay|script|song|lyric|rap|haiku|limerick|sonnet|ballad|epic|fable|myth|legend|fanfic|fan fiction|novella|short story|scene|picture|image|sunset|landscape|character)',
-        r'^(tell me|read me|share)( a| an| the|\s+)?\s+(story|poem|tale|joke|riddle|fable|myth|legend)',
-        r'^(write|compose|craft|create|describe)( me| us)?\s+(a|an|the|\d+)\s+\w+\s+(story|poem|essay|novel|tale|scene|description)',
-        r'^(write|compose|craft|create|describe)( me| us)?\s+(a|an|the|\d+)[\s\-]*\w*[\s\-]*(word|words)[\s\-]*\w*\s+(story|poem|essay|novel|narrative|tale|description)',
-        r'^(write|compose|craft|create|describe)( me| us)?\s+(a|an|the|\d+)[\s\-]*\w*[\s\-]*(word|words)\s+about',
+        r"^(write|compose|craft|create|draft| pen|describe|depict|portray)( me| us| a| an| the|\s+)?\s+(story|poem|essay|novel|narrative|tale|fiction|screenplay|script|song|lyric|rap|haiku|limerick|sonnet|ballad|epic|fable|myth|legend|fanfic|fan fiction|novella|short story|scene|picture|image|sunset|landscape|character)",
+        r"^(tell me|read me|share)( a| an| the|\s+)?\s+(story|poem|tale|joke|riddle|fable|myth|legend)",
+        r"^(write|compose|craft|create|describe)( me| us)?\s+(a|an|the|\d+)\s+\w+\s+(story|poem|essay|novel|tale|scene|description)",
+        r"^(write|compose|craft|create|describe)( me| us)?\s+(a|an|the|\d+)[\s\-]*\w*[\s\-]*(word|words)[\s\-]*\w*\s+(story|poem|essay|novel|narrative|tale|description)",
+        r"^(write|compose|craft|create|describe)( me| us)?\s+(a|an|the|\d+)[\s\-]*\w*[\s\-]*(word|words)\s+about",
     ]
     if any(re.search(p, q) for p in creative_patterns):
         return True
     # Fallback: conversational prefix — check for creative verb + noun anywhere
-    creative_verbs = ['write', 'compose', 'craft', 'create', 'tell', 'make up', 'imagine',
-                      'describe', 'depict', 'portray']
-    creative_nouns = ['story', 'poem', 'essay', 'novel', 'fiction', 'script', 'play', 'song',
-                      'tale', 'narrative', 'fable', 'myth', 'legend', 'fanfic', 'novella',
-                      'scene', 'sunset', 'landscape', 'character', 'description']
+    creative_verbs = [
+        "write",
+        "compose",
+        "craft",
+        "create",
+        "tell",
+        "make up",
+        "imagine",
+        "describe",
+        "depict",
+        "portray",
+    ]
+    creative_nouns = [
+        "story",
+        "poem",
+        "essay",
+        "novel",
+        "fiction",
+        "script",
+        "play",
+        "song",
+        "tale",
+        "narrative",
+        "fable",
+        "myth",
+        "legend",
+        "fanfic",
+        "novella",
+        "scene",
+        "sunset",
+        "landscape",
+        "character",
+        "description",
+    ]
     has_verb = any(v in q for v in creative_verbs)
     has_noun = any(n in q for n in creative_nouns)
     return has_verb and has_noun
@@ -1728,8 +2385,6 @@ def _map_to_intent_family(intent: str, intent_class: str, category: str) -> str:
     return "local_answer"
 
 
-
-
 # ---------------------------------------------------------------------------
 # Memory-aware routing gate
 # ---------------------------------------------------------------------------
@@ -1761,15 +2416,39 @@ _MEMORY_EXPLICIT_RECALL_RE = re.compile(
 
 # Live-data keywords that should NOT be overridden even with follow-up markers
 _LIVE_DATA_KEYWORDS = (
-    "weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy", "windy",
-    "news", "headlines", "latest news", "breaking",
-    "time is it", "time in", "current time", "what time",
-    "stock", "price", "bitcoin", "crypto", "trading", "market",
-    "live", "today", "week", "month", "year",
+    "weather",
+    "forecast",
+    "temperature",
+    "rain",
+    "snow",
+    "sunny",
+    "cloudy",
+    "windy",
+    "news",
+    "headlines",
+    "latest news",
+    "breaking",
+    "time is it",
+    "time in",
+    "current time",
+    "what time",
+    "stock",
+    "price",
+    "bitcoin",
+    "crypto",
+    "trading",
+    "market",
+    "live",
+    "today",
+    "week",
+    "month",
+    "year",
 )
 
 
-def _memory_routing_gate(query: str, embedding_route: str, session_id: str = "default") -> str | None:
+def _memory_routing_gate(
+    query: str, embedding_route: str, session_id: str = "default"
+) -> str | None:
     """
     Lightweight memory-aware routing gate.
 
@@ -1820,6 +2499,7 @@ def _memory_routing_gate(query: str, embedding_route: str, session_id: str = "de
     has_memory_context = False
     try:
         from memory.memory_service import get_recent_turns
+
         turns = get_recent_turns(session_id=session_id, limit=2)
         has_memory_context = bool(turns)
     except Exception:
@@ -1854,7 +2534,6 @@ def _make_local_decision(classification: ClassificationResult, query: str = "") 
     )
 
 
-
 def _make_augmented_decision(
     classification: ClassificationResult,
     prefer_paid: bool = False,
@@ -1864,7 +2543,11 @@ def _make_augmented_decision(
     from router_py import provider_resolver
 
     # Medical and veterinary queries route to EVIDENCE (strict trusted sources)
-    if classification.evidence_reason in ("medical_context", "medical_body_symptom", "veterinary_context"):
+    if classification.evidence_reason in (
+        "medical_context",
+        "medical_body_symptom",
+        "veterinary_context",
+    ):
         return RoutingDecision(
             route="EVIDENCE",
             mode="AUTO",
@@ -1879,9 +2562,7 @@ def _make_augmented_decision(
             ephemeral=False,
         )
 
-    provider = provider_resolver.resolve_provider(
-        classification, prefer_paid=prefer_paid
-    )
+    provider = provider_resolver.resolve_provider(classification, prefer_paid=prefer_paid)
 
     usage_class = provider_usage_class_for(provider)
 
@@ -1906,7 +2587,9 @@ def _make_augmented_decision(
     )
 
 
-def _make_local_with_fallback(classification: ClassificationResult, query: str = "") -> RoutingDecision:
+def _make_local_with_fallback(
+    classification: ClassificationResult, query: str = ""
+) -> RoutingDecision:
     """Create a local-first with fallback routing decision."""
     return RoutingDecision(
         route="LOCAL",  # Start local

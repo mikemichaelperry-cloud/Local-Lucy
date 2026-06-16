@@ -3,7 +3,7 @@
 Tests for structured_logging.py.
 
 Run with:
-    cd /home/mike/lucy-v10 && source ui-v10/.venv/bin/activate
+    cd <project-root> && source ui-v10/.venv/bin/activate
     python3 -m pytest tools/router_py/test_structured_logging.py -v
 """
 
@@ -13,7 +13,6 @@ import json
 import logging
 import sys
 import threading
-import time
 from io import StringIO
 from pathlib import Path
 
@@ -22,8 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pytest
 
+from router_py.logging_config import get_logger, setup_logging
 from router_py.structured_logging import (
-    ContextualLogger,
     StructuredFormatter,
     clear_logger_cache,
     configure_logging,
@@ -42,12 +41,18 @@ def _clear_logger_cache():
 # StructuredFormatter
 # ---------------------------------------------------------------------------
 
+
 class TestStructuredFormatter:
     def test_outputs_valid_json(self):
         fmt = StructuredFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="hello", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=(),
+            exc_info=None,
         )
         line = fmt.format(record)
         parsed = json.loads(line)
@@ -59,8 +64,13 @@ class TestStructuredFormatter:
     def test_includes_extra_fields(self):
         fmt = StructuredFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="hello", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=(),
+            exc_info=None,
         )
         record.request_id = "abc123"
         record.latency_ms = 42
@@ -75,8 +85,13 @@ class TestStructuredFormatter:
             raise ValueError("boom")
         except Exception:
             record = logging.LogRecord(
-                name="test", level=logging.ERROR, pathname="", lineno=0,
-                msg="error", args=(), exc_info=sys.exc_info(),
+                name="test",
+                level=logging.ERROR,
+                pathname="",
+                lineno=0,
+                msg="error",
+                args=(),
+                exc_info=sys.exc_info(),
             )
         line = fmt.format(record)
         parsed = json.loads(line)
@@ -86,8 +101,13 @@ class TestStructuredFormatter:
     def test_iso_timestamp(self):
         fmt = StructuredFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="hello", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=(),
+            exc_info=None,
         )
         line = fmt.format(record)
         parsed = json.loads(line)
@@ -98,8 +118,13 @@ class TestStructuredFormatter:
     def test_non_serializable_fallback(self):
         fmt = StructuredFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="hello", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=(),
+            exc_info=None,
         )
         record.weird = object()  # type: ignore[attr-defined]
         line = fmt.format(record)
@@ -110,6 +135,7 @@ class TestStructuredFormatter:
 # ---------------------------------------------------------------------------
 # configure_logging
 # ---------------------------------------------------------------------------
+
 
 class TestConfigureLogging:
     def test_sets_json_formatter(self):
@@ -135,6 +161,7 @@ class TestConfigureLogging:
 # ---------------------------------------------------------------------------
 # ContextualLogger
 # ---------------------------------------------------------------------------
+
 
 class TestContextualLogger:
     def test_bind_adds_fields(self):
@@ -234,6 +261,47 @@ class TestContextualLogger:
         parsed = json.loads(stream.getvalue().strip())
         assert parsed["a"] == 1
         assert parsed["b"] == 2
+
+
+# ---------------------------------------------------------------------------
+# logging_config
+# ---------------------------------------------------------------------------
+
+
+class TestLoggingConfig:
+    def test_get_logger_returns_standard_logger(self):
+        logger = get_logger("test_standard_logger")
+        assert isinstance(logger, logging.Logger)
+        assert logger.name == "test_standard_logger"
+
+    def test_setup_logging_json_output(self):
+        stream = StringIO()
+        setup_logging(level=logging.INFO, json=True, stream=stream)
+        logger = get_logger("test_json_output")
+        logger.info("hello json")
+        line = stream.getvalue().strip()
+        parsed = json.loads(line)
+        assert parsed["message"] == "hello json"
+        assert parsed["level"] == "INFO"
+        assert parsed["logger"] == "test_json_output"
+        assert "timestamp" in parsed
+
+    def test_setup_logging_plain_text_output(self):
+        stream = StringIO()
+        setup_logging(level=logging.INFO, json=False, stream=stream)
+        logger = get_logger("test_plain_output")
+        logger.warning("hello plain")
+        line = stream.getvalue().strip()
+        assert "hello plain" in line
+        assert "WARNING" in line
+        assert "test_plain_output" in line
+
+    def test_setup_logging_no_duplicate_handlers(self):
+        stream = StringIO()
+        setup_logging(level=logging.INFO, json=True, stream=stream)
+        setup_logging(level=logging.INFO, json=True, stream=stream)
+        root = logging.getLogger()
+        assert len(root.handlers) == 1
 
 
 if __name__ == "__main__":
