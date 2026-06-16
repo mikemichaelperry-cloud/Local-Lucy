@@ -91,12 +91,15 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 30
+Commits since tag: 35
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+687b182 test: further harden regression suite against local LLM variance
+e18ed14 test: robustness fixes from code review
+2e238d2 docs: update SESSION_CONTEXT.md after README refresh
 79136ec docs: update README for v10 — llama3.1 default, FINANCE route, XDG paths, packaging
 63bd4a2 docs: update SESSION_CONTEXT.md — origin/v10-dev is in sync
 09965c5 docs: update SESSION_CONTEXT.md — GitHub default branch is v10-dev
@@ -107,9 +110,6 @@ f6ffe1a test: update default model expectation to local-lucy-llama31
 b480477 chore: ignore pre-existing F841 issues in local_answer.py
 f2efa6d ci: add release workflow and Debian packaging
 53b2882 refactor(tests): remove hardcoded absolute paths and use env-driven runtime root
-9aa193e feat(logging): add logging_config wrapper and replace print statements
-eee7ee6 chore: add ruff config with per-file ignores for legacy code
-97af56e chore: ignore egg-info build artifacts
 ```
 
 ---
