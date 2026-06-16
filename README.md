@@ -19,18 +19,18 @@
 
 Local Lucy V10 is a **privacy-first, self-learning desktop AI assistant** built with PySide6. It runs entirely on your local machine with optional cloud augmentation, giving you full control over your data while providing intelligent conversation, voice interaction, and real-time information retrieval.
 
-Unlike cloud-only assistants, Lucy learns from your corrections in natural language — tell her "that should have been LOCAL" and she updates her routing model automatically.
+Unlike cloud-only assistants, Lucy learns from your explicit corrections in natural language — tell her "that should have been LOCAL" and, after a safety gate, she updates her routing model. Auto-detected signals and router logs are telemetry only; they never mutate the model unsupervised.
 
 > **Looking for the frozen V9 baseline?** Check out the [`local-lucy-v9-frozen-2026-05-28`](https://github.com/mikemichaelperry-cloud/Local-Lucy/releases/tag/local-lucy-v9-frozen-2026-05-28) tag.
 
 ## Features
 
 ### 🧠 Intelligent Routing
-- **MiniLM-L6-v2 embedding router** (384-dim, ~900 examples) with k-NN similarity and semantic disambiguation
-- **Four-stage pipeline**: structural safety → embedding k-NN → minimal keyword catches → calibrated confidence fallback
-- **Self-learning feedback loop** — natural language corrections rebuild the embedding index
-- **Auto-feedback trust tiers** — separate confidence thresholds for user vs. auto-detected corrections
-- **V1 purge complete** — legacy keyword fortress removed; embedding router is the sole authority
+- **MiniLM-L6-v2 embedding router** (384-dim, ~1,019 examples) with k-NN similarity and semantic disambiguation
+- **Four-stage pipeline**: structural safety → embedding k-NN → safety keyword guards → calibrated confidence fallback
+- **Self-learning feedback loop** — explicit user corrections rebuild the embedding index after a safety gate
+- **High-stakes review queue** — medical, veterinary, finance, legal, and EVIDENCE feedback goes to `pending_review.jsonl` for human review
+- **V1 purge complete** — legacy broad keyword fortress removed; embedding router is the authority, with keyword guards retained only for safety-critical categories
 
 ### 🎙️ Voice Interaction
 - **Push-to-Talk (PTT)** with hold and tap modes
@@ -39,14 +39,17 @@ Unlike cloud-only assistants, Lucy learns from your corrections in natural langu
 - Async state machine with timeout guards
 
 ### 🔒 Privacy & Local-First
-- **Primary LLM runs locally** via Ollama (Qwen3 14B, ~2048-token context)
+- **Primary LLM runs locally** via Ollama (`local-lucy-llama31`, llama3.1:8b, 4096-token context)
 - **Optional cloud augmentation** (Kimi/OpenAI) for complex queries
-- **SQLite state management** with versioned schema migrations
+- **SQLite state management** with versioned schema migrations and `0o600` permissions
+- **XDG-compliant runtime paths** (`~/.local/share/local-lucy`) with legacy fallback
 - **Session memory** persists across restarts
 
 ### 📡 Live Data Integration
 - **LOCAL** — Default local LLM inference via Ollama
-- **AUGMENTED** — Wikipedia → OpenAI → Kimi chain with evidence-backed answers
+- **AUGMENTED** — Web search → OpenAI → Kimi chain with evidence-backed answers
+- **EVIDENCE** — Medical/vet/finance/legal queries with trusted-source citations
+- **FINANCE** — Live FX, crypto, stock/index, and net-worth lookups with source citations
 - **TIME** — Current time, timezone conversions, date queries
 - **NEWS** — RSS feed aggregation with region filtering
 - **WEATHER** — Real-time weather lookups
@@ -71,20 +74,22 @@ Unlike cloud-only assistants, Lucy learns from your corrections in natural langu
 ┌──────────────────────▼──────────────────────────────────────┐
 │  Lucy Core (tools/router_py/)                               │
 │  ├─ Execution Engine — route dispatch & provider fallback   │
-│  ├─ Hybrid Router V2 — MiniLM-L6-v2 embeddings + keyword    │
+│  ├─ Classify — embedding k-NN + safety keyword guards       │
 │  ├─ Feedback Parser — NL correction detection               │
-│  ├─ Background Learner — auto-rebuilds from feedback        │
+│  ├─ Background Learner — user-feedback-only index rebuilds  │
+│  ├─ Structured Logging — JSON log output starter            │
 │  └─ Schema Migrations — versioned SQLite evolution          │
 └──────────────────────┬──────────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────────┐
 │  Providers                                                  │
-│  ├─ LOCAL — Ollama (Qwen3 14B)                              │
-│  ├─ AUGMENTED — Wikipedia → OpenAI → Kimi                   │
+│  ├─ LOCAL — Ollama (llama3.1:8b default)                    │
+│  ├─ AUGMENTED — Web search → OpenAI → Kimi                  │
+│  ├─ EVIDENCE — Trusted sources + citations                  │
+│  ├─ FINANCE — Live FX / crypto / stocks / net worth         │
 │  ├─ TIME — TimeAPI.io                                       │
 │  ├─ NEWS — RSS feeds                                        │
-│  ├─ WEATHER — Weather APIs                                  │
-│  └─ EVIDENCE — Wikipedia + citation requirement             │
+│  └─ WEATHER — Weather APIs                                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -99,9 +104,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete technical specification.
 - **Qt6 platform plugins** (for Linux: `qt6-base-dev` or equivalent)
 - **GPU recommended** — RTX 3060 12GB or better for local LLM + Whisper GPU coexistence
 
-> **Note:** On first run, the embedding router will auto-build its index from the bundled training examples (~899 queries). This takes 5–10 seconds and is saved to `models/router/comprehensive_embeddings.npy` for subsequent runs.
+> **Note:** On first run, the embedding router will auto-build its index from the bundled training examples (~1,019 queries). This takes 5–10 seconds and is saved to `models/router/comprehensive_embeddings.npy` for subsequent runs.
 >
-> **Disk space:** ~10 GB for the Ollama model + ~2 GB for PyTorch/Transformers pip packages.
+> **Disk space:** ~8–10 GB for the Ollama model + ~2 GB for PyTorch/Transformers pip packages.
 
 ### Quick Start
 
@@ -118,12 +123,15 @@ source ui-v10/.venv/bin/activate
 pip install -r ui-v10/requirements.txt
 
 # Download the base models and create the custom variants
-# Default: qwen3:14b (~9.8 GB VRAM, good general performance)
+# Default: llama3.1:8b (~8.5 GB VRAM, 4096-token context, follows system prompts)
+ollama pull llama3.1:8b
+ollama create local-lucy-llama31 -f config/Modelfile.local-lucy-llama31
+
+# Legacy options (still selectable in the HMI)
 ollama pull qwen3:14b
 ollama create local-lucy -f config/Modelfile.local-lucy
 ollama create local-lucy-fast -f config/Modelfile.local-lucy-fast
 
-# Alternative: mistral-nemo 12B (~7.1 GB VRAM, faster inference)
 ollama pull mistral-nemo
 ollama create local-lucy-mistral -f config/Modelfile.local-lucy-mistral
 
@@ -154,7 +162,8 @@ Just type or speak naturally. Lucy routes your query automatically:
 | "Tell me about quantum computing" | LOCAL | Runs local LLM inference |
 | "What are today's headlines?" | NEWS | Aggregates RSS feeds |
 | "What time is it in Berlin?" | TIME | Timezone conversion |
-| "Amoxicillin dose for a 10kg dog" | AUGMENTED | Evidence-backed veterinary answer |
+| "Bitcoin price" | FINANCE | Live crypto quote with source citation |
+| "Amoxicillin dose for a 10kg dog" | EVIDENCE | Evidence-backed veterinary answer |
 
 ### Teaching Lucy
 
@@ -173,29 +182,32 @@ The background learner automatically rebuilds the embedding index from correctio
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LUCY_AUTO_LEARN_THRESHOLD` | 3 | User feedback entries before rebuild |
-| `LUCY_AUTO_FEEDBACK_THRESHOLD` | 5 | Auto-feedback entries before rebuild |
-| `LUCY_AUTO_FEEDBACK_MAX_CONFIDENCE` | 0.5 | Cap on auto-feedback confidence |
-| `LUCY_RUNTIME_NAMESPACE_ROOT` | `~/.codex-api-home/lucy/runtime-v10` | Runtime state directory |
+| `LUCY_LOCAL_MODEL` | `local-lucy-llama31` | Default Ollama model |
+| `LUCY_AUTO_LEARN` | `1` | Allow background learning from explicit user feedback |
+| `LUCY_RUNTIME_NAMESPACE_ROOT` | `~/.local/share/local-lucy` | XDG runtime state directory |
 | `LUCY_RUNTIME_AUTHORITY_ROOT` | project root | Project root for contract validation |
+| `LUCY_OLLAMA_API_URL` | `http://127.0.0.1:11434/api/generate` | Local LLM endpoint |
 
 ## Development
 
 ### Running Tests
 
 ```bash
-# Router core tests
+# Full router suite (~2 min)
+cd ~/lucy-v10
 source ui-v10/.venv/bin/activate
-cd tools/router_py
-python3 -m pytest test_classify.py test_execution_engine_state.py test_memory_gate.py -q
+python -m pytest tools/router_py/ -q
 
-# UI offscreen tests
-cd ui-v10
-python3 -m pytest tests/ -q
+# Medical routing specifically
+python -m pytest tools/router_py/test_medical_evidence_routing.py -v
+
+# HMI offscreen tests
+QT_QPA_PLATFORM=offscreen python3 ui-v10/tests/test_comprehensive_hmi_inspection.py
 
 # End-to-end smoke test
-cd ui-v10
-python3 e2e_smoke_test.py
+LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 \
+  python3 -c "import sys; sys.path.insert(0,'tools'); from router_py.main import execute_plan_python; \
+  r = execute_plan_python('What is 2+2?', timeout=30); print(r.status, r.route)"
 ```
 
 ### Project Structure
@@ -209,21 +221,28 @@ Local-Lucy/
 ├── tools/router_py/        # Core execution engine & router
 │   ├── main.py             # CLI entry point
 │   ├── execution_engine.py # Provider dispatch
-│   ├── classify.py         # Intent classification (V2)
+│   ├── classify.py         # Intent classification + safety guards
 │   ├── local_answer.py     # Local LLM prompt builder
+│   ├── logging_config.py   # Structured JSON logging
 │   ├── feedback_parser.py  # NL feedback detection
 │   └── test_*.py           # Comprehensive test suite
 ├── models/router/          # Embedding model & learner
 │   ├── hybrid_router_v2.py # MiniLM-L6-v2 routing
 │   ├── background_learner.py
+│   ├── auto_feedback.py    # Telemetry-only auto-feedback
 │   ├── comprehensive_examples.json
-│   └── finetuned_minilm/   # Optional fine-tuned model
+│   └── pending_review.jsonl
 ├── tools/memory/           # Session memory service
 ├── tools/voice/            # STT/TTS pipeline
-├── data/tubes/             # Vacuum tube database
+├── tools/internet/         # Web search & circuit breakers
+├── tools/xdg_paths.py      # XDG path resolution
+├── packaging/              # .deb and AppImage build scripts
+├── data/tubes/             # Web extraction pipelines
 ├── config/                 # Environment configs, Modelfiles
-├── scripts/                # Helper scripts
-└── docs/                   # Design docs & reports
+├── scripts/                # Helper scripts (check_environment, migrate_db)
+├── docs/                   # Design docs, ADRs, runbooks
+├── START_LUCY.sh           # Desktop launcher
+└── lucy_chat.sh            # CLI chat entry point
 ```
 
 ## Safety & Hardening
@@ -231,11 +250,13 @@ Local-Lucy/
 Local Lucy is designed with multiple safety layers:
 
 - **Structural safety checks** — Empty, hostile, creative, and conspiracy input filtering
-- **Medical/vet evidence policy** — High-risk queries require evidence_mode with citations
-- **Adversarial prompt testing** — 469+ synthetic adversarial cases validated
-- **Embedding-first routing** — No broad keyword fortress; semantic similarity decides
-- **Provider fallback chains** — Graceful degradation when APIs fail
+- **Medical/vet/finance/legal evidence policy** — High-risk queries route to `EVIDENCE`/`FINANCE` with citations
+- **User-feedback-only learning** — Auto-feedback and router logs are telemetry-only; only explicit corrections are ingested
+- **High-stakes review queue** — Medical, veterinary, finance, legal, and conflicting feedback goes to `pending_review.jsonl`
+- **Embedding-first routing** — No broad keyword fortress; semantic similarity decides, with keyword guards for safety categories
+- **Provider fallback chains** — Graceful degradation when APIs fail; fallback sources are labelled
 - **Schema migrations** — Zero-downtime database evolution with rollback
+- **SQLite permission hardening** — `lucy_state.db` and `memory.db` created with `0o600`
 - **HTML/plain-text isolation** — QTextBrowser document state cleared between entries
 
 ## Contributing
