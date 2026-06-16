@@ -91,12 +91,14 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 37
+Commits since tag: 39
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+231a419 test: fix remaining test failures and enforce mypy in lint
+7ce6a2d docs: update SESSION_CONTEXT.md after ruff/lint cleanup
 2b98093 chore: install ruff and make lint pass
 f293952 docs: update SESSION_CONTEXT.md after robustness commits
 687b182 test: further harden regression suite against local LLM variance
@@ -108,8 +110,6 @@ e18ed14 test: robustness fixes from code review
 e3fe120 ci: add experimental AppImage packaging
 f6ffe1a test: update default model expectation to local-lucy-llama31
 332c097 docs: update SESSION_CONTEXT.md
-8e6c152 fix(local): steer first-person and reasoning prompts; re-record semantic golden responses
-b480477 chore: ignore pre-existing F841 issues in local_answer.py
 ```
 
 ---
