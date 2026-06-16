@@ -41,16 +41,14 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
-
 from local_answer import LocalAnswer, LocalAnswerConfig
-
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -61,7 +59,12 @@ DEFAULT_GOLDEN_PATH = PROJECT_ROOT / "tests" / "golden_responses.json"
 
 CASES_PATH = Path(os.environ.get("LUCY_RESPONSE_REGRESSION_CASES", DEFAULT_CASES_PATH))
 GOLDEN_PATH = Path(os.environ.get("LUCY_RESPONSE_REGRESSION_GOLDEN", DEFAULT_GOLDEN_PATH))
-RECORD_MODE = os.environ.get("LUCY_RESPONSE_REGRESSION_RECORD", "").lower() in ("1", "true", "yes", "on")
+RECORD_MODE = os.environ.get("LUCY_RESPONSE_REGRESSION_RECORD", "").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +212,7 @@ async def local_answer():
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 @pytest.mark.parametrize("case", _load_json(CASES_PATH) or [pytest.param({}, id="no-cases")])
-async def test_response_regression(case, golden_data, request):
+async def test_response_regression(case, golden_data, request, skip_without_ollama):
     if not case:
         pytest.skip("No test cases loaded")
 
@@ -303,7 +306,6 @@ async def test_response_regression(case, golden_data, request):
     #     ...
 
 
-
 # ---------------------------------------------------------------------------
 # Direct runner (for users who prefer `python3 test_response_regression.py`)
 # ---------------------------------------------------------------------------
@@ -365,7 +367,7 @@ def _run_direct():
 
                     golden_resp = golden.get("responses", {}).get(case_id)
                     if not golden_resp:
-                        print(f"  MISSING GOLDEN — run with RECORD=1")
+                        print("  MISSING GOLDEN — run with RECORD=1")
                         all_passed = False
                         continue
 
@@ -375,13 +377,13 @@ def _run_direct():
                     if norm_golden == norm_current:
                         print(f"  PASS ({result.duration_ms}ms)")
                     else:
-                        print(f"  FAIL — response changed")
+                        print("  FAIL — response changed")
                         diff = _make_diff(golden_resp["text"], text)
                         print(diff)
                         all_passed = False
 
                     if check_failures:
-                        print(f"  CHECK FAILURES:")
+                        print("  CHECK FAILURES:")
                         for f in check_failures:
                             print(f"    - {f}")
                         all_passed = False

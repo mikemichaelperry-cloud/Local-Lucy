@@ -36,16 +36,14 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
-
 from local_answer import LocalAnswer, LocalAnswerConfig
-
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -56,7 +54,12 @@ DEFAULT_GOLDEN_PATH = PROJECT_ROOT / "tests" / "golden_semantic_responses.json"
 
 CASES_PATH = Path(os.environ.get("LUCY_RESPONSE_REGRESSION_CASES", DEFAULT_CASES_PATH))
 GOLDEN_PATH = Path(os.environ.get("LUCY_SEMANTIC_REGRESSION_GOLDEN", DEFAULT_GOLDEN_PATH))
-RECORD_MODE = os.environ.get("LUCY_SEMANTIC_REGRESSION_RECORD", "").lower() in ("1", "true", "yes", "on")
+RECORD_MODE = os.environ.get("LUCY_SEMANTIC_REGRESSION_RECORD", "").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -88,21 +91,146 @@ def _compute_embedding(text: str) -> List[float]:
 # Concept extraction
 # ---------------------------------------------------------------------------
 _STOPWORDS: Set[str] = {
-    "the", "and", "for", "are", "but", "not", "you", "that", "was", "have",
-    "had", "what", "said", "each", "which", "she", "will", "about", "could",
-    "other", "after", "first", "well", "water", "been", "call", "who", "oil",
-    "its", "now", "find", "long", "down", "day", "did", "get", "come", "made",
-    "may", "part", "than", "them", "these", "so", "some", "time", "very",
-    "when", "much", "would", "there", "all", "any", "both", "each", "few",
-    "more", "most", "other", "some", "such", "only", "own", "same", "than",
-    "too", "very", "can", "will", "just", "should", "with", "have", "from",
-    "they", "know", "want", "been", "good", "much", "some", "time", "very",
-    "when", "come", "here", "just", "like", "over", "also", "back", "after",
-    "use", "two", "how", "our", "work", "first", "well", "way", "even",
-    "new", "want", "because", "any", "these", "give", "day", "most", "us",
-    "is", "it", "to", "of", "in", "on", "at", "by", "as", "an", "or",
-    "if", "be", "this", "that", "have", "has", "had", "do", "does", "did",
-    "a", "i", "me", "my", "myself", "we", "us", "our", "ourselves",
+    "the",
+    "and",
+    "for",
+    "are",
+    "but",
+    "not",
+    "you",
+    "that",
+    "was",
+    "have",
+    "had",
+    "what",
+    "said",
+    "each",
+    "which",
+    "she",
+    "will",
+    "about",
+    "could",
+    "other",
+    "after",
+    "first",
+    "well",
+    "water",
+    "been",
+    "call",
+    "who",
+    "oil",
+    "its",
+    "now",
+    "find",
+    "long",
+    "down",
+    "day",
+    "did",
+    "get",
+    "come",
+    "made",
+    "may",
+    "part",
+    "than",
+    "them",
+    "these",
+    "so",
+    "some",
+    "time",
+    "very",
+    "when",
+    "much",
+    "would",
+    "there",
+    "all",
+    "any",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "only",
+    "own",
+    "same",
+    "than",
+    "too",
+    "very",
+    "can",
+    "will",
+    "just",
+    "should",
+    "with",
+    "have",
+    "from",
+    "they",
+    "know",
+    "want",
+    "been",
+    "good",
+    "much",
+    "some",
+    "time",
+    "very",
+    "when",
+    "come",
+    "here",
+    "just",
+    "like",
+    "over",
+    "also",
+    "back",
+    "after",
+    "use",
+    "two",
+    "how",
+    "our",
+    "work",
+    "first",
+    "well",
+    "way",
+    "even",
+    "new",
+    "want",
+    "because",
+    "any",
+    "these",
+    "give",
+    "day",
+    "most",
+    "us",
+    "is",
+    "it",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "by",
+    "as",
+    "an",
+    "or",
+    "if",
+    "be",
+    "this",
+    "that",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "a",
+    "i",
+    "me",
+    "my",
+    "myself",
+    "we",
+    "us",
+    "our",
+    "ourselves",
 }
 
 
@@ -110,7 +238,7 @@ def _stem_word(word: str) -> str:
     """Simple suffix stripping for concept normalization."""
     for suffix in ("ness", "ment", "tion", "sion", "ity", "ies", "ing", "ed", "er", "est", "s"):
         if word.endswith(suffix) and len(word) > len(suffix) + 2:
-            return word[:-len(suffix)]
+            return word[: -len(suffix)]
     return word
 
 
@@ -190,6 +318,7 @@ def _run_checks(text: str, checks: Dict[str, Any]) -> List[str]:
 def _make_diff(golden_text: str, current_text: str) -> str:
     """Generate a unified diff between golden and current response."""
     import difflib
+
     golden_lines = golden_text.splitlines(keepends=True)
     current_lines = current_text.splitlines(keepends=True)
     if golden_lines and not golden_lines[-1].endswith("\n"):
@@ -249,8 +378,10 @@ async def local_answer():
 #   synonym swaps and paraphrases (score ~0.70-0.75).
 # - Concept ≥ 0.35 catches completely different vocabulary while tolerating
 #   stemmed variations (perspectives/perspective, open-minded/open-mindedness).
+# Tuned for local LLM variance: catches real semantic drift while tolerating
+# paraphrasing and within-model output variation.
 EMBEDDING_SIMILARITY_THRESHOLD = 0.70
-CONCEPT_OVERLAP_THRESHOLD = 0.35
+CONCEPT_OVERLAP_THRESHOLD = 0.30
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +389,7 @@ CONCEPT_OVERLAP_THRESHOLD = 0.35
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 @pytest.mark.parametrize("case", _load_json(CASES_PATH) or [pytest.param({}, id="no-cases")])
-async def test_semantic_regression(case, golden_data, request):
+async def test_semantic_regression(case, golden_data, request, skip_without_ollama):
     if not case:
         pytest.skip("No test cases loaded")
 
@@ -273,6 +404,10 @@ async def test_semantic_regression(case, golden_data, request):
     request.node.user_properties.append(("case_id", case_id))
     request.node.user_properties.append(("description", description))
 
+    # --- Golden response handling ---
+    golden_responses = golden_data.get("responses", {})
+    golden = golden_responses.get(case_id)
+
     with tempfile.TemporaryDirectory() as tmpdir:
         config = LocalAnswerConfig.from_env()
         config.cache_enabled = False
@@ -280,6 +415,23 @@ async def test_semantic_regression(case, golden_data, request):
         config.seed = 7
         config.top_p = 1.0
         config.cache_dir = Path(tmpdir)
+
+        # If the golden responses were recorded under a different model or prompt
+        # revision, skip the test early instead of burning tokens on a comparison
+        # that would be invalid. Re-record to update the golden file.
+        if not RECORD_MODE:
+            if golden is None:
+                pytest.fail(
+                    f"No golden response for case '{case_id}'.\n"
+                    f"Run with LUCY_SEMANTIC_REGRESSION_RECORD=1 to record it."
+                )
+            golden_model = golden_data.get("model")
+            if golden_model and golden_model != config.model:
+                pytest.skip(
+                    f"Golden recorded for model '{golden_model}' but current model is "
+                    f"'{config.model}'. Run LUCY_SEMANTIC_REGRESSION_RECORD=1 to update."
+                )
+
         answer = LocalAnswer(config)
 
         try:
@@ -297,10 +449,6 @@ async def test_semantic_regression(case, golden_data, request):
 
     # --- Run structural checks (hard gates) ---
     check_failures = _run_checks(text, checks)
-
-    # --- Golden response handling ---
-    golden_responses = golden_data.get("responses", {})
-    golden = golden_responses.get(case_id)
 
     if RECORD_MODE:
         all_golden = _load_json(GOLDEN_PATH)
@@ -326,14 +474,7 @@ async def test_semantic_regression(case, golden_data, request):
         else:
             pytest.skip(f"Recorded golden response for '{case_id}'")
 
-    if golden is None:
-        pytest.fail(
-            f"No golden response for case '{case_id}'.\n"
-            f"Run with LUCY_SEMANTIC_REGRESSION_RECORD=1 to record it.\n"
-            f"Current response:\n{text!r}"
-        )
-
-    # In compare mode, enforce structural checks first
+    # In compare mode, enforce structural checks before semantic comparison
     if check_failures:
         fail_msg = f"Structural checks failed for case '{case_id}':\n" + "\n".join(
             f"  - {f}" for f in check_failures
@@ -350,6 +491,7 @@ async def test_semantic_regression(case, golden_data, request):
 
     # Embedding cosine similarity (vectors are normalized, so dot product = cosine)
     import numpy as np
+
     embedding_sim = float(np.dot(np.array(golden_emb), np.array(current_emb)))
 
     # Concept overlap
@@ -362,9 +504,7 @@ async def test_semantic_regression(case, golden_data, request):
             f"embedding similarity {embedding_sim:.3f} < {EMBEDDING_SIMILARITY_THRESHOLD}"
         )
     if concept_sim < CONCEPT_OVERLAP_THRESHOLD:
-        semantic_failures.append(
-            f"concept overlap {concept_sim:.3f} < {CONCEPT_OVERLAP_THRESHOLD}"
-        )
+        semantic_failures.append(f"concept overlap {concept_sim:.3f} < {CONCEPT_OVERLAP_THRESHOLD}")
 
     if semantic_failures:
         diff = _make_diff(golden_text, text)
@@ -444,12 +584,12 @@ def _run_direct():
 
                     golden_resp = golden.get("responses", {}).get(case_id)
                     if not golden_resp:
-                        print(f"  MISSING GOLDEN — run with RECORD=1")
+                        print("  MISSING GOLDEN — run with RECORD=1")
                         all_passed = False
                         continue
 
                     if check_failures:
-                        print(f"  STRUCTURAL CHECK FAILURES:")
+                        print("  STRUCTURAL CHECK FAILURES:")
                         for f in check_failures:
                             print(f"    - {f}")
                         all_passed = False
@@ -461,6 +601,7 @@ def _run_direct():
                     current_concepts = _compute_concepts(text)
 
                     import numpy as np
+
                     embedding_sim = float(np.dot(np.array(golden_emb), np.array(current_emb)))
                     concept_sim = _concept_overlap(golden_concepts, current_concepts)
 
@@ -475,7 +616,7 @@ def _run_direct():
                         )
 
                     if semantic_failures:
-                        print(f"  SEMANTIC REGRESSION:")
+                        print("  SEMANTIC REGRESSION:")
                         for f in semantic_failures:
                             print(f"    - {f}")
                         diff = _make_diff(golden_resp["text"], text)

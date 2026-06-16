@@ -1608,7 +1608,10 @@ class LocalAnswer:
         is_reasoning_request = "explain your reasoning" in q_lower or "why do you think" in q_lower
         reasoning_hint = ""
         if is_reasoning_request:
-            reasoning_hint = "Explain your reasoning step by step using words like because, since, therefore, or depends on."
+            reasoning_hint = (
+                "Explain your reasoning step by step using words like because, since, therefore, or depends on. "
+                "Take a clear position and keep the explanation concise; do not say 'I don't know'."
+            )
 
         parts.append(f"{instruction}\n{tone}\n{budget_instruction}\n{first_person_hint}".rstrip())
 

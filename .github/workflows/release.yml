@@ -70,49 +70,7 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
 
-  build-appimage:
-    name: Build AppImage (experimental)
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-venv desktop-file-utils
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('ui-v10/requirements.txt', 'models/router/requirements.txt', 'pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install app
-        run: make install
-
-      - name: Install appimagetool
-        run: |
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool
-          chmod +x /tmp/appimagetool
-
-      - name: Build AppImage
-        run: |
-          export PATH="/tmp:$PATH"
-          ./packaging/appimage/build_appimage.sh
-
-      - name: Upload AppImage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-lucy-appimage
-          path: dist/*.AppImage
+  # AppImage build is intentionally manual for now. The build script exists
+  # at packaging/appimage/build_appimage.sh, but the bundled venv with
+  # compiled extensions is sensitive to the build host's glibc. Build and
+  # test it locally before attaching to a release.
