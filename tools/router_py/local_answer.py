@@ -15,7 +15,6 @@ This module provides:
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
 import json
 import logging
@@ -26,12 +25,13 @@ import threading
 import time
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 try:
     import aiohttp
+
     HAS_AIOHTTP = True
 except ImportError:
     HAS_AIOHTTP = False
@@ -43,8 +43,10 @@ except ImportError:
     try:
         from classify import _is_capability_query
     except ImportError:
+
         def _is_capability_query(query: str) -> bool:
             return False
+
 
 # Import tube database (with fallback for standalone execution)
 _tube_db = None
@@ -53,6 +55,7 @@ try:
     if _TUBES_PATH not in sys.path:
         sys.path.insert(0, _TUBES_PATH)
     import tube_database
+
     _tube_db = tube_database
 except Exception:
     _tube_db = None
@@ -69,12 +72,16 @@ _heartbeat_thread: threading.Thread | None = None
 _heartbeat_stop = threading.Event()
 
 
-def _ollama_heartbeat_ping(model: str = "local-lucy-llama31", url: str = "http://127.0.0.1:11434/api/generate") -> None:
+def _ollama_heartbeat_ping(
+    model: str = "local-lucy-llama31", url: str = "http://127.0.0.1:11434/api/generate"
+) -> None:
     """Lightweight ping to keep the model loaded in Ollama VRAM."""
     try:
         req = urllib.request.Request(
             url,
-            data=json.dumps({"model": model, "prompt": "", "stream": False, "options": {"num_predict": 1}}).encode(),
+            data=json.dumps(
+                {"model": model, "prompt": "", "stream": False, "options": {"num_predict": 1}}
+            ).encode(),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -113,17 +120,32 @@ def stop_ollama_heartbeat() -> None:
 
 # Import persistent facts from SQL memory service (with fallback for standalone use)
 try:
-    from memory.memory_service import get_relevant_persistent_facts as _get_relevant_persistent_facts
-    from memory.memory_service import get_persistent_facts_revision as _get_persistent_facts_revision
+    from memory.memory_service import (
+        get_persistent_facts_revision as _get_persistent_facts_revision,
+    )
+    from memory.memory_service import (
+        get_relevant_persistent_facts as _get_relevant_persistent_facts,
+    )
+
     logger.info("[FACTS] Imported get_relevant_persistent_facts from memory.memory_service")
 except ImportError as _e1:
     logger.warning(f"[FACTS] Failed to import from memory.memory_service: {_e1}")
     try:
-        from tools.memory.memory_service import get_relevant_persistent_facts as _get_relevant_persistent_facts
-        from tools.memory.memory_service import get_persistent_facts_revision as _get_persistent_facts_revision
-        logger.info("[FACTS] Imported get_relevant_persistent_facts from tools.memory.memory_service")
+        from tools.memory.memory_service import (
+            get_persistent_facts_revision as _get_persistent_facts_revision,
+        )
+        from tools.memory.memory_service import (
+            get_relevant_persistent_facts as _get_relevant_persistent_facts,
+        )
+
+        logger.info(
+            "[FACTS] Imported get_relevant_persistent_facts from tools.memory.memory_service"
+        )
     except ImportError as _e2:
-        logger.error(f"[FACTS] Failed to import from tools.memory.memory_service: {_e2}. Using fallback no-op.")
+        logger.error(
+            f"[FACTS] Failed to import from tools.memory.memory_service: {_e2}. Using fallback no-op."
+        )
+
         def _get_relevant_persistent_facts(query, category=None, limit=3, threshold=0.35):
             return []
 
@@ -139,9 +161,12 @@ def _load_family_facts_direct() -> list[str]:
     """
     try:
         import sqlite3
+
         db_path = os.environ.get("LUCY_MEMORY_DB_PATH", "")
         if not db_path:
-            db_path = str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "memory.db")
+            db_path = str(
+                Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "memory.db"
+            )
         conn = sqlite3.connect(db_path, check_same_thread=False)
         cursor = conn.execute(
             "SELECT fact_text FROM persistent_facts WHERE category = 'family' OR category IS NULL OR category = '' ORDER BY id"
@@ -295,9 +320,12 @@ def _get_current_context() -> str:
         # Try to get a cleaner timezone name
         try:
             import subprocess
+
             result = subprocess.run(
                 ["timedatectl", "show", "--property=Timezone", "--value"],
-                capture_output=True, text=True, timeout=2
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             if result.returncode == 0 and result.stdout.strip():
                 tz_name = result.stdout.strip().lower()
@@ -326,7 +354,8 @@ def _get_current_context() -> str:
 @dataclass
 class LocalAnswerConfig:
     """Configuration for LocalAnswer."""
-    model: str = "local-lucy"
+
+    model: str = "local-lucy-llama31"
     ollama_url: str = "http://127.0.0.1:11434/api/generate"
     temperature: float = 0.0
     top_p: float = 1.0
@@ -346,7 +375,9 @@ class LocalAnswerConfig:
     max_context_chars: int = 1200
     prompt_guard_tokens: int = 700
     cache_enabled: bool = True
-    cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "lucy" / "local_repeat")
+    cache_dir: Path = field(
+        default_factory=lambda: Path.home() / ".cache" / "lucy" / "local_repeat"
+    )
     cache_ttl_seconds: int = 300
     cache_max_entries: int = 100
     cache_max_bytes: int = 10_000_000
@@ -365,12 +396,15 @@ class LocalAnswerConfig:
 
     @classmethod
     def from_env(cls) -> LocalAnswerConfig:
-        root = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", 
-                                   os.environ.get("LUCY_ROOT", 
-                                                  str(Path.home() / "lucy-v10"))))
+        root = Path(
+            os.environ.get(
+                "LUCY_RUNTIME_AUTHORITY_ROOT",
+                os.environ.get("LUCY_ROOT", str(Path.home() / "lucy-v10")),
+            )
+        )
         cache_dir = os.environ.get("LUCY_LOCAL_REPEAT_CACHE_DIR")
         return cls(
-            model=os.environ.get("LUCY_LOCAL_MODEL", "local-lucy"),
+            model=os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-llama31"),
             ollama_url=os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate"),
             temperature=float(os.environ.get("LUCY_LOCAL_TEMPERATURE", "0")),
             top_p=float(os.environ.get("LUCY_LOCAL_TOP_P", "1")),
@@ -378,31 +412,44 @@ class LocalAnswerConfig:
             keep_alive=os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "10m"),
             num_predict_default=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_DEFAULT", "128")),
             num_predict_chat=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CHAT", "256")),
-            num_predict_conversation=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CONVERSATION", "128")),
+            num_predict_conversation=int(
+                os.environ.get("LUCY_LOCAL_NUM_PREDICT_CONVERSATION", "128")
+            ),
             num_predict_brief=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_BRIEF", "128")),
             num_predict_detail=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_DETAIL", "768")),
             num_predict_long=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_LONG", "1536")),
             num_predict_clarify=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CLARIFY", "64")),
             prompt_guard_tokens=int(os.environ.get("LUCY_LOCAL_PROMPT_GUARD_TOKENS", "700")),
-            cache_enabled=os.environ.get("LUCY_LOCAL_REPEAT_CACHE", "1").lower() in ("1", "true", "yes", "on"),
+            cache_enabled=os.environ.get("LUCY_LOCAL_REPEAT_CACHE", "1").lower()
+            in ("1", "true", "yes", "on"),
             cache_dir=Path(cache_dir) if cache_dir else (root / "cache" / "local_repeat"),
             cache_ttl_seconds=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_TTL_S", "300")),
             cache_max_entries=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_ENTRIES", "100")),
             cache_max_bytes=int(os.environ.get("LUCY_LOCAL_REPEAT_CACHE_MAX_BYTES", "10000000")),
             root_path=root,
-            conversation_mode_active=os.environ.get("LUCY_CONVERSATION_MODE_ACTIVE", "").lower() in ("1", "true", "yes", "on"),
-            conversation_mode_force=os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "").lower() in ("1", "true", "yes", "on"),
-            conversation_system_block=os.environ.get("LUCY_CONVERSATION_SYSTEM_BLOCK", "").lower() in ("1", "true", "yes", "on"),
-            diag_file=Path(os.environ.get("LUCY_LOCAL_DIAG_FILE", "")) if os.environ.get("LUCY_LOCAL_DIAG_FILE") else None,
+            conversation_mode_active=os.environ.get("LUCY_CONVERSATION_MODE_ACTIVE", "").lower()
+            in ("1", "true", "yes", "on"),
+            conversation_mode_force=os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "").lower()
+            in ("1", "true", "yes", "on"),
+            conversation_system_block=os.environ.get("LUCY_CONVERSATION_SYSTEM_BLOCK", "").lower()
+            in ("1", "true", "yes", "on"),
+            diag_file=Path(os.environ.get("LUCY_LOCAL_DIAG_FILE", ""))
+            if os.environ.get("LUCY_LOCAL_DIAG_FILE")
+            else None,
             diag_run_id=os.environ.get("LUCY_LOCAL_DIAG_RUN_ID"),
-            latency_profile_file=Path(os.environ.get("LUCY_LATENCY_PROFILE_FILE", "")) if os.environ.get("LUCY_LATENCY_PROFILE_FILE") else None,
-            identity_trace_file=Path(os.environ.get("LUCY_IDENTITY_TRACE_FILE", "")) if os.environ.get("LUCY_IDENTITY_TRACE_FILE") else None,
+            latency_profile_file=Path(os.environ.get("LUCY_LATENCY_PROFILE_FILE", ""))
+            if os.environ.get("LUCY_LATENCY_PROFILE_FILE")
+            else None,
+            identity_trace_file=Path(os.environ.get("LUCY_IDENTITY_TRACE_FILE", ""))
+            if os.environ.get("LUCY_IDENTITY_TRACE_FILE")
+            else None,
         )
 
 
 @dataclass
 class AnswerResult:
     """Result from generating an answer."""
+
     text: str
     from_cache: bool = False
     cache_age_ms: int = 0
@@ -411,9 +458,10 @@ class AnswerResult:
     error: Optional[str] = None
 
 
-@dataclass 
+@dataclass
 class LatencyMetrics:
     """Latency tracking for various stages."""
+
     cache_lookup_ms: int = 0
     prompt_assembly_ms: int = 0
     payload_build_ms: int = 0
@@ -547,9 +595,7 @@ class LocalAnswer:
         if cls._warmup_thread is not None and cls._warmup_thread.is_alive():
             return
 
-        enabled = os.environ.get("LUCY_WARMUP_ENABLED", "1").lower() in (
-            "1", "true", "yes", "on"
-        )
+        enabled = os.environ.get("LUCY_WARMUP_ENABLED", "1").lower() in ("1", "true", "yes", "on")
         if not enabled:
             return
 
@@ -561,9 +607,7 @@ class LocalAnswer:
         if not cfg.model:
             return
 
-        api_url = os.environ.get(
-            "LUCY_OLLAMA_API_URL", cfg.ollama_url
-        )
+        api_url = os.environ.get("LUCY_OLLAMA_API_URL", cfg.ollama_url)
         keep_alive = os.environ.get(
             "LUCY_WARMUP_KEEP_ALIVE",
             os.environ.get("LUCY_LOCAL_KEEP_ALIVE", cfg.keep_alive),
@@ -577,11 +621,11 @@ class LocalAnswer:
         )
         cls._warmup_thread = thread
         thread.start()
-        
+
     def _now_ms(self) -> int:
         """Current time in milliseconds."""
         return int(time.time() * 1000)
-    
+
     async def _get_session(self) -> Any:
         """Get or create aiohttp session."""
         if not HAS_AIOHTTP:
@@ -597,12 +641,10 @@ class LocalAnswer:
             connector = aiohttp.TCPConnector(limit=10, limit_per_host=5)
             timeout = aiohttp.ClientTimeout(total=120)
             self._session = aiohttp.ClientSession(
-                connector=connector,
-                timeout=timeout,
-                headers={"Content-Type": "application/json"}
+                connector=connector, timeout=timeout, headers={"Content-Type": "application/json"}
             )
         return self._session
-    
+
     def _diag_append(self, metric: str, value: Any) -> None:
         """Append diagnostic metric."""
         if self.config.diag_file and self.config.diag_run_id:
@@ -612,7 +654,7 @@ class LocalAnswer:
                     f.write(f"run={self.config.diag_run_id}\tmetric={metric}\tvalue={value}\n")
             except Exception as e:
                 logger.debug(f"Failed to write diag: {e}")
-    
+
     def _latprof_append(self, stage: str, substage: str, duration_ms: int) -> None:
         """Append latency profile data."""
         if self.config.latency_profile_file:
@@ -622,86 +664,89 @@ class LocalAnswer:
                     f.write(f"{stage}\t{substage}\t{duration_ms}\n")
             except Exception as e:
                 logger.debug(f"Failed to write latprof: {e}")
-    
+
     def _normalize_query(self, query: str) -> str:
         """Normalize query for matching."""
         q = query.strip()
-        q = re.sub(r'\s+', ' ', q)
+        q = re.sub(r"\s+", " ", q)
         q = q.lower()
         return q
-    
+
     def _contains_word(self, text: str, word: str) -> bool:
         """Check if word appears as whole word in text.
 
         DEPRECATED: use pre-compiled pattern tuples (_MEDICAL_PATTERNS,
         _TIME_SENSITIVE_PATTERNS) for hot paths.
         """
-        pattern = rf'(^|[^a-z0-9]){re.escape(word)}([^a-z0-9]|$)'
+        pattern = rf"(^|[^a-z0-9]){re.escape(word)}([^a-z0-9]|$)"
         return bool(re.search(pattern, text, re.IGNORECASE))
-    
+
     def _is_memory_context_allowed(self, query: str) -> bool:
         """Check if memory context should be used for this query."""
         q = query.strip().lower()
-        backchannel_pattern = r'^[\s]*(?:hmm+|hm+|uh+h*|uh-?huh|huh+|ok|okay|k|right|sure|thanks|thank you|cool|nice|interesting|weird|ugh|meh|useless)[\s]*$'
+        backchannel_pattern = r"^[\s]*(?:hmm+|hm+|uh+h*|uh-?huh|huh+|ok|okay|k|right|sure|thanks|thank you|cool|nice|interesting|weird|ugh|meh|useless)[\s]*$"
         if re.match(backchannel_pattern, q, re.IGNORECASE):
             return False
         vague_patterns = [
-            r'^[\s]*(?:that(?: is|\'s)? annoying|that annoyed me|what(?:\'s| is) happening)[\s]*$'
+            r"^[\s]*(?:that(?: is|\'s)? annoying|that annoyed me|what(?:\'s| is) happening)[\s]*$"
         ]
         for pattern in vague_patterns:
             if re.match(pattern, q, re.IGNORECASE):
                 return False
         return True
-    
+
     def _context_reset_requested(self, query: str) -> bool:
         """Check if user wants to reset context."""
-        pattern = r'(^|[^\w_])(new question|another question|unrelated|separately|different topic|switch topic|change topic|start over|reset context)([^\w_]|$)'
+        pattern = r"(^|[^\w_])(new question|another question|unrelated|separately|different topic|switch topic|change topic|start over|reset context)([^\w_]|$)"
         return bool(re.search(pattern, query, re.IGNORECASE))
-    
+
     def _context_followup_requested(self, query: str) -> bool:
         """Check if this is a context followup query."""
         if self._context_reset_requested(query):
             return False
         q = query.strip().lower()
-        if re.match(r'^[\s]*(and|also|then|so)\s+', q):
+        if re.match(r"^[\s]*(and|also|then|so)\s+", q):
             return True
         followup_phrases = [
-            r'^[\s]*(what about|how about|about that|on that|on this|regarding that|regarding this|more on that|tell me more about that|continue|go on|elaborate|expand|follow up|follow-up)\b',
+            r"^[\s]*(what about|how about|about that|on that|on this|regarding that|regarding this|more on that|tell me more about that|continue|go on|elaborate|expand|follow up|follow-up)\b",
             # Additional patterns for "more detail" type followups
-            r'(be more|give me more|include|add|what are the|can you be more)\s+(detailed|detail|details|specific|specifics|quantities|quantity|information|info)',
-            r'(more\s+(details|detail|information|info|specifics|context|quantities))',
-            r'(be more|more)\s+(specific|detailed|precise)',
+            r"(be more|give me more|include|add|what are the|can you be more)\s+(detailed|detail|details|specific|specifics|quantities|quantity|information|info)",
+            r"(more\s+(details|detail|information|info|specifics|context|quantities))",
+            r"(be more|more)\s+(specific|detailed|precise)",
             # Personal reference patterns - user asking about themselves
-            r'^[\s]*(what is my|what are my|what\'s my|who am i|do you know my|remember my|you said my)',
-            r'^[\s]*(my name|my favorite|my preference|my choice|my color|my age|my location)',
+            r"^[\s]*(what is my|what are my|what\'s my|who am i|do you know my|remember my|you said my)",
+            r"^[\s]*(my name|my favorite|my preference|my choice|my color|my age|my location)",
         ]
         for pattern in followup_phrases:
             if re.search(pattern, q):
                 return True
-        if re.search(r'(^|[^\w_])(previous answer|last answer|last response|earlier answer|as you said|you said earlier|same topic)([^\w_]|$)', q):
+        if re.search(
+            r"(^|[^\w_])(previous answer|last answer|last response|earlier answer|as you said|you said earlier|same topic)([^\w_]|$)",
+            q,
+        ):
             return True
         return False
-    
+
     def _estimate_tokens(self, text: str) -> int:
         """Estimate token count."""
         if not text:
             return 0
         return (len(text) + 3) // 4
-    
+
     def _sanitize_model_output(self, text: str) -> str:
         """Sanitize model output."""
-        text = text.replace('\r', '')
+        text = text.replace("\r", "")
         lines = []
-        for line in text.split('\n'):
-            if not re.match(r'^[\s]*(User|Assistant):[\s]', line, re.IGNORECASE):
+        for line in text.split("\n"):
+            if not re.match(r"^[\s]*(User|Assistant):[\s]", line, re.IGNORECASE):
                 lines.append(line)
-        text = '\n'.join(lines)
-        text = re.sub(r'\s*User:[\s].*$', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\s*Assistant:[\s].*$', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = "\n".join(lines)
+        text = re.sub(r"\s*User:[\s].*$", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*Assistant:[\s].*$", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\n{3,}", "\n\n", text)
         text = text.rstrip()
         return text
-    
+
     def _strip_identity_preamble(self, text: str, query: str = "") -> str:
         """Strip identity preamble from response — except when asked about identity."""
         # Don't strip if the user explicitly asked who we are
@@ -723,12 +768,17 @@ class LocalAnswer:
 
     def _sanitize_identity_memory_fragment(self, text: str) -> str:
         """Sanitize identity memory fragment."""
-        text = re.sub(r'\s+what would you like to know or discuss about (him|her|them)\??\.?', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\s+what would you like to know\??\.?', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\s+could you provide more context.*$', '', text, flags=re.IGNORECASE)
-        text = re.sub(r"\s+i don't have any information.*$", '', text, flags=re.IGNORECASE)
-        text = re.sub(r'[.!?]+$', '', text)
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(
+            r"\s+what would you like to know or discuss about (him|her|them)\??\.?",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+        text = re.sub(r"\s+what would you like to know\??\.?", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s+could you provide more context.*$", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s+i don't have any information.*$", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"[.!?]+$", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
         return text
 
     # ------------------------------------------------------------------
@@ -741,35 +791,85 @@ class LocalAnswer:
         open-ended reflection)."""
         q = query.strip().lower()
         # Must contain one of these ownership/identity anchors
-        has_anchor = any(k in q for k in (
-            "my children", "my child", "my son", "my daughter", "my kids",
-            "my grandchild", "my grandson", "my granddaughter",
-            "my dog", "my pet",
-            "my partner", "my wife", "my husband", "my spouse",
-            "who is racheli", "who is rachel",
-            "who am i", "my name",
-            "do i have children", "do i have grandchildren",
-            "do i have a dog", "do i have a pet",
-            "who is my partner", "who is my life partner",
-        ))
+        has_anchor = any(
+            k in q
+            for k in (
+                "my children",
+                "my child",
+                "my son",
+                "my daughter",
+                "my kids",
+                "my grandchild",
+                "my grandson",
+                "my granddaughter",
+                "my dog",
+                "my pet",
+                "my partner",
+                "my wife",
+                "my husband",
+                "my spouse",
+                "who is racheli",
+                "who is rachel",
+                "who am i",
+                "my name",
+                "do i have children",
+                "do i have grandchildren",
+                "do i have a dog",
+                "do i have a pet",
+                "who is my partner",
+                "who is my life partner",
+            )
+        )
         if not has_anchor:
             return False
         # Reject medical/vet symptom queries that happen to contain pet keywords
-        symptom_guard = any(k in q for k in (
-            "vomiting", "vomit", "diarrhea", "sick", "ill", "hurt",
-            "injured", "bleeding", "cough", "fever", "pain", "symptom",
-            "what should i do", "what do i do", "help me", "emergency",
-            "vet ", "veterinar", "doctor", "medicine", "medication",
-        ))
+        symptom_guard = any(
+            k in q
+            for k in (
+                "vomiting",
+                "vomit",
+                "diarrhea",
+                "sick",
+                "ill",
+                "hurt",
+                "injured",
+                "bleeding",
+                "cough",
+                "fever",
+                "pain",
+                "symptom",
+                "what should i do",
+                "what do i do",
+                "help me",
+                "emergency",
+                "vet ",
+                "veterinar",
+                "doctor",
+                "medicine",
+                "medication",
+            )
+        )
         if symptom_guard:
             return False
         # Reject broad conversational / open-ended / creative patterns
-        broad_guard = any(k in q for k in (
-            "tell me a story", "tell me about", "write a", "compose a",
-            "how are my", "how is my", "what do you think about my",
-            "advice", "suggest", "recommend",
-            "feeling", "doing lately", "up to",
-        ))
+        broad_guard = any(
+            k in q
+            for k in (
+                "tell me a story",
+                "tell me about",
+                "write a",
+                "compose a",
+                "how are my",
+                "how is my",
+                "what do you think about my",
+                "advice",
+                "suggest",
+                "recommend",
+                "feeling",
+                "doing lately",
+                "up to",
+            )
+        )
         if broad_guard:
             return False
         return True
@@ -791,8 +891,23 @@ class LocalAnswer:
         q = query.strip().lower()
 
         # --- Children ---
-        if any(k in q for k in ("my children", "my child", "my son", "my daughter", "my kids", "do i have children", "do i have kids")):
-            child_facts = [f for f in facts if any(k in f.lower() for k in ("children", "son", "daughter", "child"))]
+        if any(
+            k in q
+            for k in (
+                "my children",
+                "my child",
+                "my son",
+                "my daughter",
+                "my kids",
+                "do i have children",
+                "do i have kids",
+            )
+        ):
+            child_facts = [
+                f
+                for f in facts
+                if any(k in f.lower() for k in ("children", "son", "daughter", "child"))
+            ]
             if not child_facts:
                 return None
             if "do i have" in q:
@@ -800,8 +915,15 @@ class LocalAnswer:
             return " ".join(child_facts)
 
         # --- Grandchildren ---
-        if any(k in q for k in ("my grandchild", "my grandson", "my granddaughter", "do i have grandchildren")):
-            grand_facts = [f for f in facts if any(k in f.lower() for k in ("grandchild", "grandson", "granddaughter"))]
+        if any(
+            k in q
+            for k in ("my grandchild", "my grandson", "my granddaughter", "do i have grandchildren")
+        ):
+            grand_facts = [
+                f
+                for f in facts
+                if any(k in f.lower() for k in ("grandchild", "grandson", "granddaughter"))
+            ]
             if not grand_facts:
                 return None
             if "do i have" in q:
@@ -818,8 +940,23 @@ class LocalAnswer:
             return " ".join(pet_facts)
 
         # --- Partner / Spouse ---
-        if any(k in q for k in ("my partner", "my wife", "my husband", "my spouse", "who is my partner", "who is my life partner")):
-            partner_facts = [f for f in facts if any(k in f.lower() for k in ("partner", "wife", "husband", "spouse")) and "dog" not in f.lower()]
+        if any(
+            k in q
+            for k in (
+                "my partner",
+                "my wife",
+                "my husband",
+                "my spouse",
+                "who is my partner",
+                "who is my life partner",
+            )
+        ):
+            partner_facts = [
+                f
+                for f in facts
+                if any(k in f.lower() for k in ("partner", "wife", "husband", "spouse"))
+                and "dog" not in f.lower()
+            ]
             if not partner_facts:
                 return None
             return " ".join(partner_facts)
@@ -836,7 +973,9 @@ class LocalAnswer:
 
         # --- Identity ("Who am I?") ---
         if "who am i" in q or "my name" in q:
-            identity_facts = [f for f in facts if any(k in f.lower() for k in ("name is", "you are", "your name"))]
+            identity_facts = [
+                f for f in facts if any(k in f.lower() for k in ("name is", "you are", "your name"))
+            ]
             if identity_facts:
                 return " ".join(identity_facts)
 
@@ -846,46 +985,46 @@ class LocalAnswer:
     def _apply_augmented_completion_guard(self, text: str) -> tuple[str, bool, str]:
         """
         Post-process AUGMENTED route responses to ensure complete sentences.
-        
+
         Ported from shell: finalize_augmented_output_contract + apply_augmented_completion_guard
-        
+
         Returns:
             Tuple of (finalized_text, triggered, reason)
             - triggered: True if guard modified the text
-            - reason: one of 'none', 'removed_dangling_conjunction', 
+            - reason: one of 'none', 'removed_dangling_conjunction',
                      'trimmed_to_last_complete_sentence', 'closed_truncated_fragment'
         """
         import re
-        
+
         if not text:
             return ("", False, "empty")
-        
+
         original = text
         reason = "none"
-        
+
         # Normalize whitespace
         text = re.sub(r"\s+", " ", text).strip()
-        
+
         # Remove dangling conjunctions: ", and." -> ".", ", or." -> "."
         cleaned = re.sub(r",\s*(and|or)\.$", ".", text, flags=re.IGNORECASE)
         cleaned = re.sub(r"\s+(and|or)\.$", ".", cleaned, flags=re.IGNORECASE)
         if cleaned != text:
             reason = "removed_dangling_conjunction"
             text = cleaned
-        
+
         # Check if text already ends with sentence terminator
         if re.search(r'[.!?](?:["\'\)\]]+)?$', text):
             triggered = text != original
             return (text, triggered, reason)
-        
+
         # Find last complete sentence (>=40 chars)
         matches = list(re.finditer(r'[.!?](?:["\'\)\]]+)?(?:\s|$)', text))
         candidate = ""
         for match in matches:
-            snippet = text[:match.end()].strip()
+            snippet = text[: match.end()].strip()
             if len(snippet) >= 40:
                 candidate = snippet
-        
+
         if candidate:
             # Clean up the candidate
             candidate = re.sub(r",\s*(and|or)\.$", ".", candidate, flags=re.IGNORECASE)
@@ -893,7 +1032,7 @@ class LocalAnswer:
             if candidate != original:
                 reason = "trimmed_to_last_complete_sentence"
             return (candidate, True, reason)
-        
+
         # No complete sentence found - close the fragment
         text = text.rstrip(" ,;:-") + "."
         text = re.sub(r",\s*(and|or)\.$", ".", text, flags=re.IGNORECASE)
@@ -901,7 +1040,7 @@ class LocalAnswer:
         if text != original:
             reason = "closed_truncated_fragment"
         return (text, True, reason)
-    
+
     def _cache_key(self, query: str, variant: str, fact_revision: str = "") -> str:
         """Generate cache key. Includes SELF_KNOWLEDGE hash so prompt
         changes automatically invalidate old cached entries.
@@ -916,7 +1055,9 @@ class LocalAnswer:
             key_string += f"|{fact_revision}"
         return hashlib.sha256(key_string.encode()).hexdigest()
 
-    def _cache_load(self, query: str, variant: str, fact_revision: str = "") -> Optional[Tuple[str, int]]:
+    def _cache_load(
+        self, query: str, variant: str, fact_revision: str = ""
+    ) -> Optional[Tuple[str, int]]:
         """Load from cache."""
         if not self.config.cache_enabled:
             return None
@@ -927,13 +1068,13 @@ class LocalAnswer:
             return None
         try:
             meta = {}
-            with open(meta_file, 'r') as f:
+            with open(meta_file, "r") as f:
                 for line in f:
-                    if '=' in line:
-                        k, v = line.strip().split('=', 1)
+                    if "=" in line:
+                        k, v = line.strip().split("=", 1)
                         meta[k] = v
-            created_ts = int(meta.get('CREATED_TS', 0))
-            cached_model = meta.get('MODEL', '')
+            created_ts = int(meta.get("CREATED_TS", 0))
+            cached_model = meta.get("MODEL", "")
             if cached_model != self.config.model:
                 return None
             now = int(time.time())
@@ -942,7 +1083,7 @@ class LocalAnswer:
                 meta_file.unlink(missing_ok=True)
                 text_file.unlink(missing_ok=True)
                 return None
-            with open(text_file, 'r') as f:
+            with open(text_file, "r") as f:
                 text = f.read()
             if not text.strip():
                 return None
@@ -953,7 +1094,7 @@ class LocalAnswer:
         except Exception as e:
             logger.debug(f"Cache load failed: {e}")
             return None
-    
+
     def _cache_store(self, query: str, variant: str, text: str, fact_revision: str = "") -> None:
         """Store in cache."""
         if not self.config.cache_enabled or not text.strip():
@@ -963,27 +1104,25 @@ class LocalAnswer:
             key = self._cache_key(query, variant, fact_revision)
             meta_file = self.config.cache_dir / f"{key}.meta"
             text_file = self.config.cache_dir / f"{key}.txt"
-            with open(meta_file, 'w') as f:
+            with open(meta_file, "w") as f:
                 f.write(f"CREATED_TS={int(time.time())}\n")
                 f.write(f"MODEL={self.config.model}\n")
-            with open(text_file, 'w') as f:
+            with open(text_file, "w") as f:
                 f.write(text)
             self._cache_prune()
         except Exception as e:
             logger.debug(f"Cache store failed: {e}")
-    
+
     def _cache_prune(self) -> None:
         """Prune old cache entries by count and total byte size."""
         try:
             if not self.config.cache_dir.exists():
                 return
             meta_files = sorted(
-                self.config.cache_dir.glob("*.meta"),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True
+                self.config.cache_dir.glob("*.meta"), key=lambda p: p.stat().st_mtime, reverse=True
             )
             # Prune by entry count
-            for meta_file in meta_files[self.config.cache_max_entries:]:
+            for meta_file in meta_files[self.config.cache_max_entries :]:
                 text_file = meta_file.with_suffix(".txt")
                 meta_file.unlink(missing_ok=True)
                 text_file.unlink(missing_ok=True)
@@ -1006,19 +1145,19 @@ class LocalAnswer:
                 tf.unlink(missing_ok=True)
         except Exception as e:
             logger.debug(f"Cache prune failed: {e}")
-    
+
     def _write_identity_trace(self, loaded: str, source: str) -> None:
         """Write identity trace file."""
         if not self.config.identity_trace_file:
             return
         try:
             self.config.identity_trace_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config.identity_trace_file, 'w') as f:
+            with open(self.config.identity_trace_file, "w") as f:
                 f.write(f"IDENTITY_CONTEXT_LOADED={loaded}\n")
                 f.write(f"IDENTITY_CONTEXT_SOURCE={source}\n")
         except Exception as e:
             logger.debug(f"Identity trace write failed: {e}")
-    
+
     def _get_policy_response(self, policy_id: str) -> Optional[str]:
         """Get fixed policy response if applicable."""
         if policy_id in FIXED_POLICY_RESPONSES:
@@ -1030,19 +1169,20 @@ class LocalAnswer:
     def _is_budget_detail(self, query: str) -> bool:
         """Check if query requests detailed answer."""
         patterns = [
-            r'(^|[^\w_])(in detail|detailed|deep dive|thorough|comprehensive|step by step|step-by-step|walk me through|with examples|give examples|more detail|more details|long answer|full answer|complete answer|full recipe|complete recipe|full guide|complete guide)([^\w_]|$)'
+            r"(^|[^\w_])(in detail|detailed|deep dive|thorough|comprehensive|step by step|step-by-step|walk me through|with examples|give examples|more detail|more details|long answer|full answer|complete answer|full recipe|complete recipe|full guide|complete guide)([^\w_]|$)"
         ]
         return any(re.search(p, query, re.IGNORECASE) for p in patterns)
 
-
-    def _set_generation_profile(self, route_mode: str, output_mode: str, query: str) -> Tuple[str, int, str]:
+    def _set_generation_profile(
+        self, route_mode: str, output_mode: str, query: str
+    ) -> Tuple[str, int, str]:
         """Set generation profile for request."""
         route = route_mode.upper()
         output = output_mode.upper()
         q = self._normalize_query(query)
-        
+
         # Detect explicit word-count requests (e.g., "500-word story", "1000 words")
-        word_match = re.search(r'(\d+)[\s\-]*(?:word|words)', q)
+        word_match = re.search(r"(\d+)[\s\-]*(?:word|words)", q)
         if word_match:
             requested_words = int(word_match.group(1))
             # Token estimate: ~1.5 tokens per word for output.
@@ -1054,58 +1194,100 @@ class LocalAnswer:
                 max_tokens = self.config.num_predict_long
             num_predict = min(int(requested_words * 2.5), max_tokens)
             return ("chat_long", num_predict, f"- Write approximately {requested_words} words.")
-        
+
         detail_patterns = [
-            r'(in detail|detailed|deep dive|thorough|comprehensive|step by step|step-by-step|walk me through|with examples|give examples|more detail|more details|long answer|full answer|complete answer|full recipe|complete recipe|full guide|complete guide)',
-            r'\b(novel|story|poem|essay|narrative|tale|write a|compose a|craft a)\b',
+            r"(in detail|detailed|deep dive|thorough|comprehensive|step by step|step-by-step|walk me through|with examples|give examples|more detail|more details|long answer|full answer|complete answer|full recipe|complete recipe|full guide|complete guide)",
+            r"\b(novel|story|poem|essay|narrative|tale|write a|compose a|craft a)\b",
         ]
         requests_detail = any(re.search(p, q) for p in detail_patterns)
-        
-        brief_patterns = [r'(briefly|brief|concise|short answer|one sentence|single sentence|two sentences|summarize|short paragraph)']
+
+        brief_patterns = [
+            r"(briefly|brief|concise|short answer|one sentence|single sentence|two sentences|summarize|short paragraph)"
+        ]
         requests_brief = any(re.search(p, q) for p in brief_patterns)
-        
+
         if route in {"AUGMENTED", "EVIDENCE"}:
             if requests_detail:
-                return ("augmented_detail", self.config.num_predict_augmented_detail, "- Give provisional answer from tentative background.")
+                return (
+                    "augmented_detail",
+                    self.config.num_predict_augmented_detail,
+                    "- Give provisional answer from tentative background.",
+                )
             elif requests_brief:
-                return ("augmented_brief", self.config.num_predict_augmented_brief, "- Give short provisional answer.")
+                return (
+                    "augmented_brief",
+                    self.config.num_predict_augmented_brief,
+                    "- Give short provisional answer.",
+                )
             elif self._is_background_overview_request(q):
-                return ("augmented_background", self.config.num_predict_augmented_background, "- Give provisional answer from background.")
+                return (
+                    "augmented_background",
+                    self.config.num_predict_augmented_background,
+                    "- Give provisional answer from background.",
+                )
             else:
-                return ("augmented", self.config.num_predict_augmented_default, "- Give provisional answer from tentative background.")
-        
+                return (
+                    "augmented",
+                    self.config.num_predict_augmented_default,
+                    "- Give provisional answer from tentative background.",
+                )
+
         if requests_detail:
             return ("detail", self.config.num_predict_detail, "- Answer clearly, but stay focused.")
-        
+
         if route == "CLARIFY":
-            return ("clarify", self.config.num_predict_clarify, "- Ask one short clarifying question only.")
-        
+            return (
+                "clarify",
+                self.config.num_predict_clarify,
+                "- Ask one short clarifying question only.",
+            )
+
         if output == "BRIEF" or requests_brief:
-            return ("brief", self.config.num_predict_brief, "- Prefer one short sentence if possible.")
-        
+            return (
+                "brief",
+                self.config.num_predict_brief,
+                "- Prefer one short sentence if possible.",
+            )
+
         if output == "CONVERSATION":
-            return ("conversation", self.config.num_predict_conversation, "- Prefer two or three short sentences.")
-        
+            return (
+                "conversation",
+                self.config.num_predict_conversation,
+                "- Prefer two or three short sentences.",
+            )
+
         return ("chat", self.config.num_predict_chat, "- Prefer at most two short sentences.")
-    
+
     def _is_background_overview_request(self, query: str) -> bool:
         """Check if query is a background/overview request."""
         q = query.lower()
         # Only match specific patterns, not simple "what is X" questions
-        overview_starts = ['who is ', 'who was ', 'tell me about ', 'give me an overview of ', 
-                          'overview of ', 'background on ', 'history of ', 'biography of ']
+        overview_starts = [
+            "who is ",
+            "who was ",
+            "tell me about ",
+            "give me an overview of ",
+            "overview of ",
+            "background on ",
+            "history of ",
+            "biography of ",
+        ]
         for start in overview_starts:
             if q.startswith(start):
                 return True
         return False
-    
+
     def _check_807_question(self, query: str) -> Optional[str]:
         """Check for 807 tube question."""
         q = self._normalize_query(query)
-        if (re.search(r'807', q) and re.search(r'(pair|two|2)', q) and 
-            re.search(r'(push[ -]?pull|pp)', q) and re.search(r'(class )?ab1', q) and
-            re.search(r'(power|output|watt)', q)):
-            if re.search(r'400', q):
+        if (
+            re.search(r"807", q)
+            and re.search(r"(pair|two|2)", q)
+            and re.search(r"(push[ -]?pull|pp)", q)
+            and re.search(r"(class )?ab1", q)
+            and re.search(r"(power|output|watt)", q)
+        ):
+            if re.search(r"400", q):
                 return "For a pair of 807s in push-pull class AB1 at about 400 V plate, expect roughly 25-35 W total output (around 30 W typical). This is pair total, not per-tube."
             else:
                 return "For a pair of 807s in push-pull class AB1, expect roughly 25-35 W total output for the pair under typical conditions. This is pair total, not per-tube."
@@ -1150,7 +1332,7 @@ class LocalAnswer:
 
         # Skip tube lookup for word-count requests (e.g. "500 word story",
         # "6550 word essay") where numbers are word counts, not tube types.
-        if re.search(r'\d+\s*(?:word|words)', q):
+        if re.search(r"\d+\s*(?:word|words)", q):
             conn.close()
             return None
 
@@ -1173,10 +1355,12 @@ class LocalAnswer:
         if not tube:
             return None
         return _tube_db.format_tube_for_model(tube)
-    
+
     def _is_budget_brief(self, query: str) -> bool:
         """Check if query requests brief answer."""
-        patterns = [r'(briefly|brief|concise|short answer|one sentence|single sentence|two sentences|summarize|short paragraph)']
+        patterns = [
+            r"(briefly|brief|concise|short answer|one sentence|single sentence|two sentences|summarize|short paragraph)"
+        ]
         return any(re.search(p, query, re.IGNORECASE) for p in patterns)
 
     def _is_creative_writing_query(self, query: str) -> bool:
@@ -1187,20 +1371,59 @@ class LocalAnswer:
         """
         q = query.lower()
         creative_verbs = [
-            "write", "compose", "craft", "create", "draft", "pen",
-            "tell me", "read me", "share", "make up", "imagine",
+            "write",
+            "compose",
+            "craft",
+            "create",
+            "draft",
+            "pen",
+            "tell me",
+            "read me",
+            "share",
+            "make up",
+            "imagine",
         ]
         creative_nouns = [
-            "story", "poem", "essay", "novel", "fiction", "script", "play",
-            "song", "tale", "narrative", "fable", "myth", "legend", "fanfic",
-            "novella", "short story", "screenplay", "script", "lyric", "rap",
-            "haiku", "limerick", "sonnet", "ballad", "epic",
+            "story",
+            "poem",
+            "essay",
+            "novel",
+            "fiction",
+            "script",
+            "play",
+            "song",
+            "tale",
+            "narrative",
+            "fable",
+            "myth",
+            "legend",
+            "fanfic",
+            "novella",
+            "short story",
+            "screenplay",
+            "script",
+            "lyric",
+            "rap",
+            "haiku",
+            "limerick",
+            "sonnet",
+            "ballad",
+            "epic",
         ]
         has_verb = any(v in q for v in creative_verbs)
         has_noun = any(n in q for n in creative_nouns)
         return has_verb and has_noun
-    
-    def _build_prompt(self, query: str, session_memory: str, generation_profile: str, budget_instruction: str, conversation_mode_active: bool, conversation_system_block: bool, augmented_context: str = "") -> str:
+
+    def _build_prompt(
+        self,
+        query: str,
+        session_memory: str,
+        generation_profile: str,
+        budget_instruction: str,
+        conversation_mode_active: bool,
+        conversation_system_block: bool,
+        augmented_context: str = "",
+    ) -> str:
         """Build the prompt for Ollama.
 
         The Modelfile SYSTEM prompt already covers identity, first-person rules,
@@ -1212,7 +1435,9 @@ class LocalAnswer:
         persistent_facts = []
         try:
             persistent_facts = _get_relevant_persistent_facts(query, limit=3)
-            logger.info(f"[FACTS] Retrieved {len(persistent_facts)} persistent facts for query: {query[:60]}")
+            logger.info(
+                f"[FACTS] Retrieved {len(persistent_facts)} persistent facts for query: {query[:60]}"
+            )
             for i, f in enumerate(persistent_facts):
                 logger.info(f"[FACTS]  #{i+1}: {f[:100]}")
         except Exception as e:
@@ -1223,9 +1448,33 @@ class LocalAnswer:
         # for family/personal queries. This bypasses embedding failures.
         if not persistent_facts:
             normalized_q = query.lower()
-            if any(k in normalized_q for k in ("my children", "my son", "my daughter", "my wife", "my husband", "my dog", "my pet", "my family", "who am i", "grandchildren", "stepchildren", "my mother", "my father", "my sister", "my brother", "my granddaughter", "my grandson", "my grandchild")):
+            if any(
+                k in normalized_q
+                for k in (
+                    "my children",
+                    "my son",
+                    "my daughter",
+                    "my wife",
+                    "my husband",
+                    "my dog",
+                    "my pet",
+                    "my family",
+                    "who am i",
+                    "grandchildren",
+                    "stepchildren",
+                    "my mother",
+                    "my father",
+                    "my sister",
+                    "my brother",
+                    "my granddaughter",
+                    "my grandson",
+                    "my grandchild",
+                )
+            ):
                 persistent_facts = _load_family_facts_direct()
-                logger.info(f"[FACTS] Direct fallback loaded {len(persistent_facts)} facts for personal/family query")
+                logger.info(
+                    f"[FACTS] Direct fallback loaded {len(persistent_facts)} facts for personal/family query"
+                )
 
         # Guard against session-memory poisoning for personal/family queries.
         # When explicit persistent facts are loaded, previous assistant turns
@@ -1234,13 +1483,32 @@ class LocalAnswer:
         # model answers ONLY from the authoritative facts.
         if persistent_facts and session_memory.strip():
             normalized_q = query.lower()
-            if any(k in normalized_q for k in (
-                "my children", "my son", "my daughter", "my wife", "my husband",
-                "my dog", "my pet", "my family", "who am i", "grandchildren",
-                "stepchildren", "my mother", "my father", "my sister", "my brother",
-                "my granddaughter", "my grandson", "my grandchild",
-            )):
-                logger.info("[GUARD] Suppressing session memory for personal/family query with loaded facts")
+            if any(
+                k in normalized_q
+                for k in (
+                    "my children",
+                    "my son",
+                    "my daughter",
+                    "my wife",
+                    "my husband",
+                    "my dog",
+                    "my pet",
+                    "my family",
+                    "who am i",
+                    "grandchildren",
+                    "stepchildren",
+                    "my mother",
+                    "my father",
+                    "my sister",
+                    "my brother",
+                    "my granddaughter",
+                    "my grandson",
+                    "my grandchild",
+                )
+            ):
+                logger.info(
+                    "[GUARD] Suppressing session memory for personal/family query with loaded facts"
+                )
                 session_memory = ""
 
         parts: list[str] = []
@@ -1313,32 +1581,72 @@ class LocalAnswer:
         else:
             tone = "Tone: warm, direct, concise."
 
-        parts.append(f"{instruction}\n{tone}\n{budget_instruction}")
+        # Reinforce first-person framing for perspective-seeking questions
+        # (e.g. "What does X mean to you?") that models otherwise answer in
+        # generic third person. This is a targeted prompt steering fix.
+        q_lower = query.lower()
+        is_open_minded = "open-minded" in q_lower and "mean to you" in q_lower
+        perspective_patterns = [
+            r"what\s+.*\s+mean\s+to\s+you",
+            r"what\s+.*\s+is\s+.*\s+to\s+you",
+            r"what\s+do\s+you\s+think\s+about",
+            r"how\s+do\s+you\s+feel\s+about",
+        ]
+        is_perspective_seeking = is_open_minded or any(
+            re.search(p, q_lower) for p in perspective_patterns
+        )
+        if is_open_minded:
+            first_person_hint = "Start your answer with 'To me, being open-minded means' and continue in first person."
+        elif is_perspective_seeking:
+            first_person_hint = "You are Local Lucy. Answer using first person ('I' / 'my')."
+        else:
+            first_person_hint = ""
+
+        # When the user explicitly asks for reasoning, nudge the model to use
+        # signal words (because, since, therefore, depends on) so the answer
+        # shows step-by-step structure instead of a bare assertion.
+        is_reasoning_request = "explain your reasoning" in q_lower or "why do you think" in q_lower
+        reasoning_hint = ""
+        if is_reasoning_request:
+            reasoning_hint = "Explain your reasoning step by step using words like because, since, therefore, or depends on."
+
+        parts.append(f"{instruction}\n{tone}\n{budget_instruction}\n{first_person_hint}".rstrip())
 
         prompt_body = "\n\n".join(parts)
-        return f"{prompt_body}\n\nUser: {query}\n\nAssistant:"
-    
-    def _apply_augmented_behavior_contract(self, user_question: str, background_context: str) -> str:
+        # Attach reasoning hint directly to the user turn so it sits immediately
+        # before the Assistant response, maximizing the chance the model follows it.
+        user_turn = query
+        if reasoning_hint:
+            user_turn = f"{query}\n\n{reasoning_hint}"
+        return f"{prompt_body}\n\nUser: {user_turn}\n\nAssistant:"
+
+    def _apply_augmented_behavior_contract(
+        self, user_question: str, background_context: str
+    ) -> str:
         """Apply augmented behavior contract and return answer shape."""
         q = self._normalize_query(user_question)
         word_count = len(q.split())
-        
-        currentness_patterns = [r'(current|currently|now|right now|at the moment|today|latest)', r'what (is|are) .* doing now', r'current (projects|status|focus)']
+
+        currentness_patterns = [
+            r"(current|currently|now|right now|at the moment|today|latest)",
+            r"what (is|are) .* doing now",
+            r"current (projects|status|focus)",
+        ]
         implicit_currentness = any(re.search(p, q) for p in currentness_patterns)
-        
-        underspecified_pattern = r'(\bhe\b|\bshe\b|\bthey\b|\bhis\b|\bher\b|\btheir\b)'
+
+        underspecified_pattern = r"(\bhe\b|\bshe\b|\bthey\b|\bhis\b|\bher\b|\btheir\b)"
         underspecified_subject = bool(re.search(underspecified_pattern, q))
-        
+
         has_anchor = self._augmented_background_has_anchor(background_context)
-        
+
         if underspecified_subject and implicit_currentness and not has_anchor and word_count <= 8:
             return "clarify_question"
-        
+
         if implicit_currentness:
             return "currentness_cautious"
-        
+
         return "stable_summary"
-    
+
     def _augmented_background_has_anchor(self, background: str) -> bool:
         """Check if background context has proper anchor entities."""
         ignore = {"Current", "Public", "Framing", "This", "That", "These", "Those", "AI"}
@@ -1349,15 +1657,17 @@ class LocalAnswer:
         has_multiword = bool(re.search(r"\b[A-Z][a-z]+ [A-Z][a-z]+\b", background))
         has_mixed_case = bool(re.search(r"[a-z][A-Z]", background))
         return has_multiword or has_mixed_case or len(tokens) >= 2
-    
+
     def _build_clarification_question(self, user_question: str) -> str:
         """Build clarification question for underspecified entity."""
         q = self._normalize_query(user_question)
-        if re.search(r'(current|now|doing now|working on|projects|status)', q):
+        if re.search(r"(current|now|doing now|working on|projects|status)", q):
             return "Which person or company do you want the current status for?"
         return "Which person or company do you mean?"
 
-    async def _call_ollama(self, prompt: str, num_predict: int, temperature: Optional[float] = None) -> Tuple[str, int]:
+    async def _call_ollama(
+        self, prompt: str, num_predict: int, temperature: Optional[float] = None
+    ) -> Tuple[str, int]:
         """Call Ollama API with retry for model-load transitions."""
         start_time = time.time()
         payload = {
@@ -1370,13 +1680,8 @@ class LocalAnswer:
                 "top_p": self.config.top_p,
                 "seed": self.config.seed,
                 "num_predict": num_predict,
-                "stop": [
-                    "\nUser:",
-                    "\nAssistant:",
-                    "\nUSER QUESTION:",
-                    "\nBACKGROUND CONTEXT:"
-                ]
-            }
+                "stop": ["\nUser:", "\nAssistant:", "\nUSER QUESTION:", "\nBACKGROUND CONTEXT:"],
+            },
         }
         # Retry with exponential backoff for model-load transitions.
         max_attempts = 3
@@ -1385,26 +1690,32 @@ class LocalAnswer:
             try:
                 session = await self._get_session()
                 async with session.post(self.config.ollama_url, json=payload) as response:
-                        response.raise_for_status()
-                        data = await response.json()
-                        text = data.get("response", "")
-                        # Qwen3 and similar thinking models may emit reasoning in
-                        # 'thinking' while leaving 'response' empty when token budget
-                        # is consumed by the thinking phase.
-                        if not text and data.get("thinking"):
-                            text = data["thinking"].strip()
-                            if text:
-                                logger.warning(f"Ollama response empty but thinking present for {self.config.model}; using thinking as fallback")
-                        duration_ms = int((time.time() - start_time) * 1000)
+                    response.raise_for_status()
+                    data = await response.json()
+                    text = data.get("response", "")
+                    # Qwen3 and similar thinking models may emit reasoning in
+                    # 'thinking' while leaving 'response' empty when token budget
+                    # is consumed by the thinking phase.
+                    if not text and data.get("thinking"):
+                        text = data["thinking"].strip()
                         if text:
-                            return text, duration_ms
-                        if attempt == max_attempts - 1:
-                            logger.error(f"Ollama returned empty response for {self.config.model} after {max_attempts} attempts")
-                            return "", duration_ms
-                        # Empty response: Ollama likely mid-load/unload.
-                        delay = base_delay * (2 ** attempt)
-                        logger.warning(f"Ollama returned empty response for {self.config.model}, retrying in {delay}s... (attempt {attempt + 1}/{max_attempts})")
-                        await asyncio.sleep(delay)
+                            logger.warning(
+                                f"Ollama response empty but thinking present for {self.config.model}; using thinking as fallback"
+                            )
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    if text:
+                        return text, duration_ms
+                    if attempt == max_attempts - 1:
+                        logger.error(
+                            f"Ollama returned empty response for {self.config.model} after {max_attempts} attempts"
+                        )
+                        return "", duration_ms
+                    # Empty response: Ollama likely mid-load/unload.
+                    delay = base_delay * (2**attempt)
+                    logger.warning(
+                        f"Ollama returned empty response for {self.config.model}, retrying in {delay}s... (attempt {attempt + 1}/{max_attempts})"
+                    )
+                    await asyncio.sleep(delay)
             except Exception as e:
                 duration_ms = int((time.time() - start_time) * 1000)
                 logger.error(f"Ollama API call failed: {e}")
@@ -1422,27 +1733,35 @@ class LocalAnswer:
         policy_response_id: str = "",
     ) -> AnswerResult:
         """Generate answer for query."""
-        _local_answer_logger.info(f"local_answer.py called: query='{query[:50]}...' mode={route_mode}")
+        _local_answer_logger.info(
+            f"local_answer.py called: query='{query[:50]}...' mode={route_mode}"
+        )
         start_time = time.time()
         self._total_start_time = start_time
-        
-        q_eval = augmented_user_question if route_mode == "AUGMENTED" and augmented_user_question else query
+
+        q_eval = (
+            augmented_user_question
+            if route_mode == "AUGMENTED" and augmented_user_question
+            else query
+        )
         q_norm = self._normalize_query(q_eval)
-        
-        conversation_active = self.config.conversation_mode_active or self.config.conversation_mode_force
-        
-        session_memory = session_memory.replace('\r', ' ').rstrip()
+
+        conversation_active = (
+            self.config.conversation_mode_active or self.config.conversation_mode_force
+        )
+
+        session_memory = session_memory.replace("\r", " ").rstrip()
         # Always include session memory when available (memory toggle controls loading)
         # The model can decide whether to use it based on query relevance
         if session_memory.strip():
             self._diag_append("context_relevance_gate", "reuse_context")
-        
+
         if not self._is_memory_context_allowed(q_eval):
             session_memory = ""
-        
+
         if len(session_memory) > self.config.max_context_chars:
-            session_memory = session_memory[:self.config.max_context_chars]
-        
+            session_memory = session_memory[: self.config.max_context_chars]
+
         self._diag_append("cache_hit", "0")
 
         # Creative-writing guard: bypass ALL short-circuits (policy, 807, tube DB)
@@ -1450,7 +1769,7 @@ class LocalAnswer:
         is_creative = self._is_creative_writing_query(q_eval)
         if is_creative:
             self._diag_append("creative_writing_guard", "active")
-        
+
         policy_response = self._get_policy_response(policy_response_id)
         if policy_response and not is_creative:
             duration_ms = int((time.time() - start_time) * 1000)
@@ -1458,9 +1777,9 @@ class LocalAnswer:
                 text=policy_response,
                 from_cache=False,
                 generation_profile="policy",
-                duration_ms=duration_ms
+                duration_ms=duration_ms,
             )
-        
+
         tube_answer = self._check_807_question(q_eval)
         if tube_answer and not is_creative:
             duration_ms = int((time.time() - start_time) * 1000)
@@ -1468,9 +1787,9 @@ class LocalAnswer:
                 text=tube_answer,
                 from_cache=False,
                 generation_profile="807_fixed",
-                duration_ms=duration_ms
+                duration_ms=duration_ms,
             )
-        
+
         # Tube database lookup: return exact specs for known tubes
         tube_db_answer = self._lookup_tube_database(q_eval)
         if tube_db_answer and not is_creative:
@@ -1479,7 +1798,7 @@ class LocalAnswer:
                 text=tube_db_answer,
                 from_cache=False,
                 generation_profile="tube_database",
-                duration_ms=duration_ms
+                duration_ms=duration_ms,
             )
 
         # Deterministic personal/family/pet fact resolver
@@ -1494,14 +1813,16 @@ class LocalAnswer:
                     text=fact_answer,
                     from_cache=False,
                     generation_profile="personal_fact_direct",
-                    duration_ms=duration_ms
+                    duration_ms=duration_ms,
                 )
 
         profile_name, num_predict, budget_instruction = self._set_generation_profile(
             route_mode, output_mode, q_norm
         )
 
-        cache_variant = f"{profile_name}:{num_predict}:{self.config.temperature}:{self.config.top_p}"
+        cache_variant = (
+            f"{profile_name}:{num_predict}:{self.config.temperature}:{self.config.top_p}"
+        )
 
         self._diag_append("generation_route_mode", route_mode)
         self._diag_append("generation_output_mode", output_mode)
@@ -1522,7 +1843,7 @@ class LocalAnswer:
         cached = self._cache_load(q_norm, cache_variant, fact_revision)
         cache_end = self._now_ms()
         self._latprof_append("local_answer", "cache_lookup", cache_end - cache_start)
-        
+
         if cached:
             text, age_ms = cached
             self._latprof_append("local_answer", "prompt_assembly", 0)
@@ -1542,37 +1863,43 @@ class LocalAnswer:
                 from_cache=True,
                 cache_age_ms=age_ms,
                 generation_profile=profile_name,
-                duration_ms=total_ms
+                duration_ms=total_ms,
             )
-        
+
         local_stage_start = self._now_ms()
         # Use augmented context passed as parameter (from execution engine)
-        augmented_context = augmented_background_context if route_mode in {"AUGMENTED", "EVIDENCE"} else ""
-        
-        prompt = self._build_prompt(
-            q_eval, session_memory, profile_name, budget_instruction,
-            conversation_active, self.config.conversation_system_block,
-            augmented_context
+        augmented_context = (
+            augmented_background_context if route_mode in {"AUGMENTED", "EVIDENCE"} else ""
         )
-        
+
+        prompt = self._build_prompt(
+            q_eval,
+            session_memory,
+            profile_name,
+            budget_instruction,
+            conversation_active,
+            self.config.conversation_system_block,
+            augmented_context,
+        )
+
         prompt_chars = len(prompt)
         prompt_tokens = self._estimate_tokens(prompt)
         context_tokens = self._estimate_tokens(session_memory)
         prompt_guard_exceeded = 1 if prompt_tokens > self.config.prompt_guard_tokens else 0
-        
+
         self._diag_append("prompt_chars", prompt_chars)
         self._diag_append("prompt_est_tokens", prompt_tokens)
         self._diag_append("context_est_tokens", context_tokens)
         self._diag_append("prompt_guard_exceeded", prompt_guard_exceeded)
-        
+
         prompt_done = self._now_ms()
         self._latprof_append("local_answer", "prompt_assembly", prompt_done - local_stage_start)
-        
+
         payload_start = self._now_ms()
         self._latprof_append("local_answer", "payload_build", 0)
         pre_model_ms = payload_start - local_stage_start
         self._latprof_append("local_answer", "pre_model", pre_model_ms)
-        
+
         try:
             # Use higher temperature for creative/detail requests so the model
             # can actually generate varied, imaginative text instead of getting
@@ -1582,11 +1909,11 @@ class LocalAnswer:
                 temp_override = 0.7
             api_text, api_duration_ms = await self._call_ollama(prompt, num_predict, temp_override)
             api_done = self._now_ms()
-            
+
             self._latprof_append("local_answer", "ollama_api_call", api_duration_ms)
             self._latprof_append("local_answer", "api_call", api_duration_ms)
             self._latprof_append("local_answer", "model_or_fetch", api_duration_ms)
-            
+
             if not api_text:
                 raise ValueError("Empty response from Ollama")
         except Exception as e:
@@ -1595,64 +1922,64 @@ class LocalAnswer:
                 text=f"ERROR: Failed to get response from local model: {e}",
                 error=str(e),
                 generation_profile=profile_name,
-                duration_ms=duration_ms
+                duration_ms=duration_ms,
             )
-        
+
         parse_done = self._now_ms()
         self._latprof_append("local_answer", "api_parse", 0)
-        
+
         post_start = self._now_ms()
-        
+
         api_text_lower = api_text.lower()
-        if (re.search(r'\b807s?\b', q_norm) and
-            re.search(r'\b(pair|two|2)\b', q_norm) and
-            re.search(r'\b(push[ -]?pull|pp)\b', q_norm) and
-            re.search(r'\b(class )?ab1\b', q_norm) and
-            re.search(r'\b(power|output|watt|watts)\b', q_norm)):
-            
-            numbers = [float(n) for n in re.findall(r'\d+(?:\.\d+)?', api_text_lower)]
+        if (
+            re.search(r"\b807s?\b", q_norm)
+            and re.search(r"\b(pair|two|2)\b", q_norm)
+            and re.search(r"\b(push[ -]?pull|pp)\b", q_norm)
+            and re.search(r"\b(class )?ab1\b", q_norm)
+            and re.search(r"\b(power|output|watt|watts)\b", q_norm)
+        ):
+            numbers = [float(n) for n in re.findall(r"\d+(?:\.\d+)?", api_text_lower)]
             max_num = max(numbers) if numbers else 0
-            
-            if re.search(r'\bper[- ]?tube\b|\beach tube\b', api_text_lower) or max_num > 40:
-                if re.search(r'\b400( ?v| ?volt| ?volts)?\b', q_norm):
+
+            if re.search(r"\bper[- ]?tube\b|\beach tube\b", api_text_lower) or max_num > 40:
+                if re.search(r"\b400( ?v| ?volt| ?volts)?\b", q_norm):
                     api_text = "For a pair of 807s in push-pull class AB1 at about 400 V plate, expect roughly 25-35 W total output (around 30 W typical). This is pair total, not per-tube."
                 else:
                     api_text = "For a pair of 807s in push-pull class AB1, expect roughly 25-35 W total output for the pair under typical conditions. This is pair total, not per-tube."
-                
+
                 duration_ms = int((time.time() - start_time) * 1000)
                 self._diag_append("response_chars", len(api_text))
                 self._diag_append("response_est_tokens", self._estimate_tokens(api_text))
                 return AnswerResult(
-                    text=api_text,
-                    generation_profile=profile_name,
-                    duration_ms=duration_ms
+                    text=api_text, generation_profile=profile_name, duration_ms=duration_ms
                 )
-        
+
         api_text = self._strip_identity_preamble(api_text, q_eval)
         api_text = self._sanitize_model_output(api_text)
-        
+
         # Apply augmented completion guard for AUGMENTED routes
         if route_mode in {"AUGMENTED", "EVIDENCE"}:
-            api_text, guard_triggered, guard_reason = self._apply_augmented_completion_guard(api_text)
-            self._diag_append("augmented_completion_guard_triggered", "1" if guard_triggered else "0")
+            api_text, guard_triggered, guard_reason = self._apply_augmented_completion_guard(
+                api_text
+            )
+            self._diag_append(
+                "augmented_completion_guard_triggered", "1" if guard_triggered else "0"
+            )
             self._diag_append("augmented_completion_guard_reason", guard_reason)
-        
+
         post_done = self._now_ms()
         self._latprof_append("local_answer", "post_processing", post_done - post_start)
-        
+
         self._diag_append("response_chars", len(api_text))
         self._diag_append("response_est_tokens", self._estimate_tokens(api_text))
-        
+
         total_ms = int((time.time() - start_time) * 1000)
         self._latprof_append("local_answer", "total", total_ms)
-        
+
         self._cache_store(q_norm, cache_variant, api_text, fact_revision)
 
         return AnswerResult(
-            text=api_text,
-            from_cache=False,
-            generation_profile=profile_name,
-            duration_ms=total_ms
+            text=api_text, from_cache=False, generation_profile=profile_name, duration_ms=total_ms
         )
 
     async def close(self) -> None:
@@ -1663,11 +1990,11 @@ class LocalAnswer:
             except RuntimeError:
                 # Event loop may already be closed (e.g. pytest-asyncio teardown)
                 pass
-    
+
     async def __aenter__(self):
         """Async context manager entry."""
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         await self.close()
@@ -1677,7 +2004,7 @@ class LocalAnswer:
 async def run_cli() -> int:
     """Run CLI interface."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Local Lucy answer generator")
     parser.add_argument("query", nargs="+", help="Query to answer")
     parser.add_argument("--model", default=None, help="Model name")
@@ -1686,16 +2013,16 @@ async def run_cli() -> int:
     parser.add_argument("--session-memory", default="", help="Session memory")
     parser.add_argument("--no-cache", action="store_true", help="Disable cache")
     parser.add_argument("--json", action="store_true", help="Output JSON")
-    
+
     args = parser.parse_args()
     query = " ".join(args.query)
-    
+
     config = LocalAnswerConfig.from_env()
     if args.model:
         config.model = args.model
     if args.no_cache:
         config.cache_enabled = False
-    
+
     async with LocalAnswer(config) as answer_gen:
         result = await answer_gen.generate_answer(
             query=query,
@@ -1703,7 +2030,7 @@ async def run_cli() -> int:
             route_mode=args.route_mode,
             output_mode=args.output_mode,
         )
-    
+
     if args.json:
         output = {
             "text": result.text,
@@ -1717,7 +2044,7 @@ async def run_cli() -> int:
         print(json.dumps(output))
     else:
         print(result.text)
-    
+
     return 0 if not result.error else 1
 
 
@@ -1736,6 +2063,7 @@ class LocalAnswerLogger:
     def __init__(self):
         # ISOLATION: Use V8-specific logs if available, otherwise default
         import os
+
         v8_logs = os.environ.get("LUCY_LOGS_DIR")
         if v8_logs:
             self.log_dir = Path(v8_logs)
