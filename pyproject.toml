@@ -102,6 +102,8 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 # main.py mutates sys.path before importing router_py modules; this is intentional.
 "tools/router_py/main.py" = ["E402"]
+# local_answer.py is a large legacy module with pre-existing unused-variable issues.
+"tools/router_py/local_answer.py" = ["F841"]
 # Pre-existing style issues in legacy structured-logging tests.
 "tools/router_py/test_structured_logging.py" = ["E741", "F841"]
 # Benchmarks and offscreen tests contain deliberate unused variables / short names.
