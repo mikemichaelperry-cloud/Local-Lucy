@@ -15,7 +15,7 @@
 | **Model** | `local-lucy-llama31` (llama3.1:8b via Ollama) |
 | **Handoff file** | `~/Desktop/Local_Lucy_v10_Session_Handoff_<date>.md` |
 | **Default branch on origin** | `v10-dev` ✅ |
-| **Working tree** | Dirty — ruff installed, lint cleanup in progress |
+| **Working tree** | Clean after ruff/lint cleanup commit |
 
 ---
 
@@ -91,12 +91,14 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 35
+Commits since tag: 37
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+2b98093 chore: install ruff and make lint pass
+f293952 docs: update SESSION_CONTEXT.md after robustness commits
 687b182 test: further harden regression suite against local LLM variance
 e18ed14 test: robustness fixes from code review
 2e238d2 docs: update SESSION_CONTEXT.md after README refresh
@@ -108,8 +110,6 @@ f6ffe1a test: update default model expectation to local-lucy-llama31
 332c097 docs: update SESSION_CONTEXT.md
 8e6c152 fix(local): steer first-person and reasoning prompts; re-record semantic golden responses
 b480477 chore: ignore pre-existing F841 issues in local_answer.py
-f2efa6d ci: add release workflow and Debian packaging
-53b2882 refactor(tests): remove hardcoded absolute paths and use env-driven runtime root
 ```
 
 ---
