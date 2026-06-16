@@ -407,6 +407,7 @@ def _generate_news_examples(target: int = 60) -> list[dict]:
 # Also salvage correctly-labeled flagged examples
 # ---------------------------------------------------------------------------
 
+
 def _salvage_flagged() -> list[dict]:
     """Pull any flagged examples that were actually correctly labeled."""
     if not FLAGGED_PATH.exists():
@@ -418,11 +419,32 @@ def _salvage_flagged() -> list[dict]:
     # We want to salvage medical queries that were flagged as 'no_AUGMENTED_keywords'
     # but should actually be EVIDENCE (not AUGMENTED)
     salvageable = []
-    medical_keywords = ["symptoms", "treatment", "diagnosis", "side effects", "dosage",
-                        "prescribed", "medication", "drug", "vaccine", "vaccination",
-                        "antibiotics", "metformin", "ibuprofen", "aspirin", "warfarin",
-                        "acetaminophen", "tadalafil", "strep throat", "migraine",
-                        "concussion", "appendicitis", "diabetes", "cancer", "pneumonia"]
+    medical_keywords = [
+        "symptoms",
+        "treatment",
+        "diagnosis",
+        "side effects",
+        "dosage",
+        "prescribed",
+        "medication",
+        "drug",
+        "vaccine",
+        "vaccination",
+        "antibiotics",
+        "metformin",
+        "ibuprofen",
+        "aspirin",
+        "warfarin",
+        "acetaminophen",
+        "tadalafil",
+        "strep throat",
+        "migraine",
+        "concussion",
+        "appendicitis",
+        "diabetes",
+        "cancer",
+        "pneumonia",
+    ]
 
     for ex in flagged:
         reason = ex.get("_flag_reason", "")
@@ -442,9 +464,23 @@ def _salvage_flagged() -> list[dict]:
                 continue
 
         # Weather queries that were wrongly flagged
-        weather_keywords = ["weather", "forecast", "rain", "snow", "sunny", "temperature",
-                            "humid", "storm", "wind", "cold", "hot", "wetter", "pronostico",
-                            "météo", "tiempo"]
+        weather_keywords = [
+            "weather",
+            "forecast",
+            "rain",
+            "snow",
+            "sunny",
+            "temperature",
+            "humid",
+            "storm",
+            "wind",
+            "cold",
+            "hot",
+            "wetter",
+            "pronostico",
+            "météo",
+            "tiempo",
+        ]
         if any(kw in query for kw in weather_keywords):
             if route == "WEATHER" and "no_WEATHER_keywords" in reason:
                 # This was a false flag (e.g. foreign language weather)
@@ -478,6 +514,7 @@ def main() -> None:
 
     # Count current distribution
     from collections import Counter
+
     old_routes = Counter(ex["labels"]["route"] for ex in clean)
 
     # Generate synthetic
@@ -506,10 +543,18 @@ def main() -> None:
 
     new_routes = Counter(ex["labels"]["route"] for ex in deduped)
 
-    print(f"\n--- BEFORE vs AFTER ---")
+    print("\n--- BEFORE vs AFTER ---")
     print(f"{'Route':<15} {'Before':>8} {'After':>8} {'Target':>8}")
     print("-" * 45)
-    targets = {"LOCAL": 300, "AUGMENTED": 150, "NEWS": 60, "TIME": 60, "WEATHER": 50, "EVIDENCE": 50, "EPHEMERAL": 30}
+    targets = {
+        "LOCAL": 300,
+        "AUGMENTED": 150,
+        "NEWS": 60,
+        "TIME": 60,
+        "WEATHER": 50,
+        "EVIDENCE": 50,
+        "EPHEMERAL": 30,
+    }
     for route in ["LOCAL", "AUGMENTED", "EVIDENCE", "NEWS", "TIME", "WEATHER", "EPHEMERAL"]:
         before = old_routes.get(route, 0)
         after = new_routes.get(route, 0)

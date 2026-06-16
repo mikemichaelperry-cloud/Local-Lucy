@@ -3,7 +3,6 @@
 
 import json
 import random
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -53,7 +52,9 @@ def evaluate(model, dataloader, device):
                 all_labels[h].extend(labels[h].cpu().numpy())
     metrics = {"loss": total_loss / len(dataloader)}
     for h in HEAD_NAMES:
-        metrics[h] = classification_report(all_labels[h], all_preds[h], output_dict=True, zero_division=0)
+        metrics[h] = classification_report(
+            all_labels[h], all_preds[h], output_dict=True, zero_division=0
+        )
     return metrics
 
 
@@ -96,7 +97,11 @@ def main():
         weight_decay=config["training"]["weight_decay"],
     )
 
-    total_steps = len(train_loader) * config["training"]["epochs"] // config["training"]["gradient_accumulation_steps"]
+    total_steps = (
+        len(train_loader)
+        * config["training"]["epochs"]
+        // config["training"]["gradient_accumulation_steps"]
+    )
     scheduler = get_linear_schedule_with_warmup(
         optimizer,
         num_warmup_steps=int(total_steps * config["training"]["warmup_ratio"]),
@@ -136,7 +141,9 @@ def main():
         val_metrics = evaluate(model, val_loader, device)
         avg_val_loss = val_metrics["loss"]
 
-        log(f"Epoch {epoch + 1} summary: train_loss={avg_train_loss:.4f}, val_loss={avg_val_loss:.4f}")
+        log(
+            f"Epoch {epoch + 1} summary: train_loss={avg_train_loss:.4f}, val_loss={avg_val_loss:.4f}"
+        )
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss

@@ -9,12 +9,10 @@ are rejected at load time and cannot pollute the embedding index.
 from __future__ import annotations
 
 import json
-import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 # Ensure router module is on path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -34,6 +32,7 @@ class TestExampleValidation(unittest.TestCase):
 
     def tearDown(self):
         import shutil
+
         shutil.rmtree(self.tmp_dir, ignore_errors=True)
 
     def _write_examples(self, examples: list[dict]) -> None:
@@ -42,11 +41,25 @@ class TestExampleValidation(unittest.TestCase):
 
     def test_rejects_empty_query_string(self):
         """An example with empty query text must be dropped."""
-        self._write_examples([
-            {"query": "What is Python?", "labels": {"route": "LOCAL", "intent_family": "local_answer"}, "metadata": {}},
-            {"query": "", "labels": {"route": "WEATHER", "intent_family": "ephemeral_query"}, "metadata": {}},
-            {"query": "What time is it?", "labels": {"route": "TIME", "intent_family": "time_query"}, "metadata": {}},
-        ])
+        self._write_examples(
+            [
+                {
+                    "query": "What is Python?",
+                    "labels": {"route": "LOCAL", "intent_family": "local_answer"},
+                    "metadata": {},
+                },
+                {
+                    "query": "",
+                    "labels": {"route": "WEATHER", "intent_family": "ephemeral_query"},
+                    "metadata": {},
+                },
+                {
+                    "query": "What time is it?",
+                    "labels": {"route": "TIME", "intent_family": "time_query"},
+                    "metadata": {},
+                },
+            ]
+        )
 
         router = HybridRouterV2(
             embeddings_path=str(self.embeddings_path),
@@ -62,11 +75,25 @@ class TestExampleValidation(unittest.TestCase):
 
     def test_rejects_blank_query_string(self):
         """An example with whitespace-only query text must be dropped."""
-        self._write_examples([
-            {"query": "What is Python?", "labels": {"route": "LOCAL", "intent_family": "local_answer"}, "metadata": {}},
-            {"query": "   \t\n  ", "labels": {"route": "WEATHER", "intent_family": "ephemeral_query"}, "metadata": {}},
-            {"query": "What time is it?", "labels": {"route": "TIME", "intent_family": "time_query"}, "metadata": {}},
-        ])
+        self._write_examples(
+            [
+                {
+                    "query": "What is Python?",
+                    "labels": {"route": "LOCAL", "intent_family": "local_answer"},
+                    "metadata": {},
+                },
+                {
+                    "query": "   \t\n  ",
+                    "labels": {"route": "WEATHER", "intent_family": "ephemeral_query"},
+                    "metadata": {},
+                },
+                {
+                    "query": "What time is it?",
+                    "labels": {"route": "TIME", "intent_family": "time_query"},
+                    "metadata": {},
+                },
+            ]
+        )
 
         router = HybridRouterV2(
             embeddings_path=str(self.embeddings_path),
@@ -80,11 +107,21 @@ class TestExampleValidation(unittest.TestCase):
 
     def test_rejects_missing_labels(self):
         """An example without a labels dict must be dropped."""
-        self._write_examples([
-            {"query": "What is Python?", "labels": {"route": "LOCAL", "intent_family": "local_answer"}, "metadata": {}},
-            {"query": "What is the weather?", "metadata": {}},
-            {"query": "What time is it?", "labels": {"route": "TIME", "intent_family": "time_query"}, "metadata": {}},
-        ])
+        self._write_examples(
+            [
+                {
+                    "query": "What is Python?",
+                    "labels": {"route": "LOCAL", "intent_family": "local_answer"},
+                    "metadata": {},
+                },
+                {"query": "What is the weather?", "metadata": {}},
+                {
+                    "query": "What time is it?",
+                    "labels": {"route": "TIME", "intent_family": "time_query"},
+                    "metadata": {},
+                },
+            ]
+        )
 
         router = HybridRouterV2(
             embeddings_path=str(self.embeddings_path),
@@ -98,11 +135,25 @@ class TestExampleValidation(unittest.TestCase):
 
     def test_rejects_missing_route(self):
         """An example with labels but no route must be dropped."""
-        self._write_examples([
-            {"query": "What is Python?", "labels": {"route": "LOCAL", "intent_family": "local_answer"}, "metadata": {}},
-            {"query": "What is the weather?", "labels": {"intent_family": "ephemeral_query"}, "metadata": {}},
-            {"query": "What time is it?", "labels": {"route": "TIME", "intent_family": "time_query"}, "metadata": {}},
-        ])
+        self._write_examples(
+            [
+                {
+                    "query": "What is Python?",
+                    "labels": {"route": "LOCAL", "intent_family": "local_answer"},
+                    "metadata": {},
+                },
+                {
+                    "query": "What is the weather?",
+                    "labels": {"intent_family": "ephemeral_query"},
+                    "metadata": {},
+                },
+                {
+                    "query": "What time is it?",
+                    "labels": {"route": "TIME", "intent_family": "time_query"},
+                    "metadata": {},
+                },
+            ]
+        )
 
         router = HybridRouterV2(
             embeddings_path=str(self.embeddings_path),
@@ -116,11 +167,21 @@ class TestExampleValidation(unittest.TestCase):
 
     def test_rejects_non_dict_entry(self):
         """A non-dict entry in the examples list must be dropped."""
-        self._write_examples([
-            {"query": "What is Python?", "labels": {"route": "LOCAL", "intent_family": "local_answer"}, "metadata": {}},
-            "this is not a dict",
-            {"query": "What time is it?", "labels": {"route": "TIME", "intent_family": "time_query"}, "metadata": {}},
-        ])
+        self._write_examples(
+            [
+                {
+                    "query": "What is Python?",
+                    "labels": {"route": "LOCAL", "intent_family": "local_answer"},
+                    "metadata": {},
+                },
+                "this is not a dict",
+                {
+                    "query": "What time is it?",
+                    "labels": {"route": "TIME", "intent_family": "time_query"},
+                    "metadata": {},
+                },
+            ]
+        )
 
         router = HybridRouterV2(
             embeddings_path=str(self.embeddings_path),

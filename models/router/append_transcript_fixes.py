@@ -45,40 +45,74 @@ NEW_EXAMPLES: list[dict] = [
     # ================================================================
     {
         "query": "Are there any higher gain triodes?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "electronics"},
     },
     {
         "query": "What are some high gain vacuum tubes?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "electronics"},
     },
     {
         "query": "Compare 12AX7 and 6SL7 triodes",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "electronics"},
     },
     {
         "query": "What is the amplification factor of a 12AX7?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "electronics"},
     },
     {
         "query": "Best triodes for guitar preamps",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "electronics"},
     },
     {
         "query": "What is the difference between a triode and a tetrode?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "electronics"},
     },
     {
         "query": "List common high-mu triodes",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "electronics"},
     },
-
     # ================================================================
     # 2. Capability / Translation Queries (LOCAL)
     # Transcript: "Are you capable of Hebrew to English translation?"
@@ -86,40 +120,74 @@ NEW_EXAMPLES: list[dict] = [
     # ================================================================
     {
         "query": "Are you capable of Hebrew to English translation?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "capability"},
     },
     {
         "query": "Can you translate from Hebrew?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "capability"},
     },
     {
         "query": "Do you speak Hebrew?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "capability"},
     },
     {
         "query": "Translate this Hebrew text for me",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "capability"},
     },
     {
         "query": "Can you do language translation?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "capability"},
     },
     {
         "query": "Are you able to translate Arabic?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "capability"},
     },
     {
         "query": "What languages can you translate?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "capability"},
     },
-
     # ================================================================
     # 3. Meta / System Commands (LOCAL)
     # Transcript: "Use Augmented mode" and "Try all Augmented providers"
@@ -128,40 +196,74 @@ NEW_EXAMPLES: list[dict] = [
     # ================================================================
     {
         "query": "Use Augmented mode",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "meta_command"},
     },
     {
         "query": "Try all Augmented providers",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "meta_command"},
     },
     {
         "query": "Switch to augmented mode",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "meta_command"},
     },
     {
         "query": "Enable augmented providers",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "meta_command"},
     },
     {
         "query": "What providers are available?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "meta_command"},
     },
     {
         "query": "Show me the available modes",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "meta_command"},
     },
     {
         "query": "Change to local mode",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "meta_command"},
     },
-
     # ================================================================
     # 4. General Knowledge / Gardening (LOCAL)
     # Transcript: "What is the best general purpose fertilizer for lawns?"
@@ -169,46 +271,85 @@ NEW_EXAMPLES: list[dict] = [
     # ================================================================
     {
         "query": "What is the best general purpose fertilizer for lawns?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "general_knowledge"},
     },
     {
         "query": "What are the exact ingredients in lawn fertilizer?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "general_knowledge"},
     },
     {
         "query": "16-4-8 fertilizer ingredients",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "general_knowledge"},
     },
     {
         "query": "How does NPK fertilizer work?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "general_knowledge"},
     },
-
     # ================================================================
     # 5. Adversarial variants (common misphrasings)
     # ================================================================
     {
         "query": "Any higher gain triodes out there?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "electronics"},
     },
     {
         "query": "Can you translate Hebrew to English?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "capability"},
     },
     {
         "query": "Turn on augmented mode",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "meta_command"},
     },
     {
         "query": "List all augmented providers",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "transcript_correction", "category": "meta_command"},
     },
 ]
@@ -217,6 +358,7 @@ NEW_EXAMPLES: list[dict] = [
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def load_existing_queries() -> set[str]:
     """Load existing queries for deduplication from canonical JSON."""
@@ -265,6 +407,7 @@ def rebuild_embeddings():
     rebuild_script = Path(__file__).parent.parent.parent / "scripts" / "rebuild_embeddings.py"
     if rebuild_script.exists():
         import subprocess
+
         result = subprocess.run(
             [sys.executable, str(rebuild_script)],
             capture_output=True,
@@ -284,10 +427,15 @@ def rebuild_embeddings():
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Append transcript correction examples to embedding index")
+    parser = argparse.ArgumentParser(
+        description="Append transcript correction examples to embedding index"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Preview only, do not modify files")
-    parser.add_argument("--apply", action="store_true", help="Append examples and rebuild embeddings")
+    parser.add_argument(
+        "--apply", action="store_true", help="Append examples and rebuild embeddings"
+    )
     args = parser.parse_args()
 
     existing = load_existing_queries()
@@ -311,20 +459,21 @@ def main():
     by_category = Counter(ex["metadata"]["category"] for ex in new_examples)
 
     print(f"\nNew examples to add: {len(new_examples)}")
-    print(f"By route:")
+    print("By route:")
     for route, count in sorted(by_route.items()):
         print(f"  {route:12s} {count:2d}")
-    print(f"By category:")
+    print("By category:")
     for cat, count in sorted(by_category.items()):
         print(f"  {cat:15s} {count:2d}")
 
     if args.dry_run or not args.apply:
-        print(f"\n💡 Use --apply to append and rebuild")
+        print("\n💡 Use --apply to append and rebuild")
         return
 
     # Apply
-    print(f"\n⚠️  Applying changes in 3 seconds... (Ctrl+C to cancel)")
+    print("\n⚠️  Applying changes in 3 seconds... (Ctrl+C to cancel)")
     import time
+
     try:
         time.sleep(3)
     except KeyboardInterrupt:

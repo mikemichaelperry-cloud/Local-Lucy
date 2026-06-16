@@ -75,20 +75,22 @@ def _load_clinc_examples() -> list[dict]:
                 continue
 
             clinc_name, our_route = CLINC_INTENT_MAP[intent_id]
-            extracted.append({
-                "query": text,
-                "labels": {
-                    "intent_family": "local_answer" if our_route == "LOCAL" else "local_answer",
-                    "evidence_mode": "not_required",
-                    "route": our_route,
-                    "policy_override": "none",
-                },
-                "metadata": {
-                    "source": "clinc150",
-                    "clinc_intent": clinc_name,
-                    "clinc_intent_id": intent_id,
-                },
-            })
+            extracted.append(
+                {
+                    "query": text,
+                    "labels": {
+                        "intent_family": "local_answer" if our_route == "LOCAL" else "local_answer",
+                        "evidence_mode": "not_required",
+                        "route": our_route,
+                        "policy_override": "none",
+                    },
+                    "metadata": {
+                        "source": "clinc150",
+                        "clinc_intent": clinc_name,
+                        "clinc_intent_id": intent_id,
+                    },
+                }
+            )
 
     print(f"  Extracted {len(extracted)} raw examples from CLINC150")
 
@@ -131,9 +133,9 @@ def main() -> None:
 
     # We only want to add up to certain limits per route
     route_limits = {
-        "TIME": 300,      # generous — time zones are important
-        "WEATHER": 100,   # CLINC has good weather variety
-        "LOCAL": 100,     # OOS examples for fringe rejection
+        "TIME": 300,  # generous — time zones are important
+        "WEATHER": 100,  # CLINC has good weather variety
+        "LOCAL": 100,  # OOS examples for fringe rejection
     }
 
     # Sort by quality heuristic (prefer longer, more diverse)
@@ -157,7 +159,7 @@ def main() -> None:
     merged = existing + selected
     new_routes = Counter(ex["labels"]["route"] for ex in merged)
 
-    print(f"\n--- BEFORE vs AFTER ---")
+    print("\n--- BEFORE vs AFTER ---")
     print(f"{'Route':<15} {'Before':>8} {'After':>8} {'Change':>8}")
     print("-" * 45)
     for route in ["LOCAL", "AUGMENTED", "EVIDENCE", "NEWS", "TIME", "WEATHER", "EPHEMERAL"]:

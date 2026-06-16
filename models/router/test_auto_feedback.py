@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """Tests for auto_feedback.py — confidence capping, threshold separation."""
 
-import json
-import os
-from pathlib import Path
-
 import pytest
 
 import auto_feedback
@@ -13,7 +9,6 @@ from auto_feedback import (
     log_auto_feedback,
     load_auto_feedback,
     clear_auto_feedback,
-    AUTO_FEEDBACK_PATH,
     _MAX_AUTO_FEEDBACK_CONFIDENCE,
 )
 
@@ -109,13 +104,15 @@ class TestLogAutoFeedback:
     def test_load_filters_by_min_confidence(self):
         """load_auto_feedback respects min_confidence."""
         for conf in [0.3, 0.5, 0.7]:
-            log_auto_feedback({
-                "query": f"test {conf}",
-                "suggested_route": "LOCAL",
-                "reason": "test",
-                "confidence": conf,
-                "details": "",
-            })
+            log_auto_feedback(
+                {
+                    "query": f"test {conf}",
+                    "suggested_route": "LOCAL",
+                    "reason": "test",
+                    "confidence": conf,
+                    "details": "",
+                }
+            )
         # With cap at 0.5, 0.7 is capped to 0.5.
         # So stored confidences are [0.3, 0.5, 0.5].
         # With min_confidence=0.4, only the two 0.5 entries qualify.
@@ -135,6 +132,7 @@ class TestAutoFeedbackEnv:
         # Re-import to pick up the new env value
         import importlib
         import auto_feedback
+
         importlib.reload(auto_feedback)
 
         test_path = tmp_path / "auto_feedback.jsonl"

@@ -97,9 +97,7 @@ def _load_cases() -> List[Dict[str, Any]]:
                 pytest.skip(f"JSON parse error at line {line_no}: {exc}")
             missing = required_keys - set(case.keys())
             if missing:
-                pytest.skip(
-                    f"Case at line {line_no} missing required keys: {missing}"
-                )
+                pytest.skip(f"Case at line {line_no} missing required keys: {missing}")
             cases.append(case)
     return cases
 
@@ -131,6 +129,7 @@ def local_answer_engine(request):
         if engine._session and not engine._session.closed:
             try:
                 import asyncio
+
                 loop = asyncio.new_event_loop()
                 loop.run_until_complete(engine.close())
                 loop.close()
@@ -186,14 +185,10 @@ class TestSyntheticAdversarialRouting:
         errors = []
 
         if expected_route is not None and actual_route != expected_route:
-            errors.append(
-                f"route mismatch: got '{actual_route}', expected '{expected_route}'"
-            )
+            errors.append(f"route mismatch: got '{actual_route}', expected '{expected_route}'")
 
         if actual_route in forbidden_routes:
-            errors.append(
-                f"forbidden route triggered: '{actual_route}' is in {forbidden_routes}"
-            )
+            errors.append(f"forbidden route triggered: '{actual_route}' is in {forbidden_routes}")
 
         if actual_provider in must_not_invoke_providers:
             errors.append(
@@ -333,9 +328,7 @@ class TestSyntheticAdversarialFullAnswer:
         failures = []
         for forbidden in must_not_contain:
             if forbidden.lower() in response_text:
-                failures.append(
-                    f"  response contained forbidden phrase: '{forbidden}'"
-                )
+                failures.append(f"  response contained forbidden phrase: '{forbidden}'")
 
         if failures:
             snippet = result.text[:200].replace("\n", " ")
@@ -397,9 +390,7 @@ def _run_direct():
         total += 1
         errors = []
         if expected_route is not None and decision.route != expected_route:
-            errors.append(
-                f"route: expected {expected_route}, got {decision.route}"
-            )
+            errors.append(f"route: expected {expected_route}, got {decision.route}")
         if decision.route in forbidden_routes:
             errors.append(f"forbidden route: {decision.route}")
         if decision.provider in must_not_invoke_providers:
@@ -413,7 +404,7 @@ def _run_direct():
         else:
             passed += 1
 
-    print(f"\n=== Synthetic Adversarial Routing ===")
+    print("\n=== Synthetic Adversarial Routing ===")
     print(f"Cases:   {total}")
     print(f"Passed:  {passed}")
     print(f"Failed:  {len(failures)}")

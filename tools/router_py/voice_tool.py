@@ -51,9 +51,11 @@ if str(VOICE_DIR) not in sys.path:
 # Utility functions (also re-exported for test compatibility)
 # ---------------------------------------------------------------------------
 
+
 def iso_now() -> str:
     """Return current UTC time as ISO-8601 string with Z suffix."""
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -70,6 +72,7 @@ _playback_with_levels_import_error = None
 try:
     import tts_adapter
     from playback import play_wav_file, PlaybackError, detect_audio_player
+
     # Import playback with levels for VU meter (fallback to regular playback)
     try:
         from playback_with_levels import play_wav_file_with_levels
@@ -91,26 +94,31 @@ except ImportError as e:
 
 class VoicePipelineError(RuntimeError):
     """Base exception for voice pipeline errors."""
+
     pass
 
 
 class RecordingError(VoicePipelineError):
     """Error during audio recording."""
+
     pass
 
 
 class TranscriptionError(VoicePipelineError):
     """Error during transcription."""
+
     pass
 
 
 class SynthesisError(VoicePipelineError):
     """Error during TTS synthesis."""
+
     pass
 
 
 class PlaybackError(VoicePipelineError):
     """Error during audio playback."""
+
     pass
 
 
@@ -134,18 +142,19 @@ class TranscriptionResult:
 @dataclass
 class AudioBuffer:
     """Container for raw PCM audio data with metadata.
-    
+
     Attributes:
         data: Raw PCM audio bytes
         sample_rate: Sample rate in Hz (e.g., 16000)
         channels: Number of channels (1 for mono, 2 for stereo)
         sample_width: Bytes per sample (2 for 16-bit)
     """
+
     data: bytes
     sample_rate: int
     channels: int
     sample_width: int
-    
+
     @property
     def duration_ms(self) -> int:
         """Calculate duration in milliseconds from data length."""
@@ -153,17 +162,17 @@ class AudioBuffer:
             return 0
         frames = len(self.data) // (self.channels * self.sample_width)
         return int(frames * 1000 / self.sample_rate)
-    
+
     @property
     def frame_count(self) -> int:
         """Number of audio frames."""
         if self.sample_width <= 0 or self.channels <= 0:
             return 0
         return len(self.data) // (self.sample_width * self.channels)
-    
+
     def save_to_file(self, path: Union[str, Path], format: str = "wav") -> None:
         """Save audio buffer to file.
-        
+
         Args:
             path: Output file path
             format: Audio format (currently only "wav" supported)
@@ -171,14 +180,14 @@ class AudioBuffer:
         path = Path(path)
         if format.lower() != "wav":
             raise ValueError(f"Unsupported format: {format}")
-        
+
         path.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(path), "wb") as wav:
             wav.setnchannels(self.channels)
             wav.setsampwidth(self.sample_width)
             wav.setframerate(self.sample_rate)
             wav.writeframes(self.data)
-    
+
     @classmethod
     def from_file(cls, path: Union[str, Path]) -> "AudioBuffer":
         """Load audio buffer from WAV file."""
@@ -188,10 +197,11 @@ class AudioBuffer:
             sample_rate = wav.getframerate()
             data = wav.readframes(wav.getnframes())
         return cls(data, sample_rate, channels, sample_width)
-    
+
     @classmethod
-    def from_bytes(cls, data: bytes, sample_rate: int = 16000, 
-                   channels: int = 1, sample_width: int = 2) -> "AudioBuffer":
+    def from_bytes(
+        cls, data: bytes, sample_rate: int = 16000, channels: int = 1, sample_width: int = 2
+    ) -> "AudioBuffer":
         """Create buffer from raw bytes."""
         return cls(data, sample_rate, channels, sample_width)
 
@@ -199,24 +209,29 @@ class AudioBuffer:
 @dataclass
 class VoiceMetrics:
     """Metrics for a voice interaction."""
+
     record_duration_ms: int = 0
     transcription_time_ms: int = 0
     processing_time_ms: int = 0
     tts_time_ms: int = 0
     playback_time_ms: int = 0
     total_latency_ms: int = 0
-    
+
     @property
     def pipeline_time_ms(self) -> int:
         """Time spent in pipeline stages (excluding playback)."""
-        return self.record_duration_ms + self.transcription_time_ms + \
-               self.processing_time_ms + self.tts_time_ms
+        return (
+            self.record_duration_ms
+            + self.transcription_time_ms
+            + self.processing_time_ms
+            + self.tts_time_ms
+        )
 
 
 @dataclass
 class VoiceResult:
     """Result of a complete voice interaction.
-    
+
     Attributes:
         success: Whether the interaction succeeded
         status: Final status (completed, cancelled, no_transcript, error)
@@ -229,6 +244,7 @@ class VoiceResult:
         tts_status: TTS execution status
         request_id: Unique request ID
     """
+
     success: bool = False
     status: str = ""
     transcript: str = ""
@@ -243,13 +259,14 @@ class VoiceResult:
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         from dataclasses import asdict
+
         return asdict(self)
 
 
 @dataclass
 class VADConfig:
     """Voice Activity Detection configuration.
-    
+
     Attributes:
         enabled: Whether VAD is enabled
         energy_threshold: Energy threshold for speech detection (0-32767)
@@ -257,6 +274,7 @@ class VADConfig:
         min_speech_ms: Minimum speech duration to consider valid
         max_silence_ms: Maximum silence duration before stopping
     """
+
     enabled: bool = True
     energy_threshold: int = 500
     silence_timeout_ms: int = 1500
@@ -271,32 +289,32 @@ class VADConfig:
 
 class VoicePipeline(BaseToolWrapper):
     """Async voice processing pipeline for Local Lucy.
-    
+
     Provides a complete async pipeline for voice interactions:
     1. Record audio from microphone
     2. Transcribe using Whisper or Vosk
     3. Process through Lucy (text query)
     4. Synthesize response using TTS
     5. Play audio output
-    
+
     All stages support cancellation via the `cancel()` method.
-    
+
     Example:
         pipeline = VoicePipeline()
-        
+
         # Full interaction
         result = await pipeline.voice_interaction()
         print(f"Transcript: {result.transcript}")
         print(f"Response: {result.response_text}")
-        
+
         # Or use individual stages
         audio = await pipeline.record_audio(duration=5.0)
         tx_result = await pipeline.transcribe(audio)
         transcript = tx_result.text
     """
-    
+
     # Explicitly declare that this class implements the abstract method
-    
+
     def __init__(
         self,
         config: Optional[ToolConfig] = None,
@@ -308,7 +326,7 @@ class VoicePipeline(BaseToolWrapper):
         channels: int = 1,
     ):
         """Initialize voice pipeline.
-        
+
         Args:
             config: Tool configuration
             vad_config: Voice Activity Detection configuration
@@ -326,7 +344,7 @@ class VoicePipeline(BaseToolWrapper):
         self.sample_rate = sample_rate
         self.channels = channels
         self.sample_width = 2  # 16-bit
-        
+
         self._cancelled = False
         self._current_task: Optional[asyncio.Task] = None
         self._record_process: Optional[asyncio.subprocess.Process] = None
@@ -337,39 +355,39 @@ class VoicePipeline(BaseToolWrapper):
         self._recorder_bin: Optional[str] = None
         self._stt_engine: Optional[str] = None
         self._stt_bin: Optional[str] = None
-    
+
     # =========================================================================
     # Cancellation Support
     # =========================================================================
-    
+
     def cancel(self) -> None:
         """Cancel the current operation.
-        
+
         Sets the cancelled flag and attempts to terminate any running subprocess.
         """
         self._cancelled = True
         self._logger.info("Voice pipeline cancellation requested")
-        
+
         if self._record_process and self._record_process.returncode is None:
             try:
                 self._record_process.send_signal(signal.SIGTERM)
             except ProcessLookupError:
                 pass
-    
+
     def _check_cancelled(self) -> None:
         """Check if cancelled and raise exception if so."""
         if self._cancelled:
             raise VoicePipelineError("Operation cancelled")
-    
+
     def reset(self) -> None:
         """Reset cancellation state for reuse."""
         self._cancelled = False
         self._record_process = None
-    
+
     # =========================================================================
     # Stage 1: Audio Recording
     # =========================================================================
-    
+
     async def record_audio(
         self,
         duration: Optional[float] = None,
@@ -378,63 +396,71 @@ class VoicePipeline(BaseToolWrapper):
         device: Optional[str] = None,
     ) -> AudioBuffer:
         """Record audio from microphone.
-        
+
         Args:
             duration: Recording duration in seconds. If None, uses VAD to
                      detect silence and stop automatically.
             sample_rate: Sample rate (defaults to instance setting)
             channels: Number of channels (defaults to instance setting)
             device: Audio device (None for default)
-        
+
         Returns:
             AudioBuffer containing recorded PCM data
-        
+
         Raises:
             RecordingError: If recording fails
             VoicePipelineError: If cancelled
         """
         self._check_cancelled()
-        
+
         sample_rate = sample_rate or self.sample_rate
         channels = channels or self.channels
-        
+
         # Detect recorder
         recorder_engine, recorder_bin = self._detect_recorder()
         if not recorder_bin:
             raise RecordingError("No audio recorder available (arecord or pw-record)")
-        
-        self._logger.info(f"Recording with {recorder_engine} " +
-                         f"(duration={'VAD' if duration is None else f'{duration}s'})")
-        
+
+        self._logger.info(
+            f"Recording with {recorder_engine} "
+            + f"(duration={'VAD' if duration is None else f'{duration}s'})"
+        )
+
         # Build command
         if recorder_engine == "arecord":
-            cmd = [recorder_bin, "-q", "-f", "S16_LE", "-r", str(sample_rate), 
-                   "-c", str(channels)]
+            cmd = [recorder_bin, "-q", "-f", "S16_LE", "-r", str(sample_rate), "-c", str(channels)]
             if device:
                 cmd.extend(["-D", device])
             if duration:
                 cmd.extend(["-d", str(int(duration))])
             cmd.append("-")  # Output to stdout
         elif recorder_engine == "pw-record":
-            cmd = [recorder_bin, "--channels", str(channels), 
-                   "--rate", str(sample_rate), "--format", "s16"]
+            cmd = [
+                recorder_bin,
+                "--channels",
+                str(channels),
+                "--rate",
+                str(sample_rate),
+                "--format",
+                "s16",
+            ]
             if duration:
                 cmd.extend(["--duration", str(int(duration))])
             cmd.append("-")  # Output to stdout
         else:
             raise RecordingError(f"Unknown recorder: {recorder_engine}")
-        
+
         # Run recording
         start_time = time.time()
         audio_data = bytearray()
-        
+
         try:
             self._record_process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
-            
+
             if duration is None and self.vad_config.enabled:
                 # VAD mode: read chunks and detect silence
                 audio_data = await self._record_with_vad(
@@ -443,13 +469,11 @@ class VoicePipeline(BaseToolWrapper):
             else:
                 # Fixed duration mode
                 max_duration = duration or 30.0
-                audio_data = await self._record_fixed_duration(
-                    self._record_process, max_duration
-                )
-            
+                audio_data = await self._record_fixed_duration(self._record_process, max_duration)
+
             await self._record_process.wait()
             self._record_process = None
-            
+
         except asyncio.CancelledError:
             self.cancel()
             raise
@@ -465,15 +489,16 @@ class VoicePipeline(BaseToolWrapper):
                 except Exception:
                     pass
                 self._record_process = None
-        
+
         record_time = int((time.time() - start_time) * 1000)
         buffer = AudioBuffer(bytes(audio_data), sample_rate, channels, self.sample_width)
-        
-        self._logger.info(f"Recorded {buffer.duration_ms}ms of audio " +
-                         f"({len(audio_data)} bytes)")
-        
+
+        self._logger.info(
+            f"Recorded {buffer.duration_ms}ms of audio " + f"({len(audio_data)} bytes)"
+        )
+
         return buffer
-    
+
     async def _record_fixed_duration(
         self,
         process: asyncio.subprocess.Process,
@@ -482,23 +507,22 @@ class VoicePipeline(BaseToolWrapper):
         """Record for a fixed duration with cancellation support."""
         audio_data = bytearray()
         deadline = time.time() + duration
-        
+
         assert process.stdout is not None
-        
+
         while time.time() < deadline:
             self._check_cancelled()
-            
+
             try:
                 chunk = await asyncio.wait_for(
-                    process.stdout.read(4096),
-                    timeout=min(0.5, deadline - time.time())
+                    process.stdout.read(4096), timeout=min(0.5, deadline - time.time())
                 )
                 if not chunk:
                     break
                 audio_data.extend(chunk)
             except asyncio.TimeoutError:
                 continue
-        
+
         # Drain any remaining data
         try:
             while True:
@@ -508,9 +532,9 @@ class VoicePipeline(BaseToolWrapper):
                 audio_data.extend(chunk)
         except asyncio.TimeoutError:
             pass
-        
+
         return audio_data
-    
+
     async def _record_with_vad(
         self,
         process: asyncio.subprocess.Process,
@@ -523,36 +547,41 @@ class VoicePipeline(BaseToolWrapper):
         speech_started = False
         frame_duration_ms = 30  # 30ms frames
         bytes_per_frame = int(sample_rate * frame_duration_ms / 1000) * channels * self.sample_width
-        
+
         assert process.stdout is not None
-        
+
         # Buffer for partial frames
         buffer = bytearray()
         max_record_time = 30.0  # Hard limit
         record_start = time.time()
-        
+
         while time.time() - record_start < max_record_time:
             self._check_cancelled()
-            
+
             try:
-                chunk = await asyncio.wait_for(process.stdout.read(bytes_per_frame * 4), timeout=0.5)
+                chunk = await asyncio.wait_for(
+                    process.stdout.read(bytes_per_frame * 4), timeout=0.5
+                )
                 if not chunk:
                     break
                 buffer.extend(chunk)
             except asyncio.TimeoutError:
-                if silence_start and time.time() - silence_start > self.vad_config.silence_timeout_ms / 1000:
+                if (
+                    silence_start
+                    and time.time() - silence_start > self.vad_config.silence_timeout_ms / 1000
+                ):
                     break
                 continue
-            
+
             # Process complete frames
             while len(buffer) >= bytes_per_frame:
                 frame = bytes(buffer[:bytes_per_frame])
                 buffer = buffer[bytes_per_frame:]
                 audio_data.extend(frame)
-                
+
                 # VAD check
                 is_speech = self._detect_speech(frame, sample_rate, channels)
-                
+
                 if is_speech:
                     if not speech_started:
                         self._logger.debug("Speech detected")
@@ -561,41 +590,46 @@ class VoicePipeline(BaseToolWrapper):
                 else:
                     if speech_started and silence_start is None:
                         silence_start = time.time()
-                    
+
                     if silence_start:
                         silence_duration = time.time() - silence_start
                         if silence_duration > self.vad_config.silence_timeout_ms / 1000:
-                            self._logger.debug(f"Silence detected for {silence_duration:.2f}s, stopping")
+                            self._logger.debug(
+                                f"Silence detected for {silence_duration:.2f}s, stopping"
+                            )
                             break
-            
-            if silence_start and time.time() - silence_start > self.vad_config.silence_timeout_ms / 1000:
+
+            if (
+                silence_start
+                and time.time() - silence_start > self.vad_config.silence_timeout_ms / 1000
+            ):
                 break
-        
+
         # Add any remaining buffered data
         audio_data.extend(buffer)
-        
+
         # Check minimum speech duration
         if speech_started:
             speech_duration = len(audio_data) / (sample_rate * channels * self.sample_width) * 1000
             if speech_duration < self.vad_config.min_speech_ms:
                 self._logger.warning(f"Speech too short: {speech_duration:.0f}ms")
-        
+
         return audio_data
-    
+
     def _detect_speech(self, frame: bytes, sample_rate: int, channels: int) -> bool:
         """Detect speech in an audio frame using energy-based VAD.
-        
+
         Args:
             frame: Raw audio bytes
             sample_rate: Sample rate
             channels: Number of channels
-        
+
         Returns:
             True if speech detected
         """
         if len(frame) < 2:
             return False
-        
+
         try:
             # Calculate RMS energy
             if self.sample_width == 2:
@@ -605,15 +639,15 @@ class VoicePipeline(BaseToolWrapper):
                 rms = audioop.rms(frame, 1)
             else:
                 return False
-            
+
             return rms > self.vad_config.energy_threshold
         except Exception:
             return False
-    
+
     # =========================================================================
     # Stage 2: Transcription
     # =========================================================================
-    
+
     async def transcribe(
         self,
         audio: AudioBuffer,
@@ -621,34 +655,34 @@ class VoicePipeline(BaseToolWrapper):
         language: Optional[str] = None,
     ) -> TranscriptionResult:
         """Transcribe audio using Whisper or Vosk.
-        
+
         Args:
             audio: Audio buffer to transcribe
             model: Whisper model name (uses instance default if None)
             language: Language code (None for auto-detect)
-        
+
         Returns:
             TranscriptionResult with text, backend, fallback info
-        
+
         Raises:
             TranscriptionError: If transcription fails
         """
         self._check_cancelled()
-        
+
         stt_engine, stt_bin = self._detect_stt()
         if not stt_bin:
             raise TranscriptionError("No STT engine available (whisper or vosk)")
-        
+
         start_time = time.time()
-        
+
         # Save audio to temp file
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_path = Path(tmp.name)
-        
+
         try:
             audio.save_to_file(tmp_path)
             self._check_cancelled()
-            
+
             if stt_engine == "whisper":
                 result = await self._transcribe_whisper(stt_bin, tmp_path, model, language)
             elif stt_engine == "vosk":
@@ -656,7 +690,7 @@ class VoicePipeline(BaseToolWrapper):
                 result = TranscriptionResult(text=text)
             else:
                 raise TranscriptionError(f"Unknown STT engine: {stt_engine}")
-            
+
             # Normalize transcript
             normalized = self._normalize_transcript(result.text)
             result = TranscriptionResult(
@@ -665,22 +699,22 @@ class VoicePipeline(BaseToolWrapper):
                 fallback_used=result.fallback_used,
                 fallback_reason=result.fallback_reason,
             )
-            
+
             elapsed_ms = int((time.time() - start_time) * 1000)
             backend_label = result.backend or "unknown"
             fb_flag = " (CPU fallback)" if result.fallback_used else ""
             self._logger.info(
                 f"Transcription completed in {elapsed_ms}ms [{backend_label}{fb_flag}]: '{result.text[:50]}...'"
             )
-            
+
             return result
-            
+
         finally:
             try:
                 tmp_path.unlink()
             except OSError:
                 pass
-    
+
     async def _transcribe_whisper(
         self,
         stt_bin: str,
@@ -691,9 +725,19 @@ class VoicePipeline(BaseToolWrapper):
         """Transcribe using Whisper."""
         # Resolve model path
         model_path = self._resolve_whisper_model(model)
-        
+
         # Build command
-        cmd = [stt_bin, "-m", str(model_path), "-f", str(wav_path), "-otxt", "-of", "-", "--no-timestamps"]
+        cmd = [
+            stt_bin,
+            "-m",
+            str(model_path),
+            "-f",
+            str(wav_path),
+            "-otxt",
+            "-of",
+            "-",
+            "--no-timestamps",
+        ]
 
         if language and language.lower() != "auto":
             cmd[1:1] = ["-l", language]
@@ -710,7 +754,7 @@ class VoicePipeline(BaseToolWrapper):
 
         # Set up environment for bundled whisper
         env = self._whisper_env(stt_bin)
-        
+
         async def _run(cmd_list: list[str]) -> tuple[int, bytes, bytes]:
             proc = await asyncio.create_subprocess_exec(
                 *cmd_list,
@@ -718,32 +762,31 @@ class VoicePipeline(BaseToolWrapper):
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=45.0
-            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=45.0)
             return proc.returncode, stdout, stderr
-        
+
         def _is_gpu_error(stderr_text: str) -> bool:
             lower = stderr_text.lower()
             return any(keyword in lower for keyword in _GPU_ERROR_KEYWORDS)
-        
+
         try:
             # First attempt: GPU (default whisper behavior)
             returncode, stdout, stderr = await _run(cmd)
             if returncode == 0:
                 text = stdout.decode("utf-8", errors="replace").strip()
                 return TranscriptionResult(text=text, backend="gpu")
-            
+
             # GPU failed — check if it's a GPU-specific error
-            error_text = stderr.decode("utf-8", errors="replace").strip() or \
-                        stdout.decode("utf-8", errors="replace").strip()
+            error_text = (
+                stderr.decode("utf-8", errors="replace").strip()
+                or stdout.decode("utf-8", errors="replace").strip()
+            )
             if not error_text:
                 error_text = f"whisper exited with status {returncode}"
-            
+
             if not _is_gpu_error(error_text):
                 raise TranscriptionError(f"Whisper failed: {error_text}")
-            
+
             # Retry with CPU fallback (--no-gpu)
             returncode_cpu, stdout_cpu, stderr_cpu = await _run(cmd + ["--no-gpu"])
             if returncode_cpu == 0:
@@ -754,14 +797,14 @@ class VoicePipeline(BaseToolWrapper):
                     fallback_used=True,
                     fallback_reason=error_text,
                 )
-            
+
             # CPU fallback also failed
             cpu_error = stderr_cpu.decode("utf-8", errors="replace").strip() or error_text
             raise TranscriptionError(f"Whisper failed: {cpu_error}")
-            
+
         except asyncio.TimeoutError:
             raise TranscriptionError("Whisper transcription timed out")
-    
+
     async def _transcribe_vosk(
         self,
         stt_bin: str,
@@ -773,7 +816,7 @@ class VoicePipeline(BaseToolWrapper):
             [stt_bin, "-i", str(wav_path)],
             [stt_bin, str(wav_path)],
         ]
-        
+
         for cmd in commands:
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -781,62 +824,62 @@ class VoicePipeline(BaseToolWrapper):
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                
+
                 stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=45.0)
                 result = stdout.decode("utf-8", errors="replace").strip()
-                
+
                 if result:
                     return result
-                    
+
             except asyncio.TimeoutError:
                 continue
             except Exception:
                 continue
-        
+
         raise TranscriptionError("Vosk transcription failed")
-    
+
     def _normalize_transcript(self, text: str) -> str:
         """Normalize transcript text."""
         # Remove blank audio markers
         text = re.sub(
-            r'\[(blank_audio|inaudible|silence|no_speech|no speech)\]',
-            '',
+            r"\[(blank_audio|inaudible|silence|no_speech|no speech)\]",
+            "",
             text,
-            flags=re.IGNORECASE
+            flags=re.IGNORECASE,
         )
-        
+
         # Normalize whitespace
-        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r"\s+", " ", text)
         text = text.strip()
-        
+
         return text
-    
+
     # =========================================================================
     # Stage 3: Lucy Query Processing
     # =========================================================================
-    
+
     async def process_query(
         self,
         transcript: str,
         surface: str = "voice",
     ) -> str:
         """Process transcript through Lucy.
-        
+
         Args:
             transcript: User's transcribed speech
             surface: Interface surface ("voice", "chat", etc.)
-        
+
         Returns:
             Lucy's text response
         """
         self._check_cancelled()
-        
+
         start_time = time.time()
-        
+
         # Unified pipeline entry point (replaces inline classify→route→execute)
         import concurrent.futures
         from .main import run
-        
+
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(
@@ -846,11 +889,11 @@ class VoicePipeline(BaseToolWrapper):
                 timeout=125,
             )
             outcome = await asyncio.wrap_future(future)
-        
+
         elapsed_ms = int((time.time() - start_time) * 1000)
         self._logger.info(f"Query processed via unified pipeline in {elapsed_ms}ms")
         return outcome.response_text or ""
-    
+
     async def _process_query_shell(
         self,
         transcript: str,
@@ -859,76 +902,85 @@ class VoicePipeline(BaseToolWrapper):
         """Fallback: process query using shell execution."""
         root = self._resolve_root()
         request_tool = root / "tools" / "runtime_request.py"
-        
+
         if not request_tool.exists():
             raise VoicePipelineError("No query processing tool available")
-        
+
         env = os.environ.copy()
         env["LUCY_SURFACE"] = surface
-        
+
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, str(request_tool), "submit", "--text", transcript,
+            sys.executable,
+            str(request_tool),
+            "submit",
+            "--text",
+            transcript,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        
+
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=150.0)
-        
+
         if proc.returncode != 0:
             raise VoicePipelineError(f"Query failed: {stderr.decode()}")
-        
+
         try:
             result = json.loads(stdout.decode())
             return result.get("response_text", "")
         except json.JSONDecodeError:
             return stdout.decode().strip()
-    
+
     # =========================================================================
     # Stage 4: TTS Synthesis
     # =========================================================================
-    
+
     def _strip_html_for_tts(self, text: str) -> str:
         """Strip HTML tags from text for TTS synthesis."""
         import re
-        
+
         if not text:
             return ""
-        
+
         # Remove script and style elements
-        text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
-        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
-        
+        text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
+
         # Replace <br>, <p> etc with newlines
-        text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
-        text = re.sub(r'</p>', '\n', text, flags=re.IGNORECASE)
-        text = re.sub(r'<p[^>]*>', '', text, flags=re.IGNORECASE)
-        
+        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</p>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"<p[^>]*>", "", text, flags=re.IGNORECASE)
+
         # Replace <li> with bullet points
-        text = re.sub(r'<li[^>]*>', '\n• ', text, flags=re.IGNORECASE)
-        text = re.sub(r'</li>', '', text, flags=re.IGNORECASE)
-        
+        text = re.sub(r"<li[^>]*>", "\n• ", text, flags=re.IGNORECASE)
+        text = re.sub(r"</li>", "", text, flags=re.IGNORECASE)
+
         # Replace <a href="...">text</a> with "text (link)" or just "text"
         # Use lambda to avoid backreference interpretation issues with $ in content
-        text = re.sub(r'<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>', lambda m: m.group(2), text, flags=re.IGNORECASE)
-        text = re.sub(r'<a[^>]*>([^<]*)</a>', lambda m: m.group(1), text, flags=re.IGNORECASE)
-        
+        text = re.sub(
+            r'<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>',
+            lambda m: m.group(2),
+            text,
+            flags=re.IGNORECASE,
+        )
+        text = re.sub(r"<a[^>]*>([^<]*)</a>", lambda m: m.group(1), text, flags=re.IGNORECASE)
+
         # Remove all remaining HTML tags
-        text = re.sub(r'<[^>]+>', '', text)
-        
+        text = re.sub(r"<[^>]+>", "", text)
+
         # Decode common HTML entities
-        text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-        text = text.replace('&quot;', '"').replace('&#39;', "'")
-        text = text.replace('&nbsp;', ' ').replace('&#160;', ' ')
-        text = text.replace('&#8211;', '–').replace('&#8212;', '—')
-        text = text.replace('&#8216;', ''').replace('&#8217;', ''')
-        text = text.replace('&#8220;', '"').replace('&#8221;', '"')
-        
+        text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+        text = text.replace("&quot;", '"').replace("&#39;", "'")
+        text = text.replace("&nbsp;", " ").replace("&#160;", " ")
+        text = text.replace("&#8211;", "–").replace("&#8212;", "—")
+        text = text.replace("&#8216;", """).replace('&#8217;', """)
+        text = text.replace("&#8220;", '"').replace("&#8221;", '"')
+
         # Normalize whitespace
-        text = re.sub(r'\n\s*\n', '\n\n', text)
-        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r"\n\s*\n", "\n\n", text)
+        text = re.sub(r"[ \t]+", " ", text)
         text = text.strip()
-        
+
         return text
 
     async def synthesize(
@@ -938,47 +990,45 @@ class VoicePipeline(BaseToolWrapper):
         speed: float = 1.0,
     ) -> AudioBuffer:
         """Synthesize speech from text.
-        
+
         Args:
             text: Text to synthesize
             voice: Voice identifier (uses default if None)
             speed: Speech speed multiplier
-        
+
         Returns:
             AudioBuffer with synthesized speech
         """
         self._check_cancelled()
-        
+
         if not text or not text.strip():
             return AudioBuffer(b"", self.sample_rate, self.channels, self.sample_width)
-        
+
         # Strip HTML tags for TTS
         text = self._strip_html_for_tts(text)
-        
+
         if not text.strip():
             return AudioBuffer(b"", self.sample_rate, self.channels, self.sample_width)
-        
+
         start_time = time.time()
-        
+
         # Use tts_adapter for synthesis
         voice = voice or self.tts_voice
         engine = self.tts_engine
-        
+
         _voice_usage_logger.info(f"Voice synthesis starting: engine={engine}, voice={voice}")
-        
+
         # Create temp output directory
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
                 # Use ui-v10 Python for TTS to ensure Kokoro is available
                 voice_python = self._resolve_voice_python()
-                
+
                 # Always use subprocess to avoid Python environment issues
                 # (Kokoro is installed in ui-v10 venv, not system Python)
                 if not voice_python:
-                    raise SynthesisError(
-                        "No voice Python available. Ensure ui-v10 venv exists."
-                    )
-                
+                    raise SynthesisError("No voice Python available. Ensure ui-v10 venv exists.")
+
                 result = self._synthesize_with_subprocess(
                     text=text.strip(),
                     engine=engine,
@@ -986,29 +1036,30 @@ class VoicePipeline(BaseToolWrapper):
                     output_dir=tmpdir,
                     python_bin=voice_python,
                 )
-                
+
                 if not result.get("ok"):
                     error = result.get("error", "Unknown TTS error")
                     raise SynthesisError(f"TTS failed: {error}")
-                
+
                 wav_path = Path(result.get("wav_path", ""))
                 if not wav_path.exists():
                     raise SynthesisError("TTS produced no audio output")
-                
+
                 # Load audio
                 audio = AudioBuffer.from_file(wav_path)
-                
+
                 elapsed_ms = int((time.time() - start_time) * 1000)
-                self._logger.info(f"Synthesis completed in {elapsed_ms}ms " +
-                                 f"(engine={result.get('engine')})")
-                
+                self._logger.info(
+                    f"Synthesis completed in {elapsed_ms}ms " + f"(engine={result.get('engine')})"
+                )
+
                 return audio
-                
+
             except Exception as e:
                 if isinstance(e, SynthesisError):
                     raise
                 raise SynthesisError(f"Synthesis failed: {e}") from e
-    
+
     def _resolve_voice_python(self) -> str:
         """Resolve Python binary for TTS (ui-v10 venv has Kokoro)."""
         # Check explicit env var
@@ -1017,24 +1068,24 @@ class VoicePipeline(BaseToolWrapper):
             path = Path(explicit).expanduser()
             if path.exists() and os.access(path, os.X_OK):
                 return str(path)
-        
+
         # ISOLATION: V8 only uses ui-v10, NEVER falls back to ui-v7
         root = self._resolve_root()
         workspace_root = root if root.name == "lucy-v10" else root.parent.parent
         candidate = workspace_root / "ui-v10" / ".venv" / "bin" / "python3"
-        
+
         if candidate.exists() and os.access(candidate, os.X_OK):
             return str(candidate)
 
         for fallback in (Path(sys.executable), Path("/usr/bin/python3")):
             if fallback.exists() and os.access(fallback, os.X_OK):
                 return str(fallback)
-        
+
         raise RuntimeError(
             f"V8 ISOLATION VIOLATION: ui-v10 Python not found at {candidate}, "
             "and no system python3 fallback is executable. V8 cannot use V7 components."
         )
-    
+
     def _synthesize_with_subprocess(
         self,
         text: str,
@@ -1046,40 +1097,43 @@ class VoicePipeline(BaseToolWrapper):
         """Synthesize using TTS adapter via subprocess with ui-v10 Python."""
         import subprocess
         import json
-        
+
         tts_adapter_path = Path(__file__).parent.parent / "voice" / "tts_adapter.py"
-        
+
         cmd = [
             python_bin,
             str(tts_adapter_path),
             "synthesize",
-            "--text", text,
-            "--engine", engine,
-            "--output-dir", output_dir,
+            "--text",
+            text,
+            "--engine",
+            engine,
+            "--output-dir",
+            output_dir,
         ]
-        
+
         if voice:
             cmd.extend(["--voice", voice])
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             env=os.environ.copy(),
         )
-        
+
         if result.returncode != 0:
             return {"ok": False, "error": result.stderr or "Subprocess failed"}
-        
+
         try:
             return json.loads(result.stdout)
         except json.JSONDecodeError:
             return {"ok": False, "error": f"Invalid JSON output: {result.stdout}"}
-    
+
     # =========================================================================
     # Stage 5: Audio Playback
     # =========================================================================
-    
+
     async def play_audio(
         self,
         audio: AudioBuffer,
@@ -1087,38 +1141,45 @@ class VoicePipeline(BaseToolWrapper):
         prepad_ms: int = 0,
     ) -> None:
         """Play audio using aplay or paplay.
-        
+
         Args:
             audio: Audio buffer to play
             device: Audio device (None for default)
             prepad_ms: Leading silence to prepend (ms)
         """
         self._check_cancelled()
-        
+
         if audio.duration_ms == 0:
             return
-        
+
         start_time = time.time()
-        
+
         # Save to temp file
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_path = Path(tmp.name)
-        
+
         try:
             audio.save_to_file(tmp_path)
             self._check_cancelled()
-            
+
             # Use playback.py if available
-            self._logger.info(f"play_audio: play_wav_file_with_levels={play_wav_file_with_levels is not None}, play_wav_file={play_wav_file is not None}")
+            self._logger.info(
+                f"play_audio: play_wav_file_with_levels={play_wav_file_with_levels is not None}, play_wav_file={play_wav_file is not None}"
+            )
             if play_wav_file_with_levels:
                 # Playback with VU meter level output
                 try:
                     # Get levels file path from environment or use default
                     import os
-                    runtime_dir = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", 
-                        Path.home() / ".codex-api-home/lucy/runtime-v10"))
+
+                    runtime_dir = Path(
+                        os.environ.get(
+                            "LUCY_RUNTIME_NAMESPACE_ROOT",
+                            Path.home() / ".codex-api-home/lucy/runtime-v10",
+                        )
+                    )
                     levels_file = runtime_dir / "state" / "voice_audio_levels.json"
-                    
+
                     play_wav_file_with_levels(
                         tmp_path,
                         levels_file,
@@ -1144,16 +1205,16 @@ class VoicePipeline(BaseToolWrapper):
             else:
                 # Fallback to direct player execution
                 await self._play_with_player(tmp_path, device, prepad_ms)
-            
+
             elapsed_ms = int((time.time() - start_time) * 1000)
             self._logger.info(f"Playback completed in {elapsed_ms}ms")
-            
+
         finally:
             try:
                 tmp_path.unlink()
             except OSError:
                 pass
-    
+
     async def _play_with_player(
         self,
         wav_path: Path,
@@ -1162,57 +1223,57 @@ class VoicePipeline(BaseToolWrapper):
     ) -> None:
         """Play using system audio player."""
         player = player or detect_audio_player()
-        
+
         if not player:
             raise PlaybackError("No audio player available (aplay or paplay)")
-        
+
         # Pre-pad the WAV file with silence to prevent truncating first word
         # This embeds silence INTO the audio file rather than playing separately
-        
+
         if player == "aplay":
             cmd = ["aplay", "-q", str(wav_path)]
         elif player == "paplay":
             cmd = ["paplay", str(wav_path)]
         else:
             raise PlaybackError(f"Unknown player: {player}")
-        
+
         proc = await asyncio.create_subprocess_exec(*cmd)
         await proc.wait()
-        
+
         if proc.returncode != 0:
             raise PlaybackError(f"Player exited with code {proc.returncode}")
-    
+
     def _detect_recorder(self) -> Tuple[Optional[str], Optional[str]]:
         """Detect available audio recorder."""
         if self._recorder_engine and self._recorder_bin:
             return self._recorder_engine, self._recorder_bin
-        
+
         arecord = shutil.which("arecord")
         if arecord:
             self._recorder_engine = "arecord"
             self._recorder_bin = arecord
             return self._recorder_engine, self._recorder_bin
-        
+
         pw_record = shutil.which("pw-record")
         if pw_record:
             self._recorder_engine = "pw-record"
             self._recorder_bin = pw_record
             return self._recorder_engine, self._recorder_bin
-        
+
         return None, None
-    
+
     def _detect_stt(self) -> Tuple[Optional[str], Optional[str]]:
         """Detect available STT engine."""
         if self._stt_engine and self._stt_bin:
             return self._stt_engine, self._stt_bin
-        
+
         # Check for whisper
         whisper_bin = os.environ.get("LUCY_VOICE_WHISPER_BIN", "")
         if whisper_bin and Path(whisper_bin).exists():
             self._stt_engine = "whisper"
             self._stt_bin = whisper_bin
             return self._stt_engine, self._stt_bin
-        
+
         # Check bundled whisper
         root = self._resolve_root()
         bundled = root / "runtime" / "voice" / "bin" / "whisper"
@@ -1226,7 +1287,7 @@ class VoicePipeline(BaseToolWrapper):
                 self._stt_engine = "whisper"
                 self._stt_bin = str(bundled)
                 return self._stt_engine, self._stt_bin
-        
+
         # Check system whisper
         for name in ["whisper", "whisper-cli", "whisper-cpp"]:
             path = shutil.which(name)
@@ -1234,61 +1295,61 @@ class VoicePipeline(BaseToolWrapper):
                 self._stt_engine = "whisper"
                 self._stt_bin = path
                 return self._stt_engine, self._stt_bin
-        
+
         # Check for vosk
         vosk_bin = os.environ.get("LUCY_VOICE_VOSK_BIN", "")
         if vosk_bin and Path(vosk_bin).exists():
             self._stt_engine = "vosk"
             self._stt_bin = vosk_bin
             return self._stt_engine, self._stt_bin
-        
+
         system_vosk = shutil.which("vosk-transcriber")
         if system_vosk:
             self._stt_engine = "vosk"
             self._stt_bin = system_vosk
             return self._stt_engine, self._stt_bin
-        
+
         return None, None
-    
+
     def _resolve_whisper_model(self, model: Optional[str]) -> str:
         """Resolve whisper model path."""
         if model and Path(model).exists():
             return str(model)
-        
+
         # Check environment
         env_model = os.environ.get("LUCY_VOICE_WHISPER_MODEL", "")
         if env_model and Path(env_model).exists():
             return env_model
-        
+
         # Check bundled models
         root = self._resolve_root()
         model_name = model or os.environ.get("LUCY_VOICE_MODEL", "small.en")
         bundled = root / "runtime" / "voice" / "models" / f"ggml-{model_name}.bin"
         if bundled.exists():
             return str(bundled)
-        
+
         # Fallback to models directory
         fallback = root / "models" / "ggml-base.bin"
         if fallback.exists():
             return str(fallback)
-        
+
         # Last resort: return model name and hope it's in PATH
         return model or "base"
-    
+
     def _whisper_env(self, stt_bin: str) -> Dict[str, str]:
         """Get environment for whisper execution."""
         env = os.environ.copy()
         root = self._resolve_root()
         bundled = root / "runtime" / "voice" / "bin" / "whisper"
-        
+
         try:
             is_bundled = Path(stt_bin).resolve() == bundled.resolve()
         except OSError:
             is_bundled = False
-        
+
         if not is_bundled:
             return env
-        
+
         # Set LD_LIBRARY_PATH for bundled whisper
         lib_dirs = [
             str(root / "runtime" / "voice" / "whisper.cpp" / "build" / "src"),
@@ -1296,51 +1357,54 @@ class VoicePipeline(BaseToolWrapper):
         ]
         existing = env.get("LD_LIBRARY_PATH", "")
         env["LD_LIBRARY_PATH"] = ":".join(lib_dirs + ([existing] if existing else []))
-        
+
         return env
-    
+
     def _resolve_root(self) -> Path:
         """Resolve Local Lucy root directory."""
         env_root = os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT")
         if env_root:
             return Path(env_root).expanduser().resolve()
         return Path(__file__).resolve().parents[2]
-    
+
     def _detect_backend(self):
         """Detect voice backend availability.
-        
+
         Returns a SimpleNamespace with attributes:
         - available: bool
         - recorder_engine: str
-        - stt_engine: str  
+        - stt_engine: str
         - tts_engine: str
         - tts_device: str
         - audio_player: str
         - reason: str
         """
         from types import SimpleNamespace
-        
+
         recorder_engine, recorder_bin = self._detect_recorder()
         stt_engine, stt_bin = self._detect_stt()
-        
+
         # Detect TTS
         tts_engine = self.tts_engine if self.tts_engine else "none"
-        tts_device = "cuda" if tts_engine == "kokoro" else "cpu" if tts_engine == "piper" else "none"
-        
+        tts_device = (
+            "cuda" if tts_engine == "kokoro" else "cpu" if tts_engine == "piper" else "none"
+        )
+
         # Detect audio player
         from playback import detect_audio_player
+
         audio_player = detect_audio_player() or "none"
-        
+
         # Check availability
         missing = []
         if not recorder_bin:
             missing.append("recorder")
         if not stt_bin:
             missing.append("stt")
-        
+
         available = not missing
         reason = "ready" if available else f"missing {'; '.join(missing)}"
-        
+
         return SimpleNamespace(
             available=available,
             recorder_engine=recorder_engine or "unavailable",
@@ -1350,38 +1414,38 @@ class VoicePipeline(BaseToolWrapper):
             audio_player=audio_player or "none",
             reason=reason,
         )
-    
+
     # =========================================================================
     # BaseToolWrapper Interface
     # =========================================================================
-    
+
     async def execute(self, **kwargs) -> ToolResult:
         """Execute voice interaction (BaseToolWrapper interface).
-        
+
         Args:
             **kwargs: Optional parameters:
                 - max_duration: Max recording duration
                 - use_tts: Whether to use TTS
-        
+
         Returns:
             ToolResult with VoiceResult data
         """
         max_duration = kwargs.get("max_duration", 30.0)
         use_tts = kwargs.get("use_tts", True)
-        
+
         start_time = time.time()
         result = await self.voice_interaction(
             max_duration=max_duration,
             use_tts=use_tts,
         )
-        
+
         return ToolResult(
             success=result.success,
             data=result,
             error_message=result.error_message,
             duration_ms=int((time.time() - start_time) * 1000),
         )
-    
+
     async def voice_interaction(
         self,
         max_duration: float = 30.0,
@@ -1397,6 +1461,7 @@ class VoicePipeline(BaseToolWrapper):
             VoiceResult with transcript, response text, and status
         """
         import time
+
         start_time = time.time()
 
         try:
@@ -1419,6 +1484,7 @@ class VoicePipeline(BaseToolWrapper):
 
             # 3. Get response from Lucy
             from router_py.main import run
+
             result = run(transcript)
             if hasattr(result, "response_text"):
                 response_text = result.response_text
@@ -1430,18 +1496,25 @@ class VoicePipeline(BaseToolWrapper):
             # 4. TTS + playback
             if use_tts and response_text:
                 # Use kokoro via subprocess for simplicity
-                kokoro_script = Path(__file__).parent.parent / "router_py" / "streaming_tts_helper.py"
+                kokoro_script = (
+                    Path(__file__).parent.parent / "router_py" / "streaming_tts_helper.py"
+                )
                 voice = os.environ.get("LUCY_VOICE_KOKORO_VOICE", "af_bella")
                 proc = await asyncio.create_subprocess_exec(
-                    sys.executable, str(kokoro_script), response_text,
-                    "--voice", voice,
+                    sys.executable,
+                    str(kokoro_script),
+                    response_text,
+                    "--voice",
+                    voice,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
                 pcm_data, stderr = await proc.communicate()
                 if proc.returncode == 0 and pcm_data:
                     # Wrap in WAV header for play_audio
-                    import wave, io
+                    import wave
+                    import io
+
                     wav_buffer = io.BytesIO()
                     with wave.open(wav_buffer, "wb") as wf:
                         wf.setnchannels(1)
@@ -1500,14 +1573,14 @@ async def quick_voice_interaction(
     use_tts: bool = True,
 ) -> VoiceResult:
     """Quick voice interaction without managing pipeline state.
-    
+
     Args:
         max_duration: Maximum recording duration
         use_tts: Whether to synthesize and play response
-    
+
     Returns:
         VoiceResult with interaction details
-    
+
     Example:
         result = await quick_voice_interaction()
         print(f"You said: {result.transcript}")
@@ -1526,29 +1599,29 @@ async def test_record():
     """Test audio recording."""
     print("\n=== Test: Record Audio ===")
     print("Recording 3 seconds of audio...")
-    
+
     pipeline = VoicePipeline()
     audio = await pipeline.record_audio(duration=3.0)
-    
+
     print(f"Recorded: {audio.duration_ms}ms")
     print(f"Sample rate: {audio.sample_rate}Hz")
     print(f"Channels: {audio.channels}")
     print(f"Data size: {len(audio.data)} bytes")
-    
+
     # Save to file for inspection
     test_path = Path("/tmp/test_record.wav")
     audio.save_to_file(test_path)
     print(f"Saved to: {test_path}")
-    
+
     return audio
 
 
 async def test_transcribe(audio: Optional[AudioBuffer] = None):
     """Test transcription."""
     print("\n=== Test: Transcribe ===")
-    
+
     pipeline = VoicePipeline()
-    
+
     if audio is None:
         # Try to load test file or record
         test_path = Path("/tmp/test_record.wav")
@@ -1558,10 +1631,10 @@ async def test_transcribe(audio: Optional[AudioBuffer] = None):
         else:
             print("No audio provided, recording 3 seconds...")
             audio = await pipeline.record_audio(duration=3.0)
-    
+
     print(f"Transcribing {audio.duration_ms}ms of audio...")
     tx_result = await pipeline.transcribe(audio)
-    
+
     print(f"Transcript: '{tx_result.text}'")
     print(f"Backend: {tx_result.backend or 'unknown'}")
     if tx_result.fallback_used:
@@ -1572,13 +1645,13 @@ async def test_transcribe(audio: Optional[AudioBuffer] = None):
 async def test_synthesize():
     """Test TTS synthesis."""
     print("\n=== Test: Synthesize ===")
-    
+
     pipeline = VoicePipeline()
     text = "Hello, this is a test of the Local Lucy voice system."
-    
+
     print(f"Synthesizing: '{text}'")
     audio = await pipeline.synthesize(text)
-    
+
     print(f"Synthesized: {audio.duration_ms}ms of audio")
     return audio
 
@@ -1586,12 +1659,12 @@ async def test_synthesize():
 async def test_playback(audio: Optional[AudioBuffer] = None):
     """Test audio playback."""
     print("\n=== Test: Playback ===")
-    
+
     pipeline = VoicePipeline()
-    
+
     if audio is None:
         audio = await test_synthesize()
-    
+
     print("Playing audio...")
     await pipeline.play_audio(audio)
     print("Playback complete")
@@ -1603,32 +1676,32 @@ async def test_pipeline():
     print("This will record, transcribe, process, and speak.")
     print("Speak when ready...")
     await asyncio.sleep(1)
-    
+
     pipeline = VoicePipeline()
-    
+
     def on_transcript(t: str):
         print(f"\n[Transcript] {t}")
-    
+
     def on_response(r: str):
         print(f"\n[Response] {r[:100]}...")
-    
+
     result = await pipeline.voice_interaction(
         on_transcription=on_transcript,
         on_response=on_response,
         max_duration=10.0,
     )
-    
-    print(f"\n=== Result ===")
+
+    print("\n=== Result ===")
     print(f"Success: {result.success}")
     print(f"Transcript: {result.transcript}")
     print(f"Response: {result.response_text[:200]}...")
-    print(f"Metrics:")
+    print("Metrics:")
     print(f"  Record: {result.metrics.record_duration_ms}ms")
     print(f"  Transcription: {result.metrics.transcription_time_ms}ms")
     print(f"  Processing: {result.metrics.processing_time_ms}ms")
     print(f"  TTS: {result.metrics.tts_time_ms}ms")
     print(f"  Total: {result.metrics.total_latency_ms}ms")
-    
+
     return result
 
 
@@ -1636,17 +1709,17 @@ async def test_cancellation():
     """Test pipeline cancellation."""
     print("\n=== Test: Cancellation ===")
     print("Recording for 5 seconds, will cancel after 2 seconds...")
-    
+
     pipeline = VoicePipeline()
-    
+
     async def delayed_cancel():
         await asyncio.sleep(2)
         print("\n[Cancelling...]")
         pipeline.cancel()
-    
+
     # Start recording and cancellation task
     cancel_task = asyncio.create_task(delayed_cancel())
-    
+
     try:
         audio = await pipeline.record_audio(duration=5.0)
         print(f"Recorded: {audio.duration_ms}ms (should be ~2000ms)")
@@ -1663,15 +1736,15 @@ async def test_cancellation():
 async def test_health():
     """Test health check."""
     print("\n=== Test: Health Check ===")
-    
+
     pipeline = VoicePipeline()
     healthy = await pipeline.health_check()
-    
+
     print(f"Pipeline healthy: {healthy}")
-    
+
     recorder = pipeline._detect_recorder()
     stt = pipeline._detect_stt()
-    
+
     print(f"Recorder: {recorder[0] or 'NOT FOUND'} ({recorder[1] or 'N/A'})")
     print(f"STT: {stt[0] or 'NOT FOUND'} ({stt[1] or 'N/A'})")
 
@@ -1684,21 +1757,32 @@ async def test_health():
 async def main():
     """Main entry point with command-line test runner."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Local Lucy Voice Pipeline")
-    parser.add_argument("--test", choices=[
-        "record", "transcribe", "synthesize", "playback", 
-        "pipeline", "cancel", "health", "all"
-    ], default="health", help="Test to run")
+    parser.add_argument(
+        "--test",
+        choices=[
+            "record",
+            "transcribe",
+            "synthesize",
+            "playback",
+            "pipeline",
+            "cancel",
+            "health",
+            "all",
+        ],
+        default="health",
+        help="Test to run",
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
-    
+
     args = parser.parse_args()
-    
+
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
-    
+
     tests = {
         "record": test_record,
         "transcribe": test_transcribe,
@@ -1708,20 +1792,20 @@ async def main():
         "cancel": test_cancellation,
         "health": test_health,
     }
-    
+
     if args.test == "all":
         print("Running all tests...")
         for name, test_func in tests.items():
             print(f"\n{'='*60}")
             print(f"Running: {name}")
-            print('='*60)
+            print("=" * 60)
             try:
                 await test_func()
             except Exception as e:
                 print(f"FAILED: {e}")
     else:
         await tests[args.test]()
-    
+
     print("\n=== Done ===")
 
 
@@ -1733,30 +1817,36 @@ if __name__ == "__main__":
 # Verification Logging
 # =============================================================================
 
+
 def log_voice_pipeline_start():
     """Log that Python voice pipeline is being used."""
     import logging
+
     logger = logging.getLogger(__name__)
+
 
 # Voice engine usage logger
 class VoiceUsageLogger:
     """Logger for voice engine usage."""
+
     def __init__(self):
         self.log_dir = Path.home() / ".local" / "share" / "lucy" / "logs"
         self.log_file = self.log_dir / "voice_engine.log"
         self.log_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def log(self, level: str, msg: str):
         from datetime import datetime
+
         ts = datetime.now().isoformat()
         try:
             with open(self.log_file, "a") as f:
                 f.write(f"{ts} [{level}] {msg}\n")
         except Exception:
             pass
-    
+
     def info(self, msg: str):
         self.log("INFO", msg)
+
 
 _voice_usage_logger = VoiceUsageLogger()
 

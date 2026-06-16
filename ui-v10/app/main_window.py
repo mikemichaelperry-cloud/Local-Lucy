@@ -36,7 +36,15 @@ from app.services.state_store import (
     resolve_last_request_paid,
     resolve_last_request_provider,
 )
-from app.ui_levels import ENGINEERING, LEVELS, POWER, SIMPLE, display_level, level_at_least, normalize_level
+from app.ui_levels import (
+    ENGINEERING,
+    LEVELS,
+    POWER,
+    SIMPLE,
+    display_level,
+    level_at_least,
+    normalize_level,
+)
 
 
 APP_STYLESHEET = """
@@ -223,14 +231,20 @@ class OperatorConsoleWindow(QMainWindow):
 
         self._log_watcher = LogWatcher()
         self._runtime_bridge = RuntimeBridge()
-        
+
         # Log state store paths for debugging
-        from app.services.state_store import RUNTIME_NAMESPACE_ROOT, STATE_DIRECTORY, REQUEST_HISTORY_FILE, STATE_FILES
+        from app.services.state_store import (
+            RUNTIME_NAMESPACE_ROOT,
+            STATE_DIRECTORY,
+            REQUEST_HISTORY_FILE,
+            STATE_FILES,
+        )
+
         self._debug_log(f"RUNTIME_NAMESPACE_ROOT: {RUNTIME_NAMESPACE_ROOT}")
         self._debug_log(f"STATE_DIRECTORY: {STATE_DIRECTORY}")
         self._debug_log(f"REQUEST_HISTORY_FILE: {REQUEST_HISTORY_FILE}")
         self._debug_log(f"current_state file: {STATE_FILES['current_state']}")
-        
+
         self._backend_controls_available = all(
             capability.available for capability in self._runtime_bridge.capabilities.values()
         )
@@ -344,10 +358,13 @@ class OperatorConsoleWindow(QMainWindow):
         try:
             from pathlib import Path
             import os
+
             root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10")).resolve()
             socket_path = root / "tmp" / "run" / "kokoro_tts_worker.sock"
             if socket_path.exists():
-                import socket, json
+                import socket
+                import json
+
                 client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 client.settimeout(1.0)
                 client.connect(str(socket_path))
@@ -358,7 +375,9 @@ class OperatorConsoleWindow(QMainWindow):
         # Kill whisper-server
         try:
             from pathlib import Path
-            import os, signal
+            import os
+            import signal
+
             root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10")).resolve()
             whisper_pid_file = root / "tmp" / "run" / "whisper_worker.pid"
             if whisper_pid_file.exists():
@@ -377,7 +396,9 @@ class OperatorConsoleWindow(QMainWindow):
             previous_voice_runtime = dict(getattr(self._latest_state_snapshot, "voice_runtime", {}))
             self._latest_state_snapshot = load_runtime_snapshot()
             self._latest_log_snapshot = self._log_watcher.poll()
-            self._emit_voice_runtime_events(previous_voice_runtime, self._latest_state_snapshot.voice_runtime)
+            self._emit_voice_runtime_events(
+                previous_voice_runtime, self._latest_state_snapshot.voice_runtime
+            )
             self._reload_request_history()
             self._repaint_from_truth()
             self._restore_refresh_scroll_state(scroll_state)
@@ -413,9 +434,11 @@ class OperatorConsoleWindow(QMainWindow):
             self._latest_state_snapshot.current_state,
         )
         self.control_panel.update_voice_runtime(self._latest_state_snapshot.voice_runtime)
-        
+
         # Update voice transcription preview in conversation panel
-        voice_transcription = str(self._latest_state_snapshot.voice_runtime.get("transcription_preview", ""))
+        voice_transcription = str(
+            self._latest_state_snapshot.voice_runtime.get("transcription_preview", "")
+        )
         self.conversation_panel.set_voice_transcription_preview(voice_transcription)
         self.control_panel.set_profile_reload_available(self._profile_reload_available)
         if not self._any_backend_action_in_flight():
@@ -442,7 +465,9 @@ class OperatorConsoleWindow(QMainWindow):
             lambda value: self._execute_backend_action("mode_selection", value, "mode change")
         )
         self.control_panel.conversation_change_requested.connect(
-            lambda value: self._execute_backend_action("conversation_toggle", value, "conversation toggle")
+            lambda value: self._execute_backend_action(
+                "conversation_toggle", value, "conversation toggle"
+            )
         )
         self.control_panel.memory_change_requested.connect(
             lambda value: self._execute_backend_action("memory_toggle", value, "memory toggle")
@@ -454,10 +479,14 @@ class OperatorConsoleWindow(QMainWindow):
             lambda value: self._execute_backend_action("voice_toggle", value, "voice toggle")
         )
         self.control_panel.augmented_policy_change_requested.connect(
-            lambda value: self._execute_backend_action("augmentation_policy", value, "augmented policy change")
+            lambda value: self._execute_backend_action(
+                "augmentation_policy", value, "augmented policy change"
+            )
         )
         self.control_panel.augmented_provider_change_requested.connect(
-            lambda value: self._execute_backend_action("augmented_provider", value, "augmented provider change")
+            lambda value: self._execute_backend_action(
+                "augmented_provider", value, "augmented provider change"
+            )
         )
         self.control_panel.model_change_requested.connect(
             lambda value: self._execute_backend_action("model_selection", value, "model change")
@@ -472,7 +501,9 @@ class OperatorConsoleWindow(QMainWindow):
         self.control_panel.shutdown_requested.connect(self._handle_shutdown_requested)
         self.conversation_panel.clear_draft_requested.connect(self._clear_conversation_draft)
         self.conversation_panel.submit_requested.connect(self._handle_submit_requested)
-        self.conversation_panel.history_selection_changed.connect(self._handle_history_selection_changed)
+        self.conversation_panel.history_selection_changed.connect(
+            self._handle_history_selection_changed
+        )
         self.conversation_panel.decision_trace_toggled.connect(self._handle_decision_trace_toggled)
         self.event_log_panel.clear_view_requested.connect(self._clear_event_view)
         self.event_log_panel.acknowledge_alarms_requested.connect(self._acknowledge_alarms)
@@ -499,7 +530,9 @@ class OperatorConsoleWindow(QMainWindow):
             self._settings.setValue("interface_level", self._interface_level)
         self._reload_request_history()
         self._repaint_from_truth()
-        self.statusBar().showMessage(f"Interface level: {display_level(self._interface_level)}.", 2500)
+        self.statusBar().showMessage(
+            f"Interface level: {display_level(self._interface_level)}.", 2500
+        )
 
     def _handle_interface_level_selected(self, level: str) -> None:
         normalized = normalize_level(level)
@@ -573,7 +606,14 @@ class OperatorConsoleWindow(QMainWindow):
         self._voice_action_task.signals.finished.connect(self._handle_backend_action_complete)
         self._thread_pool.start(self._voice_action_task)
 
-    def _execute_backend_action(self, action: str, requested_value: str, action_label: str, *, context: dict[str, Any] | None = None) -> None:
+    def _execute_backend_action(
+        self,
+        action: str,
+        requested_value: str,
+        action_label: str,
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> None:
         if not self._backend_controls_available:
             self._append_ui_event(f"[warning] {action_label} unavailable")
             self.statusBar().showMessage("Backend controls unavailable.", 3000)
@@ -590,8 +630,12 @@ class OperatorConsoleWindow(QMainWindow):
         if action == "model_selection":
             cooldown_remaining = 5.0 - (time.time() - self._last_model_switch_time)
             if cooldown_remaining > 0:
-                self._append_ui_event(f"[warning] model switch cooldown {cooldown_remaining:.1f}s remaining")
-                self.statusBar().showMessage(f"Model switch cooldown: {cooldown_remaining:.1f}s remaining.", 3000)
+                self._append_ui_event(
+                    f"[warning] model switch cooldown {cooldown_remaining:.1f}s remaining"
+                )
+                self.statusBar().showMessage(
+                    f"Model switch cooldown: {cooldown_remaining:.1f}s remaining.", 3000
+                )
                 self.refresh_runtime_state()
                 return
             self._last_model_switch_time = time.time()
@@ -604,7 +648,9 @@ class OperatorConsoleWindow(QMainWindow):
         self._pending_action_label = action_label
         self._append_ui_event(f"[info] {action_label} requested -> {requested_value}")
         self.statusBar().showMessage(f"Applying {action_label}: {requested_value}", 0)
-        self._action_task = RuntimeActionTask(self._runtime_bridge, action, requested_value, context=context)
+        self._action_task = RuntimeActionTask(
+            self._runtime_bridge, action, requested_value, context=context
+        )
         self._action_task.signals.finished.connect(self._handle_backend_action_complete)
         self._thread_pool.start(self._action_task)
 
@@ -651,6 +697,7 @@ class OperatorConsoleWindow(QMainWindow):
         def _force_quit():
             self.close()
             import sys
+
             sys.exit(0)
 
         QTimer.singleShot(500, _force_quit)
@@ -660,7 +707,11 @@ class OperatorConsoleWindow(QMainWindow):
         if result.action in {"voice_ptt_start", "voice_ptt_stop", "voice_status"}:
             self._handle_voice_action_complete(result)
             return
-        if result.action in {"submit_request", "submit_request_force_augmented_once", "submit_self_review_request"}:
+        if result.action in {
+            "submit_request",
+            "submit_request_force_augmented_once",
+            "submit_self_review_request",
+        }:
             self._handle_submit_complete(result)
             return
 
@@ -703,7 +754,9 @@ class OperatorConsoleWindow(QMainWindow):
         )
 
         if result.action == "voice_ptt_start":
-            if result.status == "ok" and bool(self._latest_state_snapshot.voice_runtime.get("listening", False)):
+            if result.status == "ok" and bool(
+                self._latest_state_snapshot.voice_runtime.get("listening", False)
+            ):
                 if self._voice_release_pending:
                     self._voice_release_pending = False
                     self._voice_ptt_active = False
@@ -746,8 +799,10 @@ class OperatorConsoleWindow(QMainWindow):
                 else:
                     preview = transcript if len(transcript) <= 48 else f"{transcript[:45]}..."
                     self.statusBar().showMessage(f"Voice: '{preview}'", 3000)
-                    self._append_ui_event(f"[info] voice transcript -> submit")
-                    self._execute_backend_action("submit_request", transcript, "voice submit", context={"surface": "voice"})
+                    self._append_ui_event("[info] voice transcript -> submit")
+                    self._execute_backend_action(
+                        "submit_request", transcript, "voice submit", context={"surface": "voice"}
+                    )
                 return
             if result.status == "timeout":
                 timeout_detail = self._voice_failure_detail(result) or "timeout"
@@ -755,7 +810,9 @@ class OperatorConsoleWindow(QMainWindow):
                     self._append_ui_event(f"[alarm] {action_label} timeout")
                 self.statusBar().showMessage(f"Voice stop timed out: {timeout_detail}", 3000)
                 # Force a voice status sync to recover state after timeout
-                QTimer.singleShot(500, lambda: self._execute_voice_action("voice_status", "", "voice status sync"))
+                QTimer.singleShot(
+                    500, lambda: self._execute_voice_action("voice_status", "", "voice status sync")
+                )
                 return
 
             failure_detail = self._voice_failure_detail(result)
@@ -783,19 +840,27 @@ class OperatorConsoleWindow(QMainWindow):
 
         if self._is_self_review_request(request_text):
             if not level_at_least(self._interface_level, ENGINEERING):
-                self._append_ui_event("[warning] self-review trigger blocked outside advanced views")
-                self.statusBar().showMessage("Read-only self-review is available only in Advanced or Coding views.", 4000)
+                self._append_ui_event(
+                    "[warning] self-review trigger blocked outside advanced views"
+                )
+                self.statusBar().showMessage(
+                    "Read-only self-review is available only in Advanced or Coding views.", 4000
+                )
                 return
             if self._current_mode() != "auto":
                 self._append_ui_event("[warning] self-review trigger blocked outside auto mode")
-                self.statusBar().showMessage("Read-only self-review is available only while mode is set to auto.", 4000)
+                self.statusBar().showMessage(
+                    "Read-only self-review is available only while mode is set to auto.", 4000
+                )
                 return
             force_augmented_once = False
             action = "submit_self_review_request"
             self._pending_action_label = "read-only self-review"
         else:
             force_augmented_once = self.conversation_panel.consume_force_augmented_once()
-            action = "submit_request_force_augmented_once" if force_augmented_once else "submit_request"
+            action = (
+                "submit_request_force_augmented_once" if force_augmented_once else "submit_request"
+            )
             self._pending_action_label = "request submit"
         self._set_backend_busy(True)
         self._pending_submit_force_augmented_once = force_augmented_once
@@ -804,7 +869,9 @@ class OperatorConsoleWindow(QMainWindow):
             self.statusBar().showMessage("Submitting read-only self-review...", 0)
         elif force_augmented_once:
             self._append_ui_event("[info] request submitted with one-shot augmented override")
-            self.statusBar().showMessage("Submitting authoritative request (force augmented once)...", 0)
+            self.statusBar().showMessage(
+                "Submitting authoritative request (force augmented once)...", 0
+            )
         else:
             self._append_ui_event("[info] request submitted")
             self.statusBar().showMessage("Submitting authoritative request...", 0)
@@ -840,7 +907,9 @@ class OperatorConsoleWindow(QMainWindow):
         if request_status == "completed":
             if result.action == "submit_self_review_request":
                 self._append_ui_event("[info] read-only self-review completed")
-                self.statusBar().showMessage("Read-only self-review completed. State refresh complete.", 3000)
+                self.statusBar().showMessage(
+                    "Read-only self-review completed. State refresh complete.", 3000
+                )
             else:
                 self._append_ui_event("[info] request completed")
                 self.statusBar().showMessage("Request completed. State refresh complete.", 3000)
@@ -891,7 +960,9 @@ class OperatorConsoleWindow(QMainWindow):
         """Fire TTS in background if voice is enabled."""
         if not text:
             return
-        voice_on = self._payload_text(self._latest_state_snapshot.top_status, "Voice").lower() == "on"
+        voice_on = (
+            self._payload_text(self._latest_state_snapshot.top_status, "Voice").lower() == "on"
+        )
         if not voice_on:
             return
         task = RuntimeActionTask(self._runtime_bridge, "speak", text)
@@ -945,7 +1016,9 @@ class OperatorConsoleWindow(QMainWindow):
         status = str(self._latest_state_snapshot.voice_runtime.get("status", "")).strip().lower()
         if status not in {"fault", "unavailable"}:
             return ""
-        detail = str(self._latest_state_snapshot.voice_runtime.get("last_error", "")).strip() or status
+        detail = (
+            str(self._latest_state_snapshot.voice_runtime.get("last_error", "")).strip() or status
+        )
         return self._normalize_operator_detail(detail)
 
     def _should_emit_local_voice_failure_event(self, detail: str) -> bool:
@@ -987,7 +1060,9 @@ class OperatorConsoleWindow(QMainWindow):
         voice_runtime["record_pid"] = None
         voice_runtime["processing_pid"] = None
         voice_runtime["capture_path"] = ""
-        voice_runtime["last_error"] = voice_runtime.get("last_error", "") or "recovered from stale state"
+        voice_runtime["last_error"] = (
+            voice_runtime.get("last_error", "") or "recovered from stale state"
+        )
         self._append_ui_event("[info] voice state sanitized: recovered from stale listening state")
 
     def _emit_voice_runtime_events(
@@ -1054,7 +1129,9 @@ class OperatorConsoleWindow(QMainWindow):
         for key, value in self._latest_state_snapshot.file_paths.items():
             summary_lines.append(f"{key}: {value}")
 
-        summary_lines.append(f"log_directory: {self._log_watcher.get_log_directory(self._latest_log_snapshot.active_paths)}")
+        summary_lines.append(
+            f"log_directory: {self._log_watcher.get_log_directory(self._latest_log_snapshot.active_paths)}"
+        )
 
         clipboard = QGuiApplication.clipboard()
         clipboard.setText("\n".join(summary_lines))
@@ -1066,7 +1143,9 @@ class OperatorConsoleWindow(QMainWindow):
 
     def _open_state_directory(self) -> None:
         state_directory = get_state_directory()
-        self._open_directory(state_directory, "State directory opened.", "State directory unavailable.")
+        self._open_directory(
+            state_directory, "State directory opened.", "State directory unavailable."
+        )
 
     def _open_directory(self, directory, success_message: str, failure_message: str) -> None:
         if not directory.exists() or not directory.is_dir():
@@ -1090,24 +1169,30 @@ class OperatorConsoleWindow(QMainWindow):
     def _debug_log(self, msg: str) -> None:
         """Write debug log to file."""
         import os
-        from pathlib import Path
+
         root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10")).resolve()
         log_path = root / "ui_debug.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a") as f:
             from datetime import datetime
+
             f.write(f"{datetime.now().isoformat()} MAIN {msg}\n")
 
-    def _build_live_entry_from_payload(self, payload: dict[str, object], result: CommandResult) -> dict[str, object]:
+    def _build_live_entry_from_payload(
+        self, payload: dict[str, object], result: CommandResult
+    ) -> dict[str, object]:
         """Build a synthetic history entry for non-persisted results (e.g. NEWS)."""
         from datetime import datetime, timezone
+
         route_mode = self._payload_route_mode(payload)
         return {
             "request_id": f"live-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}",
             "status": self._payload_text(payload, "status") or result.status or "completed",
             "completed_at": datetime.now(timezone.utc).isoformat(),
             "error": self._payload_text(payload, "error") or result.stderr or "",
-            "request_text": self._payload_text(payload, "request_text") or result.requested_value or "",
+            "request_text": self._payload_text(payload, "request_text")
+            or result.requested_value
+            or "",
             "response_text": self._payload_text(payload, "response_text") or result.stdout or "",
             "route": {"mode": route_mode, "confidence": 0},
             "outcome": {
@@ -1119,11 +1204,14 @@ class OperatorConsoleWindow(QMainWindow):
         }
 
     def _reload_request_history(self) -> None:
-        self._debug_log(f"_reload_request_history called")
+        self._debug_log("_reload_request_history called")
         from app.services.state_store import REQUEST_HISTORY_FILE
+
         self._debug_log(f"REQUEST_HISTORY_FILE: {REQUEST_HISTORY_FILE}")
         history_result = load_recent_request_history()
-        self._debug_log(f"history_result: {history_result.status}, entries: {len(history_result.entries)}")
+        self._debug_log(
+            f"history_result: {history_result.status}, entries: {len(history_result.entries)}"
+        )
         self._history_entries = history_result.entries
         # Prepend live (non-persisted) entry if present so it appears in Latest Answer
         if self._latest_live_entry is not None:
@@ -1147,14 +1235,15 @@ class OperatorConsoleWindow(QMainWindow):
 
         previous_selected_id = self._selected_request_id
         signature = tuple(
-            self._payload_text(entry, "request_id")
-            for entry in self._history_entries
+            self._payload_text(entry, "request_id") for entry in self._history_entries
         )
         same_signature = signature == self._history_signature
         same_selection = selected_id == previous_selected_id
         same_level = self._interface_level == self._history_render_level
 
-        self._debug_log(f"same_signature={same_signature}, same_selection={same_selection}, same_level={same_level}")
+        self._debug_log(
+            f"same_signature={same_signature}, same_selection={same_selection}, same_level={same_level}"
+        )
         self._debug_log(f"selected_id={selected_id}, interface_level={self._interface_level}")
 
         self._selected_request_id = selected_id
@@ -1167,7 +1256,9 @@ class OperatorConsoleWindow(QMainWindow):
 
         self._history_signature = signature
         self._history_render_level = self._interface_level
-        self._debug_log(f"calling set_history_entries with {len(self._history_entries)} entries, selected={selected_id}")
+        self._debug_log(
+            f"calling set_history_entries with {len(self._history_entries)} entries, selected={selected_id}"
+        )
         applied_selection = self.conversation_panel.set_history_entries(
             self._history_entries,
             selected_request_id=selected_id,
@@ -1195,7 +1286,9 @@ class OperatorConsoleWindow(QMainWindow):
         if self._history_entries:
             latest_id = self._payload_text(self._history_entries[-1], "request_id")
         self._selected_request_id = request_id.strip() or None
-        self._history_selection_pinned = bool(self._selected_request_id and self._selected_request_id != latest_id)
+        self._history_selection_pinned = bool(
+            self._selected_request_id and self._selected_request_id != latest_id
+        )
         self._latest_request_details = build_request_details(self._selected_history_entry())
         self._latest_decision_trace_details = build_request_details(self._selected_history_entry())
         self.status_panel.update_request_details(self._latest_request_details)
@@ -1206,7 +1299,9 @@ class OperatorConsoleWindow(QMainWindow):
     def _append_request_metadata_events(self, payload: dict[str, object]) -> None:
         route = payload.get("route")
         if isinstance(route, dict):
-            route_mode = self._payload_text(route, "selected_route") or self._payload_text(route, "mode")
+            route_mode = self._payload_text(route, "selected_route") or self._payload_text(
+                route, "mode"
+            )
             route_reason = self._payload_text(route, "reason")
             if route_mode or route_reason:
                 detail = route_mode or "unknown"
@@ -1258,7 +1353,9 @@ class OperatorConsoleWindow(QMainWindow):
     def _latest_request_paid_text(self) -> str:
         return resolve_last_request_paid(self._latest_request_details)
 
-    def _update_session_augmented_counters_from_payload(self, payload: dict[str, object] | None) -> None:
+    def _update_session_augmented_counters_from_payload(
+        self, payload: dict[str, object] | None
+    ) -> None:
         if not isinstance(payload, dict):
             return
         # Support both direct outcome (text submit) and nested request outcome (voice)
@@ -1271,13 +1368,18 @@ class OperatorConsoleWindow(QMainWindow):
         if not isinstance(outcome, dict):
             return
 
-        provider_used = (self._payload_text(outcome, "augmented_provider_used") or self._payload_text(outcome, "augmented_provider")).lower()
+        provider_used = (
+            self._payload_text(outcome, "augmented_provider_used")
+            or self._payload_text(outcome, "augmented_provider")
+        ).lower()
         if provider_used not in {"openai", "kimi", "wikipedia"}:
             provider_used = "none"
         call_reason = self._payload_text(outcome, "augmented_provider_call_reason").lower()
         final_mode = self._payload_text(outcome, "final_mode").upper()
         outcome_code = self._payload_text(outcome, "outcome_code").lower()
-        paid_invoked = self._payload_text(outcome, "augmented_paid_provider_invoked").lower() == "true"
+        paid_invoked = (
+            self._payload_text(outcome, "augmented_paid_provider_invoked").lower() == "true"
+        )
 
         # Conservative accounting: missing metadata undercounts instead of overcounting.
         countable = False
@@ -1347,7 +1449,9 @@ class OperatorConsoleWindow(QMainWindow):
         header.addStretch(1)
 
         self._decision_trace_hide_button = QPushButton("Hide")
-        self._decision_trace_hide_button.clicked.connect(lambda: self._set_decision_trace_expanded(False))
+        self._decision_trace_hide_button.clicked.connect(
+            lambda: self._set_decision_trace_expanded(False)
+        )
         header.addWidget(self._decision_trace_hide_button)
         layout.addLayout(header)
 
@@ -1368,7 +1472,9 @@ class OperatorConsoleWindow(QMainWindow):
             available=available,
         )
         self._decision_trace_view.setPlainText(
-            self._build_decision_trace_text(payload) if available else "No latest request metadata available."
+            self._build_decision_trace_text(payload)
+            if available
+            else "No latest request metadata available."
         )
         if not available:
             self._set_decision_trace_expanded(False)
@@ -1387,30 +1493,61 @@ class OperatorConsoleWindow(QMainWindow):
         if not isinstance(payload, dict):
             return {}
         return {
-            "requested_mode": self._trace_value(payload, ("outcome", "requested_mode"), ("route", "requested_mode")),
-            "effective_mode": self._trace_value(payload, ("outcome", "final_mode"), ("route", "final_mode")),
+            "requested_mode": self._trace_value(
+                payload, ("outcome", "requested_mode"), ("route", "requested_mode")
+            ),
+            "effective_mode": self._trace_value(
+                payload, ("outcome", "final_mode"), ("route", "final_mode")
+            ),
             "requested_route": self._trace_value(payload, ("route", "requested_route")),
-            "selected_route": self._trace_value(payload, ("route", "selected_route"), ("route", "mode")),
+            "selected_route": self._trace_value(
+                payload, ("route", "selected_route"), ("route", "mode")
+            ),
             "route_mode": self._trace_value(payload, ("route", "mode")),
             "intent_class": self._trace_value(payload, ("route", "intent_class")),
-            "evidence_mode": self._trace_value(payload, ("outcome", "evidence_mode"), ("route", "evidence_mode"), ("control_state", "evidence")),
-            "augmented_policy": self._trace_value(payload, ("outcome", "augmented_policy"), ("control_state", "augmentation_policy")),
+            "evidence_mode": self._trace_value(
+                payload,
+                ("outcome", "evidence_mode"),
+                ("route", "evidence_mode"),
+                ("control_state", "evidence"),
+            ),
+            "augmented_policy": self._trace_value(
+                payload, ("outcome", "augmented_policy"), ("control_state", "augmentation_policy")
+            ),
             "augmented_provider": self._trace_augmented_provider(payload),
-            "augmented_provider_status": self._trace_value(payload, ("outcome", "augmented_provider_status")),
-            "augmented_provider_error_reason": self._trace_value(payload, ("outcome", "augmented_provider_error_reason")),
-            "provider_selection_reason": self._trace_value(payload, ("outcome", "augmented_provider_selection_reason")),
-            "provider_selection_query": self._trace_value(payload, ("outcome", "augmented_provider_selection_query")),
-            "provider_selection_rule": self._trace_value(payload, ("outcome", "augmented_provider_selection_rule")),
+            "augmented_provider_status": self._trace_value(
+                payload, ("outcome", "augmented_provider_status")
+            ),
+            "augmented_provider_error_reason": self._trace_value(
+                payload, ("outcome", "augmented_provider_error_reason")
+            ),
+            "provider_selection_reason": self._trace_value(
+                payload, ("outcome", "augmented_provider_selection_reason")
+            ),
+            "provider_selection_query": self._trace_value(
+                payload, ("outcome", "augmented_provider_selection_query")
+            ),
+            "provider_selection_rule": self._trace_value(
+                payload, ("outcome", "augmented_provider_selection_rule")
+            ),
             "context_title": self._trace_value(payload, ("outcome", "unverified_context_title")),
             "context_url": self._trace_value(payload, ("outcome", "unverified_context_url")),
             "answer_class": self._trace_value(payload, ("outcome", "answer_class")),
             "operator_trust_label": self._trace_value(payload, ("outcome", "operator_trust_label")),
             "operator_answer_path": self._trace_value(payload, ("outcome", "operator_answer_path")),
             "operator_note": self._trace_value(payload, ("outcome", "operator_note")),
-            "verification_status": self._trace_value(payload, ("outcome", "augmented_answer_contract", "verification_status")),
-            "estimated_confidence_pct": self._trace_value(payload, ("outcome", "augmented_answer_contract", "estimated_confidence_pct")),
-            "estimated_confidence_band": self._trace_value(payload, ("outcome", "augmented_answer_contract", "estimated_confidence_band")),
-            "estimated_confidence_label": self._trace_value(payload, ("outcome", "augmented_answer_contract", "estimated_confidence_label")),
+            "verification_status": self._trace_value(
+                payload, ("outcome", "augmented_answer_contract", "verification_status")
+            ),
+            "estimated_confidence_pct": self._trace_value(
+                payload, ("outcome", "augmented_answer_contract", "estimated_confidence_pct")
+            ),
+            "estimated_confidence_band": self._trace_value(
+                payload, ("outcome", "augmented_answer_contract", "estimated_confidence_band")
+            ),
+            "estimated_confidence_label": self._trace_value(
+                payload, ("outcome", "augmented_answer_contract", "estimated_confidence_label")
+            ),
             "source_basis": self._trace_answer_contract_source_basis(payload),
             "trust_class": self._trace_value(payload, ("outcome", "trust_class")),
             "outcome_code": self._trace_value(payload, ("outcome", "outcome_code")),
@@ -1418,7 +1555,9 @@ class OperatorConsoleWindow(QMainWindow):
             "recovery_lane": self._trace_value(payload, ("outcome", "recovery_lane")),
             "recovery_used": self._trace_value(payload, ("outcome", "recovery_used")),
             "action_hint": self._trace_value(payload, ("outcome", "action_hint")),
-            "reason": self._trace_value(payload, ("route", "reason"), ("outcome", "fallback_reason")),
+            "reason": self._trace_value(
+                payload, ("route", "reason"), ("outcome", "fallback_reason")
+            ),
             "route_confidence": self._trace_value(payload, ("route", "confidence")),
             "forced_augmented": self._trace_value(payload, ("outcome", "augmented_direct_request")),
         }
@@ -1493,7 +1632,11 @@ class OperatorConsoleWindow(QMainWindow):
                 or (
                     f"{trace['estimated_confidence_pct']}% ({trace['estimated_confidence_band']}, estimated)"
                     if trace["estimated_confidence_pct"] and trace["estimated_confidence_band"]
-                    else (f"{trace['estimated_confidence_pct']}% estimated" if trace["estimated_confidence_pct"] else "")
+                    else (
+                        f"{trace['estimated_confidence_pct']}% estimated"
+                        if trace["estimated_confidence_pct"]
+                        else ""
+                    )
                 ),
             ),
             ("Source Basis", trace["source_basis"]),
@@ -1545,21 +1688,39 @@ class OperatorConsoleWindow(QMainWindow):
         if answer_path == "Local answer":
             return "Answer stayed on the local path."
 
-        final_mode = (self._trace_value(payload, ("outcome", "final_mode")) or self._trace_value(payload, ("route", "mode"))).upper()
+        final_mode = (
+            self._trace_value(payload, ("outcome", "final_mode"))
+            or self._trace_value(payload, ("route", "mode"))
+        ).upper()
         trust_class = self._trace_value(payload, ("outcome", "trust_class")).lower()
         fallback_reason = self._trace_value(payload, ("outcome", "fallback_reason"))
-        fallback_used = self._trace_value(payload, ("outcome", "fallback_used")).lower() in {"1", "true", "yes", "on"}
+        fallback_used = self._trace_value(payload, ("outcome", "fallback_used")).lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         provider = (
             self._trace_value(payload, ("outcome", "augmented_provider_used"))
             or self._trace_value(payload, ("outcome", "augmented_provider"))
             or self._trace_value(payload, ("control_state", "augmented_provider"))
         )
-        provider_label = provider.upper() if provider and provider.lower() != "none" else "augmented"
+        provider_label = (
+            provider.upper() if provider and provider.lower() != "none" else "augmented"
+        )
         outcome_code = self._trace_value(payload, ("outcome", "outcome_code")).lower()
 
-        if final_mode == "AUGMENTED" and fallback_used and fallback_reason == "local_generation_degraded":
+        if (
+            final_mode == "AUGMENTED"
+            and fallback_used
+            and fallback_reason == "local_generation_degraded"
+        ):
             return f"Escalated from degraded local answer to {provider_label} fallback."
-        if final_mode == "AUGMENTED" and fallback_used and fallback_reason == "validated_insufficient":
+        if (
+            final_mode == "AUGMENTED"
+            and fallback_used
+            and fallback_reason == "validated_insufficient"
+        ):
             return f"Escalated from insufficient evidence path to {provider_label} fallback."
         if trust_class == "evidence_backed" or final_mode == "EVIDENCE":
             return "Answer stayed on the evidence-backed path."
@@ -1592,7 +1753,9 @@ class OperatorConsoleWindow(QMainWindow):
     def _display_operator_trust(self, payload: dict[str, object] | None) -> str:
         if self._is_validated_insufficient(payload):
             return "insufficient-evidence"
-        return self._trace_value(payload, ("outcome", "operator_trust_label"), ("outcome", "trust_class"))
+        return self._trace_value(
+            payload, ("outcome", "operator_trust_label"), ("outcome", "trust_class")
+        )
 
     def _display_operator_answer_path(self, payload: dict[str, object] | None) -> str:
         if self._is_validated_insufficient(payload):
@@ -1650,7 +1813,12 @@ class OperatorConsoleWindow(QMainWindow):
         outcome_code = self._trace_value(payload, ("outcome", "outcome_code")).lower()
         if outcome_code != "validated_insufficient":
             return False
-        return self._trace_value(payload, ("outcome", "fallback_used")).lower() not in {"1", "true", "yes", "on"}
+        return self._trace_value(payload, ("outcome", "fallback_used")).lower() not in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     def _trace_value(
         self,
@@ -1706,7 +1874,9 @@ class OperatorConsoleWindow(QMainWindow):
             button = QPushButton(display_level(level))
             button.setObjectName("levelButton")
             button.setCheckable(True)
-            button.clicked.connect(lambda checked=False, value=level: self._handle_interface_level_selected(value))
+            button.clicked.connect(
+                lambda checked=False, value=level: self._handle_interface_level_selected(value)
+            )
             self._level_button_group.addButton(button)
             self._level_buttons[level] = button
             header.addWidget(button)

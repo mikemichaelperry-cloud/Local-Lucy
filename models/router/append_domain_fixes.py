@@ -43,257 +43,506 @@ NEW_EXAMPLES: list[dict] = [
     # ================================================================
     {
         "query": "How hot is the sun?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is the temperature of the sun?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "How cold is space?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is the surface temperature of Venus?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "How hot is a supernova?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is the hottest planet in our solar system?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "How cold is the dark side of the moon?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is the core temperature of the Earth?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "How hot are stars?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is the boiling point on Mars?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "Why is the sun so hot?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "How cold is Pluto?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is the temperature of Jupiter's atmosphere?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "How hot is Mercury?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is the temperature in the center of the Earth?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "How far away is Mars?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What are stars made of?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "Tell me about black holes",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is the largest planet in our solar system?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "How many moons does Jupiter have?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is a nebula?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "Explain the life cycle of a star",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What is the Milky Way?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "How old is the universe?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
     {
         "query": "What causes a solar eclipse?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "astronomy"},
     },
-
     # ================================================================
     # 2. Geography / Capital Cities (LOCAL)
     # City/country names must not route to TIME
     # ================================================================
     {
         "query": "Capital of Japan",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of France?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital city of Germany",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of Italy?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Tell me the capital of Spain",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital of Brazil",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of India?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital city of Australia",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of Canada?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital of the United Kingdom",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of China?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital of Russia",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of Mexico?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital city of South Africa",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of Egypt?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of Argentina?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital of Turkey",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of Sweden?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital city of Norway",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of Greece?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of Portugal?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital of Thailand",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of South Korea?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "Capital city of the Netherlands",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
     {
         "query": "What is the capital of Poland?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "domain_correction", "category": "geography"},
     },
 ]
@@ -302,6 +551,7 @@ NEW_EXAMPLES: list[dict] = [
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def load_existing_queries() -> set[str]:
     """Load existing queries from the canonical JSON (case-insensitive)."""
@@ -345,6 +595,7 @@ def rebuild_embeddings():
     rebuild_script = Path(__file__).parent.parent.parent / "scripts" / "rebuild_embeddings.py"
     if rebuild_script.exists():
         import subprocess
+
         result = subprocess.run(
             [sys.executable, str(rebuild_script)],
             capture_output=True,
@@ -364,10 +615,15 @@ def rebuild_embeddings():
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Append domain correction examples to embedding index")
+    parser = argparse.ArgumentParser(
+        description="Append domain correction examples to embedding index"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Preview only, do not modify files")
-    parser.add_argument("--apply", action="store_true", help="Append examples and rebuild embeddings")
+    parser.add_argument(
+        "--apply", action="store_true", help="Append examples and rebuild embeddings"
+    )
     args = parser.parse_args()
 
     existing = load_existing_queries()
@@ -391,20 +647,21 @@ def main():
     by_category = Counter(ex["metadata"]["category"] for ex in new_examples)
 
     print(f"\nNew examples to add: {len(new_examples)}")
-    print(f"By route:")
+    print("By route:")
     for route, count in sorted(by_route.items()):
         print(f"  {route:12s} {count:2d}")
-    print(f"By category:")
+    print("By category:")
     for cat, count in sorted(by_category.items()):
         print(f"  {cat:15s} {count:2d}")
 
     if args.dry_run or not args.apply:
-        print(f"\n💡 Use --apply to append and rebuild")
+        print("\n💡 Use --apply to append and rebuild")
         return
 
     # Apply
-    print(f"\n⚠️  Applying changes in 3 seconds... (Ctrl+C to cancel)")
+    print("\n⚠️  Applying changes in 3 seconds... (Ctrl+C to cancel)")
     import time
+
     try:
         time.sleep(3)
     except KeyboardInterrupt:

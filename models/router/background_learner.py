@@ -29,7 +29,6 @@ import json
 import os
 import sys
 import time
-from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -59,12 +58,21 @@ DISABLE_FLAG = ROUTER_DIR / ".learner_disable"
 # were decided by these guards must NOT be learned, or the classifier will
 # re-learn the keyword-fortress behaviour we just removed.
 OLD_GUARD_MARKERS = {
-    "news_keyword", "news_guard_respects_local", "weather_keyword_override",
-    "clear_news_override", "historical_context_override", "capital_city_guard",
-    "astronomy_guard", "literary_context_guard", "creative_content_guard",
-    "financial_ephemeral", "current_event_synthesis_override",
-    "capability_query_override", "language_translation_override",
-    "technical_knowledge_override", "personal_finance_reasoning_override",
+    "news_keyword",
+    "news_guard_respects_local",
+    "weather_keyword_override",
+    "clear_news_override",
+    "historical_context_override",
+    "capital_city_guard",
+    "astronomy_guard",
+    "literary_context_guard",
+    "creative_content_guard",
+    "financial_ephemeral",
+    "current_event_synthesis_override",
+    "capability_query_override",
+    "language_translation_override",
+    "technical_knowledge_override",
+    "personal_finance_reasoning_override",
 }
 
 # Versioning directory
@@ -167,6 +175,7 @@ def create_version(reason: str = "") -> Path:
     for src in (INDEX_PATH, EMBEDDINGS_PATH, EXAMPLES_PATH):
         if src.exists():
             import shutil
+
             shutil.copy2(str(src), str(vdir / src.name))
 
     # Metadata
@@ -191,11 +200,13 @@ def list_versions() -> list[dict]:
         if meta_file.exists():
             with open(meta_file) as f:
                 meta = json.load(f)
-        versions.append({
-            "name": vdir.name,
-            "path": str(vdir),
-            **meta,
-        })
+        versions.append(
+            {
+                "name": vdir.name,
+                "path": str(vdir),
+                **meta,
+            }
+        )
     return versions
 
 
@@ -220,6 +231,7 @@ def rollback_version(version_name: str) -> bool:
         if src.exists():
             dst = ROUTER_DIR / src_name
             import shutil
+
             shutil.copy2(str(src), str(dst))
 
     print(f"✅ Rolled back to {version_name}")
@@ -234,6 +246,7 @@ def rollback_version(version_name: str) -> bool:
 def save_index(examples: list[dict]):
     """Save embedding index atomically to canonical JSON and derived JSONL."""
     import tempfile
+
     tmp_dir = str(Path(EXAMPLES_PATH).parent)
 
     # Strip mutable timestamps before writing to tracked files
@@ -241,8 +254,7 @@ def save_index(examples: list[dict]):
 
     # Atomic write to canonical JSON
     tmp_json = tempfile.NamedTemporaryFile(
-        mode="w", dir=tmp_dir, delete=False,
-        prefix=".comprehensive_examples.", suffix=".tmp"
+        mode="w", dir=tmp_dir, delete=False, prefix=".comprehensive_examples.", suffix=".tmp"
     )
     json.dump(cleaned, tmp_json, indent=2)
     tmp_json.close()
@@ -250,8 +262,7 @@ def save_index(examples: list[dict]):
 
     # Derived JSONL for backward compatibility
     tmp_jsonl = tempfile.NamedTemporaryFile(
-        mode="w", dir=tmp_dir, delete=False,
-        prefix=".comprehensive_index.", suffix=".tmp"
+        mode="w", dir=tmp_dir, delete=False, prefix=".comprehensive_index.", suffix=".tmp"
     )
     for ex in cleaned:
         tmp_jsonl.write(json.dumps(ex, ensure_ascii=False) + "\n")
@@ -322,12 +333,14 @@ def deduplicate(examples: list[dict]) -> tuple[list[dict], list[dict]]:
             old_route = seen[key].get("labels", {}).get("route")
             new_route = ex.get("labels", {}).get("route")
             if old_route != new_route:
-                conflicts.append({
-                    "query": key,
-                    "existing_route": old_route,
-                    "incoming_route": new_route,
-                    "incoming_source": ex.get("metadata", {}).get("source", "unknown"),
-                })
+                conflicts.append(
+                    {
+                        "query": key,
+                        "existing_route": old_route,
+                        "incoming_route": new_route,
+                        "incoming_source": ex.get("metadata", {}).get("source", "unknown"),
+                    }
+                )
         seen[key] = ex  # Overwrite with latest
     return list(seen.values()), conflicts
 
@@ -347,6 +360,7 @@ def _is_high_stakes_feedback(query: str, route: str) -> bool:
         sys.path.insert(0, _tools_path)
     try:
         from policy import requires_evidence_mode
+
         _requires, reason = requires_evidence_mode(query)
         if _requires and reason in (
             "medical_context",
@@ -495,21 +509,23 @@ def process_router_logs(log_path: Path, min_confidence: float = 0.7) -> list[dic
 
             evidence = "required" if evidence_reason else "not_required"
 
-            new_examples.append({
-                "query": query,
-                "labels": {
-                    "intent_family": intent,
-                    "evidence_mode": evidence,
-                    "route": route,
-                    "policy_override": "none",
-                },
-                "metadata": {
-                    "source": "router_log",
-                    "confidence": confidence,
-                    "guards_fired": list(guards),
-                    "embedding_route": entry.get("embedding_route", ""),
-                },
-            })
+            new_examples.append(
+                {
+                    "query": query,
+                    "labels": {
+                        "intent_family": intent,
+                        "evidence_mode": evidence,
+                        "route": route,
+                        "policy_override": "none",
+                    },
+                    "metadata": {
+                        "source": "router_log",
+                        "confidence": confidence,
+                        "guards_fired": list(guards),
+                        "embedding_route": entry.get("embedding_route", ""),
+                    },
+                }
+            )
 
     _save_log_progress(line_no)
     return new_examples
@@ -542,37 +558,42 @@ def process_user_feedback() -> list[dict]:
 
             # Safety gate: never auto-learn medical/vet/finance/legal feedback
             if _is_high_stakes_feedback(query, correct_route):
-                _append_pending_review({
-                    "timestamp": entry.get("timestamp", ""),
-                    "query": query,
-                    "correct_route": correct_route,
-                    "feedback_type": entry.get("feedback_type", "correction"),
-                    "original_route": entry.get("original_route", ""),
-                    "reason": "high_stakes_requires_review",
-                    "confidence": entry.get("confidence", 1.0),
-                    "raw_feedback": entry.get("raw_feedback", ""),
-                })
+                _append_pending_review(
+                    {
+                        "timestamp": entry.get("timestamp", ""),
+                        "query": query,
+                        "correct_route": correct_route,
+                        "feedback_type": entry.get("feedback_type", "correction"),
+                        "original_route": entry.get("original_route", ""),
+                        "reason": "high_stakes_requires_review",
+                        "confidence": entry.get("confidence", 1.0),
+                        "raw_feedback": entry.get("raw_feedback", ""),
+                    }
+                )
                 continue
 
             sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "router_py"))
             from policy import requires_evidence_mode
+
             requires_evidence, _ = requires_evidence_mode(query)
             evidence = "required" if requires_evidence else "not_required"
 
-            new_examples.append({
-                "query": query,
-                "labels": {
-                    "intent_family": _route_to_intent(correct_route),
-                    "evidence_mode": evidence,
-                    "route": correct_route,
-                    "policy_override": "none",
-                },
-                "metadata": {
-                    "source": "user_feedback",
-                    "feedback_type": entry.get("feedback_type", "correction"),
-                    "timestamp": entry.get("timestamp", ""),
-                },
-            })
+            new_examples.append(
+                {
+                    "query": query,
+                    "labels": {
+                        "intent_family": _route_to_intent(correct_route),
+                        "evidence_mode": evidence,
+                        "route": correct_route,
+                        "policy_override": "none",
+                    },
+                    "metadata": {
+                        "source": "user_feedback",
+                        "feedback_type": entry.get("feedback_type", "correction"),
+                        "timestamp": entry.get("timestamp", ""),
+                    },
+                }
+            )
 
     return new_examples
 
@@ -631,15 +652,17 @@ def learn_once(log_path: Path | None = None, verbose: bool = True) -> dict:
         # Log route conflicts for audit
         if conflicts:
             for conflict in conflicts:
-                _append_pending_review({
-                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "query": conflict["query"],
-                    "correct_route": conflict["incoming_route"],
-                    "existing_route": conflict["existing_route"],
-                    "reason": "route_conflict",
-                    "feedback_type": "correction",
-                    "details": "User feedback changed the route for a known query",
-                })
+                _append_pending_review(
+                    {
+                        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "query": conflict["query"],
+                        "correct_route": conflict["incoming_route"],
+                        "existing_route": conflict["existing_route"],
+                        "reason": "route_conflict",
+                        "feedback_type": "correction",
+                        "details": "User feedback changed the route for a known query",
+                    }
+                )
             if verbose:
                 print(f"  ({len(conflicts)} route conflicts logged for audit)")
 
@@ -707,11 +730,11 @@ def add_feedback(query: str, correct_route: str, feedback_type: str = "correctio
 
 def run_daemon(log_path: Path | None, interval: int = 60):
     """Run learner as a daemon process."""
-    print(f"Background learner daemon started")
+    print("Background learner daemon started")
     print(f"  Router log: {log_path}")
     print(f"  Check interval: {interval}s")
     print(f"  Index: {INDEX_PATH}")
-    print(f"  Press Ctrl+C to stop\n")
+    print("  Press Ctrl+C to stop\n")
 
     last_size = log_path.stat().st_size if log_path and log_path.exists() else 0
 
@@ -765,6 +788,7 @@ def maybe_auto_learn(log_path: Path | None = None, min_entries: int | None = Non
 
     # Trigger learning in background thread
     import threading
+
     def _learn():
         try:
             learn_once(verbose=False)
@@ -791,21 +815,40 @@ def main():
     parser.add_argument("--process", action="store_true", help="Process logs once and exit")
     parser.add_argument("--daemon", action="store_true", help="Run as daemon")
     parser.add_argument("--interval", type=int, default=60, help="Daemon check interval (seconds)")
-    parser.add_argument("--log-path", type=Path, help="Router decision log path (router_decisions.jsonl)")
+    parser.add_argument(
+        "--log-path", type=Path, help="Router decision log path (router_decisions.jsonl)"
+    )
     parser.add_argument("--feedback", type=str, help="Add user feedback: query string")
     parser.add_argument("--route", type=str, help="Correct route for feedback")
-    parser.add_argument("--correct", action="store_true", help="Mark feedback as confirmation (legacy was right)")
+    parser.add_argument(
+        "--correct", action="store_true", help="Mark feedback as confirmation (legacy was right)"
+    )
 
     # Kill-switch commands
-    parser.add_argument("--disable", action="store_true", help="Pause auto-learning (create .learner_disable)")
-    parser.add_argument("--enable", action="store_true", help="Resume auto-learning (remove .learner_disable)")
-    parser.add_argument("--status", action="store_true", help="Show learning status (enabled/disabled)")
+    parser.add_argument(
+        "--disable", action="store_true", help="Pause auto-learning (create .learner_disable)"
+    )
+    parser.add_argument(
+        "--enable", action="store_true", help="Resume auto-learning (remove .learner_disable)"
+    )
+    parser.add_argument(
+        "--status", action="store_true", help="Show learning status (enabled/disabled)"
+    )
 
     # Versioning commands
-    parser.add_argument("--snapshot", action="store_true", help="Create a manual snapshot of current index")
+    parser.add_argument(
+        "--snapshot", action="store_true", help="Create a manual snapshot of current index"
+    )
     parser.add_argument("--list-versions", action="store_true", help="List all saved versions")
-    parser.add_argument("--list-pending", action="store_true", help="List feedback queued for human review")
-    parser.add_argument("--rollback", type=str, metavar="VERSION", help="Rollback to a named version (e.g., v_20260512_120000)")
+    parser.add_argument(
+        "--list-pending", action="store_true", help="List feedback queued for human review"
+    )
+    parser.add_argument(
+        "--rollback",
+        type=str,
+        metavar="VERSION",
+        help="Rollback to a named version (e.g., v_20260512_120000)",
+    )
     args = parser.parse_args()
 
     # Kill-switch commands
@@ -824,7 +867,9 @@ def main():
         versions = list_versions()
         print(f"  Saved versions: {len(versions)}")
         for v in versions:
-            print(f"    {v['name']} — {v.get('example_count', '?')} examples — {v.get('reason', 'no reason')}")
+            print(
+                f"    {v['name']} — {v.get('example_count', '?')} examples — {v.get('reason', 'no reason')}"
+            )
         return
 
     # Versioning commands

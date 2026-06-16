@@ -6,7 +6,6 @@ from either content or thinking field.
 """
 
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -43,7 +42,7 @@ class Qwen3Router:
                     "model": self.model,
                     "messages": [
                         {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": f'Query: {query}\nJSON:'},
+                        {"role": "user", "content": f"Query: {query}\nJSON:"},
                     ],
                     "stream": False,
                     "options": {"temperature": 0.1, "num_predict": 200},
@@ -89,7 +88,7 @@ class Qwen3Router:
             start = text.find("{")
             end = text.rfind("}")
             if start != -1 and end != -1 and end > start:
-                return json.loads(text[start:end + 1])
+                return json.loads(text[start : end + 1])
         except json.JSONDecodeError:
             pass
 
@@ -118,17 +117,65 @@ class Qwen3Router:
         requires_evidence, evidence_reason = requires_evidence_mode(query)
 
         if any(k in q for k in ["news", "headlines", "breaking"]):
-            return {"intent_family": "news_request", "needs_web": True, "evidence_mode": "not_required", "route": "NEWS", "confidence": 0.7, "source": "fallback", "error": error}
+            return {
+                "intent_family": "news_request",
+                "needs_web": True,
+                "evidence_mode": "not_required",
+                "route": "NEWS",
+                "confidence": 0.7,
+                "source": "fallback",
+                "error": error,
+            }
         elif "time" in q or "current time" in q:
-            return {"intent_family": "time_query", "needs_web": True, "evidence_mode": "not_required", "route": "TIME", "confidence": 0.7, "source": "fallback", "error": error}
+            return {
+                "intent_family": "time_query",
+                "needs_web": True,
+                "evidence_mode": "not_required",
+                "route": "TIME",
+                "confidence": 0.7,
+                "source": "fallback",
+                "error": error,
+            }
         elif requires_evidence:
-            return {"intent_family": "current_evidence", "needs_web": True, "evidence_mode": "required", "route": "AUGMENTED", "confidence": 0.7, "source": "fallback", "error": error}
+            return {
+                "intent_family": "current_evidence",
+                "needs_web": True,
+                "evidence_mode": "required",
+                "route": "AUGMENTED",
+                "confidence": 0.7,
+                "source": "fallback",
+                "error": error,
+            }
         elif any(k in q for k in ["story", "poem", "write", "creative"]):
-            return {"intent_family": "creative_writing", "needs_web": False, "evidence_mode": "not_required", "route": "LOCAL", "confidence": 0.7, "source": "fallback", "error": error}
+            return {
+                "intent_family": "creative_writing",
+                "needs_web": False,
+                "evidence_mode": "not_required",
+                "route": "LOCAL",
+                "confidence": 0.7,
+                "source": "fallback",
+                "error": error,
+            }
         elif any(k in q for k in ["how to", "how do i", "install", "debug"]):
-            return {"intent_family": "technical_explanation", "needs_web": False, "evidence_mode": "not_required", "route": "LOCAL", "confidence": 0.7, "source": "fallback", "error": error}
+            return {
+                "intent_family": "technical_explanation",
+                "needs_web": False,
+                "evidence_mode": "not_required",
+                "route": "LOCAL",
+                "confidence": 0.7,
+                "source": "fallback",
+                "error": error,
+            }
         else:
-            return {"intent_family": "background_overview", "needs_web": True, "evidence_mode": "not_required", "route": "LOCAL_WITH_FALLBACK", "confidence": 0.6, "source": "fallback", "error": error}
+            return {
+                "intent_family": "background_overview",
+                "needs_web": True,
+                "evidence_mode": "not_required",
+                "route": "LOCAL_WITH_FALLBACK",
+                "confidence": 0.6,
+                "source": "fallback",
+                "error": error,
+            }
 
 
 def test_router():
@@ -156,8 +203,10 @@ def test_router():
     for query in test_queries:
         try:
             result = router.classify(query)
-            source = result.get('source', '?')
-            print(f"[{source:8s}] {query:50s} -> {result['route']:15s} intent={result['intent_family']:20s} evidence={result['evidence_mode']}")
+            source = result.get("source", "?")
+            print(
+                f"[{source:8s}] {query:50s} -> {result['route']:15s} intent={result['intent_family']:20s} evidence={result['evidence_mode']}"
+            )
         except Exception as e:
             print(f"[ERROR]  {query:50s} -> {e}")
 

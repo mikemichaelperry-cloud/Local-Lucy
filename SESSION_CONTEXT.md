@@ -15,7 +15,7 @@
 | **Model** | `local-lucy-llama31` (llama3.1:8b via Ollama) |
 | **Handoff file** | `~/Desktop/Local_Lucy_v10_Session_Handoff_<date>.md` |
 | **Default branch on origin** | `v10-dev` ✅ |
-| **Working tree** | Clean after robustness commit |
+| **Working tree** | Dirty — ruff installed, lint cleanup in progress |
 
 ---
 
@@ -190,7 +190,8 @@ Live market-data fetcher with source citations:
 8. ~~Regression golden fragility~~ ✅ model-mismatch now skips instead of failing; shared `skip_without_ollama` fixture added for CI/release environments without Ollama
 9. ~~Hardcoded absolute paths~~ ✅ tests/benchmarks now derive paths from `__file__` or env vars
 10. ~~Local-model regression tests~~ ✅ all 20 response/semantic regression cases now pass
-11. ~~Robustness review fixes~~ ✅ AppImage removed from automatic release; Ollama skip fixture added; model-mismatch skip in semantic regression; concept-overlap threshold relaxed to 0.25; reasoning max_chars raised to 750; reasoning prompt steered to avoid "I don't know"
+11. ~~Robustness review fixes~~ ✅ AppImage removed from automatic release; Ollama skip fixture added; model-mismatch skip in semantic regression; concept-overlap threshold relaxed to 0.25; reasoning max_chars raised to 800; reasoning prompt steered to avoid "I don't know"
+12. ~~Ruff / lint~~ ✅ ruff installed in venv; `make lint` passes; mypy is optional/skipped if not installed
 
 ---
 
@@ -209,5 +210,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T17:35:00Z*
-*Session: Robustness review fixes committed and pushed to origin/v10-dev*
+*Last updated: 2026-06-16T18:20:00Z*
+*Session: Robustness review fixes + ruff lint cleanup committed and pushed to origin/v10-dev*

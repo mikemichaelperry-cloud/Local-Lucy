@@ -18,21 +18,156 @@ EMBEDDINGS_PATH = ROUTER_DIR / "comprehensive_embeddings.npy"
 BACKUP_DIR = ROUTER_DIR / "checkpoints"
 
 NEW_EXAMPLES: list[dict] = [
-    {"query": "Show me today's top stories", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "Show me news about climate change", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "Latest world news", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "What is the current status of the Israel-Gaza conflict?", "labels": {"intent_family": "current_evidence", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "Top headlines today", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "News about the Middle East", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "What are the headlines from Europe?", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "Show me breaking news", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "Latest updates on the war", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "News from Asia today", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "What is happening in Ukraine?", "labels": {"intent_family": "current_evidence", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "Current events in the Middle East", "labels": {"intent_family": "current_evidence", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "Latest political news", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "Show me sports headlines", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
-    {"query": "Technology news today", "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}, "metadata": {"source": "synthetic_fix", "category": "news"}},
+    {
+        "query": "Show me today's top stories",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "Show me news about climate change",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "Latest world news",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "What is the current status of the Israel-Gaza conflict?",
+        "labels": {
+            "intent_family": "current_evidence",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "Top headlines today",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "News about the Middle East",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "What are the headlines from Europe?",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "Show me breaking news",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "Latest updates on the war",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "News from Asia today",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "What is happening in Ukraine?",
+        "labels": {
+            "intent_family": "current_evidence",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "Current events in the Middle East",
+        "labels": {
+            "intent_family": "current_evidence",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "Latest political news",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "Show me sports headlines",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
+    {
+        "query": "Technology news today",
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "synthetic_fix", "category": "news"},
+    },
 ]
 
 
@@ -74,6 +209,7 @@ def rebuild_embeddings():
     rebuild_script = Path(__file__).parent.parent.parent / "scripts" / "rebuild_embeddings.py"
     if rebuild_script.exists():
         import subprocess
+
         result = subprocess.run(
             [sys.executable, str(rebuild_script)],
             capture_output=True,
@@ -116,11 +252,12 @@ def main():
         print(f"  {route:12s} {count:2d}")
 
     if args.dry_run or not args.apply:
-        print(f"\n💡 Use --apply to append and rebuild")
+        print("\n💡 Use --apply to append and rebuild")
         return
 
-    print(f"\n⚠️  Applying changes in 3 seconds...")
+    print("\n⚠️  Applying changes in 3 seconds...")
     import time
+
     try:
         time.sleep(3)
     except KeyboardInterrupt:

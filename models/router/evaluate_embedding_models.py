@@ -16,7 +16,6 @@ Usage:
 
 import json
 import random
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -41,22 +40,26 @@ class ModernBERTEncoder:
     name = "ModernBERT-base [CLS]"
 
     def __init__(self):
-        import torch
         from transformers import AutoModel, AutoTokenizer
+
         self.tokenizer = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-base")
         self.model = AutoModel.from_pretrained("answerdotai/ModernBERT-base")
         self.model.eval()
 
     def encode(self, texts: list[str]) -> np.ndarray:
         import torch
+
         embeddings = []
         batch_size = 16
         with torch.no_grad():
             for i in range(0, len(texts), batch_size):
-                batch = texts[i:i + batch_size]
+                batch = texts[i : i + batch_size]
                 inputs = self.tokenizer(
-                    batch, return_tensors="pt", truncation=True,
-                    max_length=256, padding=True,
+                    batch,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=256,
+                    padding=True,
                 )
                 outputs = self.model(**inputs)
                 cls = outputs.last_hidden_state[:, 0, :].cpu().numpy()
@@ -72,6 +75,7 @@ class SentenceTransformerEncoder:
 
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         from sentence_transformers import SentenceTransformer
+
         self.model = SentenceTransformer(model_name)
 
     def encode(self, texts: list[str]) -> np.ndarray:
@@ -106,10 +110,11 @@ def evaluate_encoder(encoder, examples: list[dict], k: int = 3) -> dict:
 
     for i, ex in enumerate(test):
         query = ex["query"]
-        sims = cosine_similarity(test_embs[i:i+1], train_embs)[0]
+        sims = cosine_similarity(test_embs[i : i + 1], train_embs)[0]
         top_k_idx = np.argsort(sims)[-k:][::-1]
 
         from collections import Counter
+
         route_votes = Counter()
         intent_votes = Counter()
         total_weight = 0
@@ -179,6 +184,7 @@ def probe_encoder(encoder, examples: list[dict]) -> dict:
         top_k_idx = np.argsort(sims)[-3:][::-1]
 
         from collections import Counter
+
         route_votes = Counter()
         for idx in top_k_idx:
             route_votes[examples[idx]["labels"]["route"]] += sims[idx] ** 2
@@ -187,13 +193,15 @@ def probe_encoder(encoder, examples: list[dict]) -> dict:
         ok = pred == expected
         if ok:
             correct += 1
-        results.append({
-            "query": query,
-            "expected": expected,
-            "predicted": pred,
-            "correct": ok,
-            "top_sim": round(float(sims[top_k_idx[0]]), 4),
-        })
+        results.append(
+            {
+                "query": query,
+                "expected": expected,
+                "predicted": pred,
+                "correct": ok,
+                "top_sim": round(float(sims[top_k_idx[0]]), 4),
+            }
+        )
     return {"accuracy": correct / len(PROBE_QUERIES), "results": results}
 
 
@@ -228,7 +236,9 @@ def main():
         print(f"  Probe accuracy:     {probe['accuracy']:.3f}")
         for r in probe["results"]:
             status = "✅" if r["correct"] else "❌"
-            print(f"    {status} {r['query']!r:30s} -> {r['predicted']:10s} (top_sim={r['top_sim']})")
+            print(
+                f"    {status} {r['query']!r:30s} -> {r['predicted']:10s} (top_sim={r['top_sim']})"
+            )
         print()
 
 

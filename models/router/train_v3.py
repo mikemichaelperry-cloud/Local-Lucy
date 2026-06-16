@@ -2,7 +2,6 @@
 """ModernBERT router training with 1000+ augmented examples."""
 
 import random
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -52,7 +51,9 @@ def evaluate(model, dataloader, device):
                 all_labels[h].extend(labels[h].cpu().numpy())
     metrics = {"loss": total_loss / len(dataloader)}
     for h in HEAD_NAMES:
-        metrics[h] = classification_report(all_labels[h], all_preds[h], output_dict=True, zero_division=0)
+        metrics[h] = classification_report(
+            all_labels[h], all_preds[h], output_dict=True, zero_division=0
+        )
     return metrics
 
 
@@ -77,20 +78,23 @@ def main():
     model.to(device)
 
     log("Generating large dataset...")
-    historical = load_historical_data(Path(config["data"].get("historical_path", "historical_routes.jsonl")))
+    historical = load_historical_data(
+        Path(config["data"].get("historical_path", "historical_routes.jsonl"))
+    )
     all_data = generate_large_dataset(target_total=1200)
-    
+
     # Add historical if any
     if historical:
         all_data.extend(historical)
         random.shuffle(all_data)
-    
+
     # Stratified split
     from collections import defaultdict
+
     by_intent = defaultdict(list)
     for ex in all_data:
         by_intent[ex["labels"]["intent_family"]].append(ex)
-    
+
     train, val, test = [], [], []
     for intent, examples in by_intent.items():
         random.shuffle(examples)
@@ -98,13 +102,13 @@ def main():
         n_test = max(1, int(n * 0.15))
         n_val = max(1, int(n * 0.15))
         test.extend(examples[:n_test])
-        val.extend(examples[n_test:n_test + n_val])
-        train.extend(examples[n_test + n_val:])
-    
+        val.extend(examples[n_test : n_test + n_val])
+        train.extend(examples[n_test + n_val :])
+
     random.shuffle(train)
     random.shuffle(val)
     random.shuffle(test)
-    
+
     log(f"Train: {len(train)}, Val: {len(val)}, Test: {len(test)}")
 
     train_ds = RouterDataset(train, tokenizer, config["model"]["max_length"])
@@ -122,7 +126,11 @@ def main():
         weight_decay=config["training"]["weight_decay"],
     )
 
-    total_steps = len(train_loader) * config["training"]["epochs"] // config["training"]["gradient_accumulation_steps"]
+    total_steps = (
+        len(train_loader)
+        * config["training"]["epochs"]
+        // config["training"]["gradient_accumulation_steps"]
+    )
     scheduler = get_linear_schedule_with_warmup(
         optimizer,
         num_warmup_steps=int(total_steps * config["training"]["warmup_ratio"]),

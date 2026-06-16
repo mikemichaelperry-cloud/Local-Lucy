@@ -54,376 +54,720 @@ NEW_EXAMPLES: list[dict] = [
     # ================================================================
     {
         "query": "How do I change a tire?",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
     {
         "query": "How do I change a car tire step by step",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
     {
         "query": "How to jump start a car",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
     {
         "query": "How do I patch a hole in drywall",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
     {
         "query": "How to unclog a sink drain",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
     {
         "query": "How do I tie a tie for a wedding",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
     {
         "query": "How to bake sourdough bread from scratch",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
     {
         "query": "How do I build a bookshelf",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
     {
         "query": "How to replace a broken phone screen",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
     {
         "query": "Step by step instructions for CPR",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "diy"},
     },
-
     # ================================================================
     # 2. Ambiguous Boundary Queries (Route confusion stress tests)
     # ================================================================
     {
         "query": "What is the weather like on Mars?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
     {
         "query": "What was the weather like during D-Day?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
     {
         "query": "What time is it in a black hole?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
     {
         "query": "What's the news from ancient Rome?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
     {
         "query": "Current price of a gallon of milk",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
     {
         "query": "Bitcoin price in 2010",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
     {
         "query": "How much does a Tesla cost?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
     {
         "query": "Tell me about the news industry",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
     {
         "query": "What is the forecast for my retirement?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
     {
         "query": "Latest trends in interior design",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "ambiguous"},
     },
-
     # ================================================================
     # 3. Pronoun / Context Queries (Without Memory Gate)
     # ================================================================
     {
         "query": "What about it?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
     {
         "query": "Tell me more",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
     {
         "query": "Why is that?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
     {
         "query": "Should I keep it?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
     {
         "query": "How does it work?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
     {
         "query": "What do you think about them?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
     {
         "query": "Is that true?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
     {
         "query": "Can you explain it better?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
     {
         "query": "What happened next?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
     {
         "query": "And then?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "pronoun"},
     },
-
     # ================================================================
     # 4. Keyword Guard Bypasses (guard words in non-triggering contexts)
     # ================================================================
     {
         "query": "Write a story about a doctor",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
     {
         "query": "Write a poem about financial ruin",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
     {
         "query": "Tell me a joke about lawyers",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
     {
         "query": "How to draw a heart",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
     {
         "query": "The economy of Middle Earth",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
     {
         "query": "Stock characters in Shakespeare",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
     {
         "query": "Weather the storm in business",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
     {
         "query": "Time travel stories for kids",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
     {
         "query": "Current events in the Marvel Universe",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
     {
         "query": "Breaking news about my lunch",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "guard_bypass"},
     },
-
     # ================================================================
     # 5. Typos / Noisy Input Stress Tests
     # ================================================================
     {
         "query": "wats teh wether in tokio",
-        "labels": {"intent_family": "ephemeral_query", "evidence_mode": "not_required", "route": "WEATHER", "policy_override": "none"},
+        "labels": {
+            "intent_family": "ephemeral_query",
+            "evidence_mode": "not_required",
+            "route": "WEATHER",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
     {
         "query": "wats teh l8est newz",
-        "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"},
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
     {
         "query": "whut tiem iz it nao",
-        "labels": {"intent_family": "time_query", "evidence_mode": "not_required", "route": "TIME", "policy_override": "none"},
+        "labels": {
+            "intent_family": "time_query",
+            "evidence_mode": "not_required",
+            "route": "TIME",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
     {
         "query": "how 2 chnge a tirr",
-        "labels": {"intent_family": "how_to", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "how_to",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
     {
         "query": "wat abot that",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
     {
         "query": "tell me mor",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
     {
         "query": "wht did i say",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
     {
         "query": "rmd me wat mi nme is",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
     {
         "query": "whats teh wether 4cast",
-        "labels": {"intent_family": "ephemeral_query", "evidence_mode": "not_required", "route": "WEATHER", "policy_override": "none"},
+        "labels": {
+            "intent_family": "ephemeral_query",
+            "evidence_mode": "not_required",
+            "route": "WEATHER",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
     {
         "query": "stok prise of appl",
-        "labels": {"intent_family": "current_evidence", "evidence_mode": "required", "route": "AUGMENTED", "policy_override": "none"},
+        "labels": {
+            "intent_family": "current_evidence",
+            "evidence_mode": "required",
+            "route": "AUGMENTED",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "typos"},
     },
-
     # ================================================================
     # 6. Mixed / Compound Intent Queries
     # ================================================================
     {
         "query": "Weather forecast and news headlines",
-        "labels": {"intent_family": "ephemeral_query", "evidence_mode": "not_required", "route": "WEATHER", "policy_override": "none"},
+        "labels": {
+            "intent_family": "ephemeral_query",
+            "evidence_mode": "not_required",
+            "route": "WEATHER",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
     {
         "query": "What time is it and what's the weather?",
-        "labels": {"intent_family": "time_query", "evidence_mode": "not_required", "route": "TIME", "policy_override": "none"},
+        "labels": {
+            "intent_family": "time_query",
+            "evidence_mode": "not_required",
+            "route": "TIME",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
     {
         "query": "How do I cook pasta and what's the news?",
-        "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"},
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
     {
         "query": "Tell me a story about the stock market crash of 1929",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
     {
         "query": "Current trends in AI and machine learning",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
     {
         "query": "What is the best time to plant tomatoes?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
     {
         "query": "Price comparison of electric cars",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
     {
         "query": "How to invest in renewable energy",
-        "labels": {"intent_family": "current_evidence", "evidence_mode": "required", "route": "AUGMENTED", "policy_override": "none"},
+        "labels": {
+            "intent_family": "current_evidence",
+            "evidence_mode": "required",
+            "route": "AUGMENTED",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
     {
         "query": "Latest research on climate change",
-        "labels": {"intent_family": "current_evidence", "evidence_mode": "required", "route": "AUGMENTED", "policy_override": "none"},
+        "labels": {
+            "intent_family": "current_evidence",
+            "evidence_mode": "required",
+            "route": "AUGMENTED",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
     {
         "query": "What is the current status of my application?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "compound"},
     },
-
     # ================================================================
     # 7. Cultural / Regional Variations
     # ================================================================
     {
         "query": "What's the weather like today, mate?",
-        "labels": {"intent_family": "ephemeral_query", "evidence_mode": "not_required", "route": "WEATHER", "policy_override": "none"},
+        "labels": {
+            "intent_family": "ephemeral_query",
+            "evidence_mode": "not_required",
+            "route": "WEATHER",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
     {
         "query": "How's the weather looking, yeah?",
-        "labels": {"intent_family": "ephemeral_query", "evidence_mode": "not_required", "route": "WEATHER", "policy_override": "none"},
+        "labels": {
+            "intent_family": "ephemeral_query",
+            "evidence_mode": "not_required",
+            "route": "WEATHER",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
     {
         "query": "Cheers, what's the time?",
-        "labels": {"intent_family": "time_query", "evidence_mode": "not_required", "route": "TIME", "policy_override": "none"},
+        "labels": {
+            "intent_family": "time_query",
+            "evidence_mode": "not_required",
+            "route": "TIME",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
     {
         "query": "Give us the news, will ya?",
-        "labels": {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"},
+        "labels": {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
     {
         "query": "What's the craic?",
-        "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
     {
         "query": "Wie spät ist es?",
-        "labels": {"intent_family": "time_query", "evidence_mode": "not_required", "route": "TIME", "policy_override": "none"},
+        "labels": {
+            "intent_family": "time_query",
+            "evidence_mode": "not_required",
+            "route": "TIME",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
     {
         "query": "Quel temps fait-il?",
-        "labels": {"intent_family": "ephemeral_query", "evidence_mode": "not_required", "route": "WEATHER", "policy_override": "none"},
+        "labels": {
+            "intent_family": "ephemeral_query",
+            "evidence_mode": "not_required",
+            "route": "WEATHER",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
     {
         "query": "Wie ist das Wetter?",
-        "labels": {"intent_family": "ephemeral_query", "evidence_mode": "not_required", "route": "WEATHER", "policy_override": "none"},
+        "labels": {
+            "intent_family": "ephemeral_query",
+            "evidence_mode": "not_required",
+            "route": "WEATHER",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
     {
         "query": "Dame el pronóstico",
-        "labels": {"intent_family": "ephemeral_query", "evidence_mode": "not_required", "route": "WEATHER", "policy_override": "none"},
+        "labels": {
+            "intent_family": "ephemeral_query",
+            "evidence_mode": "not_required",
+            "route": "WEATHER",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
     {
         "query": "מה השעה?",
-        "labels": {"intent_family": "time_query", "evidence_mode": "not_required", "route": "TIME", "policy_override": "none"},
+        "labels": {
+            "intent_family": "time_query",
+            "evidence_mode": "not_required",
+            "route": "TIME",
+            "policy_override": "none",
+        },
         "metadata": {"source": "manual_augment_2026_05_10", "category": "cultural"},
     },
 ]
@@ -476,6 +820,7 @@ def rebuild_embeddings():
     rebuild_script = Path(__file__).parent.parent.parent / "scripts" / "rebuild_embeddings.py"
     if rebuild_script.exists():
         import subprocess
+
         result = subprocess.run(
             [sys.executable, str(rebuild_script)],
             capture_output=True,
@@ -494,7 +839,9 @@ def rebuild_embeddings():
 def main():
     parser = argparse.ArgumentParser(description="Append 70 curated examples to embedding index")
     parser.add_argument("--dry-run", action="store_true", help="Preview only, do not modify files")
-    parser.add_argument("--apply", action="store_true", help="Append examples and rebuild embeddings")
+    parser.add_argument(
+        "--apply", action="store_true", help="Append examples and rebuild embeddings"
+    )
     args = parser.parse_args()
 
     existing = load_existing_queries()
@@ -518,20 +865,21 @@ def main():
     by_category = Counter(ex["metadata"]["category"] for ex in new_examples)
 
     print(f"\nNew examples to add: {len(new_examples)}")
-    print(f"By route:")
+    print("By route:")
     for route, count in sorted(by_route.items()):
         print(f"  {route:12s} {count:2d}")
-    print(f"By category:")
+    print("By category:")
     for cat, count in sorted(by_category.items()):
         print(f"  {cat:15s} {count:2d}")
 
     if args.dry_run or not args.apply:
-        print(f"\n💡 Use --apply to append and rebuild")
+        print("\n💡 Use --apply to append and rebuild")
         return
 
     # Apply
-    print(f"\n⚠️  Applying changes in 3 seconds... (Ctrl+C to cancel)")
+    print("\n⚠️  Applying changes in 3 seconds... (Ctrl+C to cancel)")
     import time
+
     try:
         time.sleep(3)
     except KeyboardInterrupt:

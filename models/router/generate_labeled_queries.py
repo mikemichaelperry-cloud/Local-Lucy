@@ -6,7 +6,6 @@ routing category, then labels them with the fixed legacy router.
 """
 
 import json
-import random
 import sys
 import time
 from pathlib import Path
@@ -34,7 +33,6 @@ Requirements:
 - No numbering, no explanations, just the queries
 
 Generate 10 queries:""",
-
     "background_overview": """Generate 10 realistic user queries asking for factual knowledge or explanations about topics. These might benefit from web search but the AI may know the answer from training data.
 
 Examples: historical figures, science concepts, geography, biography.
@@ -46,7 +44,6 @@ Requirements:
 - No numbering, no explanations, just the queries
 
 Generate 10 queries:""",
-
     "technical_explanation": """Generate 10 realistic user queries asking for technical how-to instructions or deep technical explanations.
 
 Examples: programming tutorials, system administration, debugging, algorithms.
@@ -58,7 +55,6 @@ Requirements:
 - No numbering, no explanations, just the queries
 
 Generate 10 queries:""",
-
     "current_evidence": """Generate 10 realistic user queries that require verified, up-to-date information or evidence. These NEED web search or fact-checking.
 
 Examples: medical advice, legal questions, current research, financial data, fact verification.
@@ -70,7 +66,6 @@ Requirements:
 - No numbering, no explanations, just the queries
 
 Generate 10 queries:""",
-
     "news_request": """Generate 10 realistic user queries asking for current news or events.
 
 Examples: breaking news, politics, sports, weather, world events.
@@ -82,7 +77,6 @@ Requirements:
 - No numbering, no explanations, just the queries
 
 Generate 10 queries:""",
-
     "time_query": """Generate 10 realistic user queries about time, dates, or timezones.
 
 Examples: current time in cities, timezone differences, date calculations.
@@ -94,7 +88,6 @@ Requirements:
 - No numbering, no explanations, just the queries
 
 Generate 10 queries:""",
-
     "creative_writing": """Generate 10 realistic user queries asking the AI to create creative content.
 
 Examples: stories, poems, dialogues, fictional scenarios, imaginative content.
@@ -106,7 +99,6 @@ Requirements:
 - No numbering, no explanations, just the queries
 
 Generate 10 queries:""",
-
     "clarification": """Generate 10 realistic vague or ambiguous user queries that would need clarification.
 
 Examples: single words, incomplete questions, follow-ups without context.
@@ -141,7 +133,12 @@ def generate_queries(category: str, count: int = 10) -> list[str]:
 
         # Parse lines
         lines = [line.strip("-•* \t\"'") for line in content.split("\n") if line.strip()]
-        lines = [line for line in lines if len(line) > 3 and not line.lower().startswith(("here", "sure", "below", "the", "generate"))]
+        lines = [
+            line
+            for line in lines
+            if len(line) > 3
+            and not line.lower().startswith(("here", "sure", "below", "the", "generate"))
+        ]
 
         return lines[:count]
     except Exception as e:
@@ -166,15 +163,24 @@ def label_with_legacy(query: str) -> dict:
         family = "current_evidence"
         needs_web = True
         cat = "time_query"
-    elif any(k in q_lower for k in ["symptom", "treatment", "medication", "dosage", "side effects", "is it safe"]):
+    elif any(
+        k in q_lower
+        for k in ["symptom", "treatment", "medication", "dosage", "side effects", "is it safe"]
+    ):
         family = "current_evidence"
         needs_web = True
         cat = "medical"
-    elif any(k in q_lower for k in ["stock price", "bitcoin", "exchange rate", "interest rate", "market cap"]):
+    elif any(
+        k in q_lower
+        for k in ["stock price", "bitcoin", "exchange rate", "interest rate", "market cap"]
+    ):
         family = "current_evidence"
         needs_web = True
         cat = "financial"
-    elif any(k in q_lower for k in ["legal to", "court ruling", "supreme court", "tenant rights", "statute"]):
+    elif any(
+        k in q_lower
+        for k in ["legal to", "court ruling", "supreme court", "tenant rights", "statute"]
+    ):
         family = "current_evidence"
         needs_web = True
         cat = "legal"
@@ -182,11 +188,24 @@ def label_with_legacy(query: str) -> dict:
         family = "local_answer"
         needs_web = False
         cat = "procedural"
-    elif any(k in q_lower for k in ["who was", "who is", "what is the capital", "what is the speed", "when did", "what caused"]):
+    elif any(
+        k in q_lower
+        for k in [
+            "who was",
+            "who is",
+            "what is the capital",
+            "what is the speed",
+            "when did",
+            "what caused",
+        ]
+    ):
         family = "background_overview"
         needs_web = True
         cat = "informational"
-    elif any(k in q_lower for k in ["hello", "who are you", "good morning", "how are you", "what is your name"]):
+    elif any(
+        k in q_lower
+        for k in ["hello", "who are you", "good morning", "how are you", "what is your name"]
+    ):
         family = "local_answer"
         needs_web = False
         cat = "greeting"
@@ -200,8 +219,12 @@ def label_with_legacy(query: str) -> dict:
         cat = "general"
 
     classification = ClassificationResult(
-        intent=family, intent_family=family, intent_class=family,
-        category=cat, confidence=0.85, needs_web=needs_web,
+        intent=family,
+        intent_family=family,
+        intent_class=family,
+        category=cat,
+        confidence=0.85,
+        needs_web=needs_web,
         evidence_mode="required" if requires_evidence else "",
         evidence_reason=evidence_reason,
         augmentation_recommended=needs_web and not requires,
@@ -244,15 +267,16 @@ def main():
 
     # Stats
     from collections import Counter
+
     intent_counts = Counter(ex["labels"]["intent_family"] for ex in all_examples)
     route_counts = Counter(ex["labels"]["route"] for ex in all_examples)
 
     print(f"\n{'=' * 70}")
     print(f"Generated {len(all_examples)} examples")
-    print(f"\nIntent distribution:")
+    print("\nIntent distribution:")
     for intent, count in sorted(intent_counts.items()):
         print(f"  {intent:25s}: {count}")
-    print(f"\nRoute distribution:")
+    print("\nRoute distribution:")
     for route, count in sorted(route_counts.items()):
         print(f"  {route:20s}: {count}")
 

@@ -32,7 +32,7 @@ import json
 import os
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +45,9 @@ INDEX_PATH = ROUTER_DIR / "comprehensive_index.jsonl"
 EXAMPLES_PATH = ROUTER_DIR / "comprehensive_examples.json"
 
 DEFAULT_ROUTER_LOG_DIR = os.environ.get("LUCY_ROUTER_LOG_DIR", "")
-ROUTER_LOG_PATH = Path(DEFAULT_ROUTER_LOG_DIR) / "router_decisions.jsonl" if DEFAULT_ROUTER_LOG_DIR else None
+ROUTER_LOG_PATH = (
+    Path(DEFAULT_ROUTER_LOG_DIR) / "router_decisions.jsonl" if DEFAULT_ROUTER_LOG_DIR else None
+)
 
 RUNTIME_NS = Path(
     os.environ.get(
@@ -75,12 +77,21 @@ _MIN_QUERY_LENGTH = 3
 _MAX_QUERY_LENGTH = 500
 
 # Confidence thresholds
-_MIN_LOG_CONFIDENCE = 0.70      # Only learn from confident router decisions
+_MIN_LOG_CONFIDENCE = 0.70  # Only learn from confident router decisions
 _MIN_FEEDBACK_CONFIDENCE = 0.60  # Auto-feedback minimum
-_MIN_LOW_CONFIDENCE = 0.40       # Below this = needs more examples
+_MIN_LOW_CONFIDENCE = 0.40  # Below this = needs more examples
 
 # Routes that are valid for training
-_VALID_ROUTES = {"LOCAL", "AUGMENTED", "NEWS", "TIME", "WEATHER", "EPHEMERAL", "CLARIFY", "SELF_REVIEW"}
+_VALID_ROUTES = {
+    "LOCAL",
+    "AUGMENTED",
+    "NEWS",
+    "TIME",
+    "WEATHER",
+    "EPHEMERAL",
+    "CLARIFY",
+    "SELF_REVIEW",
+}
 
 
 def _is_test_or_junk(query: str) -> bool:
@@ -103,6 +114,7 @@ def _normalize_query(query: str) -> str:
 # ---------------------------------------------------------------------------
 # Loaders (all read-only)
 # ---------------------------------------------------------------------------
+
 
 def load_existing_queries() -> set[str]:
     """Load all existing queries from the canonical JSON for deduplication."""
@@ -191,6 +203,7 @@ def load_auto_feedback() -> list[dict]:
 # Candidate generators
 # ---------------------------------------------------------------------------
 
+
 def candidates_from_router_logs(entries: list[dict], existing: set[str]) -> list[dict]:
     """
     Extract candidates from router decision logs.
@@ -232,80 +245,88 @@ def candidates_from_router_logs(entries: list[dict], existing: set[str]) -> list
         # Signal 1: Memory gate override (strongest signal)
         if memory_gate_override and embedding_route != route:
             evidence = "required" if evidence_reason else "not_required"
-            candidates.append({
-                "query": query,
-                "labels": {
-                    "intent_family": intent,
-                    "evidence_mode": evidence,
-                    "route": route,
-                    "policy_override": "none",
-                },
-                "metadata": {
-                    "source": "router_log_memory_gate",
-                    "confidence": confidence,
-                    "embedding_route": embedding_route,
-                    "guards_fired": guards_fired,
-                    "reason": f"memory_gate_override: {embedding_route} -> {route}",
-                },
-            })
+            candidates.append(
+                {
+                    "query": query,
+                    "labels": {
+                        "intent_family": intent,
+                        "evidence_mode": evidence,
+                        "route": route,
+                        "policy_override": "none",
+                    },
+                    "metadata": {
+                        "source": "router_log_memory_gate",
+                        "confidence": confidence,
+                        "embedding_route": embedding_route,
+                        "guards_fired": guards_fired,
+                        "reason": f"memory_gate_override: {embedding_route} -> {route}",
+                    },
+                }
+            )
             continue
 
         # Signal 2: Guard disagreement (embedding vs legacy disagree)
         if not legacy_agrees and confidence >= 0.5:
             evidence = "required" if evidence_reason else "not_required"
-            candidates.append({
-                "query": query,
-                "labels": {
-                    "intent_family": intent,
-                    "evidence_mode": evidence,
-                    "route": route,
-                    "policy_override": "none",
-                },
-                "metadata": {
-                    "source": "router_log_guard_disagreement",
-                    "confidence": confidence,
-                    "legacy_route": entry.get("legacy_route_audit", ""),
-                    "reason": "embedding and legacy keyword router disagreed",
-                },
-            })
+            candidates.append(
+                {
+                    "query": query,
+                    "labels": {
+                        "intent_family": intent,
+                        "evidence_mode": evidence,
+                        "route": route,
+                        "policy_override": "none",
+                    },
+                    "metadata": {
+                        "source": "router_log_guard_disagreement",
+                        "confidence": confidence,
+                        "legacy_route": entry.get("legacy_route_audit", ""),
+                        "reason": "embedding and legacy keyword router disagreed",
+                    },
+                }
+            )
             continue
 
         # Signal 3: Low confidence — needs reinforcement
         if confidence < _MIN_LOW_CONFIDENCE:
             evidence = "required" if evidence_reason else "not_required"
-            candidates.append({
-                "query": query,
-                "labels": {
-                    "intent_family": intent,
-                    "evidence_mode": evidence,
-                    "route": route,
-                    "policy_override": "none",
-                },
-                "metadata": {
-                    "source": "router_log_low_confidence",
-                    "confidence": confidence,
-                    "reason": f"low confidence ({confidence:.2f}) needs reinforcement",
-                },
-            })
+            candidates.append(
+                {
+                    "query": query,
+                    "labels": {
+                        "intent_family": intent,
+                        "evidence_mode": evidence,
+                        "route": route,
+                        "policy_override": "none",
+                    },
+                    "metadata": {
+                        "source": "router_log_low_confidence",
+                        "confidence": confidence,
+                        "reason": f"low confidence ({confidence:.2f}) needs reinforcement",
+                    },
+                }
+            )
             continue
 
         # Signal 4: High-confidence known-good
         if confidence >= 0.85 and not guards_fired:
             evidence = "required" if evidence_reason else "not_required"
-            candidates.append({
-                "query": query,
-                "labels": {
-                    "intent_family": intent,
-                    "evidence_mode": evidence,
-                    "route": route,
-                    "policy_override": "none",
-                },
-                "metadata": {
-                    "source": "router_log_confirmed",
-                    "confidence": confidence,
-                    "reason": "high-confidence decision with no guard overrides",
-                },
-            })
+            candidates.append(
+                {
+                    "query": query,
+                    "labels": {
+                        "intent_family": intent,
+                        "evidence_mode": evidence,
+                        "route": route,
+                        "policy_override": "none",
+                    },
+                    "metadata": {
+                        "source": "router_log_confirmed",
+                        "confidence": confidence,
+                        "reason": "high-confidence decision with no guard overrides",
+                    },
+                }
+            )
 
     return candidates
 
@@ -344,20 +365,22 @@ def candidates_from_feedback_buffer(exchanges: list[dict], existing: set[str]) -
 
         evidence = "required" if route == "AUGMENTED" else "not_required"
 
-        candidates.append({
-            "query": query,
-            "labels": {
-                "intent_family": intent,
-                "evidence_mode": evidence,
-                "route": route,
-                "policy_override": "none",
-            },
-            "metadata": {
-                "source": "feedback_buffer",
-                "confidence": confidence,
-                "reason": "real user query from feedback buffer",
-            },
-        })
+        candidates.append(
+            {
+                "query": query,
+                "labels": {
+                    "intent_family": intent,
+                    "evidence_mode": evidence,
+                    "route": route,
+                    "policy_override": "none",
+                },
+                "metadata": {
+                    "source": "feedback_buffer",
+                    "confidence": confidence,
+                    "reason": "real user query from feedback buffer",
+                },
+            }
+        )
 
     return candidates
 
@@ -399,21 +422,23 @@ def candidates_from_user_feedback(entries: list[dict], existing: set[str]) -> li
         }
         intent = intent_map.get(correct_route, "local_answer")
 
-        candidates.append({
-            "query": query,
-            "labels": {
-                "intent_family": intent,
-                "evidence_mode": evidence,
-                "route": correct_route,
-                "policy_override": "none",
-            },
-            "metadata": {
-                "source": "user_feedback",
-                "feedback_type": feedback_type,
-                "timestamp": entry.get("timestamp", ""),
-                "reason": f"explicit user {feedback_type}",
-            },
-        })
+        candidates.append(
+            {
+                "query": query,
+                "labels": {
+                    "intent_family": intent,
+                    "evidence_mode": evidence,
+                    "route": correct_route,
+                    "policy_override": "none",
+                },
+                "metadata": {
+                    "source": "user_feedback",
+                    "feedback_type": feedback_type,
+                    "timestamp": entry.get("timestamp", ""),
+                    "reason": f"explicit user {feedback_type}",
+                },
+            }
+        )
 
     return candidates
 
@@ -456,22 +481,24 @@ def candidates_from_auto_feedback(entries: list[dict], existing: set[str]) -> li
         }
         intent = intent_map.get(correct_route, "local_answer")
 
-        candidates.append({
-            "query": query,
-            "labels": {
-                "intent_family": intent,
-                "evidence_mode": evidence,
-                "route": correct_route,
-                "policy_override": "none",
-            },
-            "metadata": {
-                "source": "auto_feedback",
-                "confidence": confidence,
-                "auto_reason": entry.get("reason", ""),
-                "details": entry.get("details", ""),
-                "reason": f"auto-detected misroute ({entry.get('reason', '')})",
-            },
-        })
+        candidates.append(
+            {
+                "query": query,
+                "labels": {
+                    "intent_family": intent,
+                    "evidence_mode": evidence,
+                    "route": correct_route,
+                    "policy_override": "none",
+                },
+                "metadata": {
+                    "source": "auto_feedback",
+                    "confidence": confidence,
+                    "auto_reason": entry.get("reason", ""),
+                    "details": entry.get("details", ""),
+                    "reason": f"auto-detected misroute ({entry.get('reason', '')})",
+                },
+            }
+        )
 
     return candidates
 
@@ -479,6 +506,7 @@ def candidates_from_auto_feedback(entries: list[dict], existing: set[str]) -> li
 # ---------------------------------------------------------------------------
 # Main logic
 # ---------------------------------------------------------------------------
+
 
 def generate_candidates(
     log_path: Path | None,
@@ -495,7 +523,7 @@ def generate_candidates(
     user_feedback = load_user_feedback()
     auto_feedback = load_auto_feedback()
 
-    print(f"\nData sources found:")
+    print("\nData sources found:")
     print(f"  Router decision logs: {len(router_logs)} entries")
     print(f"  Feedback buffer:      {len(feedback_buffer)} exchanges")
     print(f"  User feedback:        {len(user_feedback)} corrections")
@@ -504,22 +532,26 @@ def generate_candidates(
     # Optional time filtering
     if since:
         router_logs = [
-            e for e in router_logs
+            e
+            for e in router_logs
             if _parse_timestamp(e.get("timestamp", "")) is None
             or _parse_timestamp(e.get("timestamp", "")) >= since
         ]
         feedback_buffer = [
-            e for e in feedback_buffer
+            e
+            for e in feedback_buffer
             if _parse_timestamp(e.get("timestamp", "")) is None
             or _parse_timestamp(e.get("timestamp", "")) >= since
         ]
         user_feedback = [
-            e for e in user_feedback
+            e
+            for e in user_feedback
             if _parse_timestamp(e.get("timestamp", "")) is None
             or _parse_timestamp(e.get("timestamp", "")) >= since
         ]
         auto_feedback = [
-            e for e in auto_feedback
+            e
+            for e in auto_feedback
             if _parse_timestamp(e.get("timestamp", "")) is None
             or _parse_timestamp(e.get("timestamp", "")) >= since
         ]
@@ -594,12 +626,12 @@ def print_stats(stats: dict[str, Any]) -> None:
     print(f"\nCandidates generated:       {stats['candidates_generated']}")
 
     if stats["by_source"]:
-        print(f"\nBy source:")
+        print("\nBy source:")
         for source, count in sorted(stats["by_source"].items(), key=lambda x: -x[1]):
             print(f"  {source:25s} {count:4d}")
 
     if stats["by_route"]:
-        print(f"\nBy route:")
+        print("\nBy route:")
         for route, count in sorted(stats["by_route"].items(), key=lambda x: -x[1]):
             print(f"  {route:12s} {count:4d}")
 
@@ -622,6 +654,7 @@ def apply_candidates(candidates: list[dict]) -> None:
     print("Triggering background_learner.py --process...")
 
     import subprocess
+
     result = subprocess.run(
         [sys.executable, str(learner_path), "--process"],
         capture_output=True,
@@ -701,7 +734,7 @@ def main() -> None:
 
     # Limit if requested
     if args.top > 0:
-        candidates = candidates[:args.top]
+        candidates = candidates[: args.top]
         print(f"\nLimited to top {args.top} candidates.")
 
     # Apply or output
@@ -710,6 +743,7 @@ def main() -> None:
         print("   Press Ctrl+C within 3 seconds to cancel...")
         try:
             import time
+
             time.sleep(3)
         except KeyboardInterrupt:
             print("\nCancelled.")
@@ -733,7 +767,7 @@ def main() -> None:
                 print(f"  Reason:   {cand['metadata']['reason']}")
             if len(candidates) > 5:
                 print(f"\n  ... and {len(candidates) - 5} more")
-            print(f"\n💡 Use --output FILE.jsonl to save, then review before applying.")
+            print("\n💡 Use --output FILE.jsonl to save, then review before applying.")
 
 
 if __name__ == "__main__":

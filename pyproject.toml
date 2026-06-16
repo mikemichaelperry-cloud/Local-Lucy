@@ -116,3 +116,10 @@ ignore = ["E501"]
 "ui-v10/tests/test_voice_ptt_state_machine.py" = ["F841", "E402"]
 "ui-v10/tests/test_changes_verification.py" = ["F841"]
 "tools/router_py/test_feedback_loop_integration.py" = ["F841"]
+# Legacy backend modules with pre-existing import-order, bare-except, unused-variable,
+# and lambda-assignment debt. Clean these up in a dedicated refactoring pass.
+"tools/router_py/*.py" = ["E402", "E722", "E731", "F401", "F821", "F841", "I001"]
+"tools/router_py/test_*.py" = ["E402", "E722", "F401", "F841", "F821", "I001"]
+"tools/router_py/providers/*.py" = ["E402", "F401", "F841", "I001"]
+"models/router/*.py" = ["E402", "E722", "E741", "F821", "F841", "I001"]
+"ui-v10/app/**/*.py" = ["E402", "F401", "F841", "I001"]

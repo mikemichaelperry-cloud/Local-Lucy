@@ -14,7 +14,7 @@ print("STEP 1: Generating balanced synthetic training data")
 print("=" * 60)
 
 sys.path.insert(0, str(Path(__file__).parent))
-from dataset import generate_synthetic_examples, load_historical_data, balance_dataset, split_dataset
+from dataset import load_historical_data, balance_dataset, split_dataset
 
 config = {
     "train_split": 0.7,
@@ -22,7 +22,9 @@ config = {
     "min_samples_per_class": 200,
 }
 
-historical = load_historical_data(Path(__file__).parent / "data" / "raw" / "historical_routes.jsonl")
+historical = load_historical_data(
+    Path(__file__).parent / "data" / "raw" / "historical_routes.jsonl"
+)
 print(f"Historical examples: {len(historical)}")
 
 balanced = balance_dataset(historical, config["min_samples_per_class"])

@@ -68,35 +68,103 @@ def _is_garbage(query: str) -> tuple[bool, str]:
 
 _ROUTE_KEYWORDS: dict[str, list[str]] = {
     "WEATHER": [
-        "weather", "forecast", "rain", "snow", "sunny", "cloudy", "storm",
-        "temperature", "temp", "hot", "cold", "warm", "cool", "humid",
-        "drizzle", "thunder", "lightning", "fog", "wind", "breeze",
-        "wetter", "wetterbericht", "pronostico", "tiempo", "météo",
+        "weather",
+        "forecast",
+        "rain",
+        "snow",
+        "sunny",
+        "cloudy",
+        "storm",
+        "temperature",
+        "temp",
+        "hot",
+        "cold",
+        "warm",
+        "cool",
+        "humid",
+        "drizzle",
+        "thunder",
+        "lightning",
+        "fog",
+        "wind",
+        "breeze",
+        "wetter",
+        "wetterbericht",
+        "pronostico",
+        "tiempo",
+        "météo",
     ],
     "NEWS": [
-        "news", "latest", "breaking", "headline", "current events",
-        "what happened", "update on", "report on", "developments",
+        "news",
+        "latest",
+        "breaking",
+        "headline",
+        "current events",
+        "what happened",
+        "update on",
+        "report on",
+        "developments",
     ],
     "TIME": [
-        "time", "timezone", "hour", "clock", "what time", "when is",
-        "schedule", "opening hours", "closing time", "business hours",
+        "time",
+        "timezone",
+        "hour",
+        "clock",
+        "what time",
+        "when is",
+        "schedule",
+        "opening hours",
+        "closing time",
+        "business hours",
     ],
     "EVIDENCE": [
-        "symptoms", "treatment", "diagnosis", "disease", "cancer",
-        "diabetes", "appendicitis", "medical", "clinical", "study",
-        "evidence", "research", "trial", "peer reviewed", "citation",
-        "legal", "law", "statute", "regulation", "court",
-        "financial", "stock", "bond", "investment", "sec filing",
+        "symptoms",
+        "treatment",
+        "diagnosis",
+        "disease",
+        "cancer",
+        "diabetes",
+        "appendicitis",
+        "medical",
+        "clinical",
+        "study",
+        "evidence",
+        "research",
+        "trial",
+        "peer reviewed",
+        "citation",
+        "legal",
+        "law",
+        "statute",
+        "regulation",
+        "court",
+        "financial",
+        "stock",
+        "bond",
+        "investment",
+        "sec filing",
     ],
     "AUGMENTED": [
-        "what is", "how does", "explain", "why is", "compare",
-        "difference between", "pros and cons", "history of",
+        "what is",
+        "how does",
+        "explain",
+        "why is",
+        "compare",
+        "difference between",
+        "pros and cons",
+        "history of",
     ],
 }
 
 # Keywords that strongly suggest a route, used to catch mislabels
 _STRONG_ROUTE_INDICATORS: dict[str, list[str]] = {
-    "WEATHER": ["weather forecast", "weather tomorrow", "weather today", "what's the weather", "how's the weather"],
+    "WEATHER": [
+        "weather forecast",
+        "weather tomorrow",
+        "weather today",
+        "what's the weather",
+        "how's the weather",
+    ],
     "NEWS": ["latest news", "breaking news", "news about", "what's happening"],
     "TIME": ["what time is it", "what timezone", "time in ", "current time"],
     "EVIDENCE": ["symptoms of", "treatment for", "evidence for", "peer reviewed", "clinical trial"],
@@ -104,7 +172,10 @@ _STRONG_ROUTE_INDICATORS: dict[str, list[str]] = {
 
 # Things that should NEVER be AUGMENTED/EVIDENCE/NEWS
 _LOCAL_ONLY_PATTERNS = [
-    re.compile(r"\b(write|compose|craft|tell me|create|make up)\b.*\b(story|poem|essay|fiction|tale|narrative)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(write|compose|craft|tell me|create|make up)\b.*\b(story|poem|essay|fiction|tale|narrative)\b",
+        re.IGNORECASE,
+    ),
     re.compile(r"^\s*(calculate|compute|what is)\s*[\d+\-*/\s]+\?*$", re.IGNORECASE),
     re.compile(r"\bhello\b|\bhi\b|\bgood morning\b|\bgood evening\b", re.IGNORECASE),
 ]
@@ -138,8 +209,18 @@ def _is_suspicious_label(query: str, route: str) -> tuple[bool, str]:
 
     # Medical/legal/financial keywords in LOCAL route = suspicious
     if route == "LOCAL":
-        medical_finance_legal = ["symptoms", "treatment", "diagnosis", "cancer", "diabetes",
-                                  "appendicitis", "legal", "lawyer", "stock price", "investment"]
+        medical_finance_legal = [
+            "symptoms",
+            "treatment",
+            "diagnosis",
+            "cancer",
+            "diabetes",
+            "appendicitis",
+            "legal",
+            "lawyer",
+            "stock price",
+            "investment",
+        ]
         if any(kw in q for kw in medical_finance_legal):
             return True, "medical_legal_finance_in_LOCAL"
 
@@ -302,39 +383,45 @@ def main() -> None:
             status = "N/A"
         report_lines.append(f"{route:<15} {before:>8} {after:>8} {str(target):>8} {status:<15}")
 
-    report_lines.extend([
-        "",
-        "--- GARBAGE REMOVED ---",
-    ])
+    report_lines.extend(
+        [
+            "",
+            "--- GARBAGE REMOVED ---",
+        ]
+    )
     for reason, count in sorted(removed_stats.items(), key=lambda x: -x[1]):
         report_lines.append(f"  {count:4d}  {reason}")
 
-    report_lines.extend([
-        "",
-        "--- SUSPICIOUS LABELS ---",
-    ])
+    report_lines.extend(
+        [
+            "",
+            "--- SUSPICIOUS LABELS ---",
+        ]
+    )
     for reason, count in sorted(suspicion_stats.items(), key=lambda x: -x[1]):
         report_lines.append(f"  {count:4d}  {reason}")
 
-    report_lines.extend([
-        "",
-        "--- RECOMMENDATIONS ---",
-        "1. Review flagged entries in comprehensive_examples_flagged.json",
-        "2. Manually verify/correct suspicious labels",
-        "3. Add more EVIDENCE examples (currently critically underrepresented)",
-        "4. Add more WEATHER examples (currently underrepresented)",
-        "5. Rebuild comprehensive_embeddings.npy after cleaning:",
-        "   python scripts/rebuild_embeddings.py",
-        "",
-        "=" * 70,
-    ])
+    report_lines.extend(
+        [
+            "",
+            "--- RECOMMENDATIONS ---",
+            "1. Review flagged entries in comprehensive_examples_flagged.json",
+            "2. Manually verify/correct suspicious labels",
+            "3. Add more EVIDENCE examples (currently critically underrepresented)",
+            "4. Add more WEATHER examples (currently underrepresented)",
+            "5. Rebuild comprehensive_embeddings.npy after cleaning:",
+            "   python scripts/rebuild_embeddings.py",
+            "",
+            "=" * 70,
+        ]
+    )
 
     report = "\n".join(report_lines)
     with open(REPORT_PATH, "w") as f:
         f.write(report)
 
     print(report)
-    print(f"\nFiles written:")
+    print("\nFiles written:")
     print(f"  {CLEAN_PATH}")
     print(f"  {FLAGGED_PATH}")
     print(f"  {REPORT_PATH}")

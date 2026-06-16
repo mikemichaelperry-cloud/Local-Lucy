@@ -6,7 +6,6 @@ import random
 from pathlib import Path
 from typing import Any
 
-import yaml
 from torch.utils.data import Dataset
 
 
@@ -71,41 +70,94 @@ SYNTHETIC_TEMPLATES = {
 
 SLOT_VALUES = {
     "topic": [
-        "Python", "quantum computing", "Palestine", "AI safety", "diabetes",
-        "blockchain", "climate change", "nuclear fusion", "CRISPR", "dark matter",
-        "machine learning", "cybersecurity", "space exploration", "renewable energy",
-        "neuroscience", "economics", "philosophy", "history of Rome", "World War II",
-        "the solar system", "DNA replication", "photosynthesis", "evolution",
+        "Python",
+        "quantum computing",
+        "Palestine",
+        "AI safety",
+        "diabetes",
+        "blockchain",
+        "climate change",
+        "nuclear fusion",
+        "CRISPR",
+        "dark matter",
+        "machine learning",
+        "cybersecurity",
+        "space exploration",
+        "renewable energy",
+        "neuroscience",
+        "economics",
+        "philosophy",
+        "history of Rome",
+        "World War II",
+        "the solar system",
+        "DNA replication",
+        "photosynthesis",
+        "evolution",
     ],
     "claim": [
-        "vaccines are safe", "climate change is real", "AI will replace jobs",
-        "nuclear power is clean", "organic food is healthier",
+        "vaccines are safe",
+        "climate change is real",
+        "AI will replace jobs",
+        "nuclear power is clean",
+        "organic food is healthier",
     ],
     "action": [
-        "install Python", "deploy a Docker container", "configure nginx",
-        "set up a VPN", "create a React app", "train a neural network",
+        "install Python",
+        "deploy a Docker container",
+        "configure nginx",
+        "set up a VPN",
+        "create a React app",
+        "train a neural network",
     ],
     "code_snippet": [
-        "def foo(): pass", "Segmentation fault", "null pointer exception",
-        "IndexError: list index out of range", "ModuleNotFoundError",
+        "def foo(): pass",
+        "Segmentation fault",
+        "null pointer exception",
+        "IndexError: list index out of range",
+        "ModuleNotFoundError",
     ],
     "scenario": [
-        "humans can fly", "water flows uphill", "AI governs the world",
-        "dinosaurs never went extinct", "people live underwater",
+        "humans can fly",
+        "water flows uphill",
+        "AI governs the world",
+        "dinosaurs never went extinct",
+        "people live underwater",
     ],
     "character_a": ["Einstein", "Shakespeare", "Tesla", "Cleopatra", "Mozart"],
     "character_b": ["Newton", "Hemingway", "Edison", "Caesar", "Beethoven"],
     "drug": [
-        "ibuprofen", "tadalafil", "sildenafil", "metformin", "insulin",
-        "amoxicillin", "lisinopril", "atorvastatin", "omeprazole",
+        "ibuprofen",
+        "tadalafil",
+        "sildenafil",
+        "metformin",
+        "insulin",
+        "amoxicillin",
+        "lisinopril",
+        "atorvastatin",
+        "omeprazole",
     ],
     "condition": [
-        "diabetes", "hypertension", "depression", "asthma", "arthritis",
-        "migraine", "anxiety", "high cholesterol", "GERD",
+        "diabetes",
+        "hypertension",
+        "depression",
+        "asthma",
+        "arthritis",
+        "migraine",
+        "anxiety",
+        "high cholesterol",
+        "GERD",
     ],
     "location": [
-        "Tokyo", "New York", "London", "Sydney", "Berlin",
-        "Paris", "Moscow", "Beijing", "Dubai", "Rio de Janeiro",
+        "Tokyo",
+        "New York",
+        "London",
+        "Sydney",
+        "Berlin",
+        "Paris",
+        "Moscow",
+        "Beijing",
+        "Dubai",
+        "Rio de Janeiro",
     ],
 }
 
@@ -125,32 +177,34 @@ def generate_synthetic_examples(intent_family: str, count: int) -> list[dict]:
     templates = SYNTHETIC_TEMPLATES.get(intent_family, [])
     if not templates:
         return []
-    
+
     examples = []
     for _ in range(count):
         template = random.choice(templates)
         query = fill_template(template)
-        
+
         # Derive route and evidence from intent
         route = _intent_to_default_route(intent_family)
         evidence = "required" if intent_family == "medical_inquiry" else "not_required"
         policy = "none"
-        
-        examples.append({
-            "query": query,
-            "labels": {
-                "intent_family": intent_family,
-                "evidence_mode": evidence,
-                "route": route,
-                "policy_override": policy,
-            },
-            "metadata": {
-                "source": "synthetic",
-                "confidence": 1.0,
-                "template": template,
+
+        examples.append(
+            {
+                "query": query,
+                "labels": {
+                    "intent_family": intent_family,
+                    "evidence_mode": evidence,
+                    "route": route,
+                    "policy_override": policy,
+                },
+                "metadata": {
+                    "source": "synthetic",
+                    "confidence": 1.0,
+                    "template": template,
+                },
             }
-        })
-    
+        )
+
     return examples
 
 
@@ -184,17 +238,17 @@ def load_historical_data(path: Path) -> list[dict]:
 def balance_dataset(examples: list[dict], target_per_class: int) -> list[dict]:
     """Oversample rare classes with synthetic data to reach target count."""
     from collections import Counter
-    
+
     intent_counts = Counter(ex["labels"]["intent_family"] for ex in examples)
     balanced = list(examples)
-    
+
     for intent, count in intent_counts.items():
         if count < target_per_class:
             needed = target_per_class - count
             synthetic = generate_synthetic_examples(intent, needed)
             balanced.extend(synthetic)
             print(f"  Generated {needed} synthetic examples for {intent}")
-    
+
     # Also generate for completely missing classes
     all_intents = set(SYNTHETIC_TEMPLATES.keys())
     present_intents = set(intent_counts.keys())
@@ -203,7 +257,7 @@ def balance_dataset(examples: list[dict], target_per_class: int) -> list[dict]:
         synthetic = generate_synthetic_examples(missing, needed)
         balanced.extend(synthetic)
         print(f"  Generated {needed} synthetic examples for missing class {missing}")
-    
+
     random.shuffle(balanced)
     return balanced
 
@@ -213,42 +267,60 @@ def split_dataset(examples: list[dict], train_ratio: float = 0.7, val_ratio: flo
     n = len(examples)
     n_train = int(n * train_ratio)
     n_val = int(n * val_ratio)
-    
+
     return {
         "train": examples[:n_train],
-        "val": examples[n_train:n_train + n_val],
-        "test": examples[n_train + n_val:],
+        "val": examples[n_train : n_train + n_val],
+        "test": examples[n_train + n_val :],
     }
 
 
 class RouterDataset(Dataset):
     """PyTorch Dataset for tokenized router examples."""
-    
+
     def __init__(self, examples: list[dict], tokenizer, max_length: int = 256):
         self.examples = examples
         self.tokenizer = tokenizer
         self.max_length = max_length
-        
+
         # Build label index maps
-        self.intent_to_idx = {name: i for i, name in enumerate([
-            "background_overview", "current_evidence", "clarification",
-            "technical_explanation", "creative_writing", "medical_inquiry",
-            "news_request", "time_query"
-        ])}
-        self.evidence_to_idx = {name: i for i, name in enumerate(["not_required", "required", "uncertain"])}
-        self.route_to_idx = {name: i for i, name in enumerate([
-            "LOCAL", "LOCAL_WITH_FALLBACK", "AUGMENTED", "NEWS", "TIME", "CLARIFY"
-        ])}
-        self.policy_to_idx = {name: i for i, name in enumerate(["none", "disabled", "fallback_only", "force_augmented"])}
-    
+        self.intent_to_idx = {
+            name: i
+            for i, name in enumerate(
+                [
+                    "background_overview",
+                    "current_evidence",
+                    "clarification",
+                    "technical_explanation",
+                    "creative_writing",
+                    "medical_inquiry",
+                    "news_request",
+                    "time_query",
+                ]
+            )
+        }
+        self.evidence_to_idx = {
+            name: i for i, name in enumerate(["not_required", "required", "uncertain"])
+        }
+        self.route_to_idx = {
+            name: i
+            for i, name in enumerate(
+                ["LOCAL", "LOCAL_WITH_FALLBACK", "AUGMENTED", "NEWS", "TIME", "CLARIFY"]
+            )
+        }
+        self.policy_to_idx = {
+            name: i
+            for i, name in enumerate(["none", "disabled", "fallback_only", "force_augmented"])
+        }
+
     def __len__(self):
         return len(self.examples)
-    
+
     def __getitem__(self, idx):
         ex = self.examples[idx]
         query = ex["query"]
         labels = ex["labels"]
-        
+
         encoding = self.tokenizer(
             query,
             truncation=True,
@@ -256,7 +328,7 @@ class RouterDataset(Dataset):
             padding="max_length",
             return_tensors="pt",
         )
-        
+
         return {
             "input_ids": encoding["input_ids"].squeeze(0),
             "attention_mask": encoding["attention_mask"].squeeze(0),
@@ -265,25 +337,25 @@ class RouterDataset(Dataset):
                 "evidence": self.evidence_to_idx[labels["evidence_mode"]],
                 "route": self.route_to_idx[labels["route"]],
                 "policy": self.policy_to_idx[labels["policy_override"]],
-            }
+            },
         }
 
 
 def load_and_balance_data(config: dict[str, Any]) -> tuple[list[dict], list[dict], list[dict]]:
     """Load, balance, and split dataset."""
     data_dir = Path(__file__).parent / "data"
-    
+
     # Load historical data
     historical = load_historical_data(data_dir / "raw" / "historical_routes.jsonl")
     print(f"Loaded {len(historical)} historical examples")
-    
+
     # Balance with synthetic data
     target = config.get("min_samples_per_class", 50)
     balanced = balance_dataset(historical, target)
     print(f"Balanced dataset size: {len(balanced)}")
-    
+
     # Split
     splits = split_dataset(balanced, config["train_split"], config["val_split"])
     print(f"Train: {len(splits['train'])}, Val: {len(splits['val'])}, Test: {len(splits['test'])}")
-    
+
     return splits["train"], splits["val"], splits["test"]

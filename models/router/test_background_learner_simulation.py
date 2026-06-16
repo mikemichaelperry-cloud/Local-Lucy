@@ -19,9 +19,7 @@ Safety: Every file path is patched to tmp_path. HybridRouterV2 is mocked.
 from __future__ import annotations
 
 import json
-import os
 import sys
-import threading
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -130,9 +128,7 @@ def starter_index(isolated_learner):
 class TestLearnOnce:
     """End-to-end simulation of a single learning iteration."""
 
-    def test_ingests_user_feedback(
-        self, isolated_learner, mock_embedding_router, starter_index
-    ):
+    def test_ingests_user_feedback(self, isolated_learner, mock_embedding_router, starter_index):
         """User feedback is read, index grows, embeddings rebuilt."""
         bl = isolated_learner
 
@@ -198,9 +194,7 @@ class TestLearnOnce:
                 "feedback_type": "auto_correction",
             }
         ]
-        af.AUTO_FEEDBACK_PATH.write_text(
-            "\n".join(json.dumps(f) for f in auto_fb) + "\n"
-        )
+        af.AUTO_FEEDBACK_PATH.write_text("\n".join(json.dumps(f) for f in auto_fb) + "\n")
 
         result = bl.learn_once(verbose=False)
 
@@ -209,10 +203,7 @@ class TestLearnOnce:
         assert result["new_from_auto"] == 0
 
         index = bl.load_index()
-        assert not any(
-            ex["query"] == "What is the capital of Germany?"
-            for ex in index
-        )
+        assert not any(ex["query"] == "What is the capital of Germany?" for ex in index)
 
     def test_deduplication_overwrites_old(
         self, isolated_learner, mock_embedding_router, starter_index
@@ -244,9 +235,7 @@ class TestLearnOnce:
         assert entry["labels"]["route"] == "AUGMENTED"
         assert entry["metadata"]["source"] == "user_feedback"
 
-    def test_no_new_data_is_noop(
-        self, isolated_learner, mock_embedding_router, starter_index
-    ):
+    def test_no_new_data_is_noop(self, isolated_learner, mock_embedding_router, starter_index):
         """When no feedback or logs exist, learn_once is a no-op."""
         bl = isolated_learner
 
@@ -301,9 +290,7 @@ class TestMaybeAutoLearn:
             }
             for i in range(3)
         ]
-        bl.FEEDBACK_PATH.write_text(
-            "\n".join(json.dumps(e) for e in entries) + "\n"
-        )
+        bl.FEEDBACK_PATH.write_text("\n".join(json.dumps(e) for e in entries) + "\n")
 
         with patch.object(bl, "learn_once", return_value={"added": 3}) as mock_learn:
             result = bl.maybe_auto_learn(min_entries=3)
@@ -387,9 +374,7 @@ class TestMaybeAutoLearn:
 class TestEndToEnd:
     """Full pipeline simulation — closest thing to production without touching real files."""
 
-    def test_full_pipeline(
-        self, isolated_learner, mock_embedding_router, starter_index
-    ):
+    def test_full_pipeline(self, isolated_learner, mock_embedding_router, starter_index):
         """
         Simulate a realistic scenario:
         - 2 seed examples in the index
@@ -414,9 +399,7 @@ class TestEndToEnd:
                 "feedback_type": "correction",
             },
         ]
-        bl.FEEDBACK_PATH.write_text(
-            "\n".join(json.dumps(e) for e in user_entries) + "\n"
-        )
+        bl.FEEDBACK_PATH.write_text("\n".join(json.dumps(e) for e in user_entries) + "\n")
 
         result = bl.learn_once(verbose=False)
 
@@ -468,29 +451,48 @@ class TestTimestampStripping:
         seed = [
             {
                 "query": "What is 2+2?",
-                "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
-                "metadata": {"source": "router_log", "timestamp": "2026-05-13T18:16:42.043684+00:00"},
+                "labels": {
+                    "intent_family": "local_answer",
+                    "evidence_mode": "not_required",
+                    "route": "LOCAL",
+                    "policy_override": "none",
+                },
+                "metadata": {
+                    "source": "router_log",
+                    "timestamp": "2026-05-13T18:16:42.043684+00:00",
+                },
             },
             {
                 "query": "What time is it?",
-                "labels": {"intent_family": "time_query", "evidence_mode": "not_required", "route": "TIME", "policy_override": "none"},
+                "labels": {
+                    "intent_family": "time_query",
+                    "evidence_mode": "not_required",
+                    "route": "TIME",
+                    "policy_override": "none",
+                },
                 "metadata": {"source": "user_feedback", "timestamp": "2026-05-14T10:00:00Z"},
             },
         ]
         bl.save_index(seed)
 
-        with patch.object(bl, "HybridRouterV2", return_value=MagicMock(
-            fit=lambda ex: None,
-            examples=seed,
-            embeddings=np.zeros((2, 384), dtype=np.float32),
-        )):
+        with patch.object(
+            bl,
+            "HybridRouterV2",
+            return_value=MagicMock(
+                fit=lambda ex: None,
+                examples=seed,
+                embeddings=np.zeros((2, 384), dtype=np.float32),
+            ),
+        ):
             bl.rebuild_embeddings(seed)
 
         # Tracked examples file must NOT contain timestamps
         with open(bl.EXAMPLES_PATH) as f:
             saved = json.load(f)
         for ex in saved:
-            assert "timestamp" not in ex.get("metadata", {}), f"timestamp leaked into tracked file for: {ex['query']}"
+            assert "timestamp" not in ex.get(
+                "metadata", {}
+            ), f"timestamp leaked into tracked file for: {ex['query']}"
 
         # Metadata file MUST contain the runtime timestamp
         assert bl.EXAMPLES_METADATA_PATH.exists()
@@ -505,17 +507,26 @@ class TestTimestampStripping:
         seed = [
             {
                 "query": "What is 2+2?",
-                "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"},
+                "labels": {
+                    "intent_family": "local_answer",
+                    "evidence_mode": "not_required",
+                    "route": "LOCAL",
+                    "policy_override": "none",
+                },
                 "metadata": {"source": "router_log"},
             },
         ]
         bl.save_index(seed)
 
-        with patch.object(bl, "HybridRouterV2", return_value=MagicMock(
-            fit=lambda ex: None,
-            examples=seed,
-            embeddings=np.zeros((1, 384), dtype=np.float32),
-        )):
+        with patch.object(
+            bl,
+            "HybridRouterV2",
+            return_value=MagicMock(
+                fit=lambda ex: None,
+                examples=seed,
+                embeddings=np.zeros((1, 384), dtype=np.float32),
+            ),
+        ):
             bl.rebuild_embeddings(seed)
 
         # Read first write
@@ -523,11 +534,15 @@ class TestTimestampStripping:
             first = f.read()
 
         # Rebuild again with identical data
-        with patch.object(bl, "HybridRouterV2", return_value=MagicMock(
-            fit=lambda ex: None,
-            examples=seed,
-            embeddings=np.zeros((1, 384), dtype=np.float32),
-        )):
+        with patch.object(
+            bl,
+            "HybridRouterV2",
+            return_value=MagicMock(
+                fit=lambda ex: None,
+                examples=seed,
+                embeddings=np.zeros((1, 384), dtype=np.float32),
+            ),
+        ):
             bl.rebuild_embeddings(seed)
 
         # Read second write

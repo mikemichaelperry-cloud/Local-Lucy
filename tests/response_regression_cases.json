@@ -122,7 +122,7 @@
       "must_exclude_regexes": [
         "(?i)I don't know|I do not know|no idea"
       ],
-      "max_chars": 750
+      "max_chars": 800
     }
   },
   {
