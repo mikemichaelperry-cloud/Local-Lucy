@@ -70,8 +70,10 @@ test_reports/
 
 # Build and temporary artifacts
 tmp/
+dist/
 *.bak
 *.orig
+*.egg-info/
 
 # Deprecated tools
 tools/deprecated/
