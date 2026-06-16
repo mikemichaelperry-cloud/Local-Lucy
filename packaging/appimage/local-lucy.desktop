@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Local Lucy
+Comment=Self-learning, privacy-first desktop AI assistant
+Exec=local-lucy
+Icon=local-lucy
+Type=Application
+Categories=Utility;Network;Chat;AI;
+Terminal=false
