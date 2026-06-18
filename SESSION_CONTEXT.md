@@ -105,6 +105,7 @@ Working tree: clean
 
 ### Recent Commits (last 13)
 ```
+40838ce docs: refresh README, CHANGELOG, ARCHITECTURE, TODAY_SUMMARY, and SESSION_CONTEXT
 54ca91a feat(web): add optional web interface adapter
 b6170fa docs: update SESSION_CONTEXT.md after production-readiness fixes
 231a419 test: fix remaining test failures and enforce mypy in lint
