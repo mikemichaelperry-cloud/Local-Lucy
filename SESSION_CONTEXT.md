@@ -79,6 +79,7 @@ lucy-v10/
 | Health check | `python -m tools.router_py.health` |
 | Environment validator | `python scripts/check_environment.py` or `make check-env` |
 | DB migration | `python scripts/migrate_db.py` |
+| Optional web UI | `LUCY_WEB_ENABLED=1 python -m web_adapter` |
 | Pytest (full) | `make test` |
 | Lint | `make lint` |
 
@@ -192,7 +193,8 @@ Live market-data fetcher with source citations:
 10. ~~Local-model regression tests~~ ✅ all 20 response/semantic regression cases now pass
 11. ~~Robustness review fixes~~ ✅ AppImage removed from automatic release; Ollama skip fixture added; model-mismatch skip in semantic regression; concept-overlap threshold relaxed to 0.25; reasoning max_chars raised to 800; reasoning prompt steered to avoid "I don't know"
 12. ~~Ruff / lint~~ ✅ ruff installed in venv; mypy installed and enforced; `make lint` passes
-13. ~~Full test suite~~ ✅ `make test` passes: 929 passed, 19 skipped
+13. ~~Full test suite~~ ✅ `make test` passes: 942 passed, 19 skipped
+14. ~~Optional web interface~~ ✅ aiohttp adapter added at `web_adapter/`; stateless; request-scoped model selection; Basic/Bearer auth; 13 focused tests
 
 ---
 
@@ -211,5 +213,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T19:05:00Z*
-*Session: Production-readiness fixes; full test suite green; committed and pushed to origin/v10-dev*
+*Last updated: 2026-06-16T20:10:00Z*
+*Session: Optional web interface implemented; full test suite green; committed and pushed to origin/v10-dev*

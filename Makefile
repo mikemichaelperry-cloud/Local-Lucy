@@ -31,7 +31,7 @@ test:
 
 lint:
 	@echo "[lint] Running ruff..."
-	ruff check tools/router_py/ models/router/ ui-v10/app/
+	ruff check tools/router_py/ models/router/ ui-v10/app/ web_adapter/
 	@echo "[lint] Running mypy..."
 	mypy tools/router_py/ --ignore-missing-imports
 

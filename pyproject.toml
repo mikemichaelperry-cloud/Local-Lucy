@@ -91,6 +91,7 @@ testpaths = [
     "tools/voice/tests",
     "ui-v10/tests",
     "tests",
+    "web_adapter",
 ]
 asyncio_mode = "auto"
 filterwarnings = [
