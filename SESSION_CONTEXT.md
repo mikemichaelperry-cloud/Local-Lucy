@@ -105,6 +105,7 @@ Working tree: clean
 
 ### Recent Commits (last 13)
 ```
+cf2132f docs: add remote-access instructions for the web interface
 3b375eb docs: deprecate legacy transition flags and keyword-router rollback
 40838ce docs: refresh README, CHANGELOG, ARCHITECTURE, TODAY_SUMMARY, and SESSION_CONTEXT
 54ca91a feat(web): add optional web interface adapter
@@ -222,5 +223,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T22:25:00Z*
-*Session: Legacy transition flags and keyword-router rollback deprecated in docs; test suite green; all changes pushed to origin/v10-dev*
+*Last updated: 2026-06-16T22:45:00Z*
+*Session: Remote-access instructions added for web interface; legacy options deprecated; test suite green; all changes pushed to origin/v10-dev*
