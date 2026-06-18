@@ -177,6 +177,18 @@ export LUCY_WEB_AUTH_TOKEN=$(openssl rand -hex 32)
 LUCY_WEB_ENABLED=1 python -m web_adapter
 ```
 
+#### Remote access from Windows / Android / Linux
+
+The web UI works in any modern browser, so no extra Local Lucy software is needed on the device you browse from.
+
+| Scenario | What you need on the client | Link / address | Notes |
+|---|---|---|---|
+| **Same LAN** | Any browser | `http://<lucy-host-ip>:8765` | Replace `<lucy-host-ip>` with the Linux host's LAN address (e.g. `192.168.1.42`). Set `LUCY_WEB_HOST=0.0.0.0` on the host and create a token. |
+| **Tailscale VPN** (recommended) | Any browser + [Tailscale app](https://tailscale.com/download) | `http://<lucy-tailscale-ip>:8765` | Secure, no port forwarding. Install Tailscale on the Linux host and on the remote device, then use the host's Tailscale IP (usually `100.x.x.x`). |
+| **Public internet tunnel** | Any browser | URL from [ngrok](https://ngrok.com/download) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Use only for short tests; keep a token set. Do not expose port 8765 directly to the internet. |
+
+When the browser asks for a password, enter the value of `LUCY_WEB_AUTH_TOKEN` as the password (username can be blank).
+
 See [docs/web_interface.md](docs/web_interface.md) for full security and configuration details.
 
 ## Usage

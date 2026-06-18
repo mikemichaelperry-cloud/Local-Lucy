@@ -88,6 +88,46 @@ curl -H "Authorization: Bearer $LUCY_WEB_AUTH_TOKEN" \
 
 ---
 
+## Remote access from Windows, Android, or Linux
+
+No Local Lucy software needs to be installed on the device you browse from — only a web browser is required.
+
+### Same LAN
+
+1. On the host, bind to all interfaces and set a token:
+   ```bash
+   export LUCY_WEB_ENABLED=1
+   export LUCY_WEB_HOST=0.0.0.0
+   export LUCY_WEB_AUTH_TOKEN=$(openssl rand -hex 32)
+   python -m web_adapter
+   ```
+2. Find the host's LAN IP, e.g. `192.168.1.42`.
+3. From the other device, open:
+   ```text
+   http://192.168.1.42:8765
+   ```
+
+### Tailscale (recommended for remote access)
+
+1. Install Tailscale on the Linux host and on the remote device: https://tailscale.com/download
+2. On the host, bind to the Tailscale IP (or `0.0.0.0`) and set a token:
+   ```bash
+   export LUCY_WEB_ENABLED=1
+   export LUCY_WEB_HOST=0.0.0.0   # or the Tailscale IP, e.g. 100.64.0.1
+   export LUCY_WEB_AUTH_TOKEN=$(openssl rand -hex 32)
+   python -m web_adapter
+   ```
+3. From the remote device, open:
+   ```text
+   http://<lucy-tailscale-ip>:8765
+   ```
+
+### Public internet (temporary only)
+
+For short tests across the internet, use a tunnel such as [ngrok](https://ngrok.com/download) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/). Do not expose port 8765 directly to the public internet.
+
+---
+
 ## Security
 
 - **Loopback by default.** The server binds to `127.0.0.1` unless explicitly
