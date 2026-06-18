@@ -7,7 +7,7 @@
 [![CI](https://github.com/mikemichaelperry-cloud/Local-Lucy/actions/workflows/ci.yml/badge.svg)](https://github.com/mikemichaelperry-cloud/Local-Lucy/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1600%2B%20passing-brightgreen)](tools/router_py/)
+[![Tests](https://img.shields.io/badge/tests-900%2B%20passing-brightgreen)](tools/router_py/)
 
 [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Contributing](CONTRIBUTING.md)
 
@@ -59,6 +59,14 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 - Real-time status panel and event logs
 - Configurable voice, provider, and model settings
 - Cross-platform (Linux primary, extensible)
+
+### 🌐 Optional Web Interface
+- Lightweight aioHTTP adapter for remote text access
+- Reuses the same Local Lucy query pipeline as the PyQt HMI
+- Stateless by default — no conversation memory shared with the desktop HMI
+- Request-scoped model selection, validated against configured models
+- Basic/Bearer authentication; loopback-only by default
+- Mobile-friendly single-page UI
 
 ## Architecture
 
@@ -150,6 +158,27 @@ cp .env.example .env
 ./lucy_chat.sh
 ```
 
+### Web Interface (optional)
+
+```bash
+# Start the standalone web adapter
+source ui-v10/.venv/bin/activate
+LUCY_WEB_ENABLED=1 python -m web_adapter
+
+# Open in a browser
+http://127.0.0.1:8765
+```
+
+For LAN/Tailscale access, set `LUCY_WEB_HOST` and a token:
+
+```bash
+export LUCY_WEB_HOST=100.64.0.1
+export LUCY_WEB_AUTH_TOKEN=$(openssl rand -hex 32)
+LUCY_WEB_ENABLED=1 python -m web_adapter
+```
+
+See [docs/web_interface.md](docs/web_interface.md) for full security and configuration details.
+
 ## Usage
 
 ### Natural Conversation
@@ -187,16 +216,26 @@ The background learner automatically rebuilds the embedding index from correctio
 | `LUCY_RUNTIME_NAMESPACE_ROOT` | `~/.local/share/local-lucy` | XDG runtime state directory |
 | `LUCY_RUNTIME_AUTHORITY_ROOT` | project root | Project root for contract validation |
 | `LUCY_OLLAMA_API_URL` | `http://127.0.0.1:11434/api/generate` | Local LLM endpoint |
+| `LUCY_WEB_ENABLED` | `0` | Set to `1` to start the optional web adapter |
+| `LUCY_WEB_HOST` | `127.0.0.1` | Web adapter bind address |
+| `LUCY_WEB_PORT` | `8765` | Web adapter bind port |
+| `LUCY_WEB_AUTH_TOKEN` | *(none)* | Required token for non-loopback binds |
 
 ## Development
 
 ### Running Tests
 
 ```bash
-# Full router suite (~2 min)
+# Full suite (~4 min)
 cd ~/lucy-v10
 source ui-v10/.venv/bin/activate
+make test
+
+# Router suite only
 python -m pytest tools/router_py/ -q
+
+# Web adapter tests
+python -m pytest web_adapter/test_web_adapter.py -v
 
 # Medical routing specifically
 python -m pytest tools/router_py/test_medical_evidence_routing.py -v
@@ -236,6 +275,7 @@ Local-Lucy/
 ├── tools/voice/            # STT/TTS pipeline
 ├── tools/internet/         # Web search & circuit breakers
 ├── tools/xdg_paths.py      # XDG path resolution
+├── web_adapter/            # Optional HTTP/web UI adapter
 ├── packaging/              # .deb and AppImage build scripts
 ├── data/tubes/             # Web extraction pipelines
 ├── config/                 # Environment configs, Modelfiles

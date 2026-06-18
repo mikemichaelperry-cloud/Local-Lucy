@@ -36,11 +36,18 @@ lucy-v10/
 │   │   └── services/         # RuntimeBridge, state store, log watcher
 │   ├── tests/                # Offscreen PySide6 tests
 │   └── .venv/                # Python virtual environment
+├── web_adapter/              # Optional aioHTTP web interface (stateless)
+│   ├── server.py             # API + static HTML UI
+│   ├── static.py             # Dependency-free frontend page
+│   └── test_web_adapter.py   # Web adapter tests
 ├── models/router/            # Embedding router, training data, background learner
 ├── config/                   # Modelfiles, prompts, trust rules, policies
 ├── services/searxng/         # Docker Compose + settings.yml for local search proxy
 ├── scripts/                  # Operational scripts (check_environment.py, migrate_db.py)
 ├── docs/runbooks/            # INSTALL.md, SECURITY.md
+├── README.md                 # Project overview, usage, features
+├── ARCHITECTURE.md           # System architecture
+├── CHANGELOG.md              # Keep a Changelog format
 ├── runtime/                  # Generated at runtime (ignored by git)
 ├── state/                    # Generated at runtime (ignored by git)
 ├── voice/                    # Generated audio (ignored by git)
@@ -213,5 +220,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T20:10:00Z*
-*Session: Optional web interface implemented; full test suite green; committed and pushed to origin/v10-dev*
+*Last updated: 2026-06-16T21:07:00Z*
+*Session: README, CHANGELOG, ARCHITECTURE, TODAY_SUMMARY, web docs, and handoff files refreshed; test suite green; pending commit/push to origin/v10-dev*

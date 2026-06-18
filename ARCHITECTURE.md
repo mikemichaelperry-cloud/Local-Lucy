@@ -10,7 +10,7 @@
 
 ## 1. Project Overview
 
-Local Lucy v10 is a locally-hosted AI assistant running entirely on the user's machine. It combines a PySide6 desktop HMI, a hybrid keyword/embedding router, persistent SQLite memory, voice input/output (Whisper STT + Kokoro TTS), and web-augmented answering via multi-backend search (DuckDuckGo primary, SearXNG fallback, Brave API optional).
+Local Lucy v10 is a locally-hosted AI assistant running entirely on the user's machine. It combines a PySide6 desktop HMI, an optional HTTP web interface, a hybrid keyword/embedding router, persistent SQLite memory, voice input/output (Whisper STT + Kokoro TTS), and web-augmented answering via multi-backend search (DuckDuckGo primary, SearXNG fallback, Brave API optional).
 
 **Core philosophy:** Facts only, no evasion, no political correctness. The AI does what the user asks.
 
@@ -234,6 +234,11 @@ PTT Press → Record Audio → Whisper.cpp (GPU if available) → Transcript
 
 Both must only reference `ui-v10/.venv/bin/python3`.
 
+**Optional web interface:**
+- `LUCY_WEB_ENABLED=1 python -m web_adapter` — Standalone HTTP adapter
+- Binds `127.0.0.1:8765` by default; supports LAN/Tailscale binding with token auth.
+- The adapter is a thin I/O layer over `tools/router_py/main.py::execute_plan_python()` and is stateless by default.
+
 ---
 
 ## 10. Key Files for Agents
@@ -247,6 +252,7 @@ Both must only reference `ui-v10/.venv/bin/python3`.
 | `tools/router_py/execution_engine.py` | Route execution |
 | `tools/router_py/policy.py` | Evidence mode policy |
 | `ui-v10/app/services/runtime_bridge.py` | HMI ↔ backend bridge |
+| `web_adapter/server.py` | Optional HTTP/web UI adapter |
 | `config/Modelfile.local-lucy-llama31` | Default model config |
 | `memory/memory_service.py` | SQLite memory operations |
 | `pytest.ini` | Test config (asyncio_mode = auto) |
@@ -270,6 +276,12 @@ export LUCY_ROUTER_PY=1
 export LUCY_EXEC_PY=1
 export LUCY_ENABLE_INTERNET=1
 export LUCY_SESSION_MEMORY=1
+
+# Optional web interface
+export LUCY_WEB_ENABLED=1
+export LUCY_WEB_HOST=127.0.0.1
+export LUCY_WEB_PORT=8765
+# export LUCY_WEB_AUTH_TOKEN=<required for non-loopback binds>
 
 # GPU optimization
 export OLLAMA_FLASH_ATTENTION=1
