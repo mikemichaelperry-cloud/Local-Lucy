@@ -105,6 +105,7 @@ Working tree: clean
 
 ### Recent Commits (last 13)
 ```
+3b375eb docs: deprecate legacy transition flags and keyword-router rollback
 40838ce docs: refresh README, CHANGELOG, ARCHITECTURE, TODAY_SUMMARY, and SESSION_CONTEXT
 54ca91a feat(web): add optional web interface adapter
 b6170fa docs: update SESSION_CONTEXT.md after production-readiness fixes
@@ -221,5 +222,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T21:07:00Z*
-*Session: README, CHANGELOG, ARCHITECTURE, TODAY_SUMMARY, web docs, and handoff files refreshed; test suite green; pending commit/push to origin/v10-dev*
+*Last updated: 2026-06-16T22:25:00Z*
+*Session: Legacy transition flags and keyword-router rollback deprecated in docs; test suite green; all changes pushed to origin/v10-dev*
