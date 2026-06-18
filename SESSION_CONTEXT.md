@@ -92,12 +92,14 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 39
+Commits since tag: 41
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+54ca91a feat(web): add optional web interface adapter
+b6170fa docs: update SESSION_CONTEXT.md after production-readiness fixes
 231a419 test: fix remaining test failures and enforce mypy in lint
 7ce6a2d docs: update SESSION_CONTEXT.md after ruff/lint cleanup
 2b98093 chore: install ruff and make lint pass
@@ -109,8 +111,6 @@ e18ed14 test: robustness fixes from code review
 63bd4a2 docs: update SESSION_CONTEXT.md — origin/v10-dev is in sync
 09965c5 docs: update SESSION_CONTEXT.md — GitHub default branch is v10-dev
 e3fe120 ci: add experimental AppImage packaging
-f6ffe1a test: update default model expectation to local-lucy-llama31
-332c097 docs: update SESSION_CONTEXT.md
 ```
 
 ---
