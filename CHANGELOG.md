@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Web adapter defaults to loopback binding and requires authentication for LAN/Tailscale exposure.
 - No secrets embedded in source, HTML, URLs, or logs.
 
+### Deprecated
+- Legacy transition flags `LUCY_ROUTER_PY` and `LUCY_EXEC_PY` are no longer needed; Python router/execution are the default in V10.
+- Legacy keyword-router rollback `LUCY_ROUTER_LEGACY_PRIMARY=1` is deprecated and non-functional; the embedding router is the sole authority.
+
 ## [10.0.0-beta.1] - 2026-06-14
 
 ### Added

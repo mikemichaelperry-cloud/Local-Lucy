@@ -271,9 +271,7 @@ export PYTHONPATH="${LUCY_ROOT}/ui-v10/app"
 # Default model
 export LUCY_LOCAL_MODEL=local-lucy-llama31
 
-# Features
-export LUCY_ROUTER_PY=1
-export LUCY_EXEC_PY=1
+# Features (Python router/execution are the default in V10)
 export LUCY_ENABLE_INTERNET=1
 export LUCY_SESSION_MEMORY=1
 

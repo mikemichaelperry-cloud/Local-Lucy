@@ -221,6 +221,16 @@ The background learner automatically rebuilds the embedding index from correctio
 | `LUCY_WEB_PORT` | `8765` | Web adapter bind port |
 | `LUCY_WEB_AUTH_TOKEN` | *(none)* | Required token for non-loopback binds |
 
+### Deprecated / Legacy Options
+
+These options are preserved for backward compatibility but are no longer needed in V10. They will be removed in a future release.
+
+| Variable | Status | Notes |
+|----------|--------|-------|
+| `LUCY_ROUTER_PY` | **Deprecated** | Python router is the only supported router in V10. |
+| `LUCY_EXEC_PY` | **Deprecated** | Python execution engine is the only supported engine in V10. |
+| `LUCY_ROUTER_LEGACY_PRIMARY=1` | **Deprecated / non-functional** | Keyword-router rollback is no longer supported; the embedding router is the sole authority. |
+
 ## Development
 
 ### Running Tests
@@ -244,8 +254,7 @@ python -m pytest tools/router_py/test_medical_evidence_routing.py -v
 QT_QPA_PLATFORM=offscreen python3 ui-v10/tests/test_comprehensive_hmi_inspection.py
 
 # End-to-end smoke test
-LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 \
-  python3 -c "import sys; sys.path.insert(0,'tools'); from router_py.main import execute_plan_python; \
+python3 -c "import sys; sys.path.insert(0,'tools'); from router_py.main import execute_plan_python; \
   r = execute_plan_python('What is 2+2?', timeout=30); print(r.status, r.route)"
 ```
 

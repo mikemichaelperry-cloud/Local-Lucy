@@ -1,7 +1,7 @@
 # Local Lucy v10 — Agent Instructions
 
-> **READ `SESSION_CONTEXT.md` FIRST at every session start.**  
-> It contains the current branch, git state, environment variables, and latest changes.  
+> **READ `SESSION_CONTEXT.md` FIRST at every session start.**
+> It contains the current branch, git state, environment variables, and latest changes.
 > This file contains the rules; `SESSION_CONTEXT.md` contains the live state.
 
 ---
@@ -92,9 +92,11 @@ LUCY_RUNTIME_AUTHORITY_ROOT=~/lucy-v10  # Code authority validation
 LUCY_UI_ROOT=~/lucy-v10/ui-v10          # HMI path
 LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
 LUCY_LOCAL_MODEL=local-lucy-llama31
-LUCY_ROUTER_PY=1                        # Use Python router
-LUCY_EXEC_PY=1                          # Use Python execution engine
 LUCY_AUTO_LEARN=0                       # Set 0 during development to prevent mutation
+
+# Deprecated: Python router/execution are the default in V10.
+# LUCY_ROUTER_PY=1
+# LUCY_EXEC_PY=1
 ```
 
 ---
@@ -114,8 +116,7 @@ python -m pytest tools/router_py/test_medical_evidence_routing.py -v
 QT_QPA_PLATFORM=offscreen python3 ui-v10/tests/test_comprehensive_hmi_inspection.py
 
 # Live end-to-end (single request)
-LUCY_ROUTER_PY=1 LUCY_EXEC_PY=1 \
-  python3 -c "import sys; sys.path.insert(0,'tools'); from router_py.main import execute_plan_python; \
+python3 -c "import sys; sys.path.insert(0,'tools'); from router_py.main import execute_plan_python; \
   r = execute_plan_python('What is 2+2?', timeout=30); print(r.status, r.route)"
 ```
 

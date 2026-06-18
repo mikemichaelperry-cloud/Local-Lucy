@@ -1,9 +1,9 @@
-:# Local Lucy V10 — Current State Summary (2026-06-16)
+# Local Lucy V10 — Current State Summary (2026-06-16)
 
 ## Architecture
 
 **Embedding-first router** (`models/router/hybrid_router_v2.py`, MiniLM-L6-v2 k-NN) is the sole authority.
-Legacy keyword router is preserved only for emergency rollback via `LUCY_ROUTER_LEGACY_PRIMARY=1`.
+The legacy keyword-router rollback option (`LUCY_ROUTER_LEGACY_PRIMARY=1`) is deprecated and no longer functional in V10.
 
 **Feedback loop:** Only explicit user corrections are ingested by the background learner.
 Auto-feedback and router logs are telemetry-only and never mutate the model unsupervised.
@@ -23,7 +23,7 @@ Auto-feedback and router logs are telemetry-only and never mutate the model unsu
 | Component | File | Status |
 |-----------|------|--------|
 | Embedding Router | `models/router/hybrid_router_v2.py` | PRIMARY — ~1,019 examples |
-| Legacy Router | `tools/router_py/classify.py` | ROLLBACK ONLY — `LUCY_ROUTER_LEGACY_PRIMARY=1` |
+| Safety Guards | `tools/router_py/classify.py` | ACTIVE — safety-critical keyword guards only |
 | Background Learner | `models/router/background_learner.py` | ACTIVE — user-feedback only |
 | Auto-Feedback | `models/router/auto_feedback.py` | TELEMETRY ONLY |
 | Execution Engine | `tools/router_py/execution_engine.py` | STABLE — Python-native path |
@@ -55,7 +55,7 @@ Auto-feedback and router logs are telemetry-only and never mutate the model unsu
 
 | Mechanism | How |
 |-----------|-----|
-| Legacy rollback | `LUCY_ROUTER_LEGACY_PRIMARY=1` restores keyword router |
+| Deprecated rollback | `LUCY_ROUTER_LEGACY_PRIMARY=1` is deprecated; embedding router is the sole authority |
 | High-stakes review | Medical/vet/finance/legal/conflicting feedback → `models/router/pending_review.jsonl` |
 | Evidence policy | `tools/router_py/policy.py` forces evidence routes for high-risk queries |
 | Web security | Loopback-only by default; auth required for LAN/Tailscale binds |
