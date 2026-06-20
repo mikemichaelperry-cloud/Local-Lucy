@@ -180,6 +180,38 @@ def _load_family_facts_direct() -> list[str]:
         return []
 
 
+# Keywords that indicate the user is asking about themselves, their family,
+# or their pets. Only these queries should receive the restrictive
+# [PERSISTENT FACTS] block; general-knowledge questions should use the model's
+# own knowledge even if a retrieved fact happens to be semantically similar.
+_PERSONAL_FACT_KEYWORDS = (
+    "my children",
+    "my son",
+    "my daughter",
+    "my wife",
+    "my husband",
+    "my dog",
+    "my pet",
+    "my family",
+    "who am i",
+    "grandchildren",
+    "stepchildren",
+    "my mother",
+    "my father",
+    "my sister",
+    "my brother",
+    "my granddaughter",
+    "my grandson",
+    "my grandchild",
+)
+
+
+def _is_personal_fact_query(query: str) -> bool:
+    """Return True if the query is about the user's own facts/family/pets."""
+    normalized = query.lower()
+    return any(k in normalized for k in _PERSONAL_FACT_KEYWORDS)
+
+
 # Self-knowledge: identity, capabilities, limitations.
 # Injected on every LOCAL answer.  Kept short (~200 tokens) because the local
 # model has a 2048-token context window and long system blocks get ignored.
@@ -1430,82 +1462,41 @@ class LocalAnswer:
         and hard constraints.  This runtime prompt adds only query-specific
         context: memory, augmented evidence, tone, and budget.
         """
-        # Load persistent facts FIRST so we can decide whether to suppress
-        # poisoned session memory before adding it to the prompt.
-        persistent_facts = []
-        try:
-            persistent_facts = _get_relevant_persistent_facts(query, limit=3)
-            logger.info(
-                f"[FACTS] Retrieved {len(persistent_facts)} persistent facts for query: {query[:60]}"
-            )
-            for i, f in enumerate(persistent_facts):
-                logger.info(f"[FACTS]  #{i+1}: {f[:100]}")
-        except Exception as e:
-            persistent_facts = []
-            logger.warning(f"[FACTS] Failed to load relevant persistent facts: {e}", exc_info=True)
+        # Persistent facts are authoritative ONLY for questions about the user,
+        # their family, or their pets. For general-knowledge questions we skip
+        # them entirely so a semantically-similar fact (e.g. "Mike is 66") does
+        # not trick the model into saying "I don't know" about Bill Clinton.
+        is_personal_query = _is_personal_fact_query(query)
+        persistent_facts: list[str] = []
 
-        # Fallback: if semantic retrieval returned nothing, try direct SQLite load
-        # for family/personal queries. This bypasses embedding failures.
-        if not persistent_facts:
-            normalized_q = query.lower()
-            if any(
-                k in normalized_q
-                for k in (
-                    "my children",
-                    "my son",
-                    "my daughter",
-                    "my wife",
-                    "my husband",
-                    "my dog",
-                    "my pet",
-                    "my family",
-                    "who am i",
-                    "grandchildren",
-                    "stepchildren",
-                    "my mother",
-                    "my father",
-                    "my sister",
-                    "my brother",
-                    "my granddaughter",
-                    "my grandson",
-                    "my grandchild",
+        if is_personal_query:
+            try:
+                persistent_facts = _get_relevant_persistent_facts(query, limit=3)
+                logger.info(
+                    f"[FACTS] Retrieved {len(persistent_facts)} persistent facts for query: {query[:60]}"
                 )
-            ):
+                for i, f in enumerate(persistent_facts):
+                    logger.info(f"[FACTS]  #{i+1}: {f[:100]}")
+            except Exception as e:
+                persistent_facts = []
+                logger.warning(
+                    f"[FACTS] Failed to load relevant persistent facts: {e}", exc_info=True
+                )
+
+            # Fallback: if semantic retrieval returned nothing, try direct SQLite load
+            # for family/personal queries. This bypasses embedding failures.
+            if not persistent_facts:
                 persistent_facts = _load_family_facts_direct()
                 logger.info(
                     f"[FACTS] Direct fallback loaded {len(persistent_facts)} facts for personal/family query"
                 )
 
-        # Guard against session-memory poisoning for personal/family queries.
-        # When explicit persistent facts are loaded, previous assistant turns
-        # in session memory may contain hallucinated answers that the model
-        # will repeat.  Suppress session memory for these queries so the
-        # model answers ONLY from the authoritative facts.
-        if persistent_facts and session_memory.strip():
-            normalized_q = query.lower()
-            if any(
-                k in normalized_q
-                for k in (
-                    "my children",
-                    "my son",
-                    "my daughter",
-                    "my wife",
-                    "my husband",
-                    "my dog",
-                    "my pet",
-                    "my family",
-                    "who am i",
-                    "grandchildren",
-                    "stepchildren",
-                    "my mother",
-                    "my father",
-                    "my sister",
-                    "my brother",
-                    "my granddaughter",
-                    "my grandson",
-                    "my grandchild",
-                )
-            ):
+            # Guard against session-memory poisoning for personal/family queries.
+            # When explicit persistent facts are loaded, previous assistant turns
+            # in session memory may contain hallucinated answers that the model
+            # will repeat.  Suppress session memory for these queries so the
+            # model answers ONLY from the authoritative facts.
+            if persistent_facts and session_memory.strip():
                 logger.info(
                     "[GUARD] Suppressing session memory for personal/family query with loaded facts"
                 )
@@ -1560,13 +1551,19 @@ class LocalAnswer:
                 "Answer from the session memory facts above. "
                 "State facts directly; do not ask the user to repeat them."
             )
-        elif persistent_facts:
+        elif is_personal_query and persistent_facts:
             instruction = (
                 "Answer using the [PERSISTENT FACTS] block above. "
                 "Those facts are the user's own statements about themselves. "
                 "Use them exactly as written. Do not add outside information. "
                 "When the facts distinguish between biological children and stepchildren, "
                 "preserve that distinction in your answer."
+            )
+        elif is_personal_query and not persistent_facts:
+            instruction = (
+                "The user is asking about themselves, their family, or their pets, "
+                "but no persistent facts are available. Say clearly that you do not "
+                "have that information. Do not invent or guess."
             )
         else:
             instruction = (

@@ -357,6 +357,21 @@ class TestPromptBuilding(unittest.TestCase):
         self.assertIn("[PERSISTENT FACTS", prompt)
         self.assertIn("Oscar is Mike's dog", prompt)
 
+    def test_build_prompt_general_knowledge_skips_personal_facts(self):
+        """General-knowledge queries must not be restricted by retrieved personal facts."""
+        with patch(
+            "local_answer._get_relevant_persistent_facts",
+            return_value=["Mike is 66 years old."],
+        ):
+            prompt = self.answer._build_prompt(
+                "How old is Bill Clinton?", "", "chat", "- Be concise.", False, False
+            )
+        # The retrieved personal fact should not appear, and the model should be
+        # instructed to use its own knowledge so it can answer the general query.
+        self.assertNotIn("Mike is 66 years old.", prompt)
+        self.assertNotIn("[PERSISTENT FACTS", prompt)
+        self.assertIn("Answer from your own knowledge", prompt)
+
 
 class TestCompletionGuards(unittest.TestCase):
     """Test completion guard functionality."""

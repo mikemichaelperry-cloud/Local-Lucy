@@ -25,8 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pyproject.toml` testpaths and `Makefile` lint target include `web_adapter/`.
 
 ### Fixed
-- Full test suite green: `942 passed, 19 skipped`.
+- Full test suite green: `943 passed, 19 skipped`.
 - Keel loader, whisper fallback, model selector, state-store, and pytest collection issues resolved.
+- Local answers no longer treat general-knowledge questions as personal-fact questions when a semantically similar persistent fact (e.g. "Mike is 66") is retrieved. Queries such as "How old is Bill Clinton?" now use the model's own knowledge instead of replying "I don't know".
 
 ### Security
 - Web adapter defaults to loopback binding and requires authentication for LAN/Tailscale exposure.
