@@ -184,11 +184,15 @@ class ControlPanel(QFrame):
 
         self._augmentation_policy_selector = QComboBox()
         self._augmentation_policy_selector.addItems(["disabled", "fallback_only", "direct_allowed"])
-        self._augmentation_policy_selector.activated.connect(self._handle_augmentation_policy_activated)
+        self._augmentation_policy_selector.activated.connect(
+            self._handle_augmentation_policy_activated
+        )
 
         self._augmented_provider_selector = QComboBox()
         self._augmented_provider_selector.addItems(["wikipedia", "openai", "kimi"])
-        self._augmented_provider_selector.activated.connect(self._handle_augmented_provider_activated)
+        self._augmented_provider_selector.activated.connect(
+            self._handle_augmented_provider_activated
+        )
 
         self._learner_selector = QComboBox()
         self._learner_selector.addItems(["on", "off"])
@@ -203,8 +207,12 @@ class ControlPanel(QFrame):
         layout.addWidget(self._build_labeled_row("memory", self._memory_selector))
         layout.addWidget(self._build_labeled_row("evidence", self._evidence_selector))
         layout.addWidget(self._build_labeled_row("voice", self._voice_selector))
-        layout.addWidget(self._build_labeled_row("augmented policy", self._augmentation_policy_selector))
-        layout.addWidget(self._build_labeled_row("augmented provider", self._augmented_provider_selector))
+        layout.addWidget(
+            self._build_labeled_row("augmented policy", self._augmentation_policy_selector)
+        )
+        layout.addWidget(
+            self._build_labeled_row("augmented provider", self._augmented_provider_selector)
+        )
         layout.addWidget(self._build_labeled_row("auto-learn", self._learner_selector))
         note = QLabel("Feature toggles unavailable.")
         note.setWordWrap(True)
@@ -294,7 +302,9 @@ class ControlPanel(QFrame):
         # Point VU meters at the voice audio levels file for fast polling.
         runtime_ns = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "")
         if runtime_ns:
-            levels_path = Path(runtime_ns).expanduser().resolve() / "state" / "voice_audio_levels.json"
+            levels_path = (
+                Path(runtime_ns).expanduser().resolve() / "state" / "voice_audio_levels.json"
+            )
         else:
             levels_path = Path(__file__).resolve().parents[3] / "state" / "voice_audio_levels.json"
         self._voice_vu_meter.set_levels_file(levels_path)
@@ -310,7 +320,9 @@ class ControlPanel(QFrame):
         group.setVisible(False)
         return group
 
-    def update_voice_pipeline_status(self, stage: str, progress: float, transcription: str = "") -> None:
+    def update_voice_pipeline_status(
+        self, stage: str, progress: float, transcription: str = ""
+    ) -> None:
         """Update voice pipeline status display.
 
         Args:
@@ -456,7 +468,9 @@ class ControlPanel(QFrame):
         layout.addWidget(memory_button)
         layout.addWidget(shutdown_button)
 
-        note = QLabel("UI-local actions. Shutdown kills the process so code changes take effect on restart.")
+        note = QLabel(
+            "UI-local actions. Shutdown kills the process so code changes take effect on restart."
+        )
         note.setWordWrap(True)
         layout.addWidget(note)
         self._safe_actions_note = note
@@ -464,16 +478,23 @@ class ControlPanel(QFrame):
 
     def _open_memory_manager(self) -> None:
         from app.widgets.memory_manager_dialog import MemoryManagerDialog
+
         dialog = MemoryManagerDialog(self)
         dialog.exec()
 
-    def apply_backend_capabilities(self, capability_notes: dict[str, str], backend_available: bool) -> None:
+    def apply_backend_capabilities(
+        self, capability_notes: dict[str, str], backend_available: bool
+    ) -> None:
         if self._mode_note is not None:
             self._mode_note.setText(capability_notes.get("mode_selection", self._mode_note.text()))
         if self._feature_note is not None:
-            self._feature_note.setText(capability_notes.get("feature_toggles", self._feature_note.text()))
+            self._feature_note.setText(
+                capability_notes.get("feature_toggles", self._feature_note.text())
+            )
         if self._profile_note is not None:
-            self._profile_note.setText(capability_notes.get("profile_reload", self._profile_note.text()))
+            self._profile_note.setText(
+                capability_notes.get("profile_reload", self._profile_note.text())
+            )
         self.set_backend_enabled(backend_available)
 
     def set_backend_busy(self, busy: bool) -> None:
@@ -523,7 +544,18 @@ class ControlPanel(QFrame):
             if widget is not None:
                 widget.setVisible(show_power_widgets)
 
-    def update_control_state(self, top_status: dict[str, str], current_state: dict[str, Any] | None = None) -> None:
+    def update_control_state(
+        self, top_status: dict[str, str], current_state: dict[str, Any] | None = None
+    ) -> None:
+        # Use the authoritative current_state model value so the selector reflects
+        # the configured model even when the top-status label is formatted with
+        # active/load status.
+        configured_model = ""
+        if isinstance(current_state, dict):
+            configured_model = str(current_state.get("model", "")).strip()
+        if not configured_model:
+            configured_model = top_status.get("Model", "").strip()
+
         values = {
             "profile": top_status.get("Profile", "").strip(),
             "mode": top_status.get("Mode", "").strip().lower(),
@@ -533,7 +565,7 @@ class ControlPanel(QFrame):
             "voice": top_status.get("Voice", "").strip().lower(),
             "augmentation_policy": top_status.get("Augmented Policy", "").strip().lower(),
             "augmented_provider": top_status.get("Augmented Provider", "").strip().lower(),
-            "model": top_status.get("Model", "").strip(),
+            "model": configured_model,
             "learner": top_status.get("Learner", "").strip().lower(),
         }
         self._current_values.update(values)
@@ -605,7 +637,9 @@ class ControlPanel(QFrame):
             if stt_engine == "whisper":
                 device_label = stt_device if stt_device not in {"none", "unknown", ""} else "CPU"
                 self._voice_stt_label.setText(f"🎤 STT: Whisper ({device_label.upper()})")
-                self._voice_stt_label.setStyleSheet("color: #2ecc71; font-size: 11px; font-weight: bold;")
+                self._voice_stt_label.setStyleSheet(
+                    "color: #2ecc71; font-size: 11px; font-weight: bold;"
+                )
             elif stt_engine == "vosk":
                 self._voice_stt_label.setText("🎤 STT: Vosk (CPU)")
                 self._voice_stt_label.setStyleSheet("color: #f1c40f; font-size: 11px;")
@@ -623,7 +657,9 @@ class ControlPanel(QFrame):
             if tts_engine == "kokoro":
                 device_label = tts_device if tts_device != "none" else "GPU"
                 self._voice_tts_label.setText(f"🔊 TTS: Kokoro ({device_label.upper()})")
-                self._voice_tts_label.setStyleSheet("color: #2ecc71; font-size: 11px; font-weight: bold;")
+                self._voice_tts_label.setStyleSheet(
+                    "color: #2ecc71; font-size: 11px; font-weight: bold;"
+                )
             elif tts_engine == "piper":
                 self._voice_tts_label.setText("🔊 TTS: Piper (CPU)")
                 self._voice_tts_label.setStyleSheet("color: #f1c40f; font-size: 11px;")
@@ -648,19 +684,31 @@ class ControlPanel(QFrame):
         selector.blockSignals(False)
 
     def _handle_mode_activated(self, index: int) -> None:
-        self._emit_if_changed("mode", self._mode_selector.itemText(index), self.mode_change_requested)
+        self._emit_if_changed(
+            "mode", self._mode_selector.itemText(index), self.mode_change_requested
+        )
 
     def _handle_conversation_activated(self, index: int) -> None:
-        self._emit_if_changed("conversation", self._conversation_selector.itemText(index), self.conversation_change_requested)
+        self._emit_if_changed(
+            "conversation",
+            self._conversation_selector.itemText(index),
+            self.conversation_change_requested,
+        )
 
     def _handle_memory_activated(self, index: int) -> None:
-        self._emit_if_changed("memory", self._memory_selector.itemText(index), self.memory_change_requested)
+        self._emit_if_changed(
+            "memory", self._memory_selector.itemText(index), self.memory_change_requested
+        )
 
     def _handle_evidence_activated(self, index: int) -> None:
-        self._emit_if_changed("evidence", self._evidence_selector.itemText(index), self.evidence_change_requested)
+        self._emit_if_changed(
+            "evidence", self._evidence_selector.itemText(index), self.evidence_change_requested
+        )
 
     def _handle_voice_activated(self, index: int) -> None:
-        self._emit_if_changed("voice", self._voice_selector.itemText(index), self.voice_change_requested)
+        self._emit_if_changed(
+            "voice", self._voice_selector.itemText(index), self.voice_change_requested
+        )
 
     def _handle_augmentation_policy_activated(self, index: int) -> None:
         self._emit_if_changed(
@@ -677,7 +725,9 @@ class ControlPanel(QFrame):
         )
 
     def _handle_learner_activated(self, index: int) -> None:
-        self._emit_if_changed("learner", self._learner_selector.itemText(index), self.learner_change_requested)
+        self._emit_if_changed(
+            "learner", self._learner_selector.itemText(index), self.learner_change_requested
+        )
 
     def _handle_model_activated(self, index: int) -> None:
         label = self._model_selector.itemText(index)
@@ -718,7 +768,11 @@ class ControlPanel(QFrame):
             self._reload_profile_button.setEnabled(self._profile_available and not busy)
 
     def _refresh_voice_ptt(self) -> None:
-        if self._voice_ptt_group is None or self._voice_ptt_button is None or self._voice_ptt_status_label is None:
+        if (
+            self._voice_ptt_group is None
+            or self._voice_ptt_button is None
+            or self._voice_ptt_status_label is None
+        ):
             return
 
         voice_enabled = self._current_values.get("voice", "") == "on"

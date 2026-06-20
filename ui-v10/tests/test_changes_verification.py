@@ -47,6 +47,7 @@ def test_staleness_indicators():
         legacy_namespace_detected=False,
         legacy_namespace_path="",
         gpu_info={},
+        active_model={},
     )
 
     assert_ok(snapshot.snapshot_timestamp != "", "snapshot_timestamp should not be empty")

@@ -69,11 +69,12 @@ def test_model_selector():
         f"model selector should reflect current state, got={model_selector.currentText()!r}",
     )
 
-    # 2. Status panel should show the model
+    # 2. Status panel should show the configured model with load status
     status_labels = window.status_panel._runtime_summary_labels
+    model_status_text = status_labels["Model"].text()
     assert_ok(
-        status_labels["Model"].text() == "local-lucy",
-        f"status panel should show active model, got={status_labels['Model'].text()!r}",
+        "local-lucy (qwen3 14B)" in model_status_text,
+        f"status panel should show configured model with status, got={model_status_text!r}",
     )
 
     # 3. Available models should include the expected option

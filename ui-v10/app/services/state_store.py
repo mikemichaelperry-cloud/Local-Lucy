@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-from dataclasses import dataclass
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,6 +33,9 @@ class RuntimeSnapshot:
     legacy_namespace_detected: bool  # True if legacy runtime namespace exists
     legacy_namespace_path: str  # Path to legacy namespace if detected, empty otherwise
     gpu_info: dict[str, Any]  # GPU acceleration status for performance monitoring
+    active_model: dict[str, Any] = field(
+        default_factory=dict
+    )  # Ollama actually-loaded model status
 
 
 @dataclass(frozen=True)
@@ -40,13 +45,12 @@ class HistoryLoadResult:
     entries: list[dict[str, Any]]
 
 
-
 def _default_runtime_namespace_root() -> Path:
     # Use environment variable if set, otherwise use same default as backend
     raw = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "").strip()
     if raw:
         return Path(raw).expanduser()
-    
+
     # Match backend default from runtime_request.py
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
@@ -70,7 +74,7 @@ def _detect_legacy_namespace() -> tuple[bool, str]:
 
 def _detect_gpu_status() -> dict[str, Any]:
     """Detect GPU acceleration status for Ollama/local inference.
-    
+
     Returns dict with:
     - available: bool - GPU is available and being used
     - type: str - 'nvidia', 'amd', 'none'
@@ -89,11 +93,15 @@ def _detect_gpu_status() -> dict[str, Any]:
         "ollama_on_gpu": False,
         "model_loaded": False,
     }
-    
+
     # Check for NVIDIA GPU
     try:
         nvidia_smi = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.used,memory.total", "--format=csv,noheader,nounits"],
+            [
+                "nvidia-smi",
+                "--query-gpu=name,memory.used,memory.total",
+                "--format=csv,noheader,nounits",
+            ],
             capture_output=True,
             text=True,
             timeout=2,
@@ -111,7 +119,7 @@ def _detect_gpu_status() -> dict[str, Any]:
                     result["available"] = True
     except (OSError, subprocess.TimeoutExpired, ValueError):
         pass
-    
+
     # Check for AMD GPU
     if not result["available"]:
         try:
@@ -132,7 +140,7 @@ def _detect_gpu_status() -> dict[str, Any]:
                         break
         except (OSError, subprocess.TimeoutExpired):
             pass
-    
+
     # Check if Ollama is using GPU
     try:
         ollama_ps = subprocess.run(
@@ -154,7 +162,61 @@ def _detect_gpu_status() -> dict[str, Any]:
                             break
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
         pass
-    
+
+    return result
+
+
+_OLLAMA_PS_URL = "http://127.0.0.1:11434/api/ps"
+
+
+def _detect_active_ollama_model(configured_model: str) -> dict[str, Any]:
+    """Probe Ollama for the model that is actually loaded in memory.
+
+    Returns a dict with:
+    - configured: the model selected in current_state
+    - name: the loaded model name (without tag) if any
+    - status: 'running' if the configured model is loaded,
+              'mismatch' if a different model is loaded,
+              'unloaded' if Ollama is reachable but no model is loaded,
+              'unavailable' if Ollama cannot be reached
+    """
+    result: dict[str, Any] = {
+        "configured": configured_model,
+        "name": "",
+        "status": "unavailable",
+    }
+    try:
+        with urllib.request.urlopen(_OLLAMA_PS_URL, timeout=2) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError):
+        return result
+
+    if not isinstance(data, dict):
+        return result
+
+    models = data.get("models", [])
+    if not isinstance(models, list) or not models:
+        result["status"] = "unloaded"
+        return result
+
+    configured_base = str(configured_model).split(":")[0].strip()
+    loaded_names: list[str] = []
+    for model in models:
+        if not isinstance(model, dict):
+            continue
+        raw_name = str(model.get("name", "")).strip()
+        if not raw_name:
+            continue
+        base_name = raw_name.split(":")[0].strip()
+        loaded_names.append(base_name)
+        if base_name == configured_base or raw_name.startswith(configured_model):
+            result["name"] = configured_model
+            result["status"] = "running"
+            return result
+
+    # Ollama has something loaded, but it is not the configured model
+    result["name"] = loaded_names[0] if loaded_names else "unknown"
+    result["status"] = "mismatch"
     return result
 
 
@@ -170,7 +232,7 @@ def _detect_router() -> str:
     # Check environment variables that indicate Python router usage
     router_py = os.environ.get("LUCY_ROUTER_PY", "0")
     exec_py = os.environ.get("LUCY_EXEC_PY", "0")
-    
+
     if router_py == "1" and exec_py == "1":
         return "Python"
     elif router_py == "1":
@@ -196,26 +258,40 @@ RUNTIME_NAMESPACE_ROOT = Path(
     os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(_default_runtime_namespace_root()))
 ).expanduser()
 LEGACY_RUNTIME_NAMESPACE_ROOT = Path(
-    os.environ.get("LUCY_LEGACY_RUNTIME_NAMESPACE_ROOT", str(_default_legacy_runtime_namespace_root()))
+    os.environ.get(
+        "LUCY_LEGACY_RUNTIME_NAMESPACE_ROOT", str(_default_legacy_runtime_namespace_root())
+    )
 ).expanduser()
-STATE_DIRECTORY = Path(os.environ.get("LUCY_UI_STATE_DIR", str(RUNTIME_NAMESPACE_ROOT / "state"))).expanduser()
+STATE_DIRECTORY = Path(
+    os.environ.get("LUCY_UI_STATE_DIR", str(RUNTIME_NAMESPACE_ROOT / "state"))
+).expanduser()
 if _contract_required():
     _validate_within_namespace(STATE_DIRECTORY, RUNTIME_NAMESPACE_ROOT, label="LUCY_UI_STATE_DIR")
 STATE_FILES = {
-    "current_state": Path(os.environ.get("LUCY_RUNTIME_STATE_FILE", str(STATE_DIRECTORY / "current_state.json"))).expanduser(),
+    "current_state": Path(
+        os.environ.get("LUCY_RUNTIME_STATE_FILE", str(STATE_DIRECTORY / "current_state.json"))
+    ).expanduser(),
     "last_route": STATE_DIRECTORY / "last_route.json",
     "health": STATE_DIRECTORY / "health.json",
     "runtime_lifecycle": Path(
-        os.environ.get("LUCY_RUNTIME_LIFECYCLE_FILE", str(STATE_DIRECTORY / "runtime_lifecycle.json"))
+        os.environ.get(
+            "LUCY_RUNTIME_LIFECYCLE_FILE", str(STATE_DIRECTORY / "runtime_lifecycle.json")
+        )
     ).expanduser(),
-    "voice_runtime": Path(os.environ.get("LUCY_VOICE_RUNTIME_FILE", str(STATE_DIRECTORY / "voice_runtime.json"))).expanduser(),
+    "voice_runtime": Path(
+        os.environ.get("LUCY_VOICE_RUNTIME_FILE", str(STATE_DIRECTORY / "voice_runtime.json"))
+    ).expanduser(),
     "voice_audio_levels": STATE_DIRECTORY / "voice_audio_levels.json",
 }
 REQUEST_RESULT_FILE = Path(
-    os.environ.get("LUCY_RUNTIME_REQUEST_RESULT_FILE", str(STATE_DIRECTORY / "last_request_result.json"))
+    os.environ.get(
+        "LUCY_RUNTIME_REQUEST_RESULT_FILE", str(STATE_DIRECTORY / "last_request_result.json")
+    )
 ).expanduser()
 REQUEST_HISTORY_FILE = Path(
-    os.environ.get("LUCY_RUNTIME_REQUEST_HISTORY_FILE", str(STATE_DIRECTORY / "request_history.jsonl"))
+    os.environ.get(
+        "LUCY_RUNTIME_REQUEST_HISTORY_FILE", str(STATE_DIRECTORY / "request_history.jsonl")
+    )
 ).expanduser()
 
 if _contract_required():
@@ -232,9 +308,13 @@ if _contract_required():
             continue
         _validate_within_namespace(path, RUNTIME_NAMESPACE_ROOT, label=f"STATE_FILES[{key}]")
     if not os.environ.get("LUCY_RUNTIME_REQUEST_RESULT_FILE"):
-        _validate_within_namespace(REQUEST_RESULT_FILE, RUNTIME_NAMESPACE_ROOT, label="LUCY_RUNTIME_REQUEST_RESULT_FILE")
+        _validate_within_namespace(
+            REQUEST_RESULT_FILE, RUNTIME_NAMESPACE_ROOT, label="LUCY_RUNTIME_REQUEST_RESULT_FILE"
+        )
     if not os.environ.get("LUCY_RUNTIME_REQUEST_HISTORY_FILE"):
-        _validate_within_namespace(REQUEST_HISTORY_FILE, RUNTIME_NAMESPACE_ROOT, label="LUCY_RUNTIME_REQUEST_HISTORY_FILE")
+        _validate_within_namespace(
+            REQUEST_HISTORY_FILE, RUNTIME_NAMESPACE_ROOT, label="LUCY_RUNTIME_REQUEST_HISTORY_FILE"
+        )
 
 
 def load_runtime_snapshot() -> RuntimeSnapshot:
@@ -284,20 +364,30 @@ def load_runtime_snapshot() -> RuntimeSnapshot:
     }
 
     runtime_status = {
-        "Current Route": _resolve_optional_value(last_route, (("route",), ("current_route",), ("route_reason",))),
+        "Current Route": _resolve_optional_value(
+            last_route, (("route",), ("current_route",), ("route_reason",))
+        ),
         "Source Type": _resolve_optional_value(last_route, (("source_type",), ("source",))),
         "Conversation": _resolve_value(current_state, (("conversation",),)),
         "Answer Class": _resolve_optional_value(last_route, (("answer_class",),)),
-        "Operator Trust": _resolve_optional_value(last_route, (("operator_trust_label",), ("trust_class",))),
+        "Operator Trust": _resolve_optional_value(
+            last_route, (("operator_trust_label",), ("trust_class",))
+        ),
         "Voice State": _resolve_voice_state(voice_runtime_data, voice_runtime.status),
         "Voice Backend": _resolve_voice_backend(voice_runtime_data, voice_runtime.status),
         "Voice Error": _resolve_voice_error(voice_runtime_data, voice_runtime.status),
         "Augmented Policy": _resolve_value(current_state, (("augmentation_policy",),)),
         "Configured Provider": _resolve_value(current_state, (("augmented_provider",),)),
         "Configured Provider Paid": _resolve_selected_provider_paid(current_state),
-        "Authority Root": _resolve_optional_value(last_route, (("authority", "active_root"), ("authority", "authority_root"))),
-        "Runtime Namespace": _resolve_optional_value(last_route, (("authority", "runtime_namespace_root"),)),
-        "Legacy Runtime Tree": _resolve_optional_value(last_route, (("authority", "legacy_runtime_namespace_status"),)),
+        "Authority Root": _resolve_optional_value(
+            last_route, (("authority", "active_root"), ("authority", "authority_root"))
+        ),
+        "Runtime Namespace": _resolve_optional_value(
+            last_route, (("authority", "runtime_namespace_root"),)
+        ),
+        "Legacy Runtime Tree": _resolve_optional_value(
+            last_route, (("authority", "legacy_runtime_namespace_status"),)
+        ),
         "Health": _format_lifecycle_summary(
             lifecycle_status=lifecycle_status,
             lifecycle_running=lifecycle_running,
@@ -311,6 +401,8 @@ def load_runtime_snapshot() -> RuntimeSnapshot:
     snapshot_timestamp = datetime.now(timezone.utc).isoformat()
     legacy_detected, legacy_path = _detect_legacy_namespace()
     gpu_info = _detect_gpu_status()
+    configured_model = top_status.get("Model", "")
+    active_model_info = _detect_active_ollama_model(configured_model)
 
     return RuntimeSnapshot(
         top_status=top_status,
@@ -332,6 +424,7 @@ def load_runtime_snapshot() -> RuntimeSnapshot:
         legacy_namespace_detected=legacy_detected,
         legacy_namespace_path=legacy_path,
         gpu_info=gpu_info,
+        active_model=active_model_info,
     )
 
 
@@ -361,7 +454,7 @@ def load_recent_request_history(max_entries: int = 24) -> HistoryLoadResult:
 
     entries: list[dict[str, Any]] = []
     invalid_lines = 0
-    for raw_line in raw_lines[-max(max_entries * 2, max_entries):]:
+    for raw_line in raw_lines[-max(max_entries * 2, max_entries) :]:
         line = raw_line.strip()
         if not line:
             continue
@@ -379,6 +472,7 @@ def load_recent_request_history(max_entries: int = 24) -> HistoryLoadResult:
     if max_entries > 0:
         entries = entries[-max_entries:]
     return HistoryLoadResult(path=path, status=status, entries=entries)
+
 
 def build_request_details(entry: dict[str, Any] | None) -> dict[str, Any] | None:
     last_result = load_last_request_result()
@@ -407,7 +501,9 @@ def resolve_last_request_provider(payload: dict[str, Any] | None) -> str:
     # Check outcome first (augmented routes)
     outcome = payload.get("outcome")
     if isinstance(outcome, dict):
-        provider = _stringify(outcome.get("augmented_provider_used") or outcome.get("augmented_provider")).lower()
+        provider = _stringify(
+            outcome.get("augmented_provider_used") or outcome.get("augmented_provider")
+        ).lower()
         if provider in {"openai", "kimi", "wikipedia", "trusted", "none"}:
             return provider
         if provider:
@@ -474,7 +570,9 @@ def _normalize_voice_runtime(result: FileLoadResult) -> dict[str, Any]:
         "stt_device": _stringify(data.get("stt_device")) if data.get("stt_device") else "unknown",
         "tts": _stringify(data.get("tts")) if data.get("tts") else "none",
         "tts_device": _stringify(data.get("tts_device")) if data.get("tts_device") else "none",
-        "audio_player": _stringify(data.get("audio_player")) if data.get("audio_player") else "none",
+        "audio_player": _stringify(data.get("audio_player"))
+        if data.get("audio_player")
+        else "none",
     }
 
 

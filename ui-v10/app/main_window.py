@@ -419,6 +419,10 @@ class OperatorConsoleWindow(QMainWindow):
     def _repaint_from_truth(self) -> None:
         for label_text, value in self._latest_state_snapshot.top_status.items():
             if label_text in self._top_status_labels:
+                if label_text == "Model":
+                    value = self._format_model_display(
+                        value, self._latest_state_snapshot.active_model
+                    )
                 self._top_status_labels[label_text].setText(value)
 
         self.status_panel.update_runtime_snapshot(self._latest_state_snapshot)
@@ -1333,9 +1337,29 @@ class OperatorConsoleWindow(QMainWindow):
             return self._payload_text(route_payload, "mode")
         return str(route_payload or "").strip()
 
+    def _format_model_display(self, configured_model: str, active_info: dict[str, Any]) -> str:
+        """Return a human-friendly Model status string.
+
+        Shows the configured model's display label plus whether Ollama actually
+        has that model loaded, a mismatch, or no response.
+        """
+        label = ControlPanel._MODEL_LABELS.get(configured_model, configured_model)
+        status = str(active_info.get("status", "unavailable")).lower()
+        if status == "running":
+            return f"{label} — running"
+        if status == "mismatch":
+            active_name = str(active_info.get("name", "unknown")).strip() or "unknown"
+            return f"{label} — active: {active_name}"
+        if status == "unloaded":
+            return f"{label} — not loaded"
+        return f"{label} — status unknown"
+
     def _runtime_status_with_session_counters(self) -> dict[str, str]:
         values = dict(self._latest_state_snapshot.runtime_status)
-        values["Model"] = self._latest_state_snapshot.top_status.get("Model", "unknown")
+        configured_model = self._latest_state_snapshot.top_status.get("Model", "unknown")
+        values["Model"] = self._format_model_display(
+            configured_model, self._latest_state_snapshot.active_model
+        )
         values["Last Request Provider"] = self._latest_request_provider_used_text()
         values["Last Request Paid"] = self._latest_request_paid_text()
         values["Session Augmented Calls"] = str(self._session_augmented_calls_total)
