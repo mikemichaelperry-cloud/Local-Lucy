@@ -99,12 +99,13 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 51
+Commits since tag: 53
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+7318006 feat(execution): automatic LOCAL -> AUGMENTED/EVIDENCE escalation on admission of ignorance
 4d8c6dc feat(router): route public-figure age queries to AUGMENTED
 9e8916d fix(local): only inject persistent facts for personal/family queries
 8c13057 docs: update SESSION_CONTEXT.md after remote-access instructions
@@ -226,5 +227,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-17T00:20:00Z*
-*Session: Public-figure age queries now route to AUGMENTED; personal/family age queries stay LOCAL; test suite green at 947 passed; all changes pushed to origin/v10-dev*
+*Last updated: 2026-06-17T01:15:00Z*
+*Session: Automatic escalation trigger implemented — LOCAL routes escalate to AUGMENTED/EVIDENCE when local model admits ignorance (fallback-only policy); test suite green at 952 passed; all changes pushed to origin/v10-dev*
