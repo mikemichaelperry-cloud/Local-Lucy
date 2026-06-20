@@ -99,12 +99,13 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 53
+Commits since tag: 54
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+da3fc4e feat(hmi): show actually-loaded Ollama model under MODEL
 7318006 feat(execution): automatic LOCAL -> AUGMENTED/EVIDENCE escalation on admission of ignorance
 4d8c6dc feat(router): route public-figure age queries to AUGMENTED
 9e8916d fix(local): only inject persistent facts for personal/family queries
@@ -227,5 +228,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-17T01:15:00Z*
-*Session: Automatic escalation trigger implemented — LOCAL routes escalate to AUGMENTED/EVIDENCE when local model admits ignorance (fallback-only policy); test suite green at 952 passed; all changes pushed to origin/v10-dev*
+*Last updated: 2026-06-16T15:25:00Z*
+*Session: HMI Model card now shows the configured runtime-toggled model plus the actually-loaded Ollama model status (running/mismatch/unloaded/unavailable); automatic escalation trigger remains in place; test suite green at 952 passed; all changes pushed to origin/v10-dev*
