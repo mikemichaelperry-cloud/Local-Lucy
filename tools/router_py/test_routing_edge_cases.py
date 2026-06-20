@@ -29,6 +29,7 @@ from router_py.classify import classify_intent, select_route
 def _load_router():
     """Lazy-load the router to avoid model download overhead for skipped tests."""
     from hybrid_router_v2 import HybridRouterV2
+
     return HybridRouterV2()
 
 
@@ -40,76 +41,98 @@ ROUTING_TEST_CASES = [
     ("How do I patch a hole in drywall", "LOCAL", "diy"),
     ("How to unclog a sink drain", "LOCAL", "diy"),
     ("Step by step instructions for CPR", "LOCAL", "diy"),
-
     # ---- Ambiguous boundaries (weather-like but not weather) ----
     ("What is the weather like on Mars?", "LOCAL", "ambiguous"),
     ("Current price of a gallon of milk", "LOCAL", "ambiguous"),
     ("Bitcoin price in 2010", "LOCAL", "ambiguous"),
     ("Tell me about the news industry", "LOCAL", "ambiguous"),
     ("Latest trends in interior design", "LOCAL", "ambiguous"),
-
     # ---- Pronoun / context follow-ups ----
     ("What about it?", "LOCAL", "pronoun"),
     ("Should I keep it?", "LOCAL", "pronoun"),
     ("How does it work?", "LOCAL", "pronoun"),
     ("Tell me more", "LOCAL", "pronoun"),
-
     # ---- Keyword guard bypasses (guard words in non-triggering contexts) ----
     ("Write a story about a doctor", "LOCAL", "guard_bypass"),
     ("Stock characters in Shakespeare", "LOCAL", "guard_bypass"),
     ("Time travel stories for kids", "LOCAL", "guard_bypass"),
-
     # ---- Typos / noisy input ----
     ("how 2 chnge a tirr", "LOCAL", "typos"),
     ("whats teh wether 4cast", "WEATHER", "typos"),
-
     # ---- Compound / mixed intent ----
     ("Weather forecast and news headlines", "WEATHER", "compound"),
     ("What time is it and what is the weather?", "TIME", "compound"),
     ("Tell me a story about the stock market crash of 1929", "LOCAL", "compound"),
-
     # ---- Photosynthesis / biology (should NOT route to WEATHER) ----
     ("What is photosynthesis?", "LOCAL", "biology"),
     ("Explain photosynthesis in plants", "LOCAL", "biology"),
     ("How do leaves make food?", "LOCAL", "biology"),
-    ("What is cellular respiration?", "LOCAL", "biology"),  # V2 semantic disambiguation correctly routes biology to LOCAL
-
+    (
+        "What is cellular respiration?",
+        "LOCAL",
+        "biology",
+    ),  # V2 semantic disambiguation correctly routes biology to LOCAL
     # ---- Climate vs weather (climate = LOCAL, weather = WEATHER) ----
     ("What is climate change?", "LOCAL", "climate_vs_weather"),
     ("How does the greenhouse effect work?", "LOCAL", "climate_vs_weather"),
     ("Explain global warming", "LOCAL", "climate_vs_weather"),
     ("What is the weather forecast for tomorrow?", "WEATHER", "climate_vs_weather"),
-    ("Will it rain this week?", "WEATHER", "climate_vs_weather"),  # fine-tuned MiniLM correctly routes weather queries
-
+    (
+        "Will it rain this week?",
+        "WEATHER",
+        "climate_vs_weather",
+    ),  # fine-tuned MiniLM correctly routes weather queries
     # ---- Hot/cold metaphor vs actual weather ----
     ("How hot is the sun?", "LOCAL", "metaphor"),
     ("Cold fusion energy explained", "LOCAL", "metaphor"),  # physics explanation; LOCAL is correct
     ("Hot new trends in AI", "LOCAL", "metaphor"),
-    ("Cold war history", "LOCAL", "metaphor"),  # embedding collapses (0.9994/0.9994); safe LOCAL fallback
+    (
+        "Cold war history",
+        "LOCAL",
+        "metaphor",
+    ),  # embedding collapses (0.9994/0.9994); safe LOCAL fallback
     ("Is it hot outside right now?", "WEATHER", "metaphor"),
-    ("Why is it so cold today?", "WEATHER", "metaphor"),  # weather keyword "cold" + temporal context -> live weather data
-
+    (
+        "Why is it so cold today?",
+        "WEATHER",
+        "metaphor",
+    ),  # weather keyword "cold" + temporal context -> live weather data
     # ---- Capital city vs financial capital ----
     ("What is the capital of France?", "AUGMENTED", "capital_ambiguity"),
-    ("Capital of Japan", "LOCAL", "capital_ambiguity"),  # fine-tuned MiniLM correctly routes factual queries to LOCAL
+    (
+        "Capital of Japan",
+        "LOCAL",
+        "capital_ambiguity",
+    ),  # fine-tuned MiniLM correctly routes factual queries to LOCAL
     ("Current stock price of Apple", "FINANCE", "capital_ambiguity"),
     ("Working capital ratio explained", "AUGMENTED", "capital_ambiguity"),
-    ("Capital gains tax rules", "AUGMENTED", "capital_ambiguity"),  # general tax knowledge, safe for augmentation
-
+    (
+        "Capital gains tax rules",
+        "AUGMENTED",
+        "capital_ambiguity",
+    ),  # general tax knowledge, safe for augmentation
     # ---- Programming vs gram/cooking ----
     ("How to cook an egg", "AUGMENTED", "cooking"),
     ("How to bake sourdough bread", "AUGMENTED", "cooking"),
     ("Best recipe for chocolate cake", "AUGMENTED", "cooking"),
     ("How to program a Python function", "LOCAL", "cooking"),
     ("Python list comprehension tutorial", "LOCAL", "cooking"),
-
     # ---- Current/latest vs stable background ----
     ("Latest news about Israel", "NEWS", "current_vs_stable"),
     ("Current weather in London", "WEATHER", "current_vs_stable"),
     ("What is the theory of relativity?", "LOCAL", "current_vs_stable"),
     ("How does DNA replication work?", "LOCAL", "current_vs_stable"),
     ("Latest iPhone release date", "LOCAL", "current_vs_stable"),
-    ("Current president of the United States", "LOCAL", "current_vs_stable"),  # embedding sees ephemeral but no keyword match; falls to LOCAL
+    (
+        "Current president of the United States",
+        "LOCAL",
+        "current_vs_stable",
+    ),  # embedding sees ephemeral but no keyword match; falls to LOCAL
+    # ---- Public-figure age (should route AUGMENTED for current/verified age) ----
+    ("How old is Bill Clinton?", "AUGMENTED", "public_figure_age"),
+    ("What is Tom Cruise's age?", "AUGMENTED", "public_figure_age"),
+    ("What is the age of Angela Merkel?", "AUGMENTED", "public_figure_age"),
+    ("How old is my daughter?", "LOCAL", "public_figure_age"),  # personal query must stay LOCAL
 ]
 
 
@@ -144,7 +167,7 @@ class TestRoutingEdgeCases:
 
         for case in ROUTING_TEST_CASES:
             # Unpack pytest.param or plain tuple
-            if hasattr(case, 'values'):
+            if hasattr(case, "values"):
                 query, expected_route, category = case.values
             else:
                 query, expected_route, category = case
@@ -173,7 +196,7 @@ class TestRoutingEdgeCases:
         category_results = defaultdict(lambda: {"correct": 0, "total": 0})
 
         for case in ROUTING_TEST_CASES:
-            if hasattr(case, 'values'):
+            if hasattr(case, "values"):
                 query, expected_route, category = case.values
             else:
                 query, expected_route, category = case
@@ -188,7 +211,9 @@ class TestRoutingEdgeCases:
             pct = stats["correct"] / stats["total"] * 100
             print(f"  {category:15s}: {stats['correct']}/{stats['total']} ({pct:.0f}%)")
 
-        overall = sum(s["correct"] for s in category_results.values()) / sum(s["total"] for s in category_results.values())
+        overall = sum(s["correct"] for s in category_results.values()) / sum(
+            s["total"] for s in category_results.values()
+        )
         print(f"  {'overall':15s}: {overall*100:.0f}%")
 
 

@@ -1154,6 +1154,15 @@ def select_route(
                 route = "AUGMENTED"
                 guards_fired = guards_fired + ["financial_data_override"]
 
+            # Public-figure age override: the embedding router currently routes
+            # "How old is Bill Clinton?" to LOCAL. Force AUGMENTED so the answer
+            # is computed from current date + web-augmented sources, not stale
+            # parametric knowledge that may be off by a year.
+            if route == "LOCAL" and _is_public_figure_age_query(query):
+                route = "AUGMENTED"
+                evidence_reason = "public_figure_age"
+                guards_fired = guards_fired + ["public_figure_age_override"]
+
             # Memory-aware routing gate: override live-data routes for follow-ups
             memory_gate_override = _memory_routing_gate(query, route, session_id=session_id)
             if memory_gate_override:
@@ -2267,6 +2276,30 @@ def _is_personal_family_query(query: str) -> bool:
         r"\bI\s+have\s+(a|any|no)\s+(children|kids|sons|daughters|pets)",
     ]
     return any(re.search(p, q) for p in personal_relations)
+
+
+def _is_public_figure_age_query(query: str) -> bool:
+    """Detect queries asking for the age of a public figure (not the user/family).
+
+    These should route AUGMENTED so the answer uses current date/context and
+    web-augmented sources rather than potentially stale parametric knowledge.
+    Personal/family age queries ("How old is my daughter?") are excluded.
+    """
+    if not query:
+        return False
+    q = query.strip()
+    # Personal/family queries must stay LOCAL so memory.db facts can be used.
+    if _is_personal_family_query(q):
+        return False
+    patterns = [
+        # "How old is Bill Clinton?"
+        r"(?i)^how\s+old\s+is\s+(?!my\s+)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*\??$",
+        # "What is the age of Bill Clinton?"
+        r"(?i)\bwhat\s+is\s+(?:the\s+)?age\s+of\s+(?!my\s+)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b",
+        # "What is Bill Clinton's age?"
+        r"(?i)\bwhat\s+is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)'s\s+age\b",
+    ]
+    return any(re.search(p, q) for p in patterns)
 
 
 def _is_creative_writing(query: str) -> bool:

@@ -23,9 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Semantic regression skips comparison when goldens were recorded under a different model.
 - `make lint` now enforces both `ruff` and `mypy`.
 - `pyproject.toml` testpaths and `Makefile` lint target include `web_adapter/`.
+- Public-figure age queries (e.g. "How old is Bill Clinton?") now route to `AUGMENTED` so the answer uses current date and web-augmented sources instead of potentially stale parametric knowledge. Personal/family age queries still route `LOCAL`.
 
 ### Fixed
-- Full test suite green: `943 passed, 19 skipped`.
+- Full test suite green: `947 passed, 19 skipped`.
 - Keel loader, whisper fallback, model selector, state-store, and pytest collection issues resolved.
 - Local answers no longer treat general-knowledge questions as personal-fact questions when a semantically similar persistent fact (e.g. "Mike is 66") is retrieved. Queries such as "How old is Bill Clinton?" now use the model's own knowledge instead of replying "I don't know".
 
