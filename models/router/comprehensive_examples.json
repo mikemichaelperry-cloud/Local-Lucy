@@ -13247,5 +13247,2228 @@
       "source": "user_feedback",
       "feedback_type": "answer_positive"
     }
+  },
+  {
+    "query": "Do you know how is strep throat diagnosed?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Do you know what are the early signs of melanoma?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Do you know what is the recovery time for a torn ACL?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Do you know what are the risk factors for heart disease?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm doing research on how is asthma managed long-term?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Do you know how is sleep apnea diagnosed?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Please explain what is the recommended screening age for colon cancer?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I need to know what are my tenant rights if my landlord raises rent by 20%?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "My doctor mentioned this but I forgot: what is the statute of limitations for personal injury claims?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm trying to understand what does GDPR require for data consent?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you tell me what are the labor laws regarding overtime pay?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "My doctor mentioned this but I forgot: what is the legal process for trademark registration?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm trying to understand what are the SEC reporting requirements for public companies?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "For a school paper, what are the reserve requirements for banks?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you tell me what are the FINRA rules for broker-dealers?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "My doctor mentioned this but I forgot: what is the legal retirement age for full Social Security benefits?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you tell me what are the Basel III capital requirements?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you tell me what are the established facts about herd immunity thresholds?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Hey Lucy, what is the weather like today?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Quick question: will it rain tomorrow?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Hey Lucy, what's the forecast for this weekend?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Do you know if how hot will it be on Thursday?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you check what's the humidity level?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Before I leave, is it going to snow this week?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Quick question: what's the wind speed?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm planning a trip, how's the weather in Paris?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Hey Lucy, what's the weather forecast for London next week?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "My app says it's raining but what's the UV index today?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Quick question: will there be frost tonight?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you check what's the visibility like?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Do you know if what's the pollen count today?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm planning a trip, when will the rain stop?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "My app says it's raining but what's the weather like in Tokyo right now?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Before I leave, what's the air quality index?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Will it be sunny for the picnic on Saturday?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Quick question: what's the weather forecast for my vacation in Hawaii?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Is it going to be foggy in the morning?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Before I leave, what's the weather like at the beach?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Hey Lucy, when is hurricane season?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I need to know what time is it?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Do you know what time is it in Tokyo?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I need to know what timezone is Berlin in?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm scheduling a meeting, what time does the store close?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Before I call them, when does the train leave?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm scheduling a meeting, what are the opening hours?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you tell me what time is sunset today?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Hey Lucy, how many hours behind is California?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I need to know when do the markets open?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "My watch is broken, what time is it in London right now?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "My watch is broken, what timezone am I in?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Hey Lucy, when does daylight saving time start?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Before I call them, what time is the meeting?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Do you know what is the time difference between New York and Paris?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I need to know when is the next bus?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "My watch is broken, what is the current time in Sydney?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm scheduling a meeting, how many time zones are there?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Quick question: what time is it in India?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "When is the last train home?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you tell me what time does school start?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you tell me when is the deadline?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Before I call them, what time is sunrise tomorrow?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Quick question: how do I convert PST to EST?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Before I call them, what is the time in Dubai?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Before I call them, when does the flight depart?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm scheduling a meeting, what time is it in S\u00e3o Paulo?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "What timezone is New York in during summer?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "What time does the concert start?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "What is the time in Vancouver?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "What time is it in Cape Town?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm doing research on what's the latest news?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Please explain any breaking news today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm doing research on what's happening in the Middle East?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Latest updates on the election",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm doing research on what's going on in Ukraine?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Please explain any news about the hurricane?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm trying to understand what are the headlines?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you tell me latest developments in the trial",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "For a school paper, what's happening at the border?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Please explain news about the stock market crash",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm doing research on what happened at the summit?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I need to know any news about the wildfires?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm doing research on what's the latest from the UN?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Can you tell me news about the protest",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Please explain what are the latest poll results?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm doing research on any updates on the infrastructure bill?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "Do you know what's happening in the tech industry?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I need to know latest sports news",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I'm trying to understand news about the drought",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "I need to know what happened in Parliament today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation",
+      "feedback_type": "manual_label"
+    }
+  },
+  {
+    "query": "What are the SEC reporting requirements for public companies?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What are the reserve requirements for banks?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What are the Basel III capital requirements?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Explain how photosynthesis works?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What is the theory of relativity?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How does a combustion engine work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Describe the water cycle?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Explain the difference between DNA and RNA?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How does encryption work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Quel temps fait-il aujourd'hui?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "\u00bfC\u00f3mo est\u00e1 el clima hoy?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Che tempo fa oggi?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Wie alt ist die Erde?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Qu'est-ce que la photosynth\u00e8se?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "\u00bfQu\u00e9 es la gravedad?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Write a short tale?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the history of the Israeli-Palestinian conflict.?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Tell me about the?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the concept of deterrence in international relations.?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Explain the concept of?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "I speak without a?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Write a 500 word?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Tell me a story?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Write a short essay?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the concept of mutually assured destruction.?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Draft a presidential speech?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Create a dialogue between?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the current scientific consensus on GMOs?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What is the current?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Tell me a 500-word?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Israeli newspapers from the 1950s.?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the difference between REST and GraphQL?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Explain the difference between?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Debug this: IndexError list?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "how a car engine works in simple terms?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Explain how a car?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Write a story about?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the current status of my application?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Describe the smell of?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How does garbage collection?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How does a transformer?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Imagine a world where?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What was the outcome?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the difference between == and ===?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What is the difference?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Should I learn Python?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the pros and cons of remote work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What are the pros?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the math behind Fourier transforms?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Explain the math behind?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Draft a screenplay scene?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the history of Israeli news media?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What is the history?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the time complexity of quicksort?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Latest research on Alzheimer's?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Write a children's story?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Current trends in AI?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How do I reverse?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "a deadlock in operating systems?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What is a deadlock?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How to stay productive?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Write a sci-fi story?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How to bake sourdough?",
+    "labels": {
+      "intent_family": "synthesis_explanation",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the best time to plant tomatoes?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What is the best?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "that was wrong it?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Debug this Python error:?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Create a world where?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Write a novel about?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How do I change?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What was the weather?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How does consensus work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What happened in the?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the derivative of e to the x?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What is the derivative?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Say 'Where is the?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "How do I handle?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "the best way to learn Python?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "tenant rights in California?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "What are tenant rights?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Write a horror story?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
+  },
+  {
+    "query": "Write a thriller about?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_augmentation_v2",
+      "feedback_type": "router_validated"
+    }
   }
 ]
