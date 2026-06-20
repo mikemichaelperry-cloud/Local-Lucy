@@ -15470,5 +15470,2137 @@
       "source": "synthetic_augmentation_v2",
       "feedback_type": "router_validated"
     }
+  },
+  {
+    "query": "Apple share price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Apple stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the stock price of Tesla?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Tesla share price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Tesla stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the stock price of Microsoft?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Microsoft share price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Microsoft stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the stock price of Amazon?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Amazon share price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Amazon stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the stock price of Google?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Google share price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Google stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is Google trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is Google up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the stock price of Meta?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Meta share price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Meta stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the stock price of NVIDIA?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "NVIDIA share price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of NVIDIA stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the stock price of Netflix?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Netflix share price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Apple stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Apple stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Apple stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current value of Apple shares",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Apple trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Apple stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What was Tesla's closing price?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Tesla stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Tesla stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current value of Tesla shares",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Tesla trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Tesla stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Tesla stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is Microsoft trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Show me Microsoft stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What was Microsoft's closing price?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is Microsoft up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "After-hours price for Microsoft",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Microsoft stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Microsoft stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Microsoft stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current value of Microsoft shares",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Microsoft trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Microsoft stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Microsoft stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is Amazon trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Amazon ticker",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Show me Amazon stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What was Amazon's closing price?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is Amazon up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Amazon premarket",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "After-hours price for Amazon",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Amazon stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Amazon stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Amazon stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current value of Amazon shares",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Amazon trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Amazon stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Amazon stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Show me Google stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What was Google's closing price?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "After-hours price for Google",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Google stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Google stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Google stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current value of Google shares",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Google trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Google stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Google stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "GOOG price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is Meta trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Show me Meta stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What was Meta's closing price?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is Meta up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Meta premarket",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "After-hours price for Meta",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Meta stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Meta stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Meta stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current value of Meta shares",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Meta trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Meta stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Meta stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "META price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is META?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is NVIDIA trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "NVIDIA ticker",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Show me NVIDIA stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What was NVIDIA's closing price?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is NVIDIA up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "NVIDIA premarket",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "After-hours price for NVIDIA",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of NVIDIA stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "NVIDIA stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "NVIDIA stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current value of NVIDIA shares",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is NVIDIA trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest NVIDIA stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "NVIDIA stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "NVID price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is NVID?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of AMD stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is AMD up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of AMD stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "AMD stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "AMD stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current value of AMD shares",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is AMD trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest AMD stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "AMD stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Intel stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is Intel trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is Intel up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Intel stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Intel stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Intel stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Intel trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Intel stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Intel stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Netflix stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is Netflix trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Netflix ticker",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Show me Netflix stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What was Netflix's closing price?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is Netflix up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "After-hours price for Netflix",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Netflix stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Netflix stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Netflix stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current value of Netflix shares",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Netflix trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Netflix stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Netflix stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of IBM stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is IBM trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What was IBM's closing price?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of IBM stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "IBM stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "IBM stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is IBM trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest IBM stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "IBM stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Oracle stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is Oracle trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is Oracle up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Oracle stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Oracle stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Oracle stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Oracle trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Oracle stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Oracle stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Current price of Salesforce stock",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How is Salesforce trading today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Is Salesforce up or down today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is the current price of Salesforce stock today?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Salesforce stock price now",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Salesforce stock today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "What is Salesforce trading at right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Latest Salesforce stock price",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "Salesforce stock price today",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "synthetic_finance_augmentation",
+      "feedback_type": "finance_guard_validated"
+    }
   }
 ]
