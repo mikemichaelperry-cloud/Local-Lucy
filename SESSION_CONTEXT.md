@@ -99,12 +99,14 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 41
+Commits since tag: 49
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+9e8916d fix(local): only inject persistent facts for personal/family queries
+8c13057 docs: update SESSION_CONTEXT.md after remote-access instructions
 cf2132f docs: add remote-access instructions for the web interface
 3b375eb docs: deprecate legacy transition flags and keyword-router rollback
 40838ce docs: refresh README, CHANGELOG, ARCHITECTURE, TODAY_SUMMARY, and SESSION_CONTEXT
@@ -223,5 +225,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T22:45:00Z*
-*Session: Remote-access instructions added for web interface; legacy options deprecated; test suite green; all changes pushed to origin/v10-dev*
+*Last updated: 2026-06-16T23:30:00Z*
+*Session: Local-answer prompt fixed so general-knowledge queries are not restricted by retrieved personal facts; test suite green at 943 passed; all changes pushed to origin/v10-dev*
