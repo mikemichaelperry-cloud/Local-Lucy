@@ -99,12 +99,13 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 54
+Commits since tag: 55
 Working tree: clean
 ```
 
 ### Recent Commits (last 13)
 ```
+b2f6a32 feat(router): augment training data with validated synthetic examples
 da3fc4e feat(hmi): show actually-loaded Ollama model under MODEL
 7318006 feat(execution): automatic LOCAL -> AUGMENTED/EVIDENCE escalation on admission of ignorance
 4d8c6dc feat(router): route public-figure age queries to AUGMENTED
@@ -228,5 +229,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T15:25:00Z*
-*Session: HMI Model card now shows the configured runtime-toggled model plus the actually-loaded Ollama model status (running/mismatch/unloaded/unavailable); automatic escalation trigger remains in place; test suite green at 952 passed; all changes pushed to origin/v10-dev*
+*Last updated: 2026-06-16T16:15:00Z*
+*Session: Training data augmented with 171 router-validated synthetic examples (1198 total); 10-fold CV improved route accuracy 74.5% -> 79.4%, intent 64.6% -> 71.0%, short-query 78.3% -> 82.3%; HMI model-status display and automatic escalation trigger remain in place; test suite green at 952 passed; all changes pushed to origin/v10-dev*
