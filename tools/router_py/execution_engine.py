@@ -1244,12 +1244,14 @@ class ExecutionEngine:
         if forced_mode == "FORCED_ONLINE":
             return "full"
 
-        # Check if local direct path is eligible
-        if self._local_direct_eligible(route, intent, context):
-            return "bypass"
-
-        # Determine by policy
+        # Determine by policy first. When fallback is enabled we want the
+        # local-first provisional path so an admission of ignorance can
+        # automatically escalate to AUGMENTED/EVIDENCE. The fast bypass path
+        # skips that safety net.
         if normalized_policy == "disabled":
+            # Check if local direct path is eligible
+            if self._local_direct_eligible(route, intent, context):
+                return "bypass"
             return "bypass"
         elif normalized_policy == "fallback_only":
             # TIME route goes directly to full (no local attempt)
@@ -1497,11 +1499,10 @@ class ExecutionEngine:
         augmentation if the local response is insufficient. This balances
         speed (local is faster) with quality (augmented is better).
 
-        MEDICAL QUERIES:
-        Medical queries skip augmented fallback and return medical-specific
-        insufficient response when local response is insufficient.
-        This matches shell behavior (line 1365: medical queries NOT eligible
-        for validated_insufficient_recovery).
+        MEDICAL/VETERINARY QUERIES:
+        These escalate to the EVIDENCE route (strict trusted sources) when the
+        local model admits ignorance, rather than falling back to the general
+        AUGMENTED provider chain.
 
         Args:
             intent: The classified intent
@@ -1509,132 +1510,121 @@ class ExecutionEngine:
             context: Execution context
 
         Returns:
-            ExecutionResult from local or augmented execution
-
-        Ported from execute_plan.sh provisional/fallback logic:
-        1. Try local execution first
-        2. Check if local result is sufficient
-        3. If insufficient and NOT medical, try augmented provider
-        4. Track fallback usage properly
+            ExecutionResult from local or escalated execution
         """
         self._logger.info("Executing provisional route (local-first with fallback)")
         question = context.get("question", "")
-        session_id = context.get("session_id", "default") or "default"
-
-        # Check if this is a medical query (for logging/metrics only)
-        is_medical_query_flag = self._context_indicates_medical_query(context)
-        route_evidence_reason = route.evidence_reason if route else None
-        is_medical = is_medical_query_flag or route_evidence_reason in (
-            "medical_safety",
-            "medical_context",
-        )
 
         # Step 1: Try local execution first
         local_result = self._execute_bypass_route(intent, route, context)
 
         # Step 2: Check if local result is sufficient
         if local_result.status == "completed" and local_result.outcome_code == "answered":
-            # Check if response quality is acceptable
             if not self._is_local_response_sufficient(local_result.response_text):
-                # Medical queries now allow augmentation with domain restrictions
-                # Domain allowlist is set in context["allow_domains_file"]
-                if is_medical:
-                    self._logger.info(
-                        "Medical query with insufficient local response - attempting augmentation with restrictions"
-                    )
-                else:
-                    self._logger.info(
-                        "Local response insufficient, attempting augmentation fallback"
-                    )
-
-                # Step 3: Try augmented provider
-                aug_result = self._call_augmented_provider(question, intent, route, context)
-
-                if aug_result.status == "completed":
-                    # For medical queries, append disclaimer and sources
-                    if is_medical and aug_result.response_text:
-                        aug_result = self._append_medical_sources(aug_result, context)
-
-                    return ExecutionResult(
-                        status="completed",
-                        outcome_code="augmented_fallback",
-                        route="AUGMENTED",
-                        provider=aug_result.metadata.get("provider", "wikipedia"),
-                        provider_usage_class=aug_result.metadata.get(
-                            "provider_usage_class", "free"
-                        ),
-                        response_text=aug_result.response_text,
-                        metadata={
-                            "route_type": "provisional",
-                            "fallback_used": True,
-                            "fallback_reason": "local_insufficient",
-                            "local_response": local_result.response_text,
-                            **aug_result.metadata,
-                        },
-                    )
-                else:
-                    # Augmentation failed, return local result with fallback note
-                    self._logger.warning(
-                        f"Augmentation fallback failed: {aug_result.error_message}"
-                    )
-                    return ExecutionResult(
-                        status="completed",
-                        outcome_code="local_fallback",
-                        route="LOCAL",
-                        provider="local",
-                        provider_usage_class="local",
-                        response_text=local_result.response_text,
-                        metadata={
-                            "route_type": "provisional",
-                            "fallback_used": False,
-                            "fallback_reason": "augmentation_failed",
-                            "augmentation_error": aug_result.error_message,
-                        },
-                    )
-
-            # Local result is sufficient
+                return self._try_escalation_fallback(
+                    question, intent, route, context, local_result, "local_insufficient"
+                )
             return local_result
 
-        # Local execution failed, try augmentation
-        # Medical queries now allow augmentation with domain restrictions
-        if is_medical:
+        # Local execution failed, try escalation
+        return self._try_escalation_fallback(
+            question, intent, route, context, local_result, "local_failed"
+        )
+
+    def _try_escalation_fallback(
+        self,
+        question: str,
+        intent: ClassificationResult,
+        route: RoutingDecision,
+        context: dict[str, Any],
+        local_result: ExecutionResult,
+        fallback_reason: str,
+    ) -> ExecutionResult:
+        """Escalate a failed or insufficient LOCAL result to AUGMENTED or EVIDENCE."""
+        requires_evidence, evidence_reason = requires_evidence_mode(question, context)
+        is_medical_or_vet = evidence_reason in (
+            "medical_context",
+            "medical_body_symptom",
+            "veterinary_context",
+        )
+        is_strict_evidence = requires_evidence and is_medical_or_vet
+
+        if is_strict_evidence:
             self._logger.info(
-                "Medical query local execution failed - attempting augmentation with restrictions"
+                f"Local result unsuitable for {evidence_reason} query - escalating to EVIDENCE"
             )
+            evidence_route = RoutingDecision(
+                route="EVIDENCE",
+                mode=route.mode,
+                intent_family=route.intent_family,
+                confidence=route.confidence,
+                provider="trusted",
+                provider_usage_class="trusted",
+                evidence_mode="required",
+                evidence_reason=evidence_reason,
+                requires_evidence=True,
+                policy_reason="automatic_escalation_to_evidence",
+                ephemeral=route.ephemeral,
+            )
+
+            if evidence_reason in ("medical_context", "medical_body_symptom"):
+                medical_domains_file = (
+                    ROOT_DIR / "config" / "trust" / "generated" / "medical_runtime.txt"
+                )
+                context["allow_domains_file"] = str(medical_domains_file)
+                context["is_medical_query"] = True
+
+            aug_result = self._call_augmented_provider(question, intent, evidence_route, context)
+            target_route = "EVIDENCE"
         else:
-            self._logger.info("Local execution failed, attempting augmentation")
-        aug_result = self._call_augmented_provider(question, intent, route, context)
+            if is_medical_or_vet:
+                self._logger.info(
+                    "Medical query with insufficient local response - attempting augmentation with restrictions"
+                )
+            else:
+                self._logger.info("Local response insufficient, attempting augmentation fallback")
+            aug_result = self._call_augmented_provider(question, intent, route, context)
+            target_route = "AUGMENTED"
+
+        if aug_result.status == "completed" and aug_result.response_text:
+            if is_medical_or_vet:
+                aug_result = self._append_medical_sources(aug_result, context)
 
         if aug_result.status == "completed":
             return ExecutionResult(
                 status="completed",
-                outcome_code="augmented_fallback",
-                route="AUGMENTED",
-                provider=aug_result.metadata.get("provider", "wikipedia"),
-                provider_usage_class=aug_result.metadata.get("provider_usage_class", "free"),
+                outcome_code=f"{target_route.lower()}_fallback",
+                route=target_route,
+                provider=aug_result.metadata.get("provider", "wikipedia")
+                if target_route == "AUGMENTED"
+                else "trusted",
+                provider_usage_class=aug_result.metadata.get("provider_usage_class", "free")
+                if target_route == "AUGMENTED"
+                else "trusted",
                 response_text=aug_result.response_text,
                 metadata={
                     "route_type": "provisional",
                     "fallback_used": True,
-                    "fallback_reason": "local_failed",
+                    "fallback_reason": fallback_reason,
+                    "local_response": local_result.response_text,
                     **aug_result.metadata,
                 },
             )
 
-        # Both failed - return error with local's error
+        # Escalation failed, return local result
+        self._logger.warning(f"Escalation fallback failed: {aug_result.error_message}")
         return ExecutionResult(
-            status="failed",
-            outcome_code="execution_error",
+            status="completed",
+            outcome_code="local_fallback",
             route="LOCAL",
             provider="local",
             provider_usage_class="local",
-            response_text="",
-            error_message=f"Local failed: {local_result.error_message}; "
-            f"Augmentation failed: {aug_result.error_message}",
+            response_text=local_result.response_text,
             metadata={
                 "route_type": "provisional",
                 "fallback_used": False,
-                "fallback_reason": "both_failed",
+                "fallback_reason": "escalation_failed",
+                "augmentation_error": aug_result.error_message,
             },
         )
 
@@ -3308,11 +3298,32 @@ class ExecutionEngine:
             "i don't have enough information",
             "i don't have the specific",
             "i don't have information",
+            "i do not have information",
+            "i don't know",
+            "i do not know",
+            "i have no idea",
+            "i'm not sure",
+            "i am not sure",
             "i cannot provide",
+            "i can't provide",
+            "i cannot say",
+            "i can't say",
+            "i don't have any information",
+            "i do not have any information",
+            "no facts about",
+            "no information about",
+            "not mentioned",
+            "not provided",
+            "not in the facts",
+            "not in my facts",
+            "persistent fact",
+            "provided persistent fact",
+            "outside my knowledge",
+            "beyond my knowledge",
+            "outside my training",
             "this requires evidence mode",
             "insufficient evidence",
             "you may need to consult",
-            "outside my training",
             "simulation tools",
             "error",
         ]
