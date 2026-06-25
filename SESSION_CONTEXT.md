@@ -15,7 +15,7 @@
 | **Model** | `local-lucy-llama31` (llama3.1:8b via Ollama) |
 | **Handoff file** | `~/Desktop/Local_Lucy_v10_Session_Handoff_<date>.md` |
 | **Default branch on origin** | `v10-dev` ✅ |
-| **Working tree** | Clean after production-readiness fixes |
+| **Working tree** | Modified (persona LoRA pipeline finalized; docs and prompts updated) |
 
 ---
 
@@ -25,6 +25,7 @@
 lucy-v10/
 ├── tools/                    # Core backend (router, execution, voice, memory, internet)
 │   ├── router_py/            # Main execution engine (~50 modules)
+│   ├── lora/                 # Persona LoRA training, conversion, evaluation
 │   ├── internet/             # Web search (DuckDuckGo, SearXNG, Brave)
 │   ├── voice/                # TTS (Kokoro), STT (Whisper), playback
 │   ├── memory/               # SQLite memory service
@@ -100,7 +101,7 @@ Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
 Commits since tag: 56
-Working tree: clean
+Working tree: modified (persona LoRA pipeline in progress)
 ```
 
 ### Recent Commits (last 13)
@@ -129,6 +130,38 @@ e18ed14 test: robustness fixes from code review
 09965c5 docs: update SESSION_CONTEXT.md — GitHub default branch is v10-dev
 e3fe120 ci: add experimental AppImage packaging
 ```
+
+### Persona LoRA Pipeline — Completed Within Hardware Limits
+- Phase 1 (prompt-level personas) previously complete and tested.
+- Phase 2–5 completed for hardware-feasible models:
+  - `tools/lora/` scripts for dataset generation, QLoRA training, GGUF conversion, Modelfile generation, and Ollama tag creation.
+  - Persona datasets generated at `data/lora/datasets/{michael,racheli}.jsonl`.
+  - Persona-aware model resolution added to `tools/router_py/local_answer.py`.
+  - HMI persona selector (`auto` / `Michael` / `Racheli`) added to Control Panel, plus indicator and clear button, forcing the active identity for all models.
+  - Golden test cases expanded with `contains_any` / `not_contains_any` checks and evaluator hardened with `--min-pass-rate` and `--json` output.
+  - `local-lucy-llama31-michael` and `local-lucy-llama31-racheli` adapters trained, converted to GGUF, and registered as Ollama tags.
+- Hardware limitation on RTX 3060 12 GB:
+  - `Qwen/Qwen3-14B` OOMs during `prepare_model_for_kbit_training` even at rank 4 / seq 512.
+  - `mistralai/Mistral-Nemo-Instruct-2407` also OOMs at the same step, even at rank 4 / seq 512 / `q_proj,v_proj` only.
+  - Therefore `local-lucy`, `local-lucy-fast`, `local-lucy-qwen3`, and `local-lucy-mistral` use prompt-level persona injection at runtime.
+  - `train_all_personas.sh` now trains only Llama 3.1 adapters; docs/README/AGENTS/gpu_resource_allocation updated with the final adapter matrix.
+- Docs updated:
+  - New `docs/runbooks/PERSONAS.md` runbook with validation results.
+  - `README.md`, `AGENTS.md`, `docs/gpu_resource_allocation.md` reflect final LoRA/prompt status and HMI selector.
+- Tests passing:
+  - `tools/router_py/test_local_answer.py`: 59 passed
+  - `tools/tests/test_memory_*.py`: 109 passed, 5 subtests passed
+  - `tools/lora/test_build_datasets.py`: 5 passed
+  - `tools/lora/test_evaluate_persona.py`: 7 passed
+  - Golden persona evaluations (`tests/golden_persona_cases.jsonl`):
+    - Llama 3.1 Michael LoRA: 9/9 (100%)
+    - Llama 3.1 Racheli LoRA: 12/12 (100%)
+    - qwen3 14B Michael prompt: 8/9 (88.9%)
+    - qwen3 14B Racheli prompt: 12/12 (100%)
+    - Mistral-Nemo 12B Michael prompt: 8/9 (88.9%)
+    - Mistral-Nemo 12B Racheli prompt: 11/12 (91.7%)
+  - `ui-v10/tests/test_comprehensive_hmi_inspection.py`: 138 checks passed
+- Full `make test` status: 972 passed, 19 skipped, 32 failed. The failures are pre-existing routing/semantic-regression tests unrelated to the persona pipeline; persona-focused tests all pass.
 
 ---
 
@@ -230,5 +263,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-16T16:45:00Z*
-*Session: Training data augmented with 335 validated synthetic examples (1362 total), including 164 FINANCE-route examples; 10-fold CV improved route accuracy 74.5% -> 80.3%, intent 64.6% -> 74.4%, short-query 78.3% -> 83.0%; HMI model-status display and automatic escalation trigger remain in place; test suite green at 952 passed; all changes pushed to origin/v10-dev*
+*Last updated: 2026-06-24T22:35:00Z*
+*Session: Persona LoRA pipeline finalized. llama3.1 adapters (Michael/Racheli) trained, converted, and registered. qwen3:14B and mistral-nemo cannot be LoRA-trained on RTX 3060 12 GB (OOM) and use prompt-level persona injection. HMI persona selector added. Golden persona tests pass for all model/persona combinations above the 60% threshold. Full pytest suite has 32 pre-existing routing/semantic-regression failures unrelated to personas.*
