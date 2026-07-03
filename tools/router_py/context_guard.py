@@ -33,8 +33,11 @@ _bi_model: Any | None = None
 
 def _sigmoid(x: float) -> float:
     """Map an unbounded logit to [0.0, 1.0]."""
+    x = float(x)
+    if math.isnan(x):
+        return 0.0
     try:
-        return 1.0 / (1.0 + math.exp(-float(x)))
+        return 1.0 / (1.0 + math.exp(-x))
     except OverflowError:
         return 0.0 if x < 0 else 1.0
 
@@ -53,8 +56,7 @@ def _load_ce_model() -> Any | None:
             )
         except Exception as exc:  # pragma: no cover - fallback path
             logger.warning(
-                "Could not load evidence cross-encoder %s: %s. "
-                "Falling back to keyword relevance.",
+                "Could not load evidence cross-encoder %s: %s. Falling back to keyword relevance.",
                 _EVIDENCE_CROSS_ENCODER,
                 exc,
             )
@@ -72,7 +74,7 @@ def _load_bi_model() -> Any | None:
             _bi_model = SentenceTransformer(_MEMORY_BI_ENCODER, device="cpu")
         except Exception as exc:  # pragma: no cover - fallback path
             logger.warning(
-                "Could not load memory bi-encoder %s: %s. " "Falling back to keyword relevance.",
+                "Could not load memory bi-encoder %s: %s. Falling back to keyword relevance.",
                 _MEMORY_BI_ENCODER,
                 exc,
             )
@@ -105,7 +107,10 @@ def _keyword_evidence_score(question: str, evidence: dict[str, Any]) -> float:
             keywords = _extract_keywords(question)
             if keywords:
                 matched = sum(1 for kw in keywords if kw in combined)
+                # Intentional boost: this preserves the original keyword guard
+                # behavior, not the simplified raw-ratio snippet in the plan.
                 return max(0.6, matched / len(keywords))
+            # Same intentional boost when no question keywords remain.
             return 0.8
         return 0.0
 
@@ -190,7 +195,13 @@ def score_memory_relevance(question: str, turn: str) -> float:
             )
             q_norm = np.linalg.norm(q_emb, axis=1)
             t_norm = np.linalg.norm(t_emb, axis=1)
-            sim = np.sum(q_emb * t_emb, axis=1) / (q_norm * t_norm)
+            denom = q_norm * t_norm
+            sim = np.divide(
+                np.sum(q_emb * t_emb, axis=1),
+                denom,
+                out=np.zeros_like(denom),
+                where=denom > 1e-9,
+            )
             return float(sim[0])
         except Exception as exc:  # pragma: no cover - fallback path
             logger.warning("Memory semantic scoring failed: %s", exc)
@@ -356,7 +367,11 @@ def _normalize(text: str) -> str:
 
 
 def _extract_keywords(text: str) -> set[str]:
-    return {w for w in _KEYWORD_RE.findall(_normalize(text)) if len(w) > 3 and w not in _STOP_WORDS}
+    keywords: set[str] = set()
+    for w in _KEYWORD_RE.findall(_normalize(text)):
+        if len(w) > 3 and w not in _STOP_WORDS:
+            keywords.add(w)
+    return keywords
 
 
 def _extract_place_tail(text: str) -> str | None:
