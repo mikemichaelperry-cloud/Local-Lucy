@@ -225,8 +225,9 @@ _SELF_KNOWLEDGE_TEMPLATE = (
     "Whisper STT + Kokoro TTS voice stack; SQLite session memory and persistent facts.\n"
     "Routing is automatic: LOCAL (default), AUGMENTED (Wikipedia→OpenAI→Kimi), "
     "NEWS, TIME, WEATHER. Do not ask the user to pick a mode.\n"
-    "Capabilities: translation, coding, writing, reasoning, voice, "
+    "Capabilities: coding, writing, reasoning, voice, "
     "tube database (648 types), live data via AUGMENTED/NEWS/WEATHER.\n"
+    "Language: I am an English-only assistant. I do not translate to or from other languages.\n"
     "Limitations: training-data cutoff; {param_count} model so niche details may be wrong; "
     "cannot browse the web on your own — only when the router fetches it; "
     "cannot read files on the computer unless explicitly provided in context.\n"
@@ -435,8 +436,25 @@ class LocalAnswerConfig:
             )
         )
         cache_dir = os.environ.get("LUCY_LOCAL_REPEAT_CACHE_DIR")
+
+        # If the env var is not set, read the last model selected in the HMI so
+        # standalone callers (tests, scripts) report the same identity as the UI.
+        model = os.environ.get("LUCY_LOCAL_MODEL", "")
+        if not model:
+            namespace = os.environ.get(
+                "LUCY_RUNTIME_NAMESPACE_ROOT",
+                str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+            )
+            state_file = Path(namespace) / "state" / "current_state.json"
+            try:
+                model = json.loads(state_file.read_text(encoding="utf-8")).get("model", "")
+            except Exception:
+                pass
+        if not model:
+            model = "local-lucy-llama31"
+
         return cls(
-            model=os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-llama31"),
+            model=model,
             ollama_url=os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate"),
             temperature=float(os.environ.get("LUCY_LOCAL_TEMPERATURE", "0")),
             top_p=float(os.environ.get("LUCY_LOCAL_TOP_P", "1")),

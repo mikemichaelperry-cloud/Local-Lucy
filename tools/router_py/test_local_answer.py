@@ -48,6 +48,21 @@ class TestLocalAnswerConfig(unittest.TestCase):
             self.assertEqual(config.seed, 42)
             self.assertFalse(config.cache_enabled)
 
+    def test_config_from_env_falls_back_to_current_state_json(self):
+        """When LUCY_LOCAL_MODEL is not set, read the saved HMI model state."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_dir = Path(tmpdir) / "state"
+            state_dir.mkdir()
+            state_file = state_dir / "current_state.json"
+            state_file.write_text(json.dumps({"model": "local-lucy-mistral"}))
+            env = {
+                "LUCY_LOCAL_MODEL": "",
+                "LUCY_RUNTIME_NAMESPACE_ROOT": tmpdir,
+            }
+            with patch.dict(os.environ, env, clear=False):
+                config = LocalAnswerConfig.from_env()
+            self.assertEqual(config.model, "local-lucy-mistral")
+
 
 class TestQueryClassification(unittest.TestCase):
     """Test query classification methods."""
