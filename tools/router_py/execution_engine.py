@@ -2042,7 +2042,8 @@ class ExecutionEngine:
         # Direct-answer routes (WEATHER, TIME, FINANCE, NEWS) return evidence
         # as the response, so we skip filtering there to preserve completeness.
         if evidence and route.route in ("EVIDENCE", "FULL", "AUGMENTED"):
-            if not is_evidence_relevant(question, evidence):
+            relevant = await asyncio.to_thread(is_evidence_relevant, question, evidence)
+            if not relevant:
                 self._logger.warning(
                     "Dropping irrelevant evidence for route %s: title=%r",
                     route.route,
