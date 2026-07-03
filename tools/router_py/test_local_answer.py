@@ -104,6 +104,24 @@ class TestQueryClassification(unittest.TestCase):
         self.assertTrue(self.answer._is_budget_detail("step by step guide"))
         self.assertFalse(self.answer._is_budget_detail("brief answer"))
 
+    def test_memory_instruction_treats_memory_as_context_not_source(self):
+        """Session memory must not be treated as the primary answer source."""
+        prompt = self.answer._build_prompt(
+            query="What are interesting towns in Tokyo in December?",
+            session_memory=(
+                "User: What are the main tourist attractions in Japan?\n"
+                "Assistant: Tourism in China is a growing industry..."
+            ),
+            generation_profile="chat",
+            budget_instruction="",
+            conversation_mode_active=False,
+            conversation_system_block=False,
+            augmented_context="",
+        )
+        self.assertIn("context only", prompt)
+        self.assertIn("ignore any unrelated prior turns", prompt)
+        self.assertNotIn("Answer from the session memory facts above", prompt)
+
 
 class TestSanitization(unittest.TestCase):
     """Test text sanitization methods."""

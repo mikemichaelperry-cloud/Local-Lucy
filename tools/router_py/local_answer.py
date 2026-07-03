@@ -1547,9 +1547,16 @@ class LocalAnswer:
             if session_memory.strip():
                 instruction += " Also use the session memory facts."
         elif session_memory.strip():
+            # Session memory is context, not a script. The model must answer the
+            # current query from its own knowledge unless the query is clearly a
+            # follow-up to the prior conversation. This prevents a stale or wrong
+            # prior turn (e.g. a mis-retrieved evidence article) from dominating
+            # the response to an unrelated or poorly-transcribed question.
             instruction = (
-                "Answer from the session memory facts above. "
-                "State facts directly; do not ask the user to repeat them."
+                "Session memory is provided above for context only. "
+                "If the current query is a follow-up to the prior conversation, you may use it. "
+                "Otherwise answer from your own knowledge and ignore any unrelated prior turns. "
+                "Do not assume the previous topic still applies unless the user explicitly continues it."
             )
         elif is_personal_query and persistent_facts:
             instruction = (
