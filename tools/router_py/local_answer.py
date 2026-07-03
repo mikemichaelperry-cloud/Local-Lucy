@@ -56,7 +56,7 @@ except ImportError:
         from context_guard import filter_memory_context
     except ImportError:
 
-        def filter_memory_context(question: str, memory_text: str, threshold: float = 0.2) -> str:
+        def filter_memory_context(question: str, memory_text: str, threshold: float = 0.3) -> str:
             return memory_text
 
 

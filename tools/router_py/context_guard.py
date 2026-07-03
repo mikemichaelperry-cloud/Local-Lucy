@@ -20,7 +20,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _EVIDENCE_THRESHOLD = 0.50
-_MEMORY_THRESHOLD = 0.20
+_MEMORY_THRESHOLD = 0.30
 
 _EVIDENCE_CROSS_ENCODER = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 _MEMORY_BI_ENCODER = "sentence-transformers/all-MiniLM-L6-v2"
