@@ -32,6 +32,7 @@ These failures cause the LLM to cite wrong sources or repeat stale, incorrect an
 - Replacing the router's embedding model.
 - Adding new languages (especially Hebrew).
 - Rewriting `execution_engine.py` or `local_answer.py` beyond the guard call sites.
+- Coupling the guard to any specific LLM backend (llama3.1, mistral, qwen3, etc.).
 
 ## Decision: English-only semantic scoring
 
@@ -54,7 +55,7 @@ The multilingual model handles Hebrew but is heavier and conflicts with the V10 
 
 ### Components
 
-All components live in `tools/router_py/context_guard.py`.
+All components live in `tools/router_py/context_guard.py`. The guard runs before the LLM prompt is assembled and is independent of which LLM model (llama3.1, mistral, qwen3, etc.) is currently loaded by Ollama.
 
 #### 1. `EvidenceScorer`
 
