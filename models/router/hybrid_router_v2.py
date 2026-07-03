@@ -19,10 +19,14 @@ import io
 import json
 import logging
 import os
+import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
+import torch
+import torch.nn.functional as F
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
@@ -111,10 +115,15 @@ _DISAMBIGUATION_REFS = {
 class HybridRouterV2:
     """Superior hybrid router: semantic disambiguation + calibrated confidence + multi-signal fusion."""
 
-    def __init__(self, embeddings_path: str | None = None,
-                 examples_path: str | None = None,
-                 base_model: str | None = None):
-        self.device = "cpu"
+    def __init__(
+        self,
+        embeddings_path: str | None = None,
+        examples_path: str | None = None,
+        base_model: str | None = None,
+    ):
+        # Auto-select CUDA if available; MiniLM-L6 is tiny (~80 MB) and leaves
+        # plenty of headroom on a 12 GB RTX 3060 alongside the 8B q4 LLM.
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self._initialized = False
 
         # Store params for lazy init
@@ -134,23 +143,138 @@ class HybridRouterV2:
         # Minimal keyword guards — cheap, set up immediately
         self.route_confidence_thresholds = {
             "LOCAL": 0.15,
-            "AUGMENTED": 0.35,
-            "EVIDENCE": 0.30,
-            "NEWS": 0.20,
+            "AUGMENTED": 0.25,
+            "EVIDENCE": 0.22,
+            "NEWS": 0.15,
             "TIME": 0.15,
-            "WEATHER": 0.20,
+            "WEATHER": 0.15,
         }
+
+        # Classifier head (optional): learned decision boundary over frozen embeddings.
+        self.classifier_head: torch.nn.Module | None = None
+        self.classifier_threshold = 0.70
+        self.classifier_idx_to_route: dict[int, str] = {}
+        self.classifier_route_to_idx: dict[str, int] = {}
+        self.classifier_route_to_intent: dict[str, str] = {}
+
+        # Low-confidence fallback: route factual lookups outward instead of LOCAL.
+        self._fact_lookup_words_re = re.compile(
+            r"^(who|what|when|where|why|how|is|are|was|were|did|does|do|can|could|would|should|will|shall|has|have|had)\b",
+            re.IGNORECASE,
+        )
+        self._fact_lookup_exclusions = frozenset(
+            {
+                # Local capabilities
+                "translate",
+                "translation",
+                "in arabic",
+                "in french",
+                "in spanish",
+                "in german",
+                "in chinese",
+                "in japanese",
+                "in russian",
+                "in italian",
+                "code",
+                "function",
+                "script",
+                "program",
+                "programming",
+                "python",
+                "javascript",
+                "bash",
+                "command",
+                "install",
+                "debug",
+                "compile",
+                "error",
+                "library",
+                "framework",
+                "calculate",
+                "solve",
+                "equation",
+                "plus",
+                "minus",
+                "times",
+                "divided by",
+                "square root",
+                "sum of",
+                "product of",
+                "story",
+                "poem",
+                "joke",
+                "song",
+                "write",
+                "creative",
+                "opinion",
+                "think",
+                "should i",
+                "best",
+                "worst",
+                "recommend",
+                "my ",
+                "your ",
+                "our ",
+                "you ",
+                "yourself",
+                "who are you",
+                "what are you",
+                "who am i",
+                "what am i",
+                # Covered by other gates
+                "weather",
+                "forecast",
+                "temperature",
+                "stock",
+                "price",
+                "news",
+                "headlines",
+                "breaking",
+            }
+        )
+
         self.time_keywords = [
-            "time is it", "current time", "what day is it",
-            "timezone", "what date", "how many days until",
-            "time in ", "time now", "local time", "what is the time", "time right now",
+            "time is it",
+            "current time",
+            "what day is it",
+            "timezone",
+            "what date",
+            "how many days until",
+            "time in ",
+            "time now",
+            "local time",
+            "what is the time",
+            "time right now",
         ]
         self.weather_keywords = [
-            "weather", "forecast", "temperature", "rain", "raining", "snow", "snowing",
-            "sunny", "cloudy", "windy", "storm", "humidity", "precipitation",
-            "drizzle", "hail", "fog", "mist", "thunder", "lightning",
-            "overcast", "barometer", "celsius", "fahrenheit", "uv index",
-            "pollen count", "heat index", "wind chill", "current conditions",
+            "weather",
+            "forecast",
+            "temperature",
+            "rain",
+            "raining",
+            "snow",
+            "snowing",
+            "sunny",
+            "cloudy",
+            "windy",
+            "storm",
+            "humidity",
+            "precipitation",
+            "drizzle",
+            "hail",
+            "fog",
+            "mist",
+            "thunder",
+            "lightning",
+            "overcast",
+            "barometer",
+            "celsius",
+            "fahrenheit",
+            "uv index",
+            "pollen count",
+            "heat index",
+            "wind chill",
+            "current conditions",
         ]
 
     def _lazy_init(self) -> None:
@@ -169,7 +293,21 @@ class HybridRouterV2:
 
         try:
             with contextlib.redirect_stdout(io.StringIO() if not _debug else sys.stdout):
-                self.model = SentenceTransformer(self._base_model, device="cpu")
+                try:
+                    self.model = SentenceTransformer(self._base_model, device=self.device)
+                except (torch.OutOfMemoryError, RuntimeError) as exc:
+                    if self.device == "cuda" and "CUDA out of memory" in str(exc):
+                        logger = logging.getLogger(__name__)
+                        logger.warning(
+                            "CUDA OOM loading router on %s; falling back to CPU. "
+                            "This is safe but slightly slower.",
+                            self.device,
+                        )
+                        torch.cuda.empty_cache()
+                        self.device = "cpu"
+                        self.model = SentenceTransformer(self._base_model, device="cpu")
+                    else:
+                        raise
         finally:
             _tf_logger.setLevel(_orig_level)
             _hf_logger.setLevel(_orig_hf_level)
@@ -189,37 +327,46 @@ class HybridRouterV2:
             logger.warning(
                 "Embeddings file not found (%s). Building from %d examples — "
                 "this will take ~30-60s on first run.",
-                self._embeddings_path, len(self.examples),
+                self._embeddings_path,
+                len(self.examples),
             )
             self.embeddings = self._build_embeddings_from_examples()
             np.save(self._embeddings_path, self.embeddings)
-            logger.info("Saved rebuilt embeddings to %s (%s)", self._embeddings_path, self.embeddings.shape)
+            logger.info(
+                "Saved rebuilt embeddings to %s (%s)", self._embeddings_path, self.embeddings.shape
+            )
 
         expected_dim = self.model.get_embedding_dimension()
         if self.embeddings.shape[1] != expected_dim:
             logger.warning(
                 "Embeddings dimension mismatch: file has %s but model expects %d. "
                 "Rebuilding from %d examples...",
-                self.embeddings.shape, expected_dim, len(self.examples),
+                self.embeddings.shape,
+                expected_dim,
+                len(self.examples),
             )
             self.embeddings = self._build_embeddings_from_examples()
             np.save(self._embeddings_path, self.embeddings)
             logger.info(
                 "Rebuilt and saved embeddings to %s (%s)",
-                self._embeddings_path, self.embeddings.shape,
+                self._embeddings_path,
+                self.embeddings.shape,
             )
 
         if self.embeddings.shape[0] != len(self.examples):
             logger.warning(
                 "Embeddings count mismatch: file has %d rows but examples has %d. "
                 "Rebuilding from %d examples...",
-                self.embeddings.shape[0], len(self.examples), len(self.examples),
+                self.embeddings.shape[0],
+                len(self.examples),
+                len(self.examples),
             )
             self.embeddings = self._build_embeddings_from_examples()
             np.save(self._embeddings_path, self.embeddings)
             logger.info(
                 "Rebuilt and saved embeddings to %s (%s)",
-                self._embeddings_path, self.embeddings.shape,
+                self._embeddings_path,
+                self.embeddings.shape,
             )
 
         self.disambiguation_refs = {}
@@ -227,25 +374,64 @@ class HybridRouterV2:
             embs = self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
             self.disambiguation_refs[category] = embs
 
+        self._load_classifier_head()
+
         self._initialized = True
 
         self.creative_verbs = [
-            "write", "compose", "craft", "tell", "create", "make up", "imagine",
-            "describe", "depict", "portray", "paint", "draw",
+            "write",
+            "compose",
+            "craft",
+            "tell",
+            "create",
+            "make up",
+            "imagine",
+            "describe",
+            "depict",
+            "portray",
+            "paint",
+            "draw",
         ]
         self.creative_nouns = [
-            "story", "poem", "essay", "novel", "fiction", "script", "play", "song",
-            "horror", "fantasy", "sci-fi", "romance", "thriller", "mystery",
-            "character", "plot", "dialogue", "scene", "chapter",
-            "haiku", "limerick", "sonnet",
+            "story",
+            "poem",
+            "essay",
+            "novel",
+            "fiction",
+            "script",
+            "play",
+            "song",
+            "horror",
+            "fantasy",
+            "sci-fi",
+            "romance",
+            "thriller",
+            "mystery",
+            "character",
+            "plot",
+            "dialogue",
+            "scene",
+            "chapter",
+            "haiku",
+            "limerick",
+            "sonnet",
         ]
 
     def _encode(self, text: str) -> np.ndarray:
-        return self.model.encode(text, convert_to_numpy=True, show_progress_bar=False).reshape(1, -1)
+        return np.asarray(
+            self.model.encode(text, convert_to_numpy=True, show_progress_bar=False)
+        ).reshape(1, -1)
 
     def _build_embeddings_from_examples(self) -> np.ndarray:
         texts = [ex["query"] for ex in self.examples]
-        return self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+        return np.asarray(
+            self.model.encode(
+                texts,
+                convert_to_numpy=True,
+                show_progress_bar=False,
+                batch_size=64,
+            )
+        )
 
     def _validate_examples(self, examples: list[dict]) -> list[dict]:
         """Reject empty, blank, or structurally invalid training examples.
@@ -279,7 +465,11 @@ class HybridRouterV2:
             # Correct known mislabels that survive data-generation pipelines
             q_lower = query.lower()
             if q_lower == "what is python?" and labels.get("route") == "WEATHER":
-                logger.warning("[ROUTER_VALIDATE] Corrected mislabeled example %d: '%s' WEATHER -> LOCAL", i, query)
+                logger.warning(
+                    "[ROUTER_VALIDATE] Corrected mislabeled example %d: '%s' WEATHER -> LOCAL",
+                    i,
+                    query,
+                )
                 labels["route"] = "LOCAL"
                 labels["intent_family"] = "local_answer"
                 labels["evidence_mode"] = "not_required"
@@ -287,17 +477,99 @@ class HybridRouterV2:
         if rejected:
             logger.info(
                 "[ROUTER_VALIDATE] Loaded %d valid examples, rejected %d invalid",
-                len(valid), rejected,
+                len(valid),
+                rejected,
             )
         return valid
 
-    def fit(self, examples: list[dict]):
+    def fit(self, examples: list[dict], batch_size: int = 64):
         self._lazy_init()
         self.examples = examples
         texts = [ex["query"] for ex in examples]
         print(f"Encoding {len(texts)} examples...")
-        self.embeddings = self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+        # Batch encoding avoids GPU OOM when the model shares VRAM with the
+        # local LLM / other runtime services.
+        self.embeddings = self.model.encode(
+            texts,
+            convert_to_numpy=True,
+            show_progress_bar=False,
+            batch_size=batch_size,
+        )
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         print(f"Embeddings shape: {self.embeddings.shape}")
+
+    def _load_classifier_head(self) -> None:
+        """Load a trained Linear/MLP classifier head over frozen embeddings.
+
+        If the head files are missing or malformed, the router simply falls back
+        to pure k-NN.  The head is tiny, so we keep it on the same device as the
+        embedding model.
+        """
+        here = Path(self._examples_path).resolve().parent
+        config_path = here / "classifier_head_config.json"
+        model_path = here / "classifier_head.pt"
+        if not config_path.exists() or not model_path.exists():
+            return
+
+        try:
+            config = json.loads(config_path.read_text())
+            routes = config.get("routes", [])
+            self.classifier_idx_to_route = {i: route for i, route in enumerate(routes)}
+            self.classifier_route_to_idx = {route: i for i, route in enumerate(routes)}
+            self.classifier_threshold = config.get("threshold", self.classifier_threshold)
+
+            # Build a route -> intent_family map from the loaded examples
+            route_intent_counts: dict[str, dict[str, int]] = {}
+            for ex in self.examples:
+                route = ex["labels"]["route"]
+                intent = ex["labels"].get("intent_family", "local_answer")
+                route_intent_counts.setdefault(route, {}).setdefault(intent, 0)
+                route_intent_counts[route][intent] += 1
+            self.classifier_route_to_intent = {
+                route: max(intents, key=lambda k: intents[k])
+                for route, intents in route_intent_counts.items()
+            }
+
+            input_dim = config["input_dim"]
+            num_classes = config["num_classes"]
+            hidden_dim = config.get("hidden_dim")
+
+            if hidden_dim:
+                self.classifier_head = torch.nn.Sequential(
+                    torch.nn.Linear(input_dim, hidden_dim),
+                    torch.nn.ReLU(),
+                    torch.nn.Dropout(0.1),
+                    torch.nn.Linear(hidden_dim, num_classes),
+                )
+            else:
+                self.classifier_head = torch.nn.Linear(input_dim, num_classes)
+
+            state_dict = torch.load(model_path, map_location=self.device, weights_only=True)
+            self.classifier_head.load_state_dict(state_dict)
+            self.classifier_head.to(self.device)
+            self.classifier_head.eval()
+        except Exception as exc:
+            logger = logging.getLogger(__name__)
+            logger.warning("Failed to load classifier head: %s", exc)
+            self.classifier_head = None
+
+    def _classify(self, query_emb: np.ndarray) -> tuple[str, float, dict[str, float]]:
+        """Run the classifier head on a single (L2-normalised) query embedding."""
+        if self.classifier_head is None:
+            raise RuntimeError("Classifier head not loaded")
+
+        norm = np.linalg.norm(query_emb)
+        x = torch.tensor(query_emb / (norm + 1e-12), dtype=torch.float32).to(self.device)
+        with torch.no_grad():
+            logits = self.classifier_head(x)
+            probs = F.softmax(logits, dim=-1)[0]
+            conf, idx = torch.max(probs, dim=-1)
+            route = self.classifier_idx_to_route[int(idx)]
+            probs_dict = {
+                self.classifier_idx_to_route[i]: float(probs[i]) for i in range(len(probs))
+            }
+        return route, float(conf), probs_dict
 
     # -----------------------------------------------------------------------
     # Semantic disambiguation
@@ -332,10 +604,7 @@ class HybridRouterV2:
         return has_verb and has_noun
 
     def _embedding_collapsed(self, top_k_sims: list[float]) -> bool:
-        return (
-            all(s > 0.995 for s in top_k_sims)
-            or (max(top_k_sims) - min(top_k_sims) < 0.001)
-        )
+        return all(s > 0.995 for s in top_k_sims) or (max(top_k_sims) - min(top_k_sims) < 0.001)
 
     def _is_time_query(self, q_lower: str) -> bool:
         return any(kw in q_lower for kw in self.time_keywords)
@@ -353,44 +622,113 @@ class HybridRouterV2:
 
         # Core weather signals — unambiguous, always trigger
         core_weather = [
-            "rain", "raining", "snow", "snowing", "sunny", "cloudy",
-            "windy", "storm", "hail", "fog", "mist", "thunder", "lightning",
-            "weather", "humidity", "precipitation", "drizzle",
-            "overcast", "barometer", "uv index", "pollen count", "heat index",
-            "wind chill", "current conditions",
+            "rain",
+            "raining",
+            "snow",
+            "snowing",
+            "sunny",
+            "cloudy",
+            "windy",
+            "storm",
+            "hail",
+            "fog",
+            "mist",
+            "thunder",
+            "lightning",
+            "weather",
+            "humidity",
+            "precipitation",
+            "drizzle",
+            "overcast",
+            "barometer",
+            "uv index",
+            "pollen count",
+            "heat index",
+            "wind chill",
+            "current conditions",
         ]
         for kw in core_weather:
-            if re.search(rf'\b{re.escape(kw)}\b', q_lower):
+            if re.search(rf"\b{re.escape(kw)}\b", q_lower):
                 return True
 
         # "forecast" is common in economics, sports, and planning — require a
         # corroborating weather signal before treating it as a weather query.
         if "forecast" in q_lower:
-            if any(re.search(rf'\b{re.escape(kw)}\b', q_lower) for kw in core_weather):
+            if any(re.search(rf"\b{re.escape(kw)}\b", q_lower) for kw in core_weather):
                 return True
-            if any(ctx in q_lower for ctx in [
-                "weather", "temperature", "rain", "snow", "sunny", "cloudy",
-                "storm", "wind", "humidity", "precipitation",
-            ]):
+            if any(
+                ctx in q_lower
+                for ctx in [
+                    "weather",
+                    "temperature",
+                    "rain",
+                    "snow",
+                    "sunny",
+                    "cloudy",
+                    "storm",
+                    "wind",
+                    "humidity",
+                    "precipitation",
+                ]
+            ):
                 return True
 
         # Temperature words require corroborating weather context
         temperature_words = [
-            "hot", "cold", "freezing", "warm", "chilly", "scorching",
-            "sweltering", "frigid", "brisk", "cool", "mild", "temperate",
+            "hot",
+            "cold",
+            "freezing",
+            "warm",
+            "chilly",
+            "scorching",
+            "sweltering",
+            "frigid",
+            "brisk",
+            "cool",
+            "mild",
+            "temperate",
         ]
-        has_temp = any(re.search(rf'\b{re.escape(kw)}\b', q_lower) for kw in temperature_words)
+        has_temp = any(re.search(rf"\b{re.escape(kw)}\b", q_lower) for kw in temperature_words)
         if has_temp:
             weather_context = [
-                "outside", "outdoor", "weather", "forecast", "today", "tomorrow",
-                "tonight", "this week", "this weekend", "right now", "currently",
-                "will it", "going to be", "feel like", "high of", "low of",
-                "temperature", "degrees", "celsius", "fahrenheit",
+                "outside",
+                "outdoor",
+                "weather",
+                "forecast",
+                "today",
+                "tomorrow",
+                "tonight",
+                "this week",
+                "this weekend",
+                "right now",
+                "currently",
+                "will it",
+                "going to be",
+                "feel like",
+                "high of",
+                "low of",
+                "temperature",
+                "degrees",
+                "celsius",
+                "fahrenheit",
             ]
             if any(ctx in q_lower for ctx in weather_context):
                 return True
 
         return False
+
+    def _is_factual_lookup_query(self, query: str) -> bool:
+        """Detect factual who/what/when/where/why lookups that should not stay LOCAL.
+
+        Returns True if the query starts with a factual question word and does
+        not contain terms that are explicit local capabilities (translation,
+        coding, math, creative, opinion/advice, personal/meta) or already
+        handled by another gate (weather, finance, news).
+        """
+        if not self._fact_lookup_words_re.search(query):
+            return False
+        q_lower = query.lower()
+        return not any(exc in q_lower for exc in self._fact_lookup_exclusions)
 
     def _is_educational_time_query(self, q_lower: str) -> bool:
         """Detect educational queries about time concepts (not current time).
@@ -399,14 +737,31 @@ class HybridRouterV2:
         false positives on generic questions like 'What is today's news?'.
         """
         question_phrases = [
-            "how does", "how do", "explain", "history of", "how it works",
-            "how they work", "purpose of", "function of", "structure of",
+            "how does",
+            "how do",
+            "explain",
+            "history of",
+            "how it works",
+            "how they work",
+            "purpose of",
+            "function of",
+            "structure of",
         ]
         time_concepts = [
-            "daylight saving", "time zones", "time zone", "timezone",
-            "leap year", "leap second", "calendar", "chronology",
-            " Greenwich ", "coordinated universal time", "utc",
-            "solar time", "lunar calendar", "gregorian calendar",
+            "daylight saving",
+            "time zones",
+            "time zone",
+            "timezone",
+            "leap year",
+            "leap second",
+            "calendar",
+            "chronology",
+            " Greenwich ",
+            "coordinated universal time",
+            "utc",
+            "solar time",
+            "lunar calendar",
+            "gregorian calendar",
         ]
         has_question = any(p in q_lower for p in question_phrases)
         has_time_concept = any(t in q_lower for t in time_concepts)
@@ -415,17 +770,25 @@ class HybridRouterV2:
     def _is_climate_query(self, q_lower: str) -> bool:
         """Detect climate/climatology queries (not current weather)."""
         climate_phrases = [
-            "climate", "climatology", "climate change", "global warming",
-            "weather patterns", "weather pattern",
+            "climate",
+            "climatology",
+            "climate change",
+            "global warming",
+            "weather patterns",
+            "weather pattern",
         ]
         return any(p in q_lower for p in climate_phrases)
 
     def _is_math_query(self, q_lower: str) -> bool:
         stripped = q_lower.strip().rstrip("?").strip()
-        if len(stripped) <= 15 and all(c.isdigit() or c.isspace() or c in "+-*/=^." for c in stripped):
+        if len(stripped) <= 15 and all(
+            c.isdigit() or c.isspace() or c in "+-*/=^." for c in stripped
+        ):
             return True
         math_phrases = ["what is", "what's", "calculate", "compute", "solve"]
-        return any(p in q_lower for p in math_phrases) and any(c in q_lower for c in "+-*/=1234567890")
+        return any(p in q_lower for p in math_phrases) and any(
+            c in q_lower for c in "+-*/=1234567890"
+        )
 
     # -----------------------------------------------------------------------
     # Conspiracy / fringe context filter
@@ -440,37 +803,98 @@ class HybridRouterV2:
         """
         conspiracy_markers = [
             # Core conspiracy language
-            "conspiracy", "conspirac", "hoax", "cover-up", "cover up",
-            "secret plan", "hidden truth", "they don't want you to know",
-            "false flag", "inside job", "mainstream media won't",
+            "conspiracy",
+            "conspirac",
+            "hoax",
+            "cover-up",
+            "cover up",
+            "secret plan",
+            "hidden truth",
+            "they don't want you to know",
+            "false flag",
+            "inside job",
+            "mainstream media won't",
             # Specific theories
-            "flat earth", "hollow earth", "moon landing fake", "moon hoax",
-            "faked moon landing", "9/11 inside job", "9/11 conspiracy",
-            "controlled demolition", "jfk assassination conspiracy",
-            "chemtrails", "geoengineering",
-            "reptilian", "lizard people", "shape-shifting", "shape shifting",
-            "ancient aliens", "ancient astronaut", "ancient astronauts",
-            "illuminati", "freemason", "bilderberg", "skull and bones",
-            "new world order", "deep state", "shadow government",
-            "mkultra", "mk-ultra", "montauk", "philadelphia experiment",
-            "area 51", "area51", "dreamland", "s4 ", "roswell",
-            "haarp", "blue beam", "project blue beam",
-            "depopulation", "population control",
-            "microchip", "microchips", "track everyone",
-            "fema camps", "concentration camps",
-            "gun confiscation", "take our guns",
-            "pizzagate", "qanon", "q anon", "the storm", "the plan",
+            "flat earth",
+            "hollow earth",
+            "moon landing fake",
+            "moon hoax",
+            "faked moon landing",
+            "9/11 inside job",
+            "9/11 conspiracy",
+            "controlled demolition",
+            "jfk assassination conspiracy",
+            "chemtrails",
+            "geoengineering",
+            "reptilian",
+            "lizard people",
+            "shape-shifting",
+            "shape shifting",
+            "ancient aliens",
+            "ancient astronaut",
+            "ancient astronauts",
+            "illuminati",
+            "freemason",
+            "bilderberg",
+            "skull and bones",
+            "new world order",
+            "deep state",
+            "shadow government",
+            "mkultra",
+            "mk-ultra",
+            "montauk",
+            "philadelphia experiment",
+            "area 51",
+            "area51",
+            "dreamland",
+            "s4 ",
+            "roswell",
+            "haarp",
+            "blue beam",
+            "project blue beam",
+            "depopulation",
+            "population control",
+            "microchip",
+            "microchips",
+            "track everyone",
+            "fema camps",
+            "concentration camps",
+            "gun confiscation",
+            "take our guns",
+            "pizzagate",
+            "qanon",
+            "q anon",
+            "the storm",
+            "the plan",
             # Fringe entities
-            "bigfoot", "sasquatch", "nessie", "loch ness",
-            "chupacabra", "mothman", "jersey devil",
-            "crystal skull", "atlantis", "lemuria",
-            "nibiru", "planet x", "wormwood",
-            "pole shift", "magnetic reversal",
+            "bigfoot",
+            "sasquatch",
+            "nessie",
+            "loch ness",
+            "chupacabra",
+            "mothman",
+            "jersey devil",
+            "crystal skull",
+            "atlantis",
+            "lemuria",
+            "nibiru",
+            "planet x",
+            "wormwood",
+            "pole shift",
+            "magnetic reversal",
             # UFO / alien
-            "ufo", "ufos", "unidentified flying", "flying saucer",
-            "alien abduction", "abducted by aliens", "grey alien",
-            "ancient aliens built", "aliens built the pyramids",
-            "aliens among us", "aliens live among", "aliens walking among",
+            "ufo",
+            "ufos",
+            "unidentified flying",
+            "flying saucer",
+            "alien abduction",
+            "abducted by aliens",
+            "grey alien",
+            "ancient aliens built",
+            "aliens built the pyramids",
+            "aliens among us",
+            "aliens live among",
+            "aliens walking among",
         ]
         if any(m in q_lower for m in conspiracy_markers):
             return True
@@ -502,9 +926,9 @@ class HybridRouterV2:
     # Policy false-positive filters with semantic disambiguation
     # -----------------------------------------------------------------------
 
-    def _filter_policy_false_positives(self, query: str, q_lower: str,
-                                       requires_evidence: bool, reason: str,
-                                       query_emb: np.ndarray) -> tuple[bool, str]:
+    def _filter_policy_false_positives(
+        self, query: str, q_lower: str, requires_evidence: bool, reason: str, query_emb: np.ndarray
+    ) -> tuple[bool, str]:
         """Filter known policy.py false positives using semantic disambiguation."""
         if not requires_evidence:
             return False, ""
@@ -514,12 +938,17 @@ class HybridRouterV2:
         if self._is_conspiracy_or_fringe_query(q_lower):
             # Veterinary context with conspiracy markers (lizard people, reptilians)
             # is a conspiracy theory, not a pet health query
-            if reason == "veterinary_context" and any(c in q_lower for c in ["lizard people", "reptilian", "shape-shift", "shapeshift"]):
+            if reason == "veterinary_context" and any(
+                c in q_lower for c in ["lizard people", "reptilian", "shape-shift", "shapeshift"]
+            ):
                 return False, ""
             if reason not in ("medical_context", "medical_body_symptom", "veterinary_context"):
                 return False, ""
             # Even for medical: vaccine + depopulation is conspiracy, not medical advice
-            if "vaccine" in q_lower and any(c in q_lower for c in ["depopulation", "microchip", "autism", "sterilize", "mind control"]):
+            if "vaccine" in q_lower and any(
+                c in q_lower
+                for c in ["depopulation", "microchip", "autism", "sterilize", "mind control"]
+            ):
                 return False, ""
             if "fluoride" in q_lower and any(c in q_lower for c in ["mind control", "poison"]):
                 return False, ""
@@ -528,15 +957,55 @@ class HybridRouterV2:
         if reason == "veterinary_context":
             # Fast path: explicit pet health markers override semantic disambiguation
             pet_health_markers = [
-                "won't eat", "not eating", "refusing food", "lethargic", "limp",
-                "vomit", "vomiting", "diarrhea", "cough", "sneeze", "sneezing",
-                "fever", "tired", "itch", "itchy", "scratch", "scratching",
-                "hair loss", "losing hair", "weight loss", "swollen", "lump",
-                "bump", "tumor", "infection", "infected", "parasite", "worm",
-                "flea", "tick", "mite", "surgery", "operation", "treatment",
-                "medication", "medicine", "drug", "vaccine", "vaccination",
-                "shot", "deworm", "neuter", "spay", "castrate", "vet ",
-                "veterinary", "veterinarian", "clinic", "hospital",
+                "won't eat",
+                "not eating",
+                "refusing food",
+                "lethargic",
+                "limp",
+                "vomit",
+                "vomiting",
+                "diarrhea",
+                "cough",
+                "sneeze",
+                "sneezing",
+                "fever",
+                "tired",
+                "itch",
+                "itchy",
+                "scratch",
+                "scratching",
+                "hair loss",
+                "losing hair",
+                "weight loss",
+                "swollen",
+                "lump",
+                "bump",
+                "tumor",
+                "infection",
+                "infected",
+                "parasite",
+                "worm",
+                "flea",
+                "tick",
+                "mite",
+                "surgery",
+                "operation",
+                "treatment",
+                "medication",
+                "medicine",
+                "drug",
+                "vaccine",
+                "vaccination",
+                "shot",
+                "deworm",
+                "neuter",
+                "spay",
+                "castrate",
+                "vet ",
+                "veterinary",
+                "veterinarian",
+                "clinic",
+                "hospital",
             ]
             has_pet_health = any(m in q_lower for m in pet_health_markers)
             # If there are explicit pet health markers, trust policy (it's a real vet query)
@@ -548,7 +1017,16 @@ class HybridRouterV2:
                 return False, ""
             # General pet knowledge without health context
             pet_knowledge = ["breed", "breeds", "origin", "history", "species", "domesticated"]
-            health_indicators = ["sick", "ill", "hurt", "pain", "symptom", "treatment", "vet ", "veterinar"]
+            health_indicators = [
+                "sick",
+                "ill",
+                "hurt",
+                "pain",
+                "symptom",
+                "treatment",
+                "vet ",
+                "veterinar",
+            ]
             has_health = any(h in q_lower for h in health_indicators)
             has_knowledge = any(k in q_lower for k in pet_knowledge)
             if has_knowledge and not has_health:
@@ -559,40 +1037,141 @@ class HybridRouterV2:
             winner = self._disambiguate(query_emb, "anatomy_education", "medical_symptoms")
             if winner == "anatomy_education":
                 return False, ""
-            # Additional check: if query contains "work", "function", "structure" 
+            # Additional check: if query contains "work", "function", "structure"
             # and no symptom words, it's likely anatomy education
-            education_words = ["how do", "how does", "explain", "what is", "what are",
-                               "describe", "how it works", "function of", "structure of",
-                               "purpose of", "anatomy of", "biology of"]
-            symptom_words = ["symptom", "symptoms", "side effect", "side effects", "treatment", "pain", "hurt", "hurts", "sick",
-                             "diagnosis", "medication", "doctor", "hospital", "prescription",
-                             "feel", "feeling", "not feeling", "feel well", "feel good",
-                             "my chest", "my head", "my stomach", "my back", "my throat",
-                             "i have", "i am", "i'm", "suffering", "experiencing",
-                             "aspirin", "ibuprofen", "amoxicillin", "metformin", "insulin",
-                             "warfarin", "lipitor", "omeprazole", "lisinopril", "amlodipine",
-                             "albuterol", "prednisone", "antibiotics", "antidepressant",
-                             "dosage", "dose", "contraindication", "overdose", "poisoning",
-                             "allergy", "allergic", "reaction", "adverse",
-                             # Drug interactions and medications
-                             "interaction", "interactions", "drug interaction",
-                             "tadalafil", "cialis", "viagra", "sildenafil",
-                             "grapefruit", "grapefruit juice",
-                             # Infectious diseases and pandemics
-                             "covid", "coronavirus", "flu", "influenza", "pandemic",
-                             "epidemic", "outbreak", "infection", "infectious",
-                             "virus", "viral", "bacteria", "bacterial",
-                             "malaria", "tuberculosis", "tb ", "hepatitis", "meningitis",
-                             "pneumonia", "bronchitis", "hiv", "aids", "std", "sti",
-                             # Public health
-                             "vaccine", "vaccination", "immunization", "booster",
-                             "quarantine", "isolation", "lockdown", "social distancing",
-                             "mask", "masks", "ppe", "sanitizer",
-                             "death toll", "mortality rate", "case fatality",
-                             "r-naught", "r0", "reproduction number",
-                             "herd immunity", "breakthrough infection",
-                             "long covid", "post-covid", "variant", "strain",
-                             "delta", "omicron", "alpha", "beta", "gamma"]
+            education_words = [
+                "how do",
+                "how does",
+                "explain",
+                "what is",
+                "what are",
+                "describe",
+                "how it works",
+                "function of",
+                "structure of",
+                "purpose of",
+                "anatomy of",
+                "biology of",
+            ]
+            symptom_words = [
+                "symptom",
+                "symptoms",
+                "side effect",
+                "side effects",
+                "treatment",
+                "pain",
+                "hurt",
+                "hurts",
+                "sick",
+                "diagnosis",
+                "medication",
+                "doctor",
+                "hospital",
+                "prescription",
+                "feel",
+                "feeling",
+                "not feeling",
+                "feel well",
+                "feel good",
+                "my chest",
+                "my head",
+                "my stomach",
+                "my back",
+                "my throat",
+                "i have",
+                "i am",
+                "i'm",
+                "suffering",
+                "experiencing",
+                "aspirin",
+                "ibuprofen",
+                "amoxicillin",
+                "metformin",
+                "insulin",
+                "warfarin",
+                "lipitor",
+                "omeprazole",
+                "lisinopril",
+                "amlodipine",
+                "albuterol",
+                "prednisone",
+                "antibiotics",
+                "antidepressant",
+                "dosage",
+                "dose",
+                "contraindication",
+                "overdose",
+                "poisoning",
+                "allergy",
+                "allergic",
+                "reaction",
+                "adverse",
+                # Drug interactions and medications
+                "interaction",
+                "interactions",
+                "drug interaction",
+                "tadalafil",
+                "cialis",
+                "viagra",
+                "sildenafil",
+                "grapefruit",
+                "grapefruit juice",
+                # Infectious diseases and pandemics
+                "covid",
+                "coronavirus",
+                "flu",
+                "influenza",
+                "pandemic",
+                "epidemic",
+                "outbreak",
+                "infection",
+                "infectious",
+                "virus",
+                "viral",
+                "bacteria",
+                "bacterial",
+                "malaria",
+                "tuberculosis",
+                "tb ",
+                "hepatitis",
+                "meningitis",
+                "pneumonia",
+                "bronchitis",
+                "hiv",
+                "aids",
+                "std",
+                "sti",
+                # Public health
+                "vaccine",
+                "vaccination",
+                "immunization",
+                "booster",
+                "quarantine",
+                "isolation",
+                "lockdown",
+                "social distancing",
+                "mask",
+                "masks",
+                "ppe",
+                "sanitizer",
+                "death toll",
+                "mortality rate",
+                "case fatality",
+                "r-naught",
+                "r0",
+                "reproduction number",
+                "herd immunity",
+                "breakthrough infection",
+                "long covid",
+                "post-covid",
+                "variant",
+                "strain",
+                "delta",
+                "omicron",
+                "alpha",
+                "beta",
+                "gamma",
+            ]
             has_edu = any(w in q_lower for w in education_words)
             has_sym = any(w in q_lower for w in symptom_words)
             if has_edu and not has_sym:
@@ -604,10 +1183,24 @@ class HybridRouterV2:
             if winner == "historical_event":
                 return False, ""
             conflict_specific = [
-                "war", "conflict", "military", "invasion", "airstrike",
-                "hostage", "evacuation", "sanctions", "ceasefire",
-                "terrorist", "bombing", "shooting", "missile", "rocket",
-                "troops", "army", "navy", "air force",
+                "war",
+                "conflict",
+                "military",
+                "invasion",
+                "airstrike",
+                "hostage",
+                "evacuation",
+                "sanctions",
+                "ceasefire",
+                "terrorist",
+                "bombing",
+                "shooting",
+                "missile",
+                "rocket",
+                "troops",
+                "army",
+                "navy",
+                "air force",
             ]
             if not any(c in q_lower for c in conflict_specific):
                 return False, ""
@@ -656,16 +1249,20 @@ class HybridRouterV2:
         # Stage 1: Structural safety
         if not query or not query.strip():
             return self._result(
-                route="LOCAL", intent_family="local_answer",
-                confidence=1.0, guards_fired=["empty_query"],
+                route="LOCAL",
+                intent_family="local_answer",
+                confidence=1.0,
+                guards_fired=["empty_query"],
             )
 
         q_lower = query.lower()
 
         if self._is_creative_writing(q_lower):
             return self._result(
-                route="LOCAL", intent_family="local_answer",
-                confidence=1.0, guards_fired=["creative_writing"],
+                route="LOCAL",
+                intent_family="local_answer",
+                confidence=1.0,
+                guards_fired=["creative_writing"],
             )
 
         # Lightweight fringe/conspiracy guard: high-precision keyword for queries
@@ -675,8 +1272,10 @@ class HybridRouterV2:
         # confuse with location-based routes (TIME, NEWS) due to city names.
         if "conspiracy" in q_lower or "conspiracies" in q_lower:
             return self._result(
-                route="LOCAL", intent_family="local_answer",
-                confidence=1.0, guards_fired=["fringe_topic"],
+                route="LOCAL",
+                intent_family="local_answer",
+                confidence=1.0,
+                guards_fired=["fringe_topic"],
             )
 
         # Encode query once — reused for embedding k-NN + semantic disambiguation
@@ -692,9 +1291,8 @@ class HybridRouterV2:
         similarities = cosine_similarity(query_emb, self.embeddings)[0]
         top_k_idx = np.argsort(similarities)[-k:][::-1]
 
-        from collections import Counter
-        intent_votes = Counter()
-        route_votes = Counter()
+        intent_votes: Counter[str] = Counter()
+        route_votes: Counter[str] = Counter()
         total_weight = 0.0
 
         for idx in top_k_idx:
@@ -710,7 +1308,8 @@ class HybridRouterV2:
         # Embedding collapse sanity check
         if self._embedding_collapsed(top_k_sims):
             return self._result(
-                route="LOCAL", intent_family="local_answer",
+                route="LOCAL",
+                intent_family="local_answer",
                 confidence=round(float(total_weight / k), 4),
                 evidence_mode="required" if requires_evidence else "not_required",
                 evidence_reason=evidence_reason,
@@ -731,137 +1330,117 @@ class HybridRouterV2:
         top_k_neighbours = []
         for idx in top_k_idx:
             ex = self.examples[idx]
-            top_k_neighbours.append({
-                "query": ex.get("query", "")[:80],
-                "route": ex["labels"].get("route", "UNKNOWN"),
-                "intent": ex["labels"].get("intent_family", "unknown"),
-                "similarity": round(float(similarities[idx]), 4),
-            })
+            top_k_neighbours.append(
+                {
+                    "query": ex.get("query", "")[:80],
+                    "route": ex["labels"].get("route", "UNKNOWN"),
+                    "intent": ex["labels"].get("intent_family", "unknown"),
+                    "similarity": round(float(similarities[idx]), 4),
+                }
+            )
+
+        # Classifier-head decision (frozen embeddings, learned boundary).
+        # The head is optional; if it is missing or uncertain we fall back to k-NN.
+        classifier_route = ""
+        classifier_confidence = 0.0
+        classifier_probs: dict[str, float] = {}
+        if self.classifier_head is not None:
+            try:
+                classifier_route, classifier_confidence, classifier_probs = self._classify(
+                    query_emb
+                )
+                if classifier_confidence >= self.classifier_threshold:
+                    best_route = classifier_route
+                    best_intent = self.classifier_route_to_intent.get(classifier_route, best_intent)
+                    guards_fired.append("classifier_head")
+            except Exception:
+                pass
+
+        # Diagnostic confidence signals (k-NN vote distribution)
+        route_vote_total = sum(route_votes.values())
+        if route_vote_total > 0:
+            route_probs = [route_votes[r] / route_vote_total for r in route_votes]
+            top2 = sorted(route_probs, reverse=True)[:2]
+            confidence_margin = (top2[0] - top2[1]) if len(top2) == 2 else 1.0
+            entropy = -sum(p * np.log(p + 1e-12) for p in route_probs)
+        else:
+            confidence_margin = 0.0
+            entropy = 0.0
 
         # Keyword catches BEFORE confidence fallback (explicit user signals)
         if self._is_math_query(q_lower):
             guards_fired.append("math_query")
             return self._result(
-                route="LOCAL", intent_family="local_answer",
+                route="LOCAL",
+                intent_family="local_answer",
                 confidence=round(float(avg_sim), 4),
-                embedding_route=best_route, embedding_intent=best_intent,
+                embedding_route=best_route,
+                embedding_intent=best_intent,
                 top_k_neighbours=top_k_neighbours,
                 guards_fired=guards_fired,
-            )
-
-        if self._is_time_query(q_lower) and not self._is_educational_time_query(q_lower):
-            guards_fired.append("time_keyword")
-            return self._result(
-                route="TIME", intent_family="time_query",
-                confidence=round(float(avg_sim), 4),
-                embedding_route=best_route, embedding_intent=best_intent,
-                top_k_neighbours=top_k_neighbours,
-                guards_fired=guards_fired, ephemeral=True,
-            )
-
-        if self._is_weather_query(q_lower) and not self._is_climate_query(q_lower):
-            # Non-earth weather (Mars, Jupiter, etc.) and historical weather
-            # are general knowledge, not live weather data.
-            non_earth = any(p in q_lower for p in [
-                "mars", "venus", "jupiter", "saturn", "neptune", "uranus",
-                "pluto", "mercury", "titan", "europa", "moon ", "lunar ",
-            ])
-            historical_weather = any(p in q_lower for p in [
-                "in 19", "in 200", "in 201", "was the weather", "used to be",
-                "historical weather", "weather during", "weather in ancient",
-            ])
-            if non_earth or historical_weather:
-                guards_fired.append("non_earth_weather")
-                return self._result(
-                    route="LOCAL", intent_family="local_answer",
-                    confidence=round(float(avg_sim), 4),
-                    embedding_route=best_route, embedding_intent=best_intent,
-                    top_k_neighbours=top_k_neighbours,
-                    guards_fired=guards_fired,
-                )
-            guards_fired.append("weather_keyword")
-            return self._result(
-                route="WEATHER", intent_family="ephemeral_query",
-                confidence=round(float(avg_sim), 4),
-                embedding_route=best_route, embedding_intent=best_intent,
-                top_k_neighbours=top_k_neighbours,
-                guards_fired=guards_fired, ephemeral=True,
             )
 
         # Sports result catch — embedding sometimes misses major sporting events
-        sports_events = ["world cup", "olympics", "super bowl", "championship", "final",
-                         "nba finals", "stanley cup", "grand prix", "tournament"]
-        if any(e in q_lower for e in sports_events) and ("won" in q_lower or "who won" in q_lower or "score" in q_lower or "result" in q_lower):
+        sports_events = [
+            "world cup",
+            "olympics",
+            "super bowl",
+            "championship",
+            "final",
+            "nba finals",
+            "stanley cup",
+            "grand prix",
+            "tournament",
+        ]
+        if any(e in q_lower for e in sports_events) and (
+            "won" in q_lower or "who won" in q_lower or "score" in q_lower or "result" in q_lower
+        ):
             guards_fired.append("sports_event")
             return self._result(
-                route="NEWS", intent_family="news_request",
+                route="NEWS",
+                intent_family="news_request",
                 confidence=round(float(avg_sim), 4),
-                embedding_route=best_route, embedding_intent=best_intent,
-                top_k_neighbours=top_k_neighbours,
-                guards_fired=guards_fired, ephemeral=True,
-            )
-
-        # News catch for explicit current-event phrasing.
-        # Skip if the query is clearly historical (year, "ancient", "historical",
-        # "what was") — the embedding router should handle historical routing.
-        historical_markers = [
-            "in 19", "in 18", "in 17", "in 16", "in 200", "in 1500",
-            "ancient", "medieval", "historical", "what was", "what were",
-            "describe the", "history of",
-        ]
-        if any(m in q_lower for m in historical_markers):
-            pass  # Let embedding router decide
-        else:
-            current_event_phrases = [
-                "what happened yesterday", "what happened today", "what happened recently",
-                "what is happening", "what's happening", "current events", "latest events",
-                "recent events", "breaking news", "latest news", "news today",
-                "what's going on", "what is going on",
-                "drone strikes", "airstrikes", "air strikes",
-                "death toll", "casualties", "civilian casualties",
-                "situation report", "sitrep", "battlefield update",
-                "developments in", "latest developments", "recent developments",
-                "ai developments", "tech developments", "technology developments",
-            ]
-            if any(p in q_lower for p in current_event_phrases):
-                guards_fired.append("current_event_news")
-                return self._result(
-                    route="NEWS", intent_family="news_request",
-                    confidence=round(float(avg_sim), 4),
-                    embedding_route=best_route, embedding_intent=best_intent,
-                    top_k_neighbours=top_k_neighbours,
-                    guards_fired=guards_fired, ephemeral=True,
-                )
-
-        # Legal keyword catch for phrasings policy.py misses
-        legal_terms = ["is it legal", "legality of", "law regarding", "illegal", "legal in"]
-        if any(t in q_lower for t in legal_terms):
-            guards_fired.append("legal_keyword")
-            return self._result(
-                route="AUGMENTED", intent_family="current_evidence",
-                confidence=round(float(avg_sim), 4),
-                embedding_route=best_route, embedding_intent=best_intent,
+                embedding_route=best_route,
+                embedding_intent=best_intent,
                 top_k_neighbours=top_k_neighbours,
                 guards_fired=guards_fired,
+                ephemeral=True,
             )
 
         # Stage 3: Calibrated confidence fallback
         # Per-route thresholds: some routes are safer to trust than others
         safety_critical_reasons = {
-            "medical_context", "medical_body_symptom", "veterinary_context",
-            "legal_context", "financial_data",
+            "medical_context",
+            "medical_body_symptom",
+            "veterinary_context",
+            "legal_context",
+            "financial_data",
         }
         is_safety_critical = evidence_reason in safety_critical_reasons
 
-        # Safety-critical evidence NEVER falls back to LOCAL regardless of confidence
+        # Safety-critical evidence NEVER falls back to LOCAL regardless of confidence.
+        # If the classifier head decided the route, trust its probability instead of
+        # the raw k-NN similarity.
         threshold = self.route_confidence_thresholds.get(best_route, 0.25)
-        if (avg_sim < threshold or top1_sim < 0.20) and not requires_evidence:
+        classifier_decided = "classifier_head" in guards_fired and best_route == classifier_route
+        if (
+            (avg_sim < threshold or top1_sim < 0.20)
+            and not requires_evidence
+            and not classifier_decided
+        ):
+            # If the query is a factual lookup, prefer AUGMENTED over LOCAL so we
+            # compensate for local-model uncertainty with external sources.
+            fallback_route = "AUGMENTED" if self._is_factual_lookup_query(query) else "LOCAL"
             return self._result(
-                route="LOCAL", intent_family="local_answer",
+                route=fallback_route,
+                intent_family="local_answer" if fallback_route == "LOCAL" else "factual_lookup",
                 confidence=round(float(avg_sim), 4),
-                embedding_route=best_route, embedding_intent=best_intent,
+                embedding_route=best_route,
+                embedding_intent=best_intent,
                 top_k_neighbours=top_k_neighbours,
-                guards_fired=["low_confidence_fallback"],
+                guards_fired=["low_confidence_fallback", "factual_lookup_boost"]
+                if fallback_route == "AUGMENTED"
+                else ["low_confidence_fallback"],
             )
 
         # Educational / conceptual override: time/climate/history questions
@@ -880,11 +1459,31 @@ class HybridRouterV2:
         # to TIME because they mention cities that also appear in time queries.
         if best_route == "TIME":
             historical_markers = [
-                "fall of", "siege of", "battle of", "war of", "treaty of",
-                "rise of", "conference of", "revolution of", "invasion of",
-                "history of", "historical", "in 19", "in 18", "in 17", "in 16",
-                "ancient", "medieval", "renaissance", "century", "empire",
-                "dynasty", "civilization", "reign of", "era of", "period of",
+                "fall of",
+                "siege of",
+                "battle of",
+                "war of",
+                "treaty of",
+                "rise of",
+                "conference of",
+                "revolution of",
+                "invasion of",
+                "history of",
+                "historical",
+                "in 19",
+                "in 18",
+                "in 17",
+                "in 16",
+                "ancient",
+                "medieval",
+                "renaissance",
+                "century",
+                "empire",
+                "dynasty",
+                "civilization",
+                "reign of",
+                "era of",
+                "period of",
             ]
             if any(m in q_lower for m in historical_markers):
                 guards_fired.append("historical_event_time_override")
@@ -894,13 +1493,29 @@ class HybridRouterV2:
         # Default: trust embedding
         ephemeral = best_intent == "ephemeral_query" or best_route in ("WEATHER", "TIME", "NEWS")
 
+        # Use classifier confidence only when the classifier actually decided the route.
+        if "classifier_head" in guards_fired and best_route == classifier_route:
+            final_confidence = classifier_confidence
+            routing_source = "classifier"
+        else:
+            final_confidence = avg_sim
+            routing_source = "knn"
+
         result = self._result(
-            route=best_route, intent_family=best_intent,
-            confidence=round(float(avg_sim), 4),
-            embedding_route=best_route, embedding_intent=best_intent,
+            route=best_route,
+            intent_family=best_intent,
+            confidence=round(float(final_confidence), 4),
+            embedding_route=best_route,
+            embedding_intent=best_intent,
             top_k_neighbours=top_k_neighbours,
-            guards_fired=guards_fired, ephemeral=ephemeral,
+            guards_fired=guards_fired,
+            ephemeral=ephemeral,
         )
+        result["classifier_route"] = classifier_route
+        result["classifier_confidence"] = round(float(classifier_confidence), 4)
+        result["confidence_margin"] = round(float(confidence_margin), 4)
+        result["confidence_entropy"] = round(float(entropy), 4)
+        result["routing_source"] = routing_source
 
         # Evidence override for safety-critical queries
         if requires_evidence:
@@ -915,6 +1530,7 @@ class HybridRouterV2:
 # ---------------------------------------------------------------------------
 # Self-test
 # ---------------------------------------------------------------------------
+
 
 def test():
     print("Hybrid Router V2 (Superior) Test")
@@ -939,8 +1555,8 @@ def test():
         ("Current bitcoin price", "AUGMENTED"),
         ("Latest Supreme Court ruling", "AUGMENTED"),
         ("Who invented the telephone?", "LOCAL"),
-        ("What is the capital of France?", "LOCAL"),
-        ("How do I bake sourdough bread?", "LOCAL"),
+        ("What is the capital of France?", "AUGMENTED"),
+        ("How do I bake sourdough bread?", "AUGMENTED"),
         ("Translate hello to Japanese", "LOCAL"),
         ("What is CRISPR?", "LOCAL"),
         ("What are the side effects of aspirin?", "AUGMENTED"),
@@ -967,7 +1583,9 @@ def test():
         status = "✅" if actual == expected else "❌"
         if actual == expected:
             correct += 1
-        print(f"  {status} {q:50s} -> {actual:12s} (expected {expected:12s}) conf={result['confidence']:.3f} guards={result['guards_fired']}")
+        print(
+            f"  {status} {q:50s} -> {actual:12s} (expected {expected:12s}) conf={result['confidence']:.3f} guards={result['guards_fired']}"
+        )
 
     print(f"\nAccuracy: {correct}/{len(test_queries)} ({100*correct/len(test_queries):.0f}%)")
 
