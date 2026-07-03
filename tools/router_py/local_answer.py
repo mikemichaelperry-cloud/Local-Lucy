@@ -48,6 +48,18 @@ except ImportError:
             return False
 
 
+# Import memory context filter from context_guard (with fallback)
+try:
+    from router_py.context_guard import filter_memory_context
+except ImportError:
+    try:
+        from context_guard import filter_memory_context
+    except ImportError:
+
+        def filter_memory_context(question: str, memory_text: str, threshold: float = 0.2) -> str:
+            return memory_text
+
+
 # Import tube database (with fallback for standalone execution)
 _tube_db = None
 try:
@@ -1776,13 +1788,13 @@ class LocalAnswer:
         )
 
         session_memory = session_memory.replace("\r", " ").rstrip()
-        # Always include session memory when available (memory toggle controls loading)
-        # The model can decide whether to use it based on query relevance
-        if session_memory.strip():
-            self._diag_append("context_relevance_gate", "reuse_context")
 
         if not self._is_memory_context_allowed(q_eval):
             session_memory = ""
+        elif session_memory.strip():
+            session_memory = filter_memory_context(q_eval, session_memory)
+            if session_memory.strip():
+                self._diag_append("context_relevance_gate", "reuse_context")
 
         if len(session_memory) > self.config.max_context_chars:
             session_memory = session_memory[: self.config.max_context_chars]
