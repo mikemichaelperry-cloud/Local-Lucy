@@ -32,14 +32,123 @@ def _http_json(url: str, timeout: float = 2.5) -> dict:
     return parsed
 
 
+# Common words that should not be used on their own to judge title relevance.
+_STOP_WORDS = {
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "must",
+    "shall",
+    "can",
+    "need",
+    "used",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "by",
+    "for",
+    "with",
+    "about",
+    "from",
+    "up",
+    "down",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "any",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "no",
+    "nor",
+    "not",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "just",
+    "now",
+    "main",
+    "popular",
+    "famous",
+    "best",
+    "top",
+    "list",
+}
+
+# Introductory phrases that should be stripped from natural-language queries.
+_QUERY_PREFIXES = (
+    r"what\s+(?:is|was|are|were|do|does|did|will|would|can|could|should|may|might)\s+",
+    r"who\s+(?:is|was|are|were)\s+",
+    r"where\s+(?:is|are|was|were)\s+",
+    r"when\s+(?:is|was|were)\s+",
+    r"why\s+(?:is|are|was|were|do|does|did)\s+",
+    r"how\s+(?:is|are|was|were|do|does|did|can|could|should)\s+",
+    r"which\s+(?:is|are|was|were)\s+",
+    r"tell\s+me\s+(?:about|the\s+answer\s+to)\s+",
+    r"give\s+me\s+(?:an?\s+overview\s+of|the\s+answer\s+to)\s+",
+    r"overview\s+of\s+",
+    r"history\s+of\s+",
+    r"explain\s+",
+    r"list\s+of\s+",
+    r"(?:main|popular|famous|best)\s+",
+    r"top\s+\d+\s+",
+)
+
+
 def _normalize_query(query: str) -> str:
     normalized = re.sub(r"\s+", " ", (query or "").strip())
-    normalized = re.sub(
-        r"(?i)^(who was|who is|what is|what was|tell me about|give me an overview of|overview of|history of|explain)\s+",
-        "",
-        normalized,
-        count=1,
-    )
+    for prefix in _QUERY_PREFIXES:
+        normalized = re.sub(
+            rf"(?i)^(?:{prefix})",
+            "",
+            normalized,
+            count=1,
+        )
+    # Drop a leading article so "the main tourist attractions in Japan"
+    # becomes "main tourist attractions in Japan".
+    normalized = re.sub(r"^(?:the|a|an)\s+", "", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"[?.!]+$", "", normalized).strip()
     return normalized or query
 
@@ -116,6 +225,95 @@ def _success_payload(*, title: str, url: str, text: str) -> dict[str, Any]:
     }
 
 
+def _extract_place_tail(query: str) -> str | None:
+    """Extract a trailing place/topic phrase after 'in' or 'of'.
+
+    Examples:
+      'main tourist attractions in Japan' -> 'Japan'
+      'capital of France'                 -> 'France'
+      'president of the United States'    -> 'United States'
+    """
+    match = re.search(r"\b(?:in|of)\s+([A-Za-z][A-Za-z\s]*?)\s*$", query)
+    if not match:
+        return None
+    tail = match.group(1).strip()
+    tail = re.sub(r"^(?:the|a|an)\s+", "", tail, flags=re.IGNORECASE).strip()
+    tail = re.sub(r"\s+(?:today|now|currently|right\s+now)$", "", tail, flags=re.IGNORECASE).strip()
+    return tail if tail else None
+
+
+def _is_tourism_query(query: str) -> bool:
+    q = query.lower()
+    return any(term in q for term in ("tourism", "tourist", "attraction", "sightsee", "vacation"))
+
+
+def _title_matches_query(title: str, query: str, tail: str | None = None) -> bool:
+    """Return True if the fetched article title is plausibly about the query.
+
+    If the query names a place/topic tail (e.g. 'Japan'), require the title to
+    contain it. Otherwise fall back to keyword overlap.
+    """
+    title_lower = title.lower()
+    if tail:
+        # Accept both the tail and a hyphen/compact form like 'Japan-U.S.'
+        if tail.lower() in title_lower:
+            return True
+        # Allow the tail to be split if it is multi-word ('United States').
+        tail_parts = [p for p in re.split(r"\s+", tail.lower()) if p not in _STOP_WORDS]
+        if len(tail_parts) > 1 and all(part in title_lower for part in tail_parts):
+            return True
+        return False
+
+    # No place tail: check that at least one meaningful keyword appears.
+    words = [
+        w for w in re.findall(r"[a-zA-Z]+", query.lower()) if len(w) > 3 and w not in _STOP_WORDS
+    ]
+    return any(w in title_lower for w in words)
+
+
+def _try_direct_summary(title: str) -> dict[str, Any] | None:
+    """Fetch a Wikipedia page summary by exact page title."""
+    if not title:
+        return None
+    try:
+        url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(
+            title, safe=""
+        )
+        payload = _http_json(url)
+        extract = _normalize_text(str(payload.get("extract", "")))
+        canonical_url = str(
+            ((payload.get("content_urls") or {}).get("desktop") or {}).get("page", "")
+        ).strip()
+        title = _normalize_text(str(payload.get("title", "")))
+        if extract and title:
+            return _success_payload(title=title, url=canonical_url, text=extract)
+    except Exception:
+        pass
+    return None
+
+
+def _try_search(query: str) -> dict[str, Any] | None:
+    """Search Wikipedia and return the top article summary."""
+    if not query:
+        return None
+    try:
+        url = (
+            "https://en.wikipedia.org/w/api.php?action=query&format=json&list=search&srlimit=1&srsearch="
+            + urllib.parse.quote(query, safe="")
+        )
+        payload = _http_json(url)
+        items = ((payload.get("query") or {}).get("search")) or []
+        if not items:
+            return None
+        first = items[0] if isinstance(items[0], dict) else {}
+        title = _normalize_text(str(first.get("title", "")))
+        if not title:
+            return None
+        return _try_direct_summary(title)
+    except Exception:
+        return None
+
+
 def fetch_context(query: str) -> dict[str, Any]:
     normalized_query = _normalize_query(query)
 
@@ -130,45 +328,53 @@ def fetch_context(query: str) -> dict[str, Any]:
     if cached_payload is not None:
         return cached_payload
 
-    try:
-        try:
-            direct_summary_url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(normalized_query, safe="")
-            direct_summary_payload = _http_json(direct_summary_url)
-            extract = _normalize_text(str(direct_summary_payload.get("extract", "")))
-            canonical_url = str(((direct_summary_payload.get("content_urls") or {}).get("desktop") or {}).get("page", "")).strip()
-            title = _normalize_text(str(direct_summary_payload.get("title", "")))
-            if extract and title:
-                payload = _success_payload(title=title, url=canonical_url, text=extract)
-                _store_cached_payload(normalized_query, payload)
-                return payload
-        except Exception:
-            pass
+    result = _fetch_wikipedia_context(normalized_query)
+    if result is not None:
+        _store_cached_payload(normalized_query, result)
+        return result
+    return {"ok": False}
 
-        search_url = (
-            "https://en.wikipedia.org/w/api.php?action=query&format=json&list=search&srlimit=1&srsearch="
-            + urllib.parse.quote(normalized_query, safe="")
-        )
-        search_payload = _http_json(search_url)
-        search_items = (((search_payload.get("query") or {}).get("search")) or [])
-        if not search_items:
-            return {"ok": False}
-        first = search_items[0] if isinstance(search_items[0], dict) else {}
-        title = _normalize_text(str(first.get("title", "")))
-        if not title:
-            return {"ok": False}
 
-        summary_url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(title, safe="")
-        summary_payload = _http_json(summary_url)
-        extract = _normalize_text(str(summary_payload.get("extract", "")))
-        canonical_url = str(((summary_payload.get("content_urls") or {}).get("desktop") or {}).get("page", "")).strip()
-        if not extract:
-            return {"ok": False}
+def _fetch_wikipedia_context(query: str) -> dict[str, Any] | None:
+    """Fetch a relevant Wikipedia article for *query* with a place/topic fallback.
 
-        payload = _success_payload(title=title, url=canonical_url, text=extract)
-        _store_cached_payload(normalized_query, payload)
-        return payload
-    except Exception:
-        return {"ok": False}
+    Natural-language queries such as "What are the main tourist attractions in
+    Japan?" often return an unrelated top search result (e.g. Tourism in China).
+    We therefore validate the top result's title and, when it does not match the
+    query, try a more targeted lookup using the trailing place/topic phrase.
+    """
+    tail = _extract_place_tail(query)
+
+    # 1. Direct summary by the (cleaned) query title.
+    result = _try_direct_summary(query)
+    if result is not None and _title_matches_query(result["title"], query, tail):
+        return result
+
+    # 2. Wikipedia search for the cleaned query.
+    result = _try_search(query)
+    if result is not None and _title_matches_query(result["title"], query, tail):
+        return result
+
+    # 3. Fallback to the trailing place/topic, with a tourism-specific rewrite.
+    if tail:
+        fallback_queries = []
+        if _is_tourism_query(query):
+            fallback_queries.append(f"Tourism in {tail}")
+        fallback_queries.append(tail)
+
+        for fallback in fallback_queries:
+            # Skip if we already tried this exact string as the cleaned query.
+            if fallback.lower() == query.lower():
+                continue
+            result = _try_direct_summary(fallback)
+            if result is not None and _title_matches_query(result["title"], query, tail):
+                return result
+            result = _try_search(fallback)
+            if result is not None and _title_matches_query(result["title"], query, tail):
+                return result
+
+    # No relevant article found.
+    return None
 
 
 def main() -> int:
