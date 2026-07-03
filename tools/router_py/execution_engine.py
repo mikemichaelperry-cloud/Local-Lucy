@@ -64,30 +64,6 @@ _TRUSTED_EVIDENCE_DEFAULTS = {
     "DEGRADED_REASON": "",
 }
 
-# Keywords that indicate the query is about the user's private life/family/pets.
-# Light RAG skips these to avoid sending personal questions to web search backends.
-_LIGHT_RAG_PERSONAL_KEYWORDS = (
-    "my children",
-    "my son",
-    "my daughter",
-    "my wife",
-    "my husband",
-    "my dog",
-    "my pet",
-    "my family",
-    "who am i",
-    "grandchildren",
-    "stepchildren",
-    "my mother",
-    "my father",
-    "my sister",
-    "my brother",
-    "my granddaughter",
-    "my grandson",
-    "my grandchild",
-    "my cat",
-)
-
 
 def _load_medical_domains(path: Path) -> list[str]:
     """Load medical domains with mtime-based caching."""
@@ -142,7 +118,6 @@ def _trusted_evidence_metadata(
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from router_py.classify import ClassificationResult, RoutingDecision
-from router_py.local_rag import LocalRAGRetriever, is_local_rag_enabled
 from router_py.policy import requires_evidence_mode
 from router_py.request_types import ExecutionResult
 from router_py import response_formatter
@@ -165,15 +140,6 @@ except Exception:
 
     def _ft_merge(base, _tel):
         return dict(base)
-
-
-try:
-    from internet.search_web import multi_backend_search
-
-    HAS_WEB_SEARCH = True
-except Exception:
-    HAS_WEB_SEARCH = False
-    multi_backend_search = None  # type: ignore[assignment,misc]
 
 
 from router_py.execution_engine_utils import (
@@ -350,32 +316,6 @@ def _load_session_memory_context(
         query, depth, mode, session_id=session_id
     )
     return context
-
-
-def _handle_user_identity_declaration(question: str) -> tuple[bool, str | None, str | None]:
-    """
-    Detect and persist a user identity declaration (e.g. 'I am Michael').
-
-    Returns:
-        (detected: bool, canonical_name: str | None, confirmation_text: str | None)
-    """
-    try:
-        from memory.memory_service import detect_user_identity, set_current_user_identity
-    except Exception:
-        try:
-            from tools.memory.memory_service import detect_user_identity, set_current_user_identity
-        except Exception:
-            return False, None, None
-
-    identity = detect_user_identity(question)
-    if identity is None:
-        return False, None, None
-    try:
-        set_current_user_identity(identity)
-    except Exception:
-        return False, None, None
-    confirmation = f"Got it — I'll use {identity}'s style."
-    return True, identity, confirmation
 
 
 class ExecutionEngine:
@@ -721,10 +661,6 @@ class ExecutionEngine:
         register_closeable(self.state_writer)
         self._logger.info(f"StateManager initialized with namespace: {namespace}")
 
-        # Local light-RAG retriever: persistent facts + approved memory notes.
-        # Instantiated lazily on first use so import failures do not break startup.
-        self._local_rag: Any | None = None
-
         self._logger.debug(
             f"ExecutionEngine initialized with namespace: {self._execution_namespace}, "
             f"state_dir: {self._state_dir}, sqlite_state: {self.use_sqlite_state}"
@@ -797,23 +733,6 @@ class ExecutionEngine:
         if configured_model:
             env["LUCY_LOCAL_MODEL"] = str(configured_model)
             self._logger.info(f"[MODEL] Subprocess env set to: {configured_model}")
-
-        # Propagate active user persona to subprocess paths so they can load
-        # the correct prompt fragment / model tag.
-        try:
-            from memory.memory_service import get_current_user_identity
-
-            active_identity = get_current_user_identity()
-        except Exception:
-            try:
-                from tools.memory.memory_service import get_current_user_identity
-
-                active_identity = get_current_user_identity()
-            except Exception:
-                active_identity = None
-        if active_identity:
-            env["LUCY_CURRENT_USER_IDENTITY"] = str(active_identity)
-            self._logger.info(f"[PERSONA] Subprocess env set to: {active_identity}")
         return env
 
     def execute(
@@ -885,29 +804,6 @@ class ExecutionEngine:
                 error_message="Query is empty or contains only whitespace.",
                 execution_time_ms=execution_time,
                 metadata={"reason": "empty_query_rejected"},
-                evidence_reason=route.evidence_reason if route else "",
-                policy_reason=route.policy_reason if route else "",
-            )
-            self._write_state_files(route, result, context)
-            self._write_json_state_files(route, result, context)
-            return result
-
-        # Detect standalone identity declarations like "I am Michael" early,
-        # persist the persona, and return a brief confirmation.
-        identity_detected, identity_name, identity_confirmation = _handle_user_identity_declaration(
-            question
-        )
-        if identity_detected and identity_confirmation:
-            execution_time = int((time.time() - start_time) * 1000)
-            result = ExecutionResult(
-                status="completed",
-                outcome_code="identity_set",
-                route="LOCAL",
-                provider="local",
-                provider_usage_class="local",
-                response_text=identity_confirmation,
-                execution_time_ms=execution_time,
-                metadata={"identity": identity_name, "execution_time_ms": execution_time},
                 evidence_reason=route.evidence_reason if route else "",
                 policy_reason=route.policy_reason if route else "",
             )
@@ -1460,14 +1356,9 @@ class ExecutionEngine:
         intent: ClassificationResult,
         route: RoutingDecision,
         context: dict[str, Any],
-        env_overrides: dict[str, str] | None = None,
     ) -> ExecutionResult:
         """
         Execute a bypass route (local-only, no augmentation).
-
-        `env_overrides` allows callers (e.g., light RAG) to inject extra
-        environment variables such as augmented background context while still
-        reusing the same local-answer guards and metadata formatting.
 
         Bypass routes skip all augmentation logic and go directly to local
         response generation. This is used when:
@@ -1502,19 +1393,16 @@ class ExecutionEngine:
         # _prepare_subprocess_env() ensures local_answer.sh gets the proper
         # namespace variables to avoid shared-state conflicts.
         env = self._prepare_subprocess_env()
-        route_mode = (env_overrides or {}).get("LUCY_LOCAL_GEN_ROUTE_MODE", "LOCAL")
         env.update(
             {
                 "LUCY_IDENTITY_TRACE_FILE": str(
                     self._state_dir / f"identity_trace.{os.getpid()}.env"
                 ),
                 "LUCY_LOCAL_POLICY_RESPONSE_ID": context.get("governor_local_response_id", ""),
-                "LUCY_LOCAL_GEN_ROUTE_MODE": route_mode,
+                "LUCY_LOCAL_GEN_ROUTE_MODE": "LOCAL",
                 "LUCY_LOCAL_GEN_OUTPUT_MODE": context.get("output_mode", "CHAT"),
             }
         )
-        if env_overrides:
-            env.update({k: v for k, v in env_overrides.items() if k != "LUCY_LOCAL_GEN_ROUTE_MODE"})
 
         # Add session memory context if enabled
         session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(
@@ -1644,211 +1532,6 @@ class ExecutionEngine:
             question, intent, route, context, local_result, "local_failed"
         )
 
-    def _get_local_rag(self) -> LocalRAGRetriever:
-        """Lazy initializer for the local light-RAG retriever."""
-        if self._local_rag is None:
-            self._local_rag = LocalRAGRetriever()
-        return self._local_rag
-
-    def _should_attempt_local_rag(self, question: str) -> bool:
-        """Return True if local RAG is enabled and not blocked by privacy keywords."""
-        if not is_local_rag_enabled():
-            return False
-        # Avoid leaking personal/family/pet queries to local note retrieval
-        # when no explicit personal fact exists; these are handled elsewhere.
-        q = question.lower()
-        return not any(kw in q for kw in _LIGHT_RAG_PERSONAL_KEYWORDS)
-
-    def _try_local_rag_local_fallback(
-        self,
-        question: str,
-        intent: ClassificationResult,
-        route: RoutingDecision,
-        context: dict[str, Any],
-    ) -> ExecutionResult | None:
-        """Try a local fact/note-backed answer before web RAG or AUGMENTED.
-
-        Returns a LOCAL ExecutionResult if the retrieved context produces a
-        sufficient answer; otherwise returns None so escalation continues.
-        """
-        if not self._should_attempt_local_rag(question):
-            return None
-
-        try:
-            rag_context, sources = self._get_local_rag().format_context(question)
-        except Exception as exc:
-            self._logger.warning(f"Local RAG retrieval failed: {exc}")
-            return None
-
-        if not rag_context:
-            return None
-
-        self._logger.info(
-            f"Attempting local RAG fallback for: {question[:50]}... "
-            f"(sources={len(sources or [])})"
-        )
-
-        env_overrides = {
-            "LUCY_LOCAL_GEN_ROUTE_MODE": "AUGMENTED",
-            "LUCY_LOCAL_AUGMENTED_USER_QUESTION": question,
-            "LUCY_LOCAL_AUGMENTED_BACKGROUND_CONTEXT": rag_context,
-        }
-
-        try:
-            rag_result = self._execute_bypass_route(
-                intent, route, context, env_overrides=env_overrides
-            )
-        except Exception as exc:
-            self._logger.warning(f"Local RAG generation failed: {exc}")
-            return None
-
-        if rag_result.status != "completed" or not rag_result.response_text:
-            return None
-        if not self._is_local_response_sufficient(rag_result.response_text):
-            self._logger.info("Local RAG answer insufficient; continuing to next fallback")
-            return None
-
-        metadata = dict(rag_result.metadata)
-        metadata.update(
-            {
-                "route_type": "provisional",
-                "fallback_used": True,
-                "fallback_reason": "local_rag_success",
-                "local_rag_used": True,
-                "local_rag_sources": sources or [],
-                "local_rag_context_chars": len(rag_context),
-            }
-        )
-        return dataclasses.replace(
-            rag_result,
-            outcome_code="local_rag_fallback",
-            route="LOCAL",
-            provider="local",
-            provider_usage_class="local",
-            metadata=metadata,
-        )
-
-    def _should_attempt_light_rag(self, question: str) -> bool:
-        """Return True if the query is a candidate for the light RAG retry."""
-        if not HAS_WEB_SEARCH or multi_backend_search is None:
-            return False
-        env = os.environ.get("LUCY_ENABLE_LIGHT_RAG", "").lower()
-        if env in ("0", "false", "no", "off"):
-            return False
-        q = question.lower()
-        if any(kw in q for kw in _LIGHT_RAG_PERSONAL_KEYWORDS):
-            return False
-        return True
-
-    def _fetch_web_rag_context(self, question: str) -> dict[str, Any] | None:
-        """Fetch a few web snippets for the light RAG retry.
-
-        Returns a dict with {"text": formatted context, "urls": [...], "backend": ...}
-        or None if search is unavailable or returns nothing.
-        """
-        if multi_backend_search is None:
-            return None
-        q = question.strip()
-        if len(q) > 256:
-            q = q[:256]
-        try:
-            backend, results = multi_backend_search(q, max_results=3)
-        except Exception as exc:
-            self._logger.warning(f"Light RAG web search failed: {exc}")
-            return None
-        if not results:
-            return None
-
-        entries: list[str] = []
-        urls: list[str] = []
-        total_chars = 0
-        for i, item in enumerate(results[:3], start=1):
-            title = (item.get("title") or "").strip()
-            snippet = (item.get("snippet") or "").strip()
-            url = (item.get("url") or "").strip()
-            if not title or not url:
-                continue
-            entry = f"{i}. {title}\n{snippet}\nSource: {url}"
-            # Cap total context so it fits in the local model's prompt budget.
-            if total_chars + len(entry) > 1800 and entries:
-                break
-            entries.append(entry)
-            urls.append(url)
-            total_chars += len(entry) + 2
-
-        if not entries:
-            return None
-        return {
-            "text": "\n\n".join(entries),
-            "urls": urls,
-            "backend": backend,
-        }
-
-    def _try_light_rag_local_fallback(
-        self,
-        question: str,
-        intent: ClassificationResult,
-        route: RoutingDecision,
-        context: dict[str, Any],
-    ) -> ExecutionResult | None:
-        """Try a web-backed local answer before paying/escalating to AUGMENTED.
-
-        Returns a LOCAL ExecutionResult if the RAG-backed local answer is
-        sufficient; otherwise returns None so normal escalation continues.
-        """
-        if not self._should_attempt_light_rag(question):
-            return None
-
-        rag = self._fetch_web_rag_context(question)
-        if rag is None:
-            return None
-
-        self._logger.info(
-            f"Attempting light RAG local fallback for: {question[:50]}... "
-            f"(backend={rag['backend']}, sources={len(rag['urls'])})"
-        )
-
-        env_overrides = {
-            "LUCY_LOCAL_GEN_ROUTE_MODE": "AUGMENTED",
-            "LUCY_LOCAL_AUGMENTED_USER_QUESTION": question,
-            "LUCY_LOCAL_AUGMENTED_BACKGROUND_CONTEXT": rag["text"],
-        }
-
-        try:
-            rag_result = self._execute_bypass_route(
-                intent, route, context, env_overrides=env_overrides
-            )
-        except Exception as exc:
-            self._logger.warning(f"Light RAG local generation failed: {exc}")
-            return None
-
-        if rag_result.status != "completed" or not rag_result.response_text:
-            return None
-        if not self._is_local_response_sufficient(rag_result.response_text):
-            self._logger.info("Light RAG answer insufficient; continuing to AUGMENTED provider")
-            return None
-
-        metadata = dict(rag_result.metadata)
-        metadata.update(
-            {
-                "route_type": "provisional",
-                "fallback_used": True,
-                "fallback_reason": "light_rag_local_success",
-                "light_rag_used": True,
-                "light_rag_backend": rag["backend"],
-                "light_rag_sources": rag["urls"],
-                "light_rag_context_chars": len(rag["text"]),
-            }
-        )
-        return dataclasses.replace(
-            rag_result,
-            outcome_code="rag_local_fallback",
-            route="LOCAL",
-            provider="local",
-            provider_usage_class="local",
-            metadata=metadata,
-        )
-
     def _try_escalation_fallback(
         self,
         question: str,
@@ -1901,20 +1584,6 @@ class ExecutionEngine:
                 )
             else:
                 self._logger.info("Local response insufficient, attempting augmentation fallback")
-
-            # Before paying/open augmented providers, try local fact/note RAG,
-            # then web-backed light RAG.
-            if not is_medical_or_vet:
-                local_rag_result = self._try_local_rag_local_fallback(
-                    question, intent, route, context
-                )
-                if local_rag_result is not None:
-                    return local_rag_result
-
-                rag_result = self._try_light_rag_local_fallback(question, intent, route, context)
-                if rag_result is not None:
-                    return rag_result
-
             aug_result = self._call_augmented_provider(question, intent, route, context)
             target_route = "AUGMENTED"
 
@@ -2204,26 +1873,6 @@ class ExecutionEngine:
                 error_message="Query is empty or contains only whitespace.",
                 execution_time_ms=execution_time,
                 metadata={"reason": "empty_query_rejected"},
-                evidence_reason=route.evidence_reason if route else "",
-                policy_reason=route.policy_reason if route else "",
-            )
-
-        # Detect standalone identity declarations like "I am Michael" early,
-        # persist the persona, and return a brief confirmation.
-        identity_detected, identity_name, identity_confirmation = _handle_user_identity_declaration(
-            question
-        )
-        if identity_detected and identity_confirmation:
-            execution_time = int((time.time() - start_time) * 1000)
-            return ExecutionResult(
-                status="completed",
-                outcome_code="identity_set",
-                route="LOCAL",
-                provider="local",
-                provider_usage_class="local",
-                response_text=identity_confirmation,
-                execution_time_ms=execution_time,
-                metadata={"identity": identity_name, "execution_time_ms": execution_time},
                 evidence_reason=route.evidence_reason if route else "",
                 policy_reason=route.policy_reason if route else "",
             )
@@ -3675,14 +3324,6 @@ class ExecutionEngine:
             "i can't say",
             "i don't have any information",
             "i do not have any information",
-            "i don't have access",
-            "i do not have access",
-            "i don't have real-time",
-            "i do not have real-time",
-            "i don't have up-to-date",
-            "i do not have up-to-date",
-            "i don't have current",
-            "i do not have current",
             "no facts about",
             "no information about",
             "not mentioned",
@@ -3698,15 +3339,6 @@ class ExecutionEngine:
             "insufficient evidence",
             "you may need to consult",
             "simulation tools",
-            "unable to verify",
-            "cannot verify",
-            "can't verify",
-            "i can only speculate",
-            "i would need to",
-            "i'd need to",
-            "i would have to",
-            "i'd have to",
-            "without access to",
             "error",
         ]
 
