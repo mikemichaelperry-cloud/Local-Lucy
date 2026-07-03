@@ -594,10 +594,31 @@ class TestIntegration(unittest.TestCase):
                 self.assertTrue(result.from_cache)
                 self.assertEqual(result.text, "cached response")
 
+    async def async_test_memory_filter_is_applied(self):
+        """Test that session memory is passed through filter_memory_context."""
+        answer = LocalAnswer()
+
+        with patch.object(answer, "_call_ollama") as mock_call:
+            mock_call.return_value = "Mocked response"
+
+            with patch("local_answer.filter_memory_context") as mock_filter:
+                mock_filter.return_value = "Filtered memory"
+
+                await answer.generate_answer(
+                    "What are interesting towns in Tokyo?",
+                    session_memory=(
+                        "User: What are the main tourist attractions in Japan?\n\n"
+                        "Assistant: Tourism in China is a growing industry..."
+                    ),
+                )
+
+                mock_filter.assert_called_once()
+
     def test_integration(self):
         """Run async integration tests."""
         asyncio.run(self.async_test_policy_query())
         asyncio.run(self.async_test_cache_hit())
+        asyncio.run(self.async_test_memory_filter_is_applied())
 
 
 class TestPersonalFamilyFactResolver(unittest.TestCase):
