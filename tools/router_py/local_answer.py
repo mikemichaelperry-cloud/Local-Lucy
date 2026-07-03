@@ -48,18 +48,6 @@ except ImportError:
             return False
 
 
-# Import semantic context guard (with fallback)
-try:
-    from router_py.context_guard import filter_memory_context
-except ImportError:
-    try:
-        from context_guard import filter_memory_context
-    except ImportError:
-
-        def filter_memory_context(question: str, memory_text: str) -> str:
-            return memory_text
-
-
 # Import tube database (with fallback for standalone execution)
 _tube_db = None
 try:
@@ -73,72 +61,6 @@ except Exception:
     _tube_db = None
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Language detection helpers
-# ---------------------------------------------------------------------------
-_CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
-_LATIN_RE = re.compile(r"[A-Za-z\u00C0-\u024F]")
-
-
-def _finalize_text_for_query(query: str, text: str) -> str:
-    """Local Lucy is English-only; no translation is performed."""
-    return text
-
-
-def _unload_ollama_model(model_name: str, timeout: float = 10.0) -> None:
-    """Ask Ollama to unload a model immediately.
-
-    Ollama keeps models resident in VRAM until they are evicted. When we
-    deliberately switch models, we explicitly unload the previous model so it
-    does not continue consuming memory while the new model loads.
-    """
-    try:
-        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434")
-        parsed = urllib.parse.urlparse(api_url)
-        base_path = parsed.path.rstrip("/")
-        if base_path.endswith("/api/generate"):
-            base_path = base_path[: -len("/api/generate")]
-        generate_path = (base_path or "") + "/api/generate"
-        generate_url = urllib.parse.urlunparse(parsed._replace(path=generate_path))
-        payload = json.dumps(
-            {"model": model_name, "prompt": "", "stream": False, "keep_alive": 0}
-        ).encode("utf-8")
-        req = urllib.request.Request(
-            generate_url,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            resp.read()
-        logger.info(f"[OLLAMA] Unloaded previous model: {model_name}")
-    except Exception as exc:
-        logger.warning(f"[OLLAMA] Failed to unload previous model {model_name}: {exc}")
-
-
-def _detect_response_language_instruction(query: str) -> str:
-    """Return a strong language instruction matching the user's query language."""
-    if not query or not query.strip():
-        return ""
-    text = query.strip()
-    latin_chars = len(_LATIN_RE.findall(text))
-    cyrillic_chars = len(_CYRILLIC_RE.findall(text))
-
-    if cyrillic_chars > latin_chars and cyrillic_chars > 0:
-        return (
-            "CRITICAL: The user's message is written in Cyrillic. "
-            "You MUST answer in the same Cyrillic language, matching the user's wording. "
-            "Do not switch to English or Latin letters."
-        )
-    if latin_chars > 0:
-        return (
-            "CRITICAL: The user's message is in a Latin-script language (likely English). "
-            "You MUST answer in the same language the user used. "
-            "Do not switch to another language."
-        )
-    return ""
-
 
 # ---------------------------------------------------------------------------
 # Ollama keep-alive heartbeat: pings the default model every 30s to prevent
@@ -199,7 +121,6 @@ def stop_ollama_heartbeat() -> None:
 # Import persistent facts from SQL memory service (with fallback for standalone use)
 try:
     from memory.memory_service import (
-        get_current_user_identity as _get_current_user_identity,
         get_persistent_facts_revision as _get_persistent_facts_revision,
     )
     from memory.memory_service import (
@@ -211,7 +132,6 @@ except ImportError as _e1:
     logger.warning(f"[FACTS] Failed to import from memory.memory_service: {_e1}")
     try:
         from tools.memory.memory_service import (
-            get_current_user_identity as _get_current_user_identity,
             get_persistent_facts_revision as _get_persistent_facts_revision,
         )
         from tools.memory.memory_service import (
@@ -231,9 +151,6 @@ except ImportError as _e1:
 
         def _get_persistent_facts_revision(category=None):
             return ""
-
-        def _get_current_user_identity() -> str | None:
-            return None
 
 
 def _load_family_facts_direct() -> list[str]:
@@ -323,65 +240,11 @@ _SELF_KNOWLEDGE_TEMPLATE = (
 # Model-specific identity strings. Add new models here.
 _MODEL_IDENTITIES: dict[str, tuple[str, str]] = {
     # backend_name -> (ollama_model_name, parameter_description)
-    "local-lucy-llama31": ("llama3.1:8b", "~8B parameters, 8192-token context"),
-    "local-lucy-llama31-michael": ("llama3.1:8b", "~8B parameters, 8192-token context"),
+    "local-lucy-llama31": ("llama3.1:8b", "~8B parameters, 4096-token context"),
     "local-lucy": ("qwen3:14b", "~14B parameters, 2048-token context"),
-    "local-lucy-michael": ("qwen3:14b", "~14B parameters, 2048-token context"),
     "local-lucy-fast": ("qwen3:14b", "~14B parameters, 2048-token context"),
-    "local-lucy-fast-michael": ("qwen3:14b", "~14B parameters, 2048-token context"),
     "local-lucy-mistral": ("mistral-nemo", "~12B parameters, 2048-token context"),
-    "local-lucy-mistral-michael": ("mistral-nemo", "~12B parameters, 2048-token context"),
 }
-
-
-# Persona model tags that may be created from LoRA adapters.
-_PERSONA_MODELS: set[str] = {
-    "local-lucy-llama31-michael",
-    "local-lucy-michael",
-    "local-lucy-fast-michael",
-    "local-lucy-mistral-michael",
-}
-
-
-def _ollama_model_exists(model_name: str, timeout: float = 10.0) -> bool:
-    """Return True if an Ollama model tag is installed locally."""
-    try:
-        import urllib.parse
-
-        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434")
-        parsed = urllib.parse.urlparse(api_url)
-        # LUCY_OLLAMA_API_URL is sometimes set to the generate endpoint;
-        # normalize to the API root so /api/tags resolves correctly.
-        base_path = parsed.path.rstrip("/")
-        if base_path.endswith("/api/generate"):
-            base_path = base_path[: -len("/api/generate")]
-        tags_path = (base_path or "") + "/api/tags"
-        tags_url = urllib.parse.urlunparse(parsed._replace(path=tags_path))
-        req = urllib.request.Request(tags_url, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        names = {m.get("name", "").split(":")[0] for m in data.get("models", [])}
-        return model_name in names
-    except Exception:
-        return False
-
-
-def _resolve_persona_model(base_model: str) -> str:
-    """Return the persona-tagged model if an identity is active and the tag exists.
-
-    Falls back to the base model otherwise.
-    """
-    identity = _get_current_user_identity()
-    if not identity:
-        return base_model
-    persona_model = f"{base_model}-{identity.lower()}"
-    if persona_model in _PERSONA_MODELS and _ollama_model_exists(persona_model):
-        logger.info(f"[PERSONA] Resolved {base_model} -> {persona_model}")
-        return persona_model
-    logger.info(
-        f"[PERSONA] Identity {identity} active, but {persona_model} not installed; using {base_model}"
-    )
-    return base_model
 
 
 def get_self_knowledge(model_name: str = "local-lucy-llama31") -> str:
@@ -394,28 +257,6 @@ def get_self_knowledge(model_name: str = "local-lucy-llama31") -> str:
         model_identity=f"{ollama_name}, {params}",
         param_count=params.split(",")[0].strip().replace("~", ""),
     )
-
-
-# Cache for persona prompt fragments, keyed by canonical persona name.
-_PERSONA_FRAGMENT_CACHE: dict[str, str] = {}
-
-
-def _load_persona_fragment(persona_name: str) -> str:
-    """Load the persona-specific prompt fragment for the given identity.
-
-    Looks for config/personas/<lowercase>.txt under the project root.
-    Returns the file content, or an empty string if missing.
-    """
-    if persona_name in _PERSONA_FRAGMENT_CACHE:
-        return _PERSONA_FRAGMENT_CACHE[persona_name]
-    root = Path(__file__).resolve().parents[2]
-    path = root / "config" / "personas" / f"{persona_name.lower()}.txt"
-    try:
-        text = path.read_text(encoding="utf-8").strip()
-    except (OSError, FileNotFoundError):
-        text = ""
-    _PERSONA_FRAGMENT_CACHE[persona_name] = text
-    return text
 
 
 # Fixed policy responses
@@ -439,6 +280,7 @@ FIXED_POLICY_RESPONSES: Dict[str, str] = {
     "tube_807_identity": "The 807 is a beam power tetrode vacuum tube. It was widely used in RF transmitters and older audio power stages.",
     "ambiguity_ic3055": "The label 'IC 3055' is ambiguous. If you mean 2N3055, that is a power transistor, not an integrated circuit.",
     "fact_capital_france": "The capital of France is Paris.",
+    "racheli_presence_ack": "Understood. Racheli is your life partner, and I will keep responses grounded, warm, and respectful to both of you.",
     "greeting_generic": "Hello. I'm here and functioning normally. What would you like help with?",
     "recursion_one_sentence": "Recursion is solving a problem by reducing it to smaller versions of itself until a simple base case stops the loop.",
     "pet_stress_blasts": "Move your dog to the quietest interior room, close blinds, and run steady white noise to mask blasts.\nStay close, speak calmly, and offer a familiar blanket or crate; avoid forcing contact if your dog wants distance.\nIf panic is severe or persistent, contact a veterinarian for a short-term anxiety plan.",
@@ -921,13 +763,6 @@ class LocalAnswer:
             r"(be more|give me more|include|add|what are the|can you be more)\s+(detailed|detail|details|specific|specifics|quantities|quantity|information|info)",
             r"(more\s+(details|detail|information|info|specifics|context|quantities))",
             r"(be more|more)\s+(specific|detailed|precise)",
-            # Vague detail requests that rely on the immediately preceding topic
-            r"^[\s]*(full|all|complete)\s+details(?:\s+please)?\W*$",
-            r"^[\s]*all\s+the\s+details(?:\s+please)?\W*$",
-            r"^[\s]*details\s+please\W*$",
-            r"^[\s]*give\s+me\s+(?:the\s+)?details(?:\s+please)?\W*$",
-            r"^[\s]*tell\s+me\s+(?:the\s+)?details(?:\s+please)?\W*$",
-            r"^[\s]*tell\s+me\s+everything(?:\s+please)?\W*$",
             # Personal reference patterns - user asking about themselves
             r"^[\s]*(what is my|what are my|what\'s my|who am i|do you know my|remember my|you said my)",
             r"^[\s]*(my name|my favorite|my preference|my choice|my color|my age|my location)",
@@ -964,8 +799,7 @@ class LocalAnswer:
 
     def _strip_identity_preamble(self, text: str, query: str = "") -> str:
         """Strip identity preamble from response — except when asked about identity."""
-        original = text.strip()
-        # Don't strip if the user explicitly asked who we are.
+        # Don't strip if the user explicitly asked who we are
         identity_queries = [
             r"\bwho\s+are\s+you",
             r"\bwhat\s+is\s+your\s+name",
@@ -975,13 +809,12 @@ class LocalAnswer:
         ]
         q_lower = query.lower()
         if any(re.search(p, q_lower) for p in identity_queries):
-            return original
+            return text.strip()
         # Remove common self-intro boilerplate
-        text = re.sub(r"^I am Local Lucy[^.]*\.\s*", "", original, flags=re.IGNORECASE)
+        text = re.sub(r"^I am Local Lucy[^.]*\.\s*", "", text, flags=re.IGNORECASE)
         text = re.sub(r"^I will do my best[^.]*\.\s*", "", text, flags=re.IGNORECASE)
         text = text.strip()
-        # Never return a completely empty string because of preamble stripping.
-        return text or original
+        return text
 
     def _sanitize_identity_memory_fragment(self, text: str) -> str:
         """Sanitize identity memory fragment."""
@@ -1025,6 +858,8 @@ class LocalAnswer:
                 "my wife",
                 "my husband",
                 "my spouse",
+                "who is racheli",
+                "who is rachel",
                 "who am i",
                 "my name",
                 "do i have children",
@@ -1176,7 +1011,7 @@ class LocalAnswer:
                 return None
             return " ".join(partner_facts)
 
-        # --- Specific person lookup ("Who is X?") ---
+        # --- Specific person lookup ("Who is Racheli?") ---
         if "who is " in q:
             # Extract the name after "who is"
             m = re.search(r"who is\s+([a-z]+)", q)
@@ -1717,20 +1552,6 @@ class LocalAnswer:
         # its own architecture, capabilities, limitations, and guards)
         parts.append(get_self_knowledge(self.config.model))
 
-        # User-specific persona (injected when the user has declared an identity).
-        # Placed after self-knowledge so the adaptation is the last high-level
-        # instruction before the user turn, making it more salient. This applies
-        # equally to LoRA-tagged models and prompt-level fallback models (e.g.
-        # qwen3 14B, where LoRA training OOMs on 12 GB VRAM).
-        current_identity = _get_current_user_identity()
-        if current_identity:
-            persona_fragment = _load_persona_fragment(current_identity)
-            if persona_fragment:
-                parts.append(persona_fragment)
-                logger.info(
-                    f"[PERSONA] Injected {current_identity} fragment ({len(persona_fragment)} chars)"
-                )
-
         # Current date/time/location context (for age calculations, relative time,
         # location-aware queries, and holiday references)
         current_context = _get_current_context()
@@ -1816,14 +1637,6 @@ class LocalAnswer:
 
         parts.append(f"{instruction}\n{tone}\n{budget_instruction}\n{first_person_hint}".rstrip())
 
-        # Language-matching instruction is placed LAST in the system context,
-        # immediately before the user turn, so it overrides any earlier
-        # conflicting language hints in the persona or self-knowledge blocks.
-        lang_instruction = _detect_response_language_instruction(query)
-        if lang_instruction:
-            parts.append(lang_instruction)
-            logger.info(f"[LANG] Injected language instruction for query: {query[:60]}")
-
         prompt_body = "\n\n".join(parts)
         # Attach reasoning hint directly to the user turn so it sits immediately
         # before the Assistant response, maximizing the chance the model follows it.
@@ -1907,14 +1720,13 @@ class LocalAnswer:
                     text = data.get("response", "")
                     # Qwen3 and similar thinking models may emit reasoning in
                     # 'thinking' while leaving 'response' empty when token budget
-                    # is consumed by the thinking phase.  We must never emit raw
-                    # reasoning/thinking as the user-facing answer, so we treat
-                    # it as an empty response and let the retry/caller handle it.
+                    # is consumed by the thinking phase.
                     if not text and data.get("thinking"):
-                        logger.warning(
-                            f"Ollama response empty but thinking present for {self.config.model}; "
-                            "ignoring thinking content for user-facing response"
-                        )
+                        text = data["thinking"].strip()
+                        if text:
+                            logger.warning(
+                                f"Ollama response empty but thinking present for {self.config.model}; using thinking as fallback"
+                            )
                     duration_ms = int((time.time() - start_time) * 1000)
                     if text:
                         return text, duration_ms
@@ -1964,13 +1776,13 @@ class LocalAnswer:
         )
 
         session_memory = session_memory.replace("\r", " ").rstrip()
+        # Always include session memory when available (memory toggle controls loading)
+        # The model can decide whether to use it based on query relevance
+        if session_memory.strip():
+            self._diag_append("context_relevance_gate", "reuse_context")
 
         if not self._is_memory_context_allowed(q_eval):
             session_memory = ""
-        elif session_memory.strip():
-            session_memory = filter_memory_context(q_eval, session_memory)
-            if session_memory.strip():
-                self._diag_append("context_relevance_gate", "reuse_context")
 
         if len(session_memory) > self.config.max_context_chars:
             session_memory = session_memory[: self.config.max_context_chars]
@@ -1987,7 +1799,7 @@ class LocalAnswer:
         if policy_response and not is_creative:
             duration_ms = int((time.time() - start_time) * 1000)
             return AnswerResult(
-                text=_finalize_text_for_query(q_eval, policy_response),
+                text=policy_response,
                 from_cache=False,
                 generation_profile="policy",
                 duration_ms=duration_ms,
@@ -1997,7 +1809,7 @@ class LocalAnswer:
         if tube_answer and not is_creative:
             duration_ms = int((time.time() - start_time) * 1000)
             return AnswerResult(
-                text=_finalize_text_for_query(q_eval, tube_answer),
+                text=tube_answer,
                 from_cache=False,
                 generation_profile="807_fixed",
                 duration_ms=duration_ms,
@@ -2008,7 +1820,7 @@ class LocalAnswer:
         if tube_db_answer and not is_creative:
             duration_ms = int((time.time() - start_time) * 1000)
             return AnswerResult(
-                text=_finalize_text_for_query(q_eval, tube_db_answer),
+                text=tube_db_answer,
                 from_cache=False,
                 generation_profile="tube_database",
                 duration_ms=duration_ms,
@@ -2020,11 +1832,10 @@ class LocalAnswer:
             fact_answer = self._resolve_personal_family_fact(q_eval)
             if fact_answer:
                 duration_ms = int((time.time() - start_time) * 1000)
-                finalized = _finalize_text_for_query(q_eval, fact_answer)
-                self._diag_append("response_chars", len(finalized))
-                self._diag_append("response_est_tokens", self._estimate_tokens(finalized))
+                self._diag_append("response_chars", len(fact_answer))
+                self._diag_append("response_est_tokens", self._estimate_tokens(fact_answer))
                 return AnswerResult(
-                    text=finalized,
+                    text=fact_answer,
                     from_cache=False,
                     generation_profile="personal_fact_direct",
                     duration_ms=duration_ms,
@@ -2060,7 +1871,6 @@ class LocalAnswer:
 
         if cached:
             text, age_ms = cached
-            text = _finalize_text_for_query(q_eval, text)
             self._latprof_append("local_answer", "prompt_assembly", 0)
             self._latprof_append("local_answer", "payload_build", 0)
             self._latprof_append("local_answer", "pre_model", cache_end - cache_start)
@@ -2133,10 +1943,8 @@ class LocalAnswer:
                 raise ValueError("Empty response from Ollama")
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            # Avoid emitting raw error wording in the user-facing text; the
-            # `error` field still carries the technical detail for upstream handling.
             return AnswerResult(
-                text="I'm having trouble responding right now. Please try again.",
+                text=f"ERROR: Failed to get response from local model: {e}",
                 error=str(e),
                 generation_profile=profile_name,
                 duration_ms=duration_ms,
@@ -2193,8 +2001,6 @@ class LocalAnswer:
         total_ms = int((time.time() - start_time) * 1000)
         self._latprof_append("local_answer", "total", total_ms)
 
-        api_text = _finalize_text_for_query(q_eval, api_text)
-
         self._cache_store(q_norm, cache_variant, api_text, fact_revision)
 
         return AnswerResult(
@@ -2211,24 +2017,7 @@ class LocalAnswer:
                 pass
 
     async def __aenter__(self):
-        """Async context manager entry.
-
-        Resolve the runtime model to a persona-tagged variant when an identity
-        is active and the corresponding LoRA adapter has been installed.
-        If no persona-tagged model exists, keep the base model and rely on the
-        prompt-level persona fragment injected in _build_prompt.
-        """
-        base_model = self.config.model
-        self.config.model = _resolve_persona_model(base_model)
-        identity = _get_current_user_identity()
-        if identity:
-            if self.config.model != base_model:
-                logger.info(f"[PERSONA] Using LoRA-tagged model {self.config.model} for {identity}")
-            else:
-                logger.info(
-                    f"[PERSONA] Using prompt-level persona fallback for {identity} "
-                    f"(base model {base_model})"
-                )
+        """Async context manager entry."""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -2282,6 +2071,10 @@ async def run_cli() -> int:
         print(result.text)
 
     return 0 if not result.error else 1
+
+
+if __name__ == "__main__":
+    asyncio.run(run_cli())
 
 
 # Logging setup
@@ -2351,7 +2144,3 @@ class LocalAnswerLogger:
 
 # Create global logger instance
 _local_answer_logger = LocalAnswerLogger()
-
-
-if __name__ == "__main__":
-    asyncio.run(run_cli())
