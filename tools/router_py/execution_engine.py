@@ -126,6 +126,7 @@ from router_py.execution_engine_state import StateWriter
 from router_py.resilience import get_breaker, CircuitBreakerOpen
 from router_py.shutdown_handler import register_closeable
 from router_py.structured_logging import get_structured_logger, ContextualLogger
+from router_py.context_guard import is_evidence_relevant
 
 try:
     from router_py.fallback_telemetry import make as _ft, merge as _ft_merge
@@ -2036,6 +2037,18 @@ class ExecutionEngine:
             # Check if this is a voice query for voice-optimized content
             for_voice = context.get("surface") == "voice" if context else False
             evidence = await self._fetch_evidence(question, route, for_voice=for_voice)
+
+        # Filter retrieved evidence before it reaches any LLM prompt.
+        # Direct-answer routes (WEATHER, TIME, FINANCE, NEWS) return evidence
+        # as the response, so we skip filtering there to preserve completeness.
+        if evidence and route.route in ("EVIDENCE", "FULL", "AUGMENTED"):
+            if not is_evidence_relevant(question, evidence):
+                self._logger.warning(
+                    "Dropping irrelevant evidence for route %s: title=%r",
+                    route.route,
+                    evidence.get("title", "")[:60],
+                )
+                evidence = None
 
         # Special handling for WEATHER route: return weather directly
         if route.route == "WEATHER":
