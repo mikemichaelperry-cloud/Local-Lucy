@@ -72,7 +72,7 @@ All components live in `tools/router_py/context_guard.py`. The guard runs before
 - Loads lazily on first use via a module-level singleton.
 - Input: `(question: str, turn: str)`.
 - Output: `float` in `[0.0, 1.0]`, cosine similarity between question and turn embeddings.
-- Threshold: **0.20**.
+- Threshold: **0.30** (raised from the initially planned 0.20 after real-world testing showed 0.20 kept stale wrong-topic turns, e.g. a China article for a Tokyo follow-up).
 
 #### 3. `KeywordFallbackScorer`
 
@@ -88,7 +88,7 @@ All components live in `tools/router_py/context_guard.py`. The guard runs before
 ```
 question
    ├─► EvidenceScorer ──► sigmoid(logit) ──► >= 0.50 ? keep : drop
-   └─► MemoryScorer ────► cosine sim ──────► >= 0.20 ? keep : drop
+   └─► MemoryScorer ────► cosine sim ──────► >= 0.30 ? keep : drop
 ```
 
 - Evidence is filtered per-item before being added to the prompt.
@@ -118,7 +118,7 @@ question
 ## Threshold rationale
 
 - **Evidence 0.50:** Midpoint of the sigmoid scale. Empirically keeps correct evidence and drops wrong-entity evidence.
-- **Memory 0.20:** Memory turns are short and may use pronouns. This threshold keeps paraphrased references while dropping unrelated topics.
+- **Memory 0.30:** Memory turns are short and may use pronouns. This threshold drops stale wrong-topic turns (verified to drop a China tourism turn for a Tokyo follow-up) while keeping on-topic follow-ups.
 
 Both thresholds are module-level constants so they can be tuned without changing call sites.
 
