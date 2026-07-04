@@ -197,11 +197,11 @@ class TestMemoryRoutingGate(unittest.TestCase):
 
     @patch("memory.memory_service.get_recent_turns")
     def test_gate_tell_me_more(self, mock_get_turns):
-        """'Tell me more' triggers the gate."""
+        """'Tell me more' does not trigger the memory gate; continuation prompts are handled by continuation-follow-up inheritance."""
         os.environ["LUCY_SESSION_MEMORY"] = "1"
         mock_get_turns.return_value = [{"role": "user", "text": "hi"}]
         result = _memory_routing_gate("Tell me more", "AUGMENTED")
-        self.assertEqual(result, "LOCAL")
+        self.assertIsNone(result)
 
     @patch("memory.memory_service.get_recent_turns")
     def test_gate_fallback_to_text_file(self, mock_get_turns):
@@ -211,6 +211,7 @@ class TestMemoryRoutingGate(unittest.TestCase):
 
         # Create a temporary memory file
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmpdir:
             mem_file = Path(tmpdir) / "state" / "chat_session_memory.txt"
             mem_file.parent.mkdir(parents=True, exist_ok=True)
