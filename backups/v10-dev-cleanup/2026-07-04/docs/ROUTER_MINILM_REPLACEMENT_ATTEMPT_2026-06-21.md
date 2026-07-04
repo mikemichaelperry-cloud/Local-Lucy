@@ -1,8 +1,8 @@
 # Router / MiniLM Improvement Attempt — Report for ChatGPT
 
-**Date:** 2026-06-21  
-**Hardware:** RTX 3060 12 GB VRAM, 31 GB RAM  
-**Dataset:** `models/router/comprehensive_examples.json` (1,362 examples)  
+**Date:** 2026-06-21
+**Hardware:** RTX 3060 12 GB VRAM, 31 GB RAM
+**Dataset:** `models/router/comprehensive_examples.json` (1,362 examples)
 **Local model:** `local-lucy-llama31` (llama3.1:8b q4)
 
 ---

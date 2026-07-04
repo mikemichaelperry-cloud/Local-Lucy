@@ -1,8 +1,8 @@
 # Classifier / Router Improvement Report
 
-**Project:** Local Lucy v10  
-**Date:** 2026-06-26  
-**Author:** Kimi Code CLI  
+**Project:** Local Lucy v10
+**Date:** 2026-06-26
+**Author:** Kimi Code CLI
 **Status:** Complete, tested, merged into working tree
 
 ---

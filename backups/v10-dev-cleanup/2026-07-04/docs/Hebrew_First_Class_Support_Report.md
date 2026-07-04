@@ -1,8 +1,8 @@
 # Hebrew First-Class Support — Implementation Report
 
-**Project:** Local Lucy v10  
-**Date:** 2026-06-29  
-**Author:** Kimi Code CLI  
+**Project:** Local Lucy v10
+**Date:** 2026-06-29
+**Author:** Kimi Code CLI
 **Status:** Complete, tested, merged into working tree
 
 ---

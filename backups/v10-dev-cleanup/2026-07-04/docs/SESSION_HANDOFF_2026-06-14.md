@@ -1,7 +1,7 @@
 # Session Handoff — 2026-06-14
 
-**Session scope:** Production hardening for Local Lucy v10  
-**End state:** v10.0.0-beta.1 tagged, 13 commits ahead of baseline, working tree clean  
+**Session scope:** Production hardening for Local Lucy v10
+**End state:** v10.0.0-beta.1 tagged, 13 commits ahead of baseline, working tree clean
 **Next owner:** Any agent (read `SESSION_CONTEXT.md` + `AGENTS.md` first)
 
 ---
