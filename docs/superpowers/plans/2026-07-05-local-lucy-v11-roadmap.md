@@ -153,7 +153,7 @@ Transform Local Lucy v10 into v11: an **English-only**, autonomous assistant tha
 
 **Success criteria:**
 - Shadow logs show ≥ 90% agreement with sensible manual choices over at least 50 diverse queries.
-- Blind A/B comparisons do not show a systematic user preference against the recommended model.
+- The recommended model equals or exceeds the competing model in blind A/B preference, with no significant class where it consistently underperforms.
 - Qwen is not chosen for a class unless it demonstrably outperforms llama3.1 on that class, including in A/B answer quality.
 
 ---

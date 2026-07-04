@@ -7,6 +7,20 @@
 
 ---
 
+## ⚠️ V11 Migration Notice
+
+This document describes the **current V10 implementation**. It is **descriptive, not normative for V11**. Several components documented here are scheduled for correction or isolation in Phase 0 of the V11 roadmap (`docs/superpowers/plans/2026-07-05-local-lucy-v11-roadmap.md`):
+
+- **Hebrew / Racheli persona support** is being separated from the primary Local Lucy runtime.
+- **Evidence versus synthesis** handling will change: Wikipedia, official APIs, and trusted domains remain evidence sources; OpenAI and Kimi are synthesis providers, not evidence sources themselves.
+- **Local-first routing** will be strengthened: stable basic facts, recipes, coding, opinion, and creative writing should stay LOCAL unless the user requests verification or live data.
+- **Prompt policy** will be revised to remove contradictions ("say I don't know" vs "never hedge" vs "facts only").
+- **Context validation** will be added before any source is injected into the LLM prompt.
+
+When implementing V11, follow the revised V11 roadmap, not this document as a specification. During Phase 0, this document will be frozen as `Architecture_V10_Current_State.md` and `Architecture.md` will become the evolving normative V11 architecture.
+
+---
+
 ## 1. Overview
 
 Local Lucy V10 is a privacy-first, locally-hosted AI assistant. It runs entirely on the user's machine, keeps conversation history and persistent facts in a local SQLite database, and only reaches out to the internet when the router explicitly decides an answer needs live or external evidence.

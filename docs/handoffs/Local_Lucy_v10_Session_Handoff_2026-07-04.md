@@ -35,11 +35,12 @@
 
 5. **v11 roadmap created, revised, and approved**
    - Saved to `docs/superpowers/plans/2026-07-05-local-lucy-v11-roadmap.md`
-   - Approved with four amendments:
+   - Approved with five amendments:
      1. Hebrew code paths: aim for separation (not reachable/loaded/maintained in primary runtime), not destructive deletion of shared utilities.
-     2. Shadow-mode model selection: treat manual choice as one signal; add blind A/B answer comparisons and continue collecting data after the 50-query gate.
+     2. Shadow-mode model selection: treat manual choice as one signal; add blind A/B answer comparisons; continue collecting data after the 50-query gate; require recommended model to equal or exceed the competitor in A/B preference.
      3. Failed evidence retrieval: add route-dependent fallback rules so high-stakes queries do not silently fall back to unverified local answers.
      4. Voice GPU configuration: confirm actual Kokoro device (CPU vs CUDA) and document one source of truth before changing defaults.
+     5. Architecture.md: added a prominent V11 migration notice so the current V10 document is not mistaken for the V11 specification.
    - Additional metric added: context-guard telemetry including unused accepted context, citation coverage, context disagreement, and entity collision.
    - Phase order:
      - Phase 0: Correct scope (English-only, evidence vs synthesis)
