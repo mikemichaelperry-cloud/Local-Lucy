@@ -17,7 +17,6 @@ from typing import Any
 
 from runtime_control import enforce_authority_contract, iso_now, locked_state_file
 
-
 DEFAULT_START_TIMEOUT_SECONDS = 8.0
 DEFAULT_STOP_TIMEOUT_SECONDS = 10.0
 DEFAULT_ACTION_TIMEOUT_SECONDS = 15.0
@@ -98,7 +97,7 @@ def resolve_launcher_path(explicit_path: str | None) -> Path:
     env_path = os.environ.get("LUCY_RUNTIME_LAUNCHER_PATH")
     if env_path:
         return Path(env_path).expanduser()
-    return Path(__file__).with_name("start_local_lucy_v9.sh")
+    return Path(__file__).with_name("START_LUCY.sh")
 
 
 def resolve_log_file(explicit_path: str | None) -> Path:
@@ -166,7 +165,7 @@ def _is_stale_state(payload: dict[str, Any], max_age_seconds: float = 30.0) -> b
 def start_runtime(*, lifecycle_file: Path, launcher_path: Path, log_file: Path) -> dict[str, Any]:
     lifecycle_file.parent.mkdir(parents=True, exist_ok=True)
     current = reconcile_lifecycle_state(lifecycle_file)
-    
+
     # Handle stale or orphaned states
     if bool(current.get("running")):
         if _is_stale_state(current):
@@ -178,7 +177,7 @@ def start_runtime(*, lifecycle_file: Path, launcher_path: Path, log_file: Path) 
             persist_lifecycle_state(lifecycle_file, current)
         else:
             return current
-    
+
     if not launcher_path.exists():
         update = default_lifecycle_state()
         update["last_error"] = f"missing launcher: {launcher_path}"
@@ -343,7 +342,7 @@ def serve_runtime(args: argparse.Namespace) -> None:
             while True:
                 if child.poll() is not None:
                     break
-                
+
                 # Update heartbeat every 5 seconds
                 if time.time() - last_heartbeat >= 5.0:
                     try:
@@ -354,7 +353,7 @@ def serve_runtime(args: argparse.Namespace) -> None:
                         last_heartbeat = time.time()
                     except Exception:
                         pass
-                
+
                 readable, _, _ = select.select([master_fd], [], [], 0.25)
                 if master_fd in readable:
                     try:
@@ -413,7 +412,9 @@ def read_lifecycle_state(lifecycle_file: Path) -> dict[str, Any]:
     try:
         payload = json.loads(lifecycle_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeLifecycleError(f"unable to read lifecycle state {lifecycle_file}: {exc}") from exc
+        raise RuntimeLifecycleError(
+            f"unable to read lifecycle state {lifecycle_file}: {exc}"
+        ) from exc
     if not isinstance(payload, dict):
         raise RuntimeLifecycleError(f"lifecycle state must contain a JSON object: {lifecycle_file}")
     normalized = default_lifecycle_state()

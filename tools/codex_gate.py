@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Minimal local pre-processor for Codex tasks.
-"""
+"""Minimal local pre-processor for Codex tasks."""
+
 from __future__ import annotations
 
 import argparse
@@ -17,6 +17,7 @@ from typing import Iterable, Sequence
 
 IGNORE_CASE = re.compile("[A-Za-z0-9_]+", re.ASCII)
 
+
 @dataclasses.dataclass
 class BootstrapState:
     active_root: str
@@ -25,6 +26,7 @@ class BootstrapState:
     first_steps: Sequence[str]
     baseline_status: str
     handoff_path: str
+
 
 POLITE_PREFIXES = [
     r"(please\s+)?(can you|could you|would you|kindly|i need you to|i'd like you to|can we|could we)(\s+)?",
@@ -102,7 +104,9 @@ def find_latest_handoff(root: pathlib.Path) -> pathlib.Path:
     dev_notes = root / "dev_notes"
     if not dev_notes.is_dir():
         raise FileNotFoundError(f"missing dev_notes under {root}")
-    files = sorted(dev_notes.glob("SESSION_HANDOFF_*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    files = sorted(
+        dev_notes.glob("SESSION_HANDOFF_*.md"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     if not files:
         raise FileNotFoundError("no session handoff notes found")
     return files[0]
@@ -231,7 +235,7 @@ def recommend_model(decision: str, task: str) -> tuple[str, str]:
 def clean_task(task: str) -> str:
     cleaned = task.strip()
     for prefix in POLITE_PREFIXES:
-        cleaned = re.sub(fr"^{prefix}", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(rf"^{prefix}", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
     cleaned = cleaned.strip(" ?!.")
     if not cleaned:
@@ -281,13 +285,18 @@ def extract_explicit_paths(task: str, files: Sequence[str], root: pathlib.Path) 
         explicit.append(match)
     if "codex_launcher_gui.sh" in task and "codex_launcher_gui.sh" not in explicit:
         explicit.append("codex_launcher_gui.sh")
-    return dedupe_keep_order(normalize_output_path(resolve_candidate_path(item, root), root) for item in explicit)
+    return dedupe_keep_order(
+        normalize_output_path(resolve_candidate_path(item, root), root) for item in explicit
+    )
 
 
 def collect_patch_hint_files(task: str, root: pathlib.Path) -> list[str]:
     lower_task = task.lower()
     hints: list[str] = []
-    if any(token in lower_task for token in ("codex", "preprocess", "patch surface", "validation plan", "sanity", "scope")):
+    if any(
+        token in lower_task
+        for token in ("codex", "preprocess", "patch surface", "validation plan", "sanity", "scope")
+    ):
         hints.extend(
             [
                 "tools/codex_gate.py",
@@ -299,20 +308,22 @@ def collect_patch_hint_files(task: str, root: pathlib.Path) -> list[str]:
         hints.extend(
             [
                 "codex_launcher_gui.sh",
-                "tools/start_local_lucy_v9.sh",
+                "START_LUCY.sh",
                 "tools/start_local_lucy_opt_experimental_v3_dev.sh",
             ]
         )
     if "launcher chain" in lower_task or "local lucy" in lower_task:
         hints.extend(
             [
-                "tools/start_local_lucy_v9.sh",
+                "START_LUCY.sh",
                 "tools/start_local_lucy_opt_experimental_v3_dev.sh",
             ]
         )
     if any(token in lower_task for token in ("test", "validation")):
         hints.append("tools/tests/test_codex_prompt_integrity.sh")
-    return dedupe_keep_order(normalize_output_path(resolve_candidate_path(item, root), root) for item in hints)
+    return dedupe_keep_order(
+        normalize_output_path(resolve_candidate_path(item, root), root) for item in hints
+    )
 
 
 def keyword_tokens(text: str) -> list[str]:
@@ -421,7 +432,10 @@ def targeted_grep_hits(root: pathlib.Path, task: str, candidates: Sequence[str])
 def nearby_tests_for_files(files: Sequence[str]) -> list[str]:
     tests: list[str] = []
     joined = " ".join(files)
-    if any(item.endswith("tools/codex_gate.py") or item.endswith("tools/codex_gate.sh") for item in files):
+    if any(
+        item.endswith("tools/codex_gate.py") or item.endswith("tools/codex_gate.sh")
+        for item in files
+    ):
         tests.extend(
             [
                 "tools/tests/test_codex_gate.sh",
@@ -512,21 +526,28 @@ def infer_patch_surface(
     explicit_paths = extract_explicit_paths(task, files, root)
     hint_paths = collect_patch_hint_files(cleaned_task, root)
     grep_hits = targeted_grep_hits(root, cleaned_task, explicit_paths + hint_paths)
-    scored_candidates = score_patch_candidates(cleaned_task, explicit_paths, hint_paths, grep_hits, root)
+    scored_candidates = score_patch_candidates(
+        cleaned_task, explicit_paths, hint_paths, grep_hits, root
+    )
 
     ranked_files = [
-        item for item in scored_candidates if int(item["score"]) > 0 and not str(item["path"]).startswith("tools/tests/")
+        item
+        for item in scored_candidates
+        if int(item["score"]) > 0 and not str(item["path"]).startswith("tools/tests/")
     ]
     explicit_set = set(explicit_paths)
     primary_candidates = [
-        item for item in ranked_files if int(item["role_rank"]) <= 1 or str(item["path"]) in explicit_set
+        item
+        for item in ranked_files
+        if int(item["role_rank"]) <= 1 or str(item["path"]) in explicit_set
     ]
     primary_files = [str(item["path"]) for item in primary_candidates[:PRIMARY_LIMIT]]
 
     non_launcher_leftovers = [
         str(item["path"])
         for item in ranked_files
-        if str(item["path"]) not in primary_files and not is_launcher_ui_candidate(str(item["path"]))
+        if str(item["path"]) not in primary_files
+        and not is_launcher_ui_candidate(str(item["path"]))
     ]
     launcher_leftovers = [
         str(item["path"])
@@ -534,9 +555,7 @@ def infer_patch_surface(
         if str(item["path"]) not in primary_files and is_launcher_ui_candidate(str(item["path"]))
     ]
     nearby_tests = dedupe_keep_order(
-        test
-        for item in ranked_files[: PRIMARY_LIMIT + 1]
-        for test in item["nearby_tests"]
+        test for item in ranked_files[: PRIMARY_LIMIT + 1] for test in item["nearby_tests"]
     )
     secondary_pool = list(non_launcher_leftovers)
     secondary_pool.extend(nearby_tests[:SECONDARY_TEST_HINT_LIMIT])
@@ -566,7 +585,9 @@ def infer_patch_surface(
     if nearby_tests:
         reasoning_parts.append(f"nearby tests: {', '.join(nearby_tests[:3])}")
     if not reasoning_parts:
-        reasoning_parts.append("No safe patch surface inferred from explicit targets, cheap symbol relevance, grep hits, or nearby tests.")
+        reasoning_parts.append(
+            "No safe patch surface inferred from explicit targets, cheap symbol relevance, grep hits, or nearby tests."
+        )
 
     return {
         "primary_files": primary_files,
@@ -582,9 +603,15 @@ def infer_validation_plan(patch_surface: dict[str, object]) -> list[str]:
         *patch_surface.get("secondary_files", []),
     ]
     commands: list[str] = []
-    if any(item.startswith("tools/router/") or "route_manifest" in item or "execute_plan" in item for item in files):
+    if any(
+        item.startswith("tools/router/") or "route_manifest" in item or "execute_plan" in item
+        for item in files
+    ):
         commands.append("bash tools/router_regression.sh")
-    if any(item.endswith("tools/codex_gate.py") or item.endswith("tools/codex_gate.sh") for item in files):
+    if any(
+        item.endswith("tools/codex_gate.py") or item.endswith("tools/codex_gate.sh")
+        for item in files
+    ):
         commands.extend(
             [
                 "bash tools/tests/test_codex_gate.sh",
@@ -664,16 +691,22 @@ def reduce_scope_structured(
     }
 
 
-def analyze_sanity_flags(cleaned_task: str, target_files: Sequence[str], patch_surface: dict[str, object] | None = None) -> dict[str, object]:
+def analyze_sanity_flags(
+    cleaned_task: str, target_files: Sequence[str], patch_surface: dict[str, object] | None = None
+) -> dict[str, object]:
     task_lower = cleaned_task.lower()
     primary_files = list((patch_surface or {}).get("primary_files", []))
     contradiction = bool(
         re.search(r"\b(and|but)\b.*\bnot\b", task_lower)
         or re.search(r"\bnot\b.*\b(and|but)\b", task_lower)
     )
-    underspecified = len(primary_files) == 0 or (len(cleaned_task.split()) < 5 and len(target_files) == 0)
+    underspecified = len(primary_files) == 0 or (
+        len(cleaned_task.split()) < 5 and len(target_files) == 0
+    )
     dangerous = bool(
-        re.search(r"(rm\s+-rf|sudo\s+rm|dd\s+if=|format\s+disk|shutdown|reboot|mkfs|poweroff)", task_lower)
+        re.search(
+            r"(rm\s+-rf|sudo\s+rm|dd\s+if=|format\s+disk|shutdown|reboot|mkfs|poweroff)", task_lower
+        )
     )
     notes = []
     if contradiction:
@@ -730,7 +763,7 @@ def build_prompt(
     lines.extend(
         [
             "",
-        "CONSTRAINTS:",
+            "CONSTRAINTS:",
         ]
     )
     if constraints:
@@ -792,8 +825,12 @@ def print_kvs(entries: Iterable[tuple[str, str]]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Local pre-processing gate for Codex workflows")
     parser.add_argument("--task", required=True, help="User-described task for Codex")
-    parser.add_argument("--files", nargs="*", default=[], help="Optional files or paths mentioned in the request")
-    parser.add_argument("--prompt-path", help="Explicit path where the compact prompt should be written")
+    parser.add_argument(
+        "--files", nargs="*", default=[], help="Optional files or paths mentioned in the request"
+    )
+    parser.add_argument(
+        "--prompt-path", help="Explicit path where the compact prompt should be written"
+    )
     parser.add_argument("--root", help="Override the Lucy root path")
     args = parser.parse_args()
 
@@ -853,7 +890,9 @@ def main() -> None:
         ("PROMPT_PATH", str(prompt_file)),
     ]
     if classification == "codex_needed":
-        entries.append(("PROMPT_SUMMARY", textwrap.shorten(prompt_text, width=200, placeholder="...")))
+        entries.append(
+            ("PROMPT_SUMMARY", textwrap.shorten(prompt_text, width=200, placeholder="..."))
+        )
     print_kvs(entries)
 
 
