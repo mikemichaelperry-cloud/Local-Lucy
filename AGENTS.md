@@ -134,7 +134,7 @@ User-specific personas (Michael, Racheli) are triggered by identity declarations
 
 | Base model | Persona path | Notes |
 |------------|--------------|-------|
-| `local-lucy-llama31` (llama3.1:8b) | LoRA adapter | Trained/converted/registered |
+| `local-lucy-llama31` (llama3.1:8b) | LoRA adapter | Archived to `backups/v10-dev-cleanup/2026-07-04/lora/`; retrain or restore to use |
 | `local-lucy-mistral` (mistral-nemo:12b) | **Prompt-level fallback** | LoRA training OOMs at `prepare_model_for_kbit_training` on 12 GB VRAM; prompt fallback is seamless |
 | `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` (qwen3:14b) | **Prompt-level fallback** | LoRA training OOMs at `prepare_model_for_kbit_training` on 12 GB VRAM; fallback is seamless via `local_answer.py` |
 
@@ -149,6 +149,9 @@ User-specific personas (Michael, Racheli) are triggered by identity declarations
 - `tests/golden_persona_cases.jsonl` — persona-specific behavioral checks
 
 ### Typical workflow
+
+> **Note:** The pre-trained Michael/Racheli LoRA artifacts and datasets were archived to `backups/v10-dev-cleanup/2026-07-04/lora/` as part of the v10-dev cleanup. The commands below regenerate them at their original paths from the built-in specs.
+
 ```bash
 cd ~/lucy-v10
 source ui-v10/.venv/bin/activate
@@ -178,7 +181,7 @@ python3 tools/lora/evaluate_persona.py --model local-lucy --prompt-persona rache
 
 | Base tag | Backend model | Michael | Racheli | Notes |
 |---|---|---|---|---|
-| `local-lucy-llama31` | Llama 3.1 8B | ✅ LoRA | ✅ LoRA | Trained, converted, registered |
+| `local-lucy-llama31` | Llama 3.1 8B | ⚠️ Archived | ⚠️ Archived | Artifacts backed up to `backups/v10-dev-cleanup/2026-07-04/lora/`; prompt fallback remains active |
 | `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` | Qwen3 14B | ⚠️ Prompt fallback | ⚠️ Prompt fallback | OOM on RTX 3060 12 GB |
 | `local-lucy-mistral` | Mistral-Nemo 12B | ⚠️ Prompt fallback | ⚠️ Prompt fallback | OOM on RTX 3060 12 GB |
 

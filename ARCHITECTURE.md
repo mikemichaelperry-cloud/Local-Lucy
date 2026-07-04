@@ -230,7 +230,7 @@ PTT Press → Record Audio → Whisper.cpp (GPU if available) → Transcript
 
 **Launcher scripts:**
 - `START_LUCY.sh` — Desktop shortcut entrypoint
-- `tools/start_local_lucy_v9.sh` — Legacy terminal launcher
+- `backups/v10-dev-cleanup/2026-07-04/tools/start_local_lucy_v9.sh` — Legacy terminal launcher (archived)
 
 Both must only reference `ui-v10/.venv/bin/python3`.
 

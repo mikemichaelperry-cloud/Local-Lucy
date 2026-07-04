@@ -24,12 +24,12 @@ The runtime resolution is handled in `tools/router_py/local_answer.py`.
 
 | Base model | Ollama tag | Size | Michael | Racheli | Implementation |
 |---|---|---|---|---|---|
-| Llama 3.1 8B Instruct | `local-lucy-llama31` | ~8B | ✅ LoRA (`local-lucy-llama31-michael`) | ✅ LoRA (`local-lucy-llama31-racheli`) | Trained, converted to GGUF, registered |
+| Llama 3.1 8B Instruct | `local-lucy-llama31` | ~8B | ⚠️ Archived (`local-lucy-llama31-michael`) | ⚠️ Archived (`local-lucy-llama31-racheli`) | Pre-trained adapters backed up to `backups/v10-dev-cleanup/2026-07-04/lora/`; prompt-level fallback is active until restored or retrained |
 | Qwen3 14B | `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` | ~14B | ⚠️ Prompt-level fallback | ⚠️ Prompt-level fallback | Cannot train on RTX 3060 12 GB (OOM) |
 | Mistral-Nemo 12B | `local-lucy-mistral` | ~12B | ⚠️ Prompt-level fallback | ⚠️ Prompt-level fallback | Cannot train on RTX 3060 12 GB (OOM); prompt fallback is used |
 
-> **Legend:** ✅ LoRA adapter installed and registered  
-> **⚠️** Falls back to prompt-level persona injection  
+> **Legend:** ✅ LoRA adapter installed and registered
+> **⚠️** Falls back to prompt-level persona injection
 > **🔄** Adapter training or conversion is pending
 
 ### Hardware limitation: Qwen3 14B
@@ -46,10 +46,12 @@ The runtime resolution is handled in `tools/router_py/local_answer.py`.
 |---|---|
 | `config/personas/michael.txt` | Prompt fragment for Michael |
 | `config/personas/racheli.txt` | Prompt fragment for Racheli |
-| `data/lora/datasets/michael.jsonl` | Training conversations for Michael LoRA |
-| `data/lora/datasets/racheli.jsonl` | Training conversations for Racheli LoRA |
+| `backups/v10-dev-cleanup/2026-07-04/lora/datasets/michael.jsonl` | Archived training conversations for Michael LoRA |
+| `backups/v10-dev-cleanup/2026-07-04/lora/datasets/racheli.jsonl` | Archived training conversations for Racheli LoRA |
 
 ## Training a Persona LoRA Adapter
+
+> **Note:** The pre-trained LoRA adapters and datasets were archived to `backups/v10-dev-cleanup/2026-07-04/lora/` as part of the v10-dev cleanup. To use the existing adapters, restore them to `models/lora/` and `data/lora/` or update the corresponding `config/Modelfile.*` ADAPTER paths. The workflow below regenerates the adapters from the built-in specs.
 
 ### One adapter manually
 

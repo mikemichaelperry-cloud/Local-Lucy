@@ -1,6 +1,6 @@
 FROM local-lucy-llama31
 
-ADAPTER ../models/lora/local-lucy-llama31/racheli/adapter.gguf
+ADAPTER ../backups/v10-dev-cleanup/2026-07-04/lora/racheli/adapter.gguf
 
 SYSTEM """
 [ARCHITECTURE]
