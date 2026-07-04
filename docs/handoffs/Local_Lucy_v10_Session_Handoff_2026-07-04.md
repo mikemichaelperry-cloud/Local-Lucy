@@ -33,9 +33,15 @@
    - Kept only `Local_Lucy_V10_Architecture_2026-07-04.md` on the Desktop
    - Verified `Local-Lucy-v10.desktop` still points to `/home/mike/lucy-v10/START_LUCY.sh`
 
-5. **v11 roadmap created and revised**
+5. **v11 roadmap created, revised, and approved**
    - Saved to `docs/superpowers/plans/2026-07-05-local-lucy-v11-roadmap.md`
-   - Revised order after review feedback:
+   - Approved with four amendments:
+     1. Hebrew code paths: aim for separation (not reachable/loaded/maintained in primary runtime), not destructive deletion of shared utilities.
+     2. Shadow-mode model selection: treat manual choice as one signal; add blind A/B answer comparisons and continue collecting data after the 50-query gate.
+     3. Failed evidence retrieval: add route-dependent fallback rules so high-stakes queries do not silently fall back to unverified local answers.
+     4. Voice GPU configuration: confirm actual Kokoro device (CPU vs CUDA) and document one source of truth before changing defaults.
+   - Additional metric added: context-guard telemetry including unused accepted context, citation coverage, context disagreement, and entity collision.
+   - Phase order:
      - Phase 0: Correct scope (English-only, evidence vs synthesis)
      - Phase 1: Establish measurements (frozen validation corpus, confusion matrix, latency baselines)
      - Phase 2: Context provenance and guard

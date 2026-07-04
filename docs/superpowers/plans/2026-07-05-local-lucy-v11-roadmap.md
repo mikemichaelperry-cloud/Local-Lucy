@@ -17,7 +17,7 @@ Transform Local Lucy v10 into v11: an **English-only**, autonomous assistant tha
   - `local-lucy-llama31`: llama3.1:8b (8192 ctx)
   - `local-lucy-mistral`: mistral-nemo 12B
 - One model loaded at a time; switching models incurs unload/load latency
-- Voice: Whisper STT + Kokoro TTS (cuda where possible)
+- Voice: Whisper STT + Kokoro TTS. Current configuration must be confirmed before v11 implementation: earlier docs disagreed on whether Kokoro runs on CPU or CUDA. On RTX 3060 12 GB, a 9 GB Qwen model plus CUDA TTS may cause VRAM contention. Document one source of truth and measure GPU memory before changing defaults.
 
 ## v11 Design Principles
 
@@ -44,7 +44,8 @@ Transform Local Lucy v10 into v11: an **English-only**, autonomous assistant tha
 - [ ] Fix system-prompt contradictions: replace "never hedge/disclaim" + "facts only" with "answer directly, distinguish facts/inferences/uncertainty, never invent."
 
 **Success criteria:**
-- No `HEBREW_QUERY` or Racheli-specific code remains in the primary Local Lucy runtime.
+- No `HEBREW_QUERY` or Racheli-specific code is reachable from, loaded by, or maintained as part of the primary Local Lucy runtime.
+- Shared utilities or archived modules may remain if they are isolated and do not add runtime complexity. The aim is separation, not deletion for its own sake.
 - Augmented route documentation clearly separates evidence sources from synthesis providers.
 
 ---
@@ -95,13 +96,26 @@ Transform Local Lucy v10 into v11: an **English-only**, autonomous assistant tha
   - Memory turn: entity or lexical signal + embedding ≥ 0.30
   - Wikipedia/news snippet: entity or lexical signal + embedding ≥ 0.45 + temporal check
   - Generated text (OpenAI/Kimi): never injected as evidence; only used as synthesis if evidence is present
+- [ ] Add strict fallback rules when evidence retrieval fails:
+  - Stable ordinary fact → LOCAL answer allowed, labelled as unverified if appropriate.
+  - Current fact/news/price/weather/time → do not silently answer from local knowledge; ask for clarification or report unavailability.
+  - Medical/veterinary/legal high-stakes → do not replace failed evidence with confident local generation.
+  - Opinion or analysis → LOCAL reasoning acceptable, but distinguish from verified fact.
 - [ ] Integrate the guard into `classify.py` before the final `RoutingDecision`.
 - [ ] Update prompt instruction: "Use the following context only if it directly answers the current query; otherwise answer from your own knowledge."
 - [ ] Begin extracting context-building logic from `execution_engine.py` into `context_builder.py`.
+- [ ] Log context-guard telemetry:
+  - accepted context,
+  - rejected context,
+  - unused accepted context (passed guard but answer did not rely on it),
+  - answer citation coverage (major factual claims supported by evidence),
+  - context disagreement (two accepted sources contradict each other),
+  - entity collision (similar names but different people, places, products).
 
 **Success criteria:**
 - Japan tourism query no longer cites China tourism.
 - Context-contamination tests pass.
+- Failed evidence retrieval follows route-dependent fallback rules.
 - Barrage and HMI tests pass.
 
 ---
@@ -133,11 +147,14 @@ Transform Local Lucy v10 into v11: an **English-only**, autonomous assistant tha
   - actual latency,
   - user correction (if any).
 - [ ] Run shadow mode during normal use and compare recommendations with manual selections.
+- [ ] Run blind A/B comparisons: for a subset of queries, generate answers from both the recommended model and the competing model without revealing which is which. Record the user's preferred answer. Answer preference is a stronger label than manual model selection.
+- [ ] Continue collecting shadow logs and A/B results after the initial gate; 50 queries is enough to enable Auto, not enough to lock the policy permanently.
 - [ ] Only after the shadow logs show reliable recommendations, make Auto the default and move manual control into the Engineering panel.
 
 **Success criteria:**
 - Shadow logs show ≥ 90% agreement with sensible manual choices over at least 50 diverse queries.
-- Qwen is not chosen for a class unless it demonstrably outperforms llama3.1 on that class.
+- Blind A/B comparisons do not show a systematic user preference against the recommended model.
+- Qwen is not chosen for a class unless it demonstrably outperforms llama3.1 on that class, including in A/B answer quality.
 
 ---
 
