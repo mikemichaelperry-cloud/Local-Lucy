@@ -263,31 +263,6 @@ class RSSNewsProvider:
             "name": "i24NEWS",
             "region": "middle_east",
         },
-        # Hebrew-language Israeli sources
-        "hebrew_ynet": {
-            "url": "https://www.ynet.co.il/Integration/StoryRss1854.xml",
-            "name": "Ynet (Hebrew)",
-            "region": "israel_hebrew",
-            "language": "he",
-        },
-        "hebrew_wall": {
-            "url": "https://www.walla.co.il/rss",
-            "name": "Walla! (Hebrew)",
-            "region": "israel_hebrew",
-            "language": "he",
-        },
-        "hebrew_mako": {
-            "url": "https://www.mako.co.il/rss/headlines-index.xml",
-            "name": "Mako (Hebrew)",
-            "region": "israel_hebrew",
-            "language": "he",
-        },
-        "hebrew_n12": {
-            "url": "https://www.mako.co.il/rss/news-military.xml",
-            "name": "N12 (Hebrew)",
-            "region": "israel_hebrew",
-            "language": "he",
-        },
         # Australia
         "guardian_australia": {
             "url": "https://www.theguardian.com/australia-news/rss",
@@ -384,26 +359,6 @@ class RSSNewsProvider:
             "dome of the rock",
             "golan heights",
         ],
-        "israel_hebrew": [
-            "ישראל",
-            "ירושלים",
-            "תל אביב",
-            "חיפה",
-            "פלסטין",
-            "עזה",
-            "חמאס",
-            "גדה המערבית",
-            "לבנון",
-            "חיזבאללה",
-            "באר שבע",
-            "נתניהו",
-            'צה"ל',
-            "איראן",
-            "סוריה",
-            "מזרח התיכון",
-            "חדשות ישראל",
-            "חדשות היום",
-        ],
         "australia": [
             "australia",
             "australian",
@@ -434,20 +389,14 @@ class RSSNewsProvider:
         ],
     }
 
-    # Hebrew character detection for Hebrew-source preference
-    _HEBREW_RE = re.compile(r"[\u0590-\u05FF]")
-
     @classmethod
     def _detect_region(cls, query: str) -> set[str]:
-        """Detect regions from query keywords, including Hebrew queries."""
+        """Detect regions from query keywords."""
         query_lower = query.lower()
         detected = set()
         for region, keywords in cls.REGION_KEYWORDS.items():
             if any(kw in query_lower for kw in keywords):
                 detected.add(region)
-        # Hebrew-script queries always prefer Hebrew sources alongside any region.
-        if cls._HEBREW_RE.search(query):
-            detected.add("israel_hebrew")
         return detected
 
     @classmethod
@@ -456,20 +405,14 @@ class RSSNewsProvider:
         detected_regions = cls._detect_region(query)
         regional_feeds = []
         world_feeds = []
-        hebrew_feeds = []
 
         for source_id, source_info in cls.RSS_FEEDS.items():
             feed_region = source_info.get("region", "world")
-            if feed_region == "israel_hebrew":
-                hebrew_feeds.append((source_id, source_info))
-            elif feed_region in detected_regions:
+            if feed_region in detected_regions:
                 regional_feeds.append((source_id, source_info))
             elif feed_region == "world":
                 world_feeds.append((source_id, source_info))
 
-        # Hebrew queries: Hebrew sources first, then regional, then world.
-        if "israel_hebrew" in detected_regions:
-            return hebrew_feeds + regional_feeds + world_feeds
         if detected_regions:
             return regional_feeds + world_feeds
         return world_feeds

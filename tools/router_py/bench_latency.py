@@ -29,7 +29,7 @@ QUERIES = [
     "Latest news on Israel Gaza conflict.",
     "What is the current price of AAPL?",
     "What is the standard dosage of amoxicillin for adults?",
-    "Translate 'hello' to Hebrew.",
+    "Translate 'hello' to French.",
     "Write a Python function to reverse a string.",
     "Tell me a joke.",
     "What did we discuss earlier?",
@@ -107,10 +107,12 @@ async def main() -> int:
         pass
 
     routing = bench_routing()
-    print(f"\nRouting (classify + policy router):")
-    print(f"  mean={routing['mean_ms']:.1f}ms  min={routing['min_ms']:.1f}ms  max={routing['max_ms']:.1f}ms")
+    print("\nRouting (classify + policy router):")
+    print(
+        f"  mean={routing['mean_ms']:.1f}ms  min={routing['min_ms']:.1f}ms  max={routing['max_ms']:.1f}ms"
+    )
 
-    print(f"\nLocal model generation (3 queries each):")
+    print("\nLocal model generation (3 queries each):")
     print(f"{'Model':<30} {'Mean':>10} {'Min':>10} {'Max':>10} {'Errors':>8}")
     for model in MODELS:
         result = await bench_model(model)

@@ -475,11 +475,38 @@ def gate_recreational_pet(
 
     # Do not treat health/disease queries as recreational.
     health_disease_terms = [
-        "dysplasia", "cancer", "tumor", "lump", "vomiting", "diarrhea", "fever",
-        "limp", "limping", "coughing", "sneezing", "scratching", "lethargic",
-        "worms", "fleas", "ticks", "infection", "disease", "sick", "ill",
-        "not eating", "refusing food", "lost weight", "pain", "hurt", "injured",
-        "vet", "veterinary", "veterinarian", "emergency", "poison", "toxin",
+        "dysplasia",
+        "cancer",
+        "tumor",
+        "lump",
+        "vomiting",
+        "diarrhea",
+        "fever",
+        "limp",
+        "limping",
+        "coughing",
+        "sneezing",
+        "scratching",
+        "lethargic",
+        "worms",
+        "fleas",
+        "ticks",
+        "infection",
+        "disease",
+        "sick",
+        "ill",
+        "not eating",
+        "refusing food",
+        "lost weight",
+        "pain",
+        "hurt",
+        "injured",
+        "vet",
+        "veterinary",
+        "veterinarian",
+        "emergency",
+        "poison",
+        "toxin",
     ]
     if any(term in q for term in health_disease_terms):
         return None
@@ -523,14 +550,37 @@ def gate_medical_vet(
     if query and _TRAVEL_PLACE_RE.search(query):
         q_lower = query.lower()
         medical_markers = (
-            r"\bmedication\b", r"\bmedicine\b", r"\bprescription\b", r"\bdosage\b",
-            r"\bvaccine\b", r"\bvaccination\b", r"\bmalaria\b", r"\bdengue\b",
-            r"\binsurance\b", r"\bdoctor\b", r"\bhospital\b", r"\bclinic\b",
-            r"\bpregnant\b", r"\bpregnancy\b", r"\bdiabetes\b", r"\ballergy\b",
-            r"\ballergic\b", r"\bepipen\b", r"\bsymptom\b", r"\bsick\b",
-            r"\billness\b", r"\bdisease\b", r"\binfection\b", r"\bpain\b",
-            r"\bdog\b", r"\bcat\b", r"\bpet\b", r"\bveterinary\b", r"\bvet\b",
-            r"\bpuppy\b", r"\bkitten\b",
+            r"\bmedication\b",
+            r"\bmedicine\b",
+            r"\bprescription\b",
+            r"\bdosage\b",
+            r"\bvaccine\b",
+            r"\bvaccination\b",
+            r"\bmalaria\b",
+            r"\bdengue\b",
+            r"\binsurance\b",
+            r"\bdoctor\b",
+            r"\bhospital\b",
+            r"\bclinic\b",
+            r"\bpregnant\b",
+            r"\bpregnancy\b",
+            r"\bdiabetes\b",
+            r"\ballergy\b",
+            r"\ballergic\b",
+            r"\bepipen\b",
+            r"\bsymptom\b",
+            r"\bsick\b",
+            r"\billness\b",
+            r"\bdisease\b",
+            r"\binfection\b",
+            r"\bpain\b",
+            r"\bdog\b",
+            r"\bcat\b",
+            r"\bpet\b",
+            r"\bveterinary\b",
+            r"\bvet\b",
+            r"\bpuppy\b",
+            r"\bkitten\b",
         )
         if not any(re.search(m, q_lower) for m in medical_markers):
             return None
@@ -582,8 +632,17 @@ def gate_ambiguous_local(
 
     # Planetary / space weather is a science question, not a live forecast.
     planetary_bodies = {
-        "mars", "moon", "jupiter", "saturn", "venus", "mercury",
-        "neptune", "uranus", "pluto", "sun", "solar system",
+        "mars",
+        "moon",
+        "jupiter",
+        "saturn",
+        "venus",
+        "mercury",
+        "neptune",
+        "uranus",
+        "pluto",
+        "sun",
+        "solar system",
     }
     if "weather" in q and any(body in q for body in planetary_bodies):
         return PolicyDecision(
@@ -608,10 +667,25 @@ def gate_ambiguous_local(
 
     # Financial instrument + explicit historical year is a history question.
     financial_terms = {
-        "bitcoin", "btc", "ethereum", "eth", "stock", "stocks", "share", "shares",
-        "gold", "silver", "oil", "gas", "price", "value", "traded",
+        "bitcoin",
+        "btc",
+        "ethereum",
+        "eth",
+        "stock",
+        "stocks",
+        "share",
+        "shares",
+        "gold",
+        "silver",
+        "oil",
+        "gas",
+        "price",
+        "value",
+        "traded",
     }
-    if any(term in q for term in financial_terms) and re.search(r"\bin\s+19\d{2}\b|\bin\s+20\d{2}\b", q):
+    if any(term in q for term in financial_terms) and re.search(
+        r"\bin\s+19\d{2}\b|\bin\s+20\d{2}\b", q
+    ):
         return PolicyDecision(
             route="LOCAL",
             reason_code="policy:historical_finance_local",
@@ -1185,11 +1259,9 @@ class PolicyRouter:
         gate_personal_family,
         gate_recreational_pet,
         gate_medical_vet,
-        # Hebrew-script queries bypass the English keyword gates and embedding
-        # router so that Hebrew Wikipedia / news / time / weather are used.
-        # Placed early (after medical/vet) so English-centric gates do not
-        # misroute Hebrew factual lookups to TIME, FINANCE, etc.
-        gate_hebrew_query,
+        # Hebrew-script query gate has been removed from the primary runtime
+        # as part of the V11 English-only scope. The function is retained below
+        # as an isolated utility for a separate Hebrew assistant.
         # Specific external-source gates must run before the broad factual_lookup
         # gate so that time/weather/news/conflict/age/current queries keep their
         # dedicated routes and reason codes.

@@ -235,8 +235,9 @@ _SELF_KNOWLEDGE_TEMPLATE = (
     "Architecture: PySide6/Qt6 HMI (Python 3.10); Ollama LLM backend; "
     "MiniLM-L6-v2 embedding router (384-dim, k=3) with deterministic policy guards; "
     "Whisper STT + Kokoro TTS voice stack; SQLite session memory and persistent facts.\n"
-    "Routing is automatic: LOCAL (default), AUGMENTED (Wikipedia→OpenAI→Kimi), "
-    "NEWS, TIME, WEATHER. Do not ask the user to pick a mode.\n"
+    "Routing is automatic: LOCAL (default), AUGMENTED (Wikipedia evidence with "
+    "optional synthesis by OpenAI/Kimi), NEWS, TIME, WEATHER. "
+    "Do not ask the user to pick a mode.\n"
     "Capabilities: coding, writing, reasoning, voice, "
     "tube database (648 types), live data via AUGMENTED/NEWS/WEATHER.\n"
     "Language: I am an English-only assistant. I do not translate to or from other languages.\n"
@@ -292,7 +293,6 @@ FIXED_POLICY_RESPONSES: Dict[str, str] = {
     "tube_807_identity": "The 807 is a beam power tetrode vacuum tube. It was widely used in RF transmitters and older audio power stages.",
     "ambiguity_ic3055": "The label 'IC 3055' is ambiguous. If you mean 2N3055, that is a power transistor, not an integrated circuit.",
     "fact_capital_france": "The capital of France is Paris.",
-    "racheli_presence_ack": "Understood. Racheli is your life partner, and I will keep responses grounded, warm, and respectful to both of you.",
     "greeting_generic": "Hello. I'm here and functioning normally. What would you like help with?",
     "recursion_one_sentence": "Recursion is solving a problem by reducing it to smaller versions of itself until a simple base case stops the loop.",
     "pet_stress_blasts": "Move your dog to the quietest interior room, close blinds, and run steady white noise to mask blasts.\nStay close, speak calmly, and offer a familiar blanket or crate; avoid forcing contact if your dog wants distance.\nIf panic is severe or persistent, contact a veterinarian for a short-term anxiety plan.",
@@ -913,7 +913,7 @@ class LocalAnswer:
                 "my wife",
                 "my husband",
                 "my spouse",
-                "who is racheli",
+                "who is ",
                 "who is rachel",
                 "who am i",
                 "my name",
@@ -1066,12 +1066,12 @@ class LocalAnswer:
                 return None
             return " ".join(partner_facts)
 
-        # --- Specific person lookup ("Who is Racheli?") ---
+        # --- Specific person lookup ("Who is Sarah?") ---
         if "who is " in q:
             # Extract the name after "who is"
-            m = re.search(r"who is\s+([a-z]+)", q)
+            m = re.search(r"who is\s+([a-zA-Z]+)", q)
             if m:
-                name = m.group(1)
+                name = m.group(1).lower()
                 person_facts = [f for f in facts if name in f.lower()]
                 if person_facts:
                     return " ".join(person_facts)

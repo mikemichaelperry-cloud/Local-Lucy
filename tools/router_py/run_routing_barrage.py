@@ -39,7 +39,7 @@ BARRAGE: list[tuple[str, str | set[str]]] = [
     ("What is the standard dosage of amoxicillin for adults?", "EVIDENCE"),
     ("My dog is vomiting and has diarrhea. What should I do?", "EVIDENCE"),
     # Local capabilities -> LOCAL
-    ("Translate 'hello' to Hebrew.", "LOCAL"),
+    ("Translate 'hello' to French.", "LOCAL"),
     ("Write a Python function to reverse a string.", {"LOCAL", "AUGMENTED"}),
     ("Tell me a joke.", "LOCAL"),
     ("What is your opinion on artificial intelligence?", "LOCAL"),
@@ -52,12 +52,10 @@ BARRAGE: list[tuple[str, str | set[str]]] = [
     ("History of the Roman Empire.", {"LOCAL", "AUGMENTED"}),
     ("What is 2 + 2?", "LOCAL"),
     ("Write a short story about a dragon.", "LOCAL"),
-    # Hebrew queries -> should route to external sources when factual
-    ("מהי בירת ישראל?", "AUGMENTED"),
-    ("חדשות ישראל", "NEWS"),
-    ("מה השעה בטוקיו?", "TIME"),
-    ("איך אומרים שלום באנגלית?", "LOCAL"),
-    ("מי ראש הממשלה של ישראל?", "AUGMENTED"),
+    # Current factual queries in English -> external sources when appropriate
+    ("What is the capital of Israel?", "AUGMENTED"),
+    ("Israel news", "NEWS"),
+    ("What time is it in Tokyo?", "TIME"),
     # Edge cases
     ("Bitcoin price in 2010", "LOCAL"),
     ("News industry business model", "LOCAL"),

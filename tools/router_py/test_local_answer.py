@@ -689,21 +689,21 @@ class TestPersonalFamilyFactResolver(unittest.TestCase):
         with patch(
             "local_answer._load_family_facts_direct",
             return_value=[
-                "Racheli is your life partner.",
+                "Sarah is your life partner.",
             ],
         ):
             result = self.answer._resolve_personal_family_fact("Who is my partner?")
-        self.assertIn("Racheli", result or "")
+        self.assertIn("Sarah", result or "")
 
     def test_resolve_specific_person_from_facts(self):
         with patch(
             "local_answer._load_family_facts_direct",
             return_value=[
-                "Racheli is your life partner.",
+                "Sarah is your life partner.",
             ],
         ):
-            result = self.answer._resolve_personal_family_fact("Who is Racheli?")
-        self.assertIn("Racheli", result or "")
+            result = self.answer._resolve_personal_family_fact("Who is Sarah?")
+        self.assertIn("Sarah", result or "")
 
     def test_resolve_returns_none_for_unknown(self):
         with patch("local_answer._load_family_facts_direct", return_value=[]):
