@@ -126,7 +126,14 @@ from router_py.execution_engine_state import StateWriter
 from router_py.resilience import get_breaker, CircuitBreakerOpen
 from router_py.shutdown_handler import register_closeable
 from router_py.structured_logging import get_structured_logger, ContextualLogger
-from router_py.context_guard import is_evidence_relevant
+from router_py.context_guard import is_evidence_relevant, filter_memory_context
+
+try:
+    from router_py import metrics as _router_metrics
+
+    HAS_ROUTER_METRICS = True
+except Exception:
+    HAS_ROUTER_METRICS = False
 
 try:
     from router_py.fallback_telemetry import make as _ft, merge as _ft_merge
@@ -239,6 +246,28 @@ DEFAULT_POLICY_CONFIDENCE_THRESHOLD = 0.60
 
 # Default chat memory file path (matches runtime_request.py)
 DEFAULT_CHAT_MEMORY_FILE = "~/.codex-api-home/lucy/runtime-v10/state/chat_session_memory.txt"
+
+# Current-fact markers used for route-dependent evidence fallback.
+_CURRENT_FACT_MARKERS = {"current", "latest", "now", "today", "price"}
+
+
+def _is_current_fact_query(question: str) -> bool:
+    """Return True when the query asks for current/latest/real-time information."""
+    norm = re.sub(r"\s+", " ", (question or "").lower().strip())
+    return any(marker in norm for marker in _CURRENT_FACT_MARKERS)
+
+
+def _evidence_has_content(evidence: dict[str, Any] | None) -> bool:
+    """Return True when *evidence* actually contains usable content."""
+    if not evidence or not isinstance(evidence, dict):
+        return False
+    return bool(
+        evidence.get("context")
+        or evidence.get("content")
+        or evidence.get("formatted")
+        or evidence.get("bounded_response")
+        or evidence.get("html_context")
+    )
 
 
 def _load_session_memory_context_with_telemetry(
@@ -702,6 +731,37 @@ class ExecutionEngine:
         self._logger.debug(f"Using namespace-isolated state dir: {state_dir}")
         return state_dir
 
+    def _record_request_metrics(
+        self,
+        context: dict[str, Any],
+        route: RoutingDecision | None,
+        result: ExecutionResult,
+        execution_time_ms: int,
+    ) -> None:
+        """Emit a request-level metric; failures are swallowed."""
+        if not HAS_ROUTER_METRICS:
+            return
+        try:
+            request_id = (context or {}).get("request_id", "")
+            model = self.config.get("model") or os.environ.get("LUCY_LOCAL_MODEL", "")
+            _router_metrics.record_request(
+                request_id=str(request_id),
+                query=str((context or {}).get("question", "")),
+                route=str(route.route if route else result.route),
+                model=str(model),
+                provider=str(result.provider),
+                confidence=float(route.confidence if route else 0.0),
+                latency_ms=execution_time_ms,
+                outcome_code=str(result.outcome_code),
+                error=result.error_message or None,
+                extra={
+                    "status": result.status,
+                    "provider_usage_class": result.provider_usage_class,
+                },
+            )
+        except Exception:
+            self._logger.debug("Failed to record request metrics", exc_info=True)
+
     def _prepare_subprocess_env(self, base_env: dict[str, str] | None = None) -> dict[str, str]:
         """
         Prepare environment variables for subprocess calls.
@@ -821,6 +881,7 @@ class ExecutionEngine:
             )
             self._write_state_files(route, result, context)
             self._write_json_state_files(route, result, context)
+            self._record_request_metrics(context, route, result, execution_time)
             return result
 
         # Use Python-native path by default for all routes (shell-free)
@@ -882,7 +943,7 @@ class ExecutionEngine:
             if cached:
                 execution_time = int((time.time() - start_time) * 1000)
                 self._logger.info(f"Cache hit: returning cached response ({execution_time}ms)")
-                return ExecutionResult(
+                cache_result = ExecutionResult(
                     status="completed",
                     outcome_code="local_answer",
                     route="LOCAL",
@@ -892,11 +953,17 @@ class ExecutionEngine:
                     execution_time_ms=execution_time,
                     metadata={"cache_hit": True, "execution_time_ms": execution_time},
                 )
+                self._record_request_metrics(context, route, cache_result, execution_time)
+                return cache_result
 
         try:
             # Handle CLARIFY route early
             if route.route == "CLARIFY":
-                return self._handle_clarify_route(intent, route, context, start_time)
+                clarify_result = self._handle_clarify_route(intent, route, context, start_time)
+                self._record_request_metrics(
+                    context, route, clarify_result, clarify_result.execution_time_ms
+                )
+                return clarify_result
 
             # Determine execution path based on route type
             route_type = self._determine_route_type(route, intent, context)
@@ -981,6 +1048,7 @@ class ExecutionEngine:
                 f"outcome={final_result.outcome_code}, time={execution_time}ms"
             )
 
+            self._record_request_metrics(context, route, final_result, execution_time)
             return final_result
 
         except Exception as e:
@@ -1021,6 +1089,7 @@ class ExecutionEngine:
                 except Exception:
                     pass
 
+            self._record_request_metrics(context, route, error_result, execution_time)
             return error_result
 
         finally:
@@ -1887,7 +1956,7 @@ class ExecutionEngine:
         # Reject empty or whitespace-only queries at the engine boundary
         if not question or not question.strip():
             execution_time = int((time.time() - start_time) * 1000)
-            return ExecutionResult(
+            empty_result = ExecutionResult(
                 status="failed",
                 outcome_code="empty_query",
                 route="LOCAL",
@@ -1900,6 +1969,8 @@ class ExecutionEngine:
                 evidence_reason=route.evidence_reason if route else "",
                 policy_reason=route.policy_reason if route else "",
             )
+            self._record_request_metrics(context, route, empty_result, execution_time)
+            return empty_result
 
         # Check for medical context and configure safety constraints
         requires_evidence, evidence_reason = requires_evidence_mode(question, context)
@@ -1923,7 +1994,11 @@ class ExecutionEngine:
         try:
             # Handle CLARIFY route early
             if route.route == "CLARIFY":
-                return self._handle_clarify_route(intent, route, context, start_time)
+                clarify_result = self._handle_clarify_route(intent, route, context, start_time)
+                self._record_request_metrics(
+                    context, route, clarify_result, clarify_result.execution_time_ms
+                )
+                return clarify_result
 
             # Determine route type for proper handling
             route_type = self._determine_route_type(route, intent, context)
@@ -1986,6 +2061,7 @@ class ExecutionEngine:
                 f"outcome={final_result.outcome_code}, time={execution_time}ms"
             )
 
+            self._record_request_metrics(context, route, final_result, execution_time)
             return final_result
 
         except Exception as e:
@@ -2011,6 +2087,7 @@ class ExecutionEngine:
             except Exception:
                 pass
 
+            self._record_request_metrics(context, route, error_result, execution_time)
             return error_result
 
         finally:
@@ -2050,6 +2127,7 @@ class ExecutionEngine:
         self._logger.info(f"Executing full Python route: {route.route}")
         question = context.get("question", "")
         session_id = context.get("session_id", "default") or "default"
+        request_id = context.get("request_id", "")
 
         is_medical_query = self._context_indicates_medical_query(context) or (
             route and route.evidence_reason in ("medical_safety", "medical_context")
@@ -2066,7 +2144,9 @@ class ExecutionEngine:
         # Direct-answer routes (WEATHER, TIME, FINANCE, NEWS) return evidence
         # as the response, so we skip filtering there to preserve completeness.
         if evidence and route.route in ("EVIDENCE", "FULL", "AUGMENTED"):
-            relevant = await asyncio.to_thread(is_evidence_relevant, question, evidence)
+            relevant = await asyncio.to_thread(
+                is_evidence_relevant, question, evidence, request_id=request_id
+            )
             if not relevant:
                 self._logger.warning(
                     "Dropping irrelevant evidence for route %s: title=%r",
@@ -2074,6 +2154,54 @@ class ExecutionEngine:
                     evidence.get("title", "")[:60],
                 )
                 evidence = None
+
+        # Route-dependent evidence failure handling (Phase 1-2).
+        # When evidence is unavailable or was rejected, do not silently fall back
+        # to unverified local knowledge for current facts or high-stakes domains.
+        if route.route in ("AUGMENTED", "EVIDENCE", "FULL") and not _evidence_has_content(evidence):
+            is_current = _is_current_fact_query(question)
+            if is_current:
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="live_data_unavailable",
+                    route=route.route,
+                    provider=route.provider,
+                    provider_usage_class=route.provider_usage_class,
+                    response_text="Live data is currently unavailable for this request. Please try again later.",
+                    error_message="evidence_unavailable",
+                    metadata={
+                        "route_type": "evidence_failure",
+                        "fallback": "live_data_unavailable",
+                        "real_route_preserved": True,
+                    },
+                )
+            if route.route == "EVIDENCE" or route.evidence_reason in (
+                "medical_context",
+                "medical_safety",
+                "veterinary_context",
+            ):
+                return ExecutionResult(
+                    status="completed",
+                    outcome_code="clarification_requested",
+                    route=route.route,
+                    provider=route.provider,
+                    provider_usage_class=route.provider_usage_class,
+                    response_text=(
+                        "I could not find trusted evidence for this question. "
+                        "For medical, veterinary, or legal topics, please consult a "
+                        "qualified professional or rephrase your question with more details."
+                    ),
+                    error_message="trusted_evidence_unavailable",
+                    metadata={
+                        "route_type": "evidence_failure",
+                        "fallback": "safe_clarification",
+                        "real_route_preserved": True,
+                    },
+                )
+            if route.route == "AUGMENTED":
+                # Stable ordinary fact: allow a local, explicitly unverified answer.
+                context["_augmented_evidence_failed_stable_fact"] = True
+                route = dataclasses.replace(route, provider="local", provider_usage_class="local")
 
         # Special handling for WEATHER route: return weather directly
         if route.route == "WEATHER":
@@ -2302,7 +2430,11 @@ class ExecutionEngine:
                 question, session_id=session_id
             )
             if session_memory:
-                self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
+                session_memory = await asyncio.to_thread(
+                    filter_memory_context, question, session_memory, request_id=request_id
+                )
+                if session_memory:
+                    self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
 
             if route.provider == "local":
                 response = await self._call_local_model_async(
@@ -2392,6 +2524,19 @@ class ExecutionEngine:
 
         if is_medical_query and result.route == "AUGMENTED" and result.response_text:
             result = self._append_medical_sources(result, context)
+
+        if context.get("_augmented_evidence_failed_stable_fact") and result.response_text:
+            result = dataclasses.replace(
+                result,
+                response_text=(
+                    "I could not verify this externally; here is what I know: "
+                    + result.response_text
+                ),
+                metadata={
+                    **result.metadata,
+                    "evidence_unverified_local_answer": True,
+                },
+            )
 
         return result
 

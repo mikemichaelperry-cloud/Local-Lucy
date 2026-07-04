@@ -1,11 +1,13 @@
 """Tests for the context relevance guard."""
 
+import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import metrics
 import pytest
 
 from context_guard import (
@@ -218,3 +220,133 @@ def test_memory_fallback_to_keyword_when_model_missing():
     with patch("context_guard._load_bi_model", return_value=None):
         score = score_memory_relevance("Tell me more about Japan", turn)
     assert score >= 0.8
+
+
+# ---------------------------------------------------------------------------
+# Hardening signals (Phase 1-2)
+# ---------------------------------------------------------------------------
+
+
+def _fake_ce(score: float):
+    fake = MagicMock()
+    fake.predict.return_value = [score]
+    return fake
+
+
+def test_provenance_boosts_trusted_and_damps_generated():
+    query = "climate in Japan"
+    base_text = "The climate in Japan is temperate."
+    wiki = {"context": base_text, "provenance": "wikipedia"}
+    generated = {"context": base_text, "provenance": "generated"}
+
+    with patch("context_guard._load_ce_model", return_value=_fake_ce(0.5)):
+        wiki_score = score_evidence_relevance(query, wiki)
+        gen_score = score_evidence_relevance(query, generated)
+
+    # Same semantic raw score; provenance should make Wikipedia higher.
+    assert wiki_score > gen_score
+    assert wiki_score >= 0.6
+    assert gen_score < 0.5
+
+
+def test_temporal_penalty_for_current_query_with_stale_evidence():
+    query = "What is the latest climate news?"
+    fresh = {"context": "Climate news today.", "date": "2026-07-04"}
+    stale = {"context": "Climate news last year.", "date": "2025-01-01"}
+
+    with patch("context_guard._load_ce_model", return_value=_fake_ce(1.0)):
+        fresh_score = score_evidence_relevance(query, fresh)
+        stale_score = score_evidence_relevance(query, stale)
+
+    assert fresh_score > stale_score
+    assert stale_score < 0.55
+
+
+def test_temporal_penalty_skipped_for_weather_and_time():
+    query = "What is the current weather?"
+    stale_weather = {
+        "context": "Current weather is sunny.",
+        "date": "2025-01-01",
+        "provenance": "weather",
+    }
+
+    with patch("context_guard._load_ce_model", return_value=_fake_ce(2.0)):
+        score = score_evidence_relevance(query, stale_weather)
+
+    assert score >= 0.85
+
+
+def test_entity_collision_reduces_score_for_different_place():
+    query = "What is the climate in Japan?"
+    wrong_place = {"context": "The climate in China is diverse."}
+    right_place = {"context": "The climate in Japan is temperate."}
+
+    with patch("context_guard._load_ce_model", return_value=_fake_ce(1.0)):
+        wrong_score = score_evidence_relevance(query, wrong_place)
+        right_score = score_evidence_relevance(query, right_place)
+
+    assert right_score > wrong_score
+    assert wrong_score < 0.5
+
+
+def test_answerability_penalty_when_no_content_word_overlap():
+    query = "What is the climate in Japan?"
+    unrelated = {"context": "Banana farming in Ecuador relies on rainfall."}
+
+    with patch("context_guard._load_ce_model", return_value=_fake_ce(2.0)):
+        score = score_evidence_relevance(query, unrelated)
+
+    assert score < 0.2
+
+
+def test_is_evidence_relevant_records_metric_when_request_id_given(isolated_metrics, monkeypatch):
+    request_id = "req-cg-1"
+    evidence = {"title": "Tourism in Japan", "context": "Tourism in Japan is major."}
+    is_evidence_relevant("What are tourist attractions in Japan?", evidence, request_id=request_id)
+
+    records = [
+        json.loads(line)
+        for line in metrics._METRICS_FILE.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    decision_records = [r for r in records if r.get("type") == "context_decision"]
+    assert len(decision_records) == 1
+    assert decision_records[0]["request_id"] == request_id
+    assert decision_records[0]["kind"] == "evidence"
+    assert decision_records[0]["accepted"] is True
+
+
+def test_filter_memory_context_records_usage_metric(isolated_metrics, monkeypatch):
+    request_id = "req-cg-2"
+    memory = (
+        "User: What are tourist attractions in Japan?\n"
+        "Assistant: Tourism in Japan is a major industry...\n\n"
+        "User: What is quantum computing?\n"
+        "Assistant: Quantum computing uses qubits..."
+    )
+    filtered = filter_memory_context("Tell me more about Japan", memory, request_id=request_id)
+    assert "Japan" in filtered
+    assert "quantum" not in filtered
+
+    records = [
+        json.loads(line)
+        for line in metrics._METRICS_FILE.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    usage_records = [r for r in records if r.get("type") == "context_usage"]
+    assert len(usage_records) == 1
+    assert usage_records[0]["request_id"] == request_id
+    assert usage_records[0]["used"] == 1
+    assert usage_records[0]["total"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Shared fixtures / helpers
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def isolated_metrics(tmp_path, monkeypatch):
+    path = tmp_path / "context_guard_metrics.jsonl"
+    monkeypatch.setattr("metrics._METRICS_FILE", path)
+    yield path
