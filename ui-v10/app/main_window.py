@@ -923,6 +923,15 @@ class OperatorConsoleWindow(QMainWindow):
             self.statusBar().showMessage(f"Request failed: {failure_detail}", 4000)
             return
 
+        # Phase 3: surface the automatic model recommendation in engineering view.
+        if isinstance(payload, dict):
+            recommendation = payload.get("model_recommendation")
+            recommendation_reason = payload.get("model_recommendation_reason")
+            if recommendation:
+                self.control_panel.set_model_recommendation(
+                    f"{recommendation} — {recommendation_reason}"
+                )
+
         request_status = self._payload_text(payload, "status") or result.status
         if request_status == "completed":
             if result.action == "submit_self_review_request":

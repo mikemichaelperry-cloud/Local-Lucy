@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import sys
@@ -11,9 +12,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
-
-import fcntl
-
 
 MODE_TO_ROUTE_CONTROL = {
     "auto": "AUTO",
@@ -111,7 +109,9 @@ def main() -> int:
         else:
             raise RuntimeControlError(f"unsupported command: {args.command}")
 
-        print_success(args.command, result.field, result.value, result.changed, state_file, result.state)
+        print_success(
+            args.command, result.field, result.value, result.changed, state_file, result.state
+        )
         return 0
     except RuntimeControlError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -155,7 +155,13 @@ def build_parser() -> argparse.ArgumentParser:
     model_parser.add_argument(
         "--value",
         required=True,
-        choices=("local-lucy-llama31", "local-lucy", "local-lucy-fast", "local-lucy-mistral"),
+        choices=(
+            "auto",
+            "local-lucy-llama31",
+            "local-lucy",
+            "local-lucy-fast",
+            "local-lucy-mistral",
+        ),
     )
 
     return parser
@@ -168,7 +174,11 @@ def resolve_state_file(explicit_path: str | None) -> Path:
 def resolve_runtime_paths(explicit_path: str | None) -> ResolvedRuntimePaths:
     if contract_required():
         namespace_raw = os.environ.get(RUNTIME_NAMESPACE_ENV, "").strip()
-        if not namespace_raw and not explicit_path and not os.environ.get("LUCY_RUNTIME_STATE_FILE", "").strip():
+        if (
+            not namespace_raw
+            and not explicit_path
+            and not os.environ.get("LUCY_RUNTIME_STATE_FILE", "").strip()
+        ):
             raise RuntimeControlError(
                 f"missing required {RUNTIME_NAMESPACE_ENV} while {CONTRACT_REQUIRED_ENV}=1"
             )
@@ -259,7 +269,9 @@ def enforce_authority_contract(*, expected_authority_root: Path | None = None) -
     if not runtime_ns_raw:
         missing.append(RUNTIME_NAMESPACE_ENV)
     if missing:
-        raise RuntimeControlError(f"missing required authority contract env(s): {', '.join(missing)}")
+        raise RuntimeControlError(
+            f"missing required authority contract env(s): {', '.join(missing)}"
+        )
 
     authority_root = Path(authority_raw).expanduser().resolve()
     ui_root = Path(ui_root_raw).expanduser().resolve()
@@ -308,9 +320,12 @@ def default_state() -> dict[str, Any]:
         "memory": "on",
         "evidence": "on",
         "voice": "on",
-        "augmentation_policy": clean_text(os.environ.get("LUCY_AUGMENTATION_POLICY")) or "fallback_only",
+        "augmentation_policy": clean_text(os.environ.get("LUCY_AUGMENTATION_POLICY"))
+        or "fallback_only",
         "augmented_provider": "wikipedia",
-        "model": os.environ.get("LUCY_RUNTIME_MODEL") or os.environ.get("LUCY_LOCAL_MODEL") or "local-lucy-llama31",
+        "model": os.environ.get("LUCY_RUNTIME_MODEL")
+        or os.environ.get("LUCY_LOCAL_MODEL")
+        or "local-lucy-llama31",
         "learner": _resolve_initial_learner_state(),
         "approval_required": False,
         "status": "ready",
@@ -379,7 +394,17 @@ def update_state_field(state_file: Path, field: str, requested_value: str) -> Up
         prior_value = state[field]
         state[field] = requested_value
         state["last_updated"] = iso_now()
-        if field in {"mode", "conversation", "memory", "evidence", "voice", "augmentation_policy", "augmented_provider", "model", "learner"}:
+        if field in {
+            "mode",
+            "conversation",
+            "memory",
+            "evidence",
+            "voice",
+            "augmentation_policy",
+            "augmented_provider",
+            "model",
+            "learner",
+        }:
             state["status"] = "ready"
         if field == "model":
             state["active_model"] = requested_value

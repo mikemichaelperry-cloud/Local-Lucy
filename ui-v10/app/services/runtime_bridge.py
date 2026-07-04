@@ -339,6 +339,7 @@ class RuntimeBridge:
                 name="model_selection",
                 available=available,
                 allowed_values=(
+                    "auto",
                     "local-lucy-llama31",
                     "local-lucy",
                     "local-lucy-fast",
@@ -858,6 +859,31 @@ class RuntimeBridge:
                 payload=None,
             )
 
+        # Phase 3: shadow-mode automatic model selection.
+        try:
+            from router_py.model_selector import select_model, is_auto_model
+            from router_py import metrics as router_metrics
+        except Exception:
+            select_model = None  # type: ignore[assignment]
+            is_auto_model = None  # type: ignore[assignment]
+            router_metrics = None  # type: ignore[assignment]
+
+        manual_model = self._resolve_current_model()
+        effective_model = manual_model
+        recommendation: dict[str, Any] | None = None
+        if select_model is not None:
+            try:
+                recommendation = select_model(
+                    request_text,
+                    route=None,
+                    intent_family=None,
+                    manual_model=manual_model,
+                )
+                if is_auto_model(manual_model):
+                    effective_model = recommendation["recommended"]
+            except Exception:
+                recommendation = None
+
         # Get augmentation policy from environment
         policy = normalize_augmentation_policy(
             os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
@@ -877,6 +903,7 @@ class RuntimeBridge:
                 augmented_direct_once=augmented_direct_once,
                 self_review=self_review,
                 context=context,
+                model=effective_model,
             )
 
             # Calculate execution time
@@ -890,6 +917,34 @@ class RuntimeBridge:
                 request_text=request_text,
                 execution_time_ms=execution_time_ms,
             )
+
+            # Phase 3: expose the recommendation to the HMI and log shadow metrics.
+            if recommendation is not None:
+                payload["model_recommendation"] = recommendation["recommended"]
+                payload["model_recommendation_reason"] = recommendation["reason"]
+                if router_metrics is not None:
+                    try:
+                        router_metrics.record_model_selection_shadow(
+                            request_id=outcome.request_id or "",
+                            query=request_text,
+                            route=outcome.route or "",
+                            manual_model=manual_model,
+                            recommended_model=recommendation["recommended"],
+                            competing_model=recommendation["competing"],
+                            reason=recommendation["reason"],
+                            confidence=recommendation["confidence"],
+                        )
+                        router_metrics.record_model_latency(
+                            request_id=outcome.request_id or "",
+                            model=effective_model,
+                            latency_ms=execution_time_ms,
+                            extra={
+                                "route": outcome.route,
+                                "outcome_code": outcome.outcome_code,
+                            },
+                        )
+                    except Exception:
+                        pass
 
             # NOTE: We do NOT write history entries here.
             # The core ExecutionEngine's StateWriter already writes the

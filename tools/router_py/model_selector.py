@@ -281,3 +281,252 @@ def select_local_model(
         chosen,
     )
     return chosen
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: automatic model-selection policy (shadow mode)
+# ---------------------------------------------------------------------------
+
+# Routes that are always answered by the factual/default model.
+_FACTUAL_ROUTES: frozenset[str] = frozenset({"NEWS", "TIME", "WEATHER", "FINANCE", "EVIDENCE"})
+
+# Query-only signals for factual/current information.
+_CURRENT_INFO_RE = re.compile(
+    r"\b(current|today|tonight|latest|now|news|weather|forecast|"
+    r"stock price|share price|price of|market|bitcoin|crypto|exchange rate|"
+    r"time in|what time|what is the capital|who is the president|"
+    r"who won|recent events|this week|this month)\b",
+    re.IGNORECASE,
+)
+
+# Query-only signals for creative/short/low-latency requests.
+_CREATIVE_RE = re.compile(
+    r"\b(write|compose|tell me|create|make up|draft)\b.*?"
+    r"\b(story|poem|joke|song|script|essay|fiction|horror|fantasy|sci-fi|"
+    r"romance|thriller|mystery|dialogue|scene|chapter|novel)\b",
+    re.IGNORECASE,
+)
+
+# Latency budgets by base model name (milliseconds). These are planning
+# estimates, not hard timeouts.
+_LATENCY_BUDGETS_MS: dict[str, int] = {
+    "local-lucy-fast": 3000,
+    "local-lucy": 8000,
+    "local-lucy-qwen3": 8000,
+    "local-lucy-llama31": 5000,
+    "local-lucy-stable": 8000,
+    "local-lucy-memory": 5000,
+    "local-lucy-mistral": 8000,
+    "qwen3:30b": 25000,
+}
+
+
+def is_auto_model(model_name: str | None) -> bool:
+    """Return True if *model_name* represents the Auto option.
+
+    Accepts backend values like ``"auto"`` and display labels like
+    ``"Auto (Lucy chooses per query)"``.
+    """
+    if not model_name:
+        return True
+    return str(model_name).strip().lower().startswith("auto")
+
+
+def _base_name(model_tag: str) -> str:
+    """Strip an optional ``:latest`` or ``:<digest>`` suffix for budget lookup."""
+    if ":" in model_tag:
+        return model_tag.split(":", 1)[0]
+    return model_tag
+
+
+def _latency_budget_for(model_tag: str) -> int:
+    """Return the planning latency budget for a concrete model tag."""
+    return _LATENCY_BUDGETS_MS.get(_base_name(model_tag), 8000)
+
+
+def _is_factual_current_query(query: str) -> bool:
+    """Detect queries that ask for factual or current information."""
+    return bool(_CURRENT_INFO_RE.search(query or ""))
+
+
+def _is_creative_query(query: str) -> bool:
+    """Detect creative-writing or light creative requests."""
+    return bool(_CREATIVE_RE.search(query or ""))
+
+
+def _confidence_for_bucket(
+    bucket: str,
+    route_name: str,
+    intent_family: str,
+    query: str,
+) -> float:
+    """Return a heuristic confidence for the recommendation."""
+    if route_name in _FACTUAL_ROUTES:
+        return 0.95
+    if route_name == "AUGMENTED" and intent_family == "factual":
+        return 0.92
+    if _is_factual_current_query(query):
+        return 0.88
+    if bucket in ("memory", "coding", "deep_thought"):
+        return 0.90
+    if bucket == "reasoning":
+        return 0.85
+    if bucket == "fast" or _is_creative_query(query):
+        return 0.80
+    return 0.75
+
+
+def _competing_model(recommended: str, installed: set[str]) -> str:
+    """Pick a sensible competing model for shadow A/B comparisons."""
+    base = _base_name(recommended)
+    candidates: list[str] = []
+    if base == "local-lucy-llama31":
+        candidates = ["local-lucy-qwen3", "local-lucy-stable", "local-lucy-fast"]
+    elif base in ("local-lucy-qwen3", "local-lucy"):
+        candidates = ["local-lucy-llama31", "local-lucy-fast"]
+    elif base == "local-lucy-fast":
+        candidates = ["local-lucy", "local-lucy-llama31"]
+    elif base == "local-lucy-memory":
+        candidates = ["local-lucy-llama31"]
+    elif base == "qwen3:30b":
+        candidates = ["local-lucy-stable", "local-lucy-llama31"]
+    elif base == "local-lucy-stable":
+        candidates = ["qwen3:30b", "local-lucy-llama31"]
+    else:
+        candidates = ["local-lucy-llama31", "local-lucy-fast"]
+
+    for cand in candidates:
+        resolved = _resolve_installed_tag(cand, installed)
+        if resolved:
+            return resolved
+    # Final fallback to the first installed model, or Llama 3.1.
+    return next(iter(installed), "local-lucy-llama31")
+
+
+def select_model(
+    query: str,
+    route: RoutingDecision | str | None = None,
+    intent_family: str | None = None,
+    manual_model: str | None = None,
+    available: list[str] | None = None,
+) -> dict[str, Any]:
+    """Return a policy-driven model recommendation with metadata.
+
+    The recommendation is independent of any manual HMI selection so it can be
+    used in shadow mode.
+
+    Args:
+        query: The user's question.
+        route: Optional routing decision or route name.
+        intent_family: Optional intent family (e.g. ``"factual"``).
+        manual_model: The manually-selected model, if any (recorded only).
+        available: Optional universe of installed model tags for tests.
+
+    Returns:
+        Dict with keys ``recommended``, ``reason``, ``competing``,
+        ``confidence``, ``latency_budget_ms``.
+    """
+    installed = _available_models(available)
+    bucket = _query_bucket(query)
+
+    route_name = ""
+    if isinstance(route, RoutingDecision):
+        route_name = route.route
+        intent_family = route.intent_family or intent_family
+    elif isinstance(route, str):
+        route_name = route
+
+    if intent_family in ("synthesis_explanation", "self_review") and bucket == "general":
+        bucket = "reasoning"
+    elif intent_family == "local_answer" and bucket == "general":
+        bucket = "general"
+
+    recommended: str
+    reason: str
+
+    if route_name in _FACTUAL_ROUTES:
+        recommended = (
+            _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
+        )
+        reason = f"{route_name} route requires factual accuracy; defaulting to Llama 3.1"
+    elif route_name == "AUGMENTED" and intent_family == "factual":
+        recommended = (
+            _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
+        )
+        reason = "AUGMENTED factual query; using Llama 3.1 for accuracy"
+    elif _is_factual_current_query(query):
+        recommended = (
+            _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
+        )
+        reason = "Query asks for factual/current information; using Llama 3.1"
+    elif bucket == "memory":
+        recommended = _resolve_installed_tag("local-lucy-memory", installed) or "local-lucy-memory"
+        reason = "Memory/personal-fact query; using memory-tuned model"
+    elif bucket == "deep_thought":
+        resolved = _resolve_installed_tag("qwen3:30b", installed)
+        if resolved:
+            recommended = resolved
+            reason = "Deep-thought pattern; using qwen3:30b"
+        else:
+            recommended = (
+                _resolve_installed_tag("local-lucy-stable", installed) or "local-lucy-stable"
+            )
+            reason = "Deep-thought pattern; qwen3:30b unavailable, using stable model"
+    elif bucket in ("coding", "reasoning"):
+        resolved = _resolve_installed_tag("local-lucy-qwen3", installed)
+        if resolved:
+            recommended = resolved
+            reason = f"{bucket} query; qwen3:14b installed"
+        else:
+            recommended = (
+                _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
+            )
+            reason = f"{bucket} query; qwen3:14b not installed, using Llama 3.1"
+    elif bucket == "fast" or intent_family == "creative" or _is_creative_query(query):
+        resolved = _resolve_installed_tag("local-lucy", installed)
+        if resolved:
+            recommended = resolved
+            reason = "Creative/short-chat/low-latency query; using qwen3:14b with shorter budget"
+        else:
+            recommended = _resolve_installed_tag("local-lucy-fast", installed) or "local-lucy-fast"
+            reason = "Creative/short-chat/low-latency query; using fast model"
+    else:
+        recommended = (
+            _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
+        )
+        reason = "General query; defaulting to Llama 3.1"
+
+    if manual_model and not is_auto_model(manual_model):
+        reason = f"{reason} (manual override selected: {manual_model})"
+
+    competing = _competing_model(recommended, installed)
+    confidence = _confidence_for_bucket(bucket, route_name, intent_family or "", query)
+    latency_budget_ms = _latency_budget_for(recommended)
+
+    logger.debug(
+        "Policy model selection: bucket=%s route=%s recommended=%s competing=%s",
+        bucket,
+        route_name,
+        recommended,
+        competing,
+    )
+    return {
+        "recommended": recommended,
+        "reason": reason,
+        "competing": competing,
+        "confidence": confidence,
+        "latency_budget_ms": latency_budget_ms,
+    }
+
+
+def generate_ab_pair(
+    query: str,
+    route: RoutingDecision | str | None = None,
+    available: list[str] | None = None,
+) -> tuple[str, str]:
+    """Return (model_a, model_b) for a blind A/B comparison.
+
+    *model_a* is the recommended model; *model_b* is the competing model.
+    """
+    recommendation = select_model(query, route=route, available=available)
+    return recommendation["recommended"], recommendation["competing"]

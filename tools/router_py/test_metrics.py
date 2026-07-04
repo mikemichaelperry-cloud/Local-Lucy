@@ -180,3 +180,57 @@ def test_metrics_file_is_created(isolated_metrics_path: Path):
         outcome_code="answered",
     )
     assert isolated_metrics_path.exists()
+
+
+def test_record_model_selection_shadow(isolated_metrics_path: Path):
+    metrics.record_model_selection_shadow(
+        request_id="req-shadow-1",
+        query="What is 2+2?",
+        route="LOCAL",
+        manual_model="auto",
+        recommended_model="local-lucy-llama31",
+        competing_model="local-lucy-qwen3",
+        reason="General query",
+        confidence=0.85,
+    )
+    records = _read_records(isolated_metrics_path)
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["type"] == "model_selection_shadow"
+    assert rec["recommended_model"] == "local-lucy-llama31"
+    assert rec["competing_model"] == "local-lucy-qwen3"
+    assert rec["confidence"] == 0.85
+    assert rec["manual_model"] == "auto"
+
+
+def test_record_model_latency(isolated_metrics_path: Path):
+    metrics.record_model_latency(
+        request_id="req-latency-1",
+        model="local-lucy-llama31",
+        latency_ms=1234,
+        extra={"route": "LOCAL"},
+    )
+    records = _read_records(isolated_metrics_path)
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["type"] == "model_latency"
+    assert rec["model"] == "local-lucy-llama31"
+    assert rec["latency_ms"] == 1234
+    assert rec["extra"] == {"route": "LOCAL"}
+
+
+def test_record_ab_comparison(isolated_metrics_path: Path):
+    metrics.record_ab_comparison(
+        request_id="req-ab-1",
+        query="Which answer is better?",
+        model_a="local-lucy-llama31",
+        model_b="local-lucy-qwen3",
+        preferred_model="model_b",
+    )
+    records = _read_records(isolated_metrics_path)
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["type"] == "ab_comparison"
+    assert rec["model_a"] == "local-lucy-llama31"
+    assert rec["model_b"] == "local-lucy-qwen3"
+    assert rec["preferred_model"] == "model_b"

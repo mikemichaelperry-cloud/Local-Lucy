@@ -94,6 +94,7 @@ class ControlPanel(QFrame):
         self._safe_actions_note: QLabel | None = None
         self._persona_indicator: QLabel | None = None
         self._clear_persona_button: QPushButton | None = None
+        self._model_recommendation_label: QLabel | None = None
         self._current_values = {
             "mode": "",
             "conversation": "",
@@ -220,6 +221,13 @@ class ControlPanel(QFrame):
         self._model_selector.addItems(list(self._MODEL_LABELS.values()))
         self._model_selector.activated.connect(self._handle_model_activated)
 
+        self._model_recommendation_label = QLabel("Model recommendation: —")
+        self._model_recommendation_label.setObjectName("cardLabel")
+        self._model_recommendation_label.setWordWrap(True)
+        self._model_recommendation_label.setToolTip(
+            "Engineering read-out of the last automatic model recommendation (Auto mode only)."
+        )
+
         self._persona_indicator = QLabel("No active persona")
         self._persona_indicator.setObjectName("cardLabel")
         self._persona_indicator.setToolTip(
@@ -250,6 +258,7 @@ class ControlPanel(QFrame):
         persona_layout.addWidget(self._clear_persona_button)
 
         layout.addWidget(self._build_labeled_row("model", self._model_selector))
+        layout.addWidget(self._model_recommendation_label)
         layout.addWidget(persona_row)
         layout.addWidget(self._build_labeled_row("conversation", self._conversation_selector))
         layout.addWidget(self._build_labeled_row("memory", self._memory_selector))
@@ -611,6 +620,8 @@ class ControlPanel(QFrame):
             configured_model = str(current_state.get("model", "")).strip()
         if not configured_model:
             configured_model = top_status.get("Model", "").strip()
+        if not configured_model:
+            configured_model = "auto"
 
         pending_values = pending_values or {}
         # Persona is read from persistent storage; while a set/clear action is in
@@ -830,6 +841,11 @@ class ControlPanel(QFrame):
             self._persona_indicator.setText("No active persona")
             if self._clear_persona_button is not None:
                 self._clear_persona_button.setEnabled(False)
+
+    def set_model_recommendation(self, text: str) -> None:
+        """Update the engineering-only model recommendation read-out."""
+        if self._model_recommendation_label is not None:
+            self._model_recommendation_label.setText(f"Model recommendation: {text}")
 
     def _handle_clear_persona(self) -> None:
         """Emit a request to clear the active user identity."""

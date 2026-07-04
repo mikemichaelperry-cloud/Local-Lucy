@@ -129,3 +129,80 @@ def record_context_usage(
             _write_line(_METRICS_FILE, record)
     except Exception:
         logger.debug("Failed to record context usage metric", exc_info=True)
+
+
+def record_model_selection_shadow(
+    request_id: str,
+    query: str,
+    route: str,
+    manual_model: str | None,
+    recommended_model: str,
+    competing_model: str,
+    reason: str,
+    confidence: float,
+) -> None:
+    """Record a shadow-mode automatic model-selection decision."""
+    try:
+        record: dict[str, Any] = {
+            "ts": _now_iso(),
+            "type": "model_selection_shadow",
+            "request_id": request_id,
+            "query": query,
+            "route": route,
+            "manual_model": manual_model or "",
+            "recommended_model": recommended_model,
+            "competing_model": competing_model,
+            "reason": reason,
+            "confidence": confidence,
+        }
+        with _lock:
+            _write_line(_METRICS_FILE, record)
+    except Exception:
+        logger.debug("Failed to record model selection shadow metric", exc_info=True)
+
+
+def record_model_latency(
+    request_id: str,
+    model: str,
+    latency_ms: int,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    """Record the actual end-to-end latency for a model choice."""
+    try:
+        record: dict[str, Any] = {
+            "ts": _now_iso(),
+            "type": "model_latency",
+            "request_id": request_id,
+            "model": model,
+            "latency_ms": latency_ms,
+        }
+        if extra:
+            record["extra"] = extra
+        with _lock:
+            _write_line(_METRICS_FILE, record)
+    except Exception:
+        logger.debug("Failed to record model latency metric", exc_info=True)
+
+
+def record_ab_comparison(
+    request_id: str,
+    query: str,
+    model_a: str,
+    model_b: str,
+    preferred_model: str,
+) -> None:
+    """Record the result of a blind A/B comparison."""
+    try:
+        record: dict[str, Any] = {
+            "ts": _now_iso(),
+            "type": "ab_comparison",
+            "request_id": request_id,
+            "query": query,
+            "model_a": model_a,
+            "model_b": model_b,
+            "preferred_model": preferred_model,
+        }
+        with _lock:
+            _write_line(_METRICS_FILE, record)
+    except Exception:
+        logger.debug("Failed to record A/B comparison metric", exc_info=True)

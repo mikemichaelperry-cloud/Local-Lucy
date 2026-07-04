@@ -100,12 +100,13 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 56
-Working tree: modified (persona LoRA pipeline in progress)
+Commits since tag: 57
+Working tree: modified (Phase 3 automatic model selection in progress; pre-existing `models/router/comprehensive_examples.json` change unrelated)
 ```
 
 ### Recent Commits (last 13)
 ```
+Phase 3: automatic model selection in shadow mode with Auto HMI option
 b01f548 feat(router): add validated FINANCE-route training examples
 b2f6a32 feat(router): augment training data with validated synthetic examples
 da3fc4e feat(hmi): show actually-loaded Ollama model under MODEL
@@ -245,6 +246,7 @@ Live market-data fetcher with source citations:
 12. ~~Ruff / lint~~ ✅ ruff installed in venv; mypy installed and enforced; `make lint` passes
 13. ~~Optional web interface~~ ✅ aiohttp adapter added at `web_adapter/`; stateless; request-scoped model selection; Basic/Bearer auth; 13 focused tests
 14. ~~Memory greeting hallucination fix~~ ✅ MiniLM embeddings now primary; `<think>` blocks stripped; greetings forced to shallow context; polluted DB cleaned; `LUCY_OLLAMA_MODEL` propagated
+15. ~~Automatic model selection (Phase 3)~~ ✅ `select_model()` policy, shadow-mode metrics, Auto HMI option, A/B harness
 
 ---
 
@@ -263,5 +265,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-06-24T14:21:00Z*
-*Session: Fixed the greeting → general-relativity hallucination. Root causes were (1) Ollama `/api/embeddings` failing for qwen3 so topic-shift detection silently returned False, (2) qwen3 `<think>` blocks polluting the session summary, (3) auto-depth detection treating "this evening" as a conversational reference, and (4) `LUCY_OLLAMA_MODEL` not being propagated from the UI model selection. Implemented MiniLM-L6-v2 as the primary embedding provider, added thinking-block stripping at storage/read/summarization boundaries, forced standalone greetings to shallow context, cleaned the polluted memory DB, and propagated the selected model. Fixed a CLI logger initialization bug in `local_answer.py`. Full pytest suite: 974 passed, 33 failed, 19 skipped; failures are pre-existing routing/semantic-regression issues unrelated to the memory fix. Handoff file: `~/Desktop/Local_Lucy_v10_Memory_Greeting_Fix_Handoff_2026-06-24.md`.*
+*Last updated: 2026-07-04T20:32:00Z*
+*Session: Implemented Phase 3 automatic model selection in shadow mode. Added `select_model()` policy in `tools/router_py/model_selector.py`, shadow metrics in `tools/router_py/metrics.py`, Auto default in the HMI model selector with an engineering recommendation read-out, and A/B harness functions. Updated `runtime_bridge.py` to call the selector when Auto is chosen and log recommendations/latency. Tests: `tools/router_py/` 742 passed/34 skipped; HMI inspection 138/138; model selector offscreen passed; consolidated bridge 10/10. Pre-existing unrelated change remains in `models/router/comprehensive_examples.json`.*
