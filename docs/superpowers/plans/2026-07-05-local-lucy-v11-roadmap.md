@@ -1,10 +1,11 @@
-# Local Lucy v11 Roadmap
+# Local Lucy v11 Roadmap — Revised 2026-07-04
 
 > Next-session implementation plan for moving from v10 to a leaner, faster, more accurate Local Lucy v11.
+> This revision incorporates the review feedback from 2026-07-04.
 
 ## Goal
 
-Transform Local Lucy v10 into v11: an autonomous assistant that picks the right mode, model, and source without user-facing toggles, returns factual answers with verified context, and runs efficiently on the current RTX 3060 12 GB / 31 GB RAM hardware.
+Transform Local Lucy v10 into v11: an **English-only**, autonomous assistant that picks the right mode, model, and source without user-facing toggles, returns factual answers with verified context, and runs efficiently on the current RTX 3060 12 GB / 31 GB RAM hardware.
 
 ## Hardware Constraints
 
@@ -20,126 +21,194 @@ Transform Local Lucy v10 into v11: an autonomous assistant that picks the right 
 
 ## v11 Design Principles
 
-1. **Zero user-facing switches.** The HMI should not require the user to pick mode, model, provider, or persona. The system decides.
-2. **Context is guilty until proven innocent.** Every injected source (memory, Wikipedia, news, augmented provider output) must pass a relevance gate before it enters the LLM prompt.
-3. **Fail up, not down.** If the local model is uncertain, route to augmented/news/evidence automatically. No more "I don't know" when external sources are available.
-4. **One canonical prompt.** One system prompt / Modelfile that knows the architecture and capabilities, not per-model/persona variants.
-5. **Measure before optimizing.** Every change must be covered by the routing barrage and HMI inspection; latency must be measured before/after.
+1. **English-only runtime.** Hebrew and Racheli persona work is removed from Local Lucy and treated as a separate system.
+2. **Zero default switches.** The normal HMI should not require the user to pick mode, model, provider, or persona. The system decides.
+3. **External LLMs synthesize, they do not verify.** Wikipedia, official APIs, and trusted domains are evidence sources. OpenAI and Kimi may synthesize evidence, but their outputs are not evidence themselves.
+4. **Context is guilty until proven innocent.** Every injected source must pass entity, intent, temporal, lexical, provenance, and relevance checks before it enters the LLM prompt.
+5. **Measure before hiding controls.** Automatic model selection runs in shadow mode with full logging before manual selectors are removed from the default view.
+6. **Canonical policy, not one brittle prompt.** One shared Lucy policy plus route-specific instructions plus thin per-model adapters.
+7. **Local-first routing.** Stable basic facts, recipes, opinion, coding, and creative writing stay LOCAL unless the user asks for verification or live data.
+8. **Measure before optimizing.** Every change must be covered by the routing barrage and HMI inspection; latency must be measured before/after.
 
 ---
 
-## Task 1: HMI Simplification — Remove the Switch Farm
+## Phase 0: Correct the Roadmap and Scope
 
-**Why:** The current engineering interface exposes mode, memory, evidence, voice, augmentation policy, provider, learner, model, and persona selectors. The persona toggle already jumps back to Auto. This conflicts with the "one ring" goal.
+**Why:** The previous plan still carried Hebrew and Racheli assumptions and treated OpenAI/Kimi as evidence sources.
+
+**Actions:**
+- [ ] Remove `HEBREW_QUERY` routing and Hebrew-specific provider logic from Local Lucy.
+- [ ] Archive or quarantine the Racheli persona Modelfile from the primary runtime.
+- [ ] Document that Hebrew/Racheli is a separate service.
+- [ ] Change augmented-provider chain description from "Wikipedia → OpenAI → Kimi" to "Wikipedia evidence → optional synthesis by OpenAI/Kimi if evidence exists."
+- [ ] Fix system-prompt contradictions: replace "never hedge/disclaim" + "facts only" with "answer directly, distinguish facts/inferences/uncertainty, never invent."
+
+**Success criteria:**
+- No `HEBREW_QUERY` or Racheli-specific code remains in the primary Local Lucy runtime.
+- Augmented route documentation clearly separates evidence sources from synthesis providers.
+
+---
+
+## Phase 1: Establish Measurements
+
+**Why:** You cannot improve what you do not measure. The 81% accuracy number is too coarse.
+
+**Actions:**
+- [ ] Freeze a real-query routing corpus for validation (not the training set, not synthetic adversarial prompts).
+- [ ] Compute and log a confusion matrix, per-route precision/recall, and high-stakes false negatives.
+- [ ] Establish per-route latency baselines: LOCAL, AUGMENTED, NEWS, TIME, WEATHER, FINANCE, EVIDENCE.
+- [ ] Build a model-selection comparison set and a context-contamination test set (Japan/China tourism, similar medications, etc.).
+- [ ] Add a `metrics/` module that records router decisions, model selections, context accept/reject, and provider outcomes.
 
 **Files:**
-- `ui-v10/app/panels/control_panel.py`
-- `ui-v10/app/main_window.py`
-- `ui-v10/app/services/runtime_bridge.py`
+- `tools/router_py/metrics.py` (new)
+- `tools/router_py/barrage_test.py` or `run_routing_barrage.py`
+- `tools/router_py/evaluate_router.py` (new or extend existing)
 
-**Steps:**
-- [ ] Audit every selector in `control_panel.py` and decide: automatic | user preference | debug-only.
-- [ ] Keep only two user-facing toggles:
-  - **Memory** (on/off) — user owns whether session turns are remembered
-  - **Voice** (on/off) — user owns input/output modality
-- [ ] Move everything else (mode, evidence, augmentation policy, provider, learner, model, persona) behind an "Engineering" collapsible panel or remove the widgets entirely.
-- [ ] Fix the persona selector jump-back-to-Auto bug.
-- [ ] Make the default view an operator-level panel: input, output, route indicator, trust indicator.
-- [ ] Update HMI comprehensive inspection test expectations to match the simplified layout.
-
-**Acceptance:**
-- `python3 ui-v10/tests/test_comprehensive_hmi_inspection.py` passes with the new layout.
-- A non-technical user can launch Lucy and ask a question without touching a selector.
+**Success criteria:**
+- Running `python3 tools/router_py/evaluate_router.py` prints confusion matrix, per-route recall, and latency baseline.
+- Validation corpus is saved to `data/evaluation/routing_validation_corpus.jsonl` and committed.
 
 ---
 
-## Task 2: Automatic Model Selection
+## Phase 2: Context Provenance and Guard
 
-**Why:** The user wants the model chosen by the classified query. Right now the HMI exposes four models and the runtime defaults to one.
+**Why:** The most embarrassing failures come from injecting irrelevant context.
+
+**Files:**
+- `tools/router_py/context_guard.py` (new)
+- `tools/router_py/classify.py`
+- `tools/router_py/local_answer.py`
+- `tools/router_py/providers/`
+- `tools/router_py/context_builder.py` (start extracting from `execution_engine.py`)
+
+**Actions:**
+- [ ] Create `ContextGuard` with scoring methods:
+  - `entity_match(query, context)` — NER/keyword overlap for people, places, products, medications.
+  - `intent_compatible(query_route, context_route)` — e.g., news context should not satisfy a personal-memory query.
+  - `temporal_compatible(query, context)` — current queries need fresh material; historical queries accept older context.
+  - `lexical_overlap(query, context)` — simple word/phrase overlap as a guard against similar-but-wrong entities.
+  - `embedding_score(query, context)` — MiniLM similarity, used as one signal, not the judge.
+  - `provenance(context)` — label as memory, wikipedia, news, official_api, or generated_text.
+  - `answerability(query, context)` — does the context actually contain information capable of answering the question?
+- [ ] Set combined thresholds per source type:
+  - Memory turn: entity or lexical signal + embedding ≥ 0.30
+  - Wikipedia/news snippet: entity or lexical signal + embedding ≥ 0.45 + temporal check
+  - Generated text (OpenAI/Kimi): never injected as evidence; only used as synthesis if evidence is present
+- [ ] Integrate the guard into `classify.py` before the final `RoutingDecision`.
+- [ ] Update prompt instruction: "Use the following context only if it directly answers the current query; otherwise answer from your own knowledge."
+- [ ] Begin extracting context-building logic from `execution_engine.py` into `context_builder.py`.
+
+**Success criteria:**
+- Japan tourism query no longer cites China tourism.
+- Context-contamination tests pass.
+- Barrage and HMI tests pass.
+
+---
+
+## Phase 3: Automatic Model Selection in Shadow Mode
+
+**Why:** The user wants the model chosen automatically, but hiding mistakes too early is dangerous.
 
 **Files:**
 - `tools/router_py/classify.py`
 - `tools/router_py/policy_router.py`
 - `ui-v10/app/services/runtime_bridge.py`
 - `ui-v10/app/panels/control_panel.py`
+- `tools/router_py/metrics.py`
 
-**Steps:**
-- [ ] Define a model-selection policy keyed off router output:
-  - Factual/current-time queries where accuracy matters → `local-lucy-llama31` (8192 ctx, lower hallucination)
-  - Coding/reasoning/translation → `local-lucy-fast` / qwen3:14b
+**Actions:**
+- [ ] Define a draft model-selection policy keyed off router output:
+  - Factual/current-time queries where accuracy matters → `local-lucy-llama31`
+  - Coding/reasoning/translation → candidate: `local-lucy-fast` / qwen3:14b, but only if testing confirms it is better than llama3.1 for these classes
   - Creative writing, short chat, low-latency → `local-lucy` / qwen3:14b with shorter budget
-  - Medical/vet/finance evidence → `local-lucy-llama31` for careful reasoning
-- [ ] Add a `_select_model(query, route, intent_family)` helper in `tools/router_py/classify.py`.
-- [ ] Plumb the selected model through the routing decision so `runtime_bridge.py` uses it instead of the HMI selector.
-- [ ] Add model-switch cooldown/unload logic in `runtime_bridge.py` so rapid-fire queries do not thrash Ollama.
-- [ ] Remove the model selector from the default HMI view (keep it in engineering debug view if useful).
-- [ ] Add tests: `test_model_selection.py` covering each policy case.
+  - Medical/vet/finance evidence → `local-lucy-llama31`
+- [ ] Add `_select_model(query, route, intent_family)` helper that returns a recommendation.
+- [ ] **Keep the manual model selector.** Add an "Auto" option at the top.
+- [ ] In shadow mode, log for every query:
+  - recommended model,
+  - reason,
+  - competing model,
+  - confidence,
+  - actual latency,
+  - user correction (if any).
+- [ ] Run shadow mode during normal use and compare recommendations with manual selections.
+- [ ] Only after the shadow logs show reliable recommendations, make Auto the default and move manual control into the Engineering panel.
 
-**Acceptance:**
-- `python3 tools/router_py/run_routing_barrage.py` passes.
-- A query like "Write a Python function" routes LOCAL and selects qwen3.
-- A query like "What are the main tourist attractions in Japan?" routes AUGMENTED and selects llama3.1.
-
----
-
-## Task 3: Context-Injection Guard Layer
-
-**Why:** The most embarrassing failures come from injecting irrelevant context (Tourism in China for a Japan query) or stale memory turns.
-
-**Files:**
-- `tools/router_py/context_guard.py` (new)
-- `tools/router_py/classify.py`
-- `tools/router_py/local_answer.py`
-- `tools/router_py/providers/` (augmented, news, evidence)
-
-**Steps:**
-- [ ] Create `ContextGuard` class with scoring methods:
-  - `score_memory_turn(query, turn_text)` — semantic similarity using MiniLM
-  - `score_source(query, source_title, source_snippet)` — title + snippet overlap
-  - `score_evidence(query, evidence_pack)` — keyword + embedding relevance
-- [ ] Set thresholds:
-  - Memory turn: >= 0.30 similarity (current threshold, validated)
-  - External source: >= 0.45 similarity or explicit keyword overlap
-- [ ] Integrate the guard into `classify.py` before the final `RoutingDecision`:
-  - Drop memory turns below threshold from the prompt context
-  - Reject Wikipedia/news snippets below threshold and fall back to next provider or local knowledge
-- [ ] Update prompt instruction: "Use the following context only if it directly answers the current query; otherwise answer from your own knowledge."
-- [ ] Add unit tests for the guard in `tools/router_py/test_context_guard.py`.
-
-**Acceptance:**
-- The Japan tourist query no longer cites Tourism in China.
-- Stale memory turns are filtered out.
-- Barrage and HMI tests pass.
+**Success criteria:**
+- Shadow logs show ≥ 90% agreement with sensible manual choices over at least 50 diverse queries.
+- Qwen is not chosen for a class unless it demonstrably outperforms llama3.1 on that class.
 
 ---
 
-## Task 4: Classifier Hardening
+## Phase 4: Classifier Hardening
 
-**Why:** 81.3% router accuracy is too low for an autonomous system. Too many queries need overrides.
+**Why:** 81% global accuracy is too coarse and too low.
 
 **Files:**
 - `models/router/train_classifier_head.py`
 - `models/router/finetune_minilm.py`
 - `tools/router_py/append_*_examples.py`
 - `tools/router_py/classify.py`
+- `data/evaluation/routing_validation_corpus.jsonl`
 
-**Steps:**
-- [ ] Audit current misrouted cases in the barrage and synthetic adversarial tests.
-- [ ] Generate hard-negative training examples for the weakest classes (AUGMENTED, EPHEMERAL, NEWS vs LOCAL).
+**Actions:**
+- [ ] Use the frozen validation corpus from Phase 1.
+- [ ] Categorize failures from the corpus and barrage:
+  - AUGMENTED vs LOCAL confusion
+  - NEWS vs LOCAL confusion
+  - EVIDENCE false negatives
+  - EPHEMERAL misclassification
+- [ ] Generate hard-negative training examples for the worst classes.
 - [ ] Re-train the MiniLM embedding + classifier head with the expanded data.
-- [ ] Add a confidence-triggered LLM arbiter:
-  - When embedding confidence < 0.60 and margin < 0.15, call a lightweight LLM judge (qwen3 fast path) to pick the route.
-  - Cache arbiter decisions to avoid repeated LLM calls.
-- [ ] Add a regression test that locks in barrage pass rate; fail CI if it drops.
+- [ ] Track per-route precision/recall and high-stakes false negatives, not just global accuracy.
+- [ ] Add a confidence-triggered LLM arbiter for low-confidence cases (embedding confidence < 0.60 and margin < 0.15).
+- [ ] Add a regression test that fails if any per-route recall drops below its current value.
 
-**Acceptance:**
-- Combined validation accuracy > 85%.
+**Success criteria:**
+- Per-route recall on the frozen validation corpus improves.
+- High-stakes false negatives (medical, vet, finance) approach zero.
 - Routing barrage 38/38 PASS.
-- No regression in HMI inspection.
 
 ---
 
-## Task 5: Test Suite Cleanup
+## Phase 5: Simplify the HMI
+
+**Why:** The current engineering interface exposes too many toggles.
+
+**Files:**
+- `ui-v10/app/panels/control_panel.py`
+- `ui-v10/app/main_window.py`
+- `ui-v10/app/services/runtime_bridge.py`
+
+**Actions:**
+- [ ] **Only after Phase 3 shadow mode is reliable:** make Auto the default for mode and model.
+- [ ] Default view keeps only:
+  - **Memory** (on/off)
+  - **Voice** (on/off)
+  - **Route/model status indicator**
+  - **Trust/source summary**
+- [ ] Move mode, evidence, augmentation policy, provider, learner, model, and persona selectors into a collapsible "Engineering" panel.
+- [ ] Fix the persona selector jump-back-to-Auto bug or remove the persona selector from Local Lucy entirely (persona is not part of v11 scope).
+- [ ] Engineering panel preserves observability:
+  - selected route,
+  - selected model,
+  - confidence and margin,
+  - context items accepted/rejected,
+  - provider chain,
+  - source freshness,
+  - latency breakdown,
+  - manual model override.
+- [ ] Update HMI comprehensive inspection test expectations.
+
+**Success criteria:**
+- A non-technical user can launch Lucy and ask a question without touching a selector.
+- Engineering panel shows full decision trace.
+- HMI inspection passes.
+
+---
+
+## Phase 6: Test Suite Cleanup
 
 **Why:** Pre-existing failures in synthetic adversarial and environment tests erode trust.
 
@@ -149,20 +218,25 @@ Transform Local Lucy v10 into v11: an autonomous assistant that picks the right 
 - `pyproject.toml`
 - `run_all_tests.py`
 
-**Steps:**
+**Actions:**
 - [ ] Fix `test_changes_verification.py::test_fail_loud_no_env_vars` so the subprocess uses the project venv python instead of system `python3`.
-- [ ] For `test_synthetic_adversarial.py`, either:
-  - Update expectations to match current routing behavior, or
-  - Move it to an optional `tools/router_py/adversarial/` directory and run it as a diagnostic, not a CI gate.
+- [ ] Categorize adversarial failures:
+  - obsolete expectation,
+  - deliberately unsupported behaviour,
+  - ambiguous query,
+  - genuine routing defect,
+  - test infrastructure problem.
+- [ ] Move unsupported/ambiguous cases to an optional diagnostic directory.
+- [ ] Fix genuine routing defects.
 - [ ] Make `run_all_tests.py` respect `pyproject.toml` ignore patterns.
 - [ ] Add a fast pre-commit test target: barrage + HMI + memory gate + context guard.
 
-**Acceptance:**
+**Success criteria:**
 - `python run_all_tests.py` exits green in the project venv.
 
 ---
 
-## Task 6: Latency Optimization
+## Phase 7: Latency Optimization
 
 **Why:** v11 should feel faster than v10.
 
@@ -172,80 +246,82 @@ Transform Local Lucy v10 into v11: an autonomous assistant that picks the right 
 - `ui-v10/app/services/runtime_bridge.py`
 - `tools/router_py/providers/`
 
-**Steps:**
-- [ ] Profile end-to-end latency for LOCAL, AUGMENTED, NEWS, EVIDENCE routes.
-- [ ] Add async/concurrent provider calls for AUGMENTED chain (Wikipedia, OpenAI, Kimi can be fired in parallel with early exit on first good result).
+**Actions:**
+- [ ] Use the latency baselines from Phase 1.
+- [ ] Fire AUGMENTED evidence sources in parallel with early exit on first good result.
 - [ ] Cache MiniLM embeddings for repeated queries.
-- [ ] Set aggressive `num_predict` and `num_ctx` budgets per route:
+- [ ] Set per-route token budgets:
   - LOCAL simple Q&A: 256 tokens
   - AUGMENTED: 512 tokens
   - EVIDENCE: 768 tokens
-  - Creative: user-controlled, default 512
-- [ ] Keep Ollama model warm for the most-likely-next-model to reduce switch latency.
+  - Creative: 512 tokens default
+- [ ] Keep the most-likely-next model warm.
 - [ ] Measure and report before/after latency for 10 representative queries.
 
-**Acceptance:**
+**Success criteria:**
 - Average LOCAL response latency improves by >= 20%.
 - AUGMENTED route latency improves by >= 15%.
 
 ---
 
-## Task 7: News / Wikipedia / Evidence Reliability
+## Phase 8: Evidence/News Improvements, Documentation, and Version Bump
 
-**Why:** User explicitly asked for more reliable and extensive news fetching and better Hebrew Wikipedia access.
+**Why:** The user wants more reliable news and evidence, and v11 needs a version marker.
 
 **Files:**
-- `tools/router_py/providers/wikipedia_provider.py`
 - `tools/router_py/providers/news_provider.py`
+- `tools/router_py/providers/evidence_provider.py`
 - `tools/internet/`
-- `tools/router_py/policy_router.py`
+- `VERSION`
+- `Architecture.md`
+- `README.md`
 
-**Steps:**
-- [ ] Add Hebrew Wikipedia support:
-  - Try `he.wikipedia.org` first for Hebrew queries
-  - Fall back to English Wikipedia and translate summaries if needed
+**Actions:**
 - [ ] Add source cross-check: fetch 2-3 news sources and merge/disagree in the answer.
 - [ ] Add recency scoring for news: penalize articles older than 7 days unless query asks for history.
 - [ ] Add evidence source freshness check for medical/vet/finance domains.
 - [ ] Add a "no live source available" graceful fallback to local knowledge with a clear caveat.
-
-**Acceptance:**
-- Hebrew query `מה החדשות בישראל?` returns Hebrew/Israeli news.
-- Factual queries cite at least one source; conflicting sources are flagged.
-
----
-
-## Task 8: Documentation and Version Bump
-
-**Why:** v11 needs clear docs and a version marker.
-
-**Files:**
-- `VERSION`
-- `Architecture.md`
-- `README.md`
-- Desktop architecture file
-
-**Steps:**
 - [ ] Bump `VERSION` to `11.0.0-dev`.
-- [ ] Update `Architecture.md` to reflect the simplified HMI, automatic model selection, and context guard.
-- [ ] Update `README.md` quick-start to match the new launcher flow.
-- [ ] Sync Architecture.md to Desktop with the new date.
+- [ ] Update `Architecture.md` to reflect simplified HMI, automatic model selection, context guard, and English-only scope.
+- [ ] Update `README.md` quick-start.
+- [ ] Sync Architecture.md to Desktop.
 
-**Acceptance:**
+**Success criteria:**
+- Factual queries cite at least one source; conflicting sources are flagged.
 - `cat VERSION` returns `11.0.0-dev`.
 - Desktop has a current `Local_Lucy_V11_Architecture_YYYY-MM-DD.md`.
 
 ---
 
-## Execution Order
+## Modularization Target
 
-1. Task 1 + Task 2 in parallel (HMI simplification + automatic model selection both touch `control_panel.py` and `runtime_bridge.py`, so coordinate)
-2. Task 3 (context guard) — depends on stable routing
-3. Task 4 (classifier hardening) — can run in parallel with Task 3 if interfaces are agreed
-4. Task 5 (test cleanup) — after Tasks 1-4
-5. Task 6 (latency) — after Tasks 1-5
-6. Task 7 (news/evidence) — after Task 3
-7. Task 8 (docs/version) — last
+Gradually extract four clear modules from `execution_engine.py` (~3,700 lines):
+
+- `execution_engine.py` — orchestration only
+- `context_builder.py` — memory and external-context assembly + guard integration
+- `provider_executor.py` — provider invocation, fallback chains, and synthesis
+- `response_pipeline.py` — synthesis, formatting, and state writing
+
+Do not perform a big-bang rewrite. Move logic incrementally as you touch each area.
+
+---
+
+## More Local-First Routing Policy
+
+Revise the policy gates so that:
+
+- Stable basic fact → LOCAL
+- Stable fact + requested citations → AUGMENTED
+- Current office-holder/status → AUGMENTED
+- Travel logistics/recommendations → AUGMENTED
+- Ordinary recipe → LOCAL
+- Coding, opinion, creative writing → LOCAL
+- Medical/vet/legal high-stakes → EVIDENCE
+- Latest news/weather/finance/time → dedicated live provider
+
+This better matches the "local-first" goal and reduces latency/API dependence.
+
+---
 
 ## Verification Commands
 
@@ -257,14 +333,17 @@ python3 -m pytest tools/router_py -q
 python3 ui-v10/tests/test_comprehensive_hmi_inspection.py
 ```
 
-Run once at the end:
+Run once at phase boundaries:
 ```bash
+python3 tools/router_py/evaluate_router.py
 python run_all_tests.py
 ```
 
 ## Notes for ChatGPT/Codex Handoff
 
-- The v11 goal is autonomy: fewer toggles, smarter routing, verified context.
-- Current weakest points: classifier accuracy, HMI complexity, model-switch robustness.
+- Local Lucy v11 is **English-only**. Racheli/Hebrew is a separate service.
+- External LLMs (OpenAI, Kimi) synthesize evidence; they are not evidence sources themselves.
+- Context must pass entity, intent, temporal, lexical, provenance, and answerability checks.
+- Automatic model selection starts in shadow mode. Do not remove manual controls until shadow logs prove reliability.
 - Do not add new models or LoRAs until the classifier and HMI are fixed.
-- Preserve the existing routing barrage as the regression safety net.
+- Preserve the routing barrage as the regression safety net.

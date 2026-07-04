@@ -4,7 +4,7 @@
 **Session focus:** Consolidation cleanup, Git LFS push, and v11 roadmap
 **Branch:** `v10-dev` (pushed to `origin/v10-dev`)
 **Status:** Cleanup complete; ready for v11 implementation
-**Next session:** Begin v11 roadmap (`docs/superpowers/plans/2026-07-05-local-lucy-v11-roadmap.md`)
+**Next session:** Begin revised v11 roadmap (`docs/superpowers/plans/2026-07-05-local-lucy-v11-roadmap.md`). Start with Phase 0 (scope correction) and Phase 1 (measurements), not HMI changes.
 
 ---
 
@@ -33,15 +33,24 @@
    - Kept only `Local_Lucy_V10_Architecture_2026-07-04.md` on the Desktop
    - Verified `Local-Lucy-v10.desktop` still points to `/home/mike/lucy-v10/START_LUCY.sh`
 
-5. **v11 roadmap created**
+5. **v11 roadmap created and revised**
    - Saved to `docs/superpowers/plans/2026-07-05-local-lucy-v11-roadmap.md`
-   - Eight tasks: HMI simplification, automatic model selection, context-injection guard, classifier hardening, test cleanup, latency optimization, news/evidence reliability, version bump/docs
+   - Revised order after review feedback:
+     - Phase 0: Correct scope (English-only, evidence vs synthesis)
+     - Phase 1: Establish measurements (frozen validation corpus, confusion matrix, latency baselines)
+     - Phase 2: Context provenance and guard
+     - Phase 3: Automatic model selection in shadow mode
+     - Phase 4: Classifier hardening
+     - Phase 5: HMI simplification (only after auto-routing is reliable)
+     - Phase 6: Test cleanup
+     - Phase 7: Latency optimization
+     - Phase 8: Evidence/news improvements, version bump/docs
 
 ---
 
 ## Current repository state
 
-- Branch: `v10-dev` at `ce367a3`
+- Branch: `v10-dev` (HEAD)
 - Working tree: clean
 - Git LFS: tracking 4 optimizer.pt files
 - Desktop shortcut: correct
@@ -49,6 +58,8 @@
 
 Recent commits (last 10):
 ```
+1ad56ad docs: revise v11 roadmap after review feedback
+caa7659 docs: add session handoff for 2026-07-04
 ce367a3 docs: add Local Lucy v11 roadmap
 95a0a7a docs: fix broken links in SESSION_HANDOFF_2026-06-27.md to archived reports
 463c97f docs: update links after archival cleanup
@@ -57,8 +68,6 @@ ce367a3 docs: add Local Lucy v11 roadmap
 1f80e44 cleanup: archive stale session handoffs and reports
 cb39261 docs: correct test commands in cleanup plan
 262d390 fix: update stale test_gate_tell_me_more to match continuation-follow-up design
-c662fd3 cleanup: archive unused LoRA binary artifacts and training data
-b546cb4 WIP: session fixes before cleanup merge
 ```
 
 ---
@@ -75,7 +84,7 @@ b546cb4 WIP: session fixes before cleanup merge
 
 ## Files to read first next session
 
-1. **This handoff** — `/home/mike/Desktop/SESSION_HANDOFF_2026-07-04.md` (also at `docs/handoffs/SESSION_HANDOFF_2026-07-04.md`)
+1. **This handoff** — `/home/mike/Desktop/Local_Lucy_v10_Session_Handoff_2026-07-04.md` (also at `docs/handoffs/Local_Lucy_v10_Session_Handoff_2026-07-04.md`)
 2. **v11 roadmap** — `docs/superpowers/plans/2026-07-05-local-lucy-v11-roadmap.md`
 3. **Current architecture** — `Architecture.md` and `Local_Lucy_V10_Architecture_2026-07-04.md`
 4. **ChatGPT report** — `/home/mike/Desktop/Local_Lucy_v10_to_v11_Report_For_ChatGPT_2026-07-04.md`
@@ -84,7 +93,11 @@ b546cb4 WIP: session fixes before cleanup merge
 
 ## Recommended first actions next session
 
-1. Open the v11 roadmap and pick the first task (HMI simplification + automatic model selection are tightly coupled, so start there).
+1. Read the revised v11 roadmap and the ChatGPT report. The key corrections are:
+   - Local Lucy v11 is English-only; Hebrew/Racheli is a separate system.
+   - OpenAI/Kimi synthesize evidence; they are not evidence sources.
+   - Context guard must use entity, intent, temporal, lexical, provenance, and answerability checks — not just embedding similarity.
+   - Automatic model selection starts in shadow mode with full logging; manual selectors stay until shadow mode proves reliable.
 2. Run the verification commands to confirm baseline:
    ```bash
    cd /home/mike/lucy-v10
@@ -92,7 +105,8 @@ b546cb4 WIP: session fixes before cleanup merge
    python3 -m pytest tools/router_py -q
    python3 ui-v10/tests/test_comprehensive_hmi_inspection.py
    ```
-3. Do not add new models or LoRAs until the classifier and HMI are fixed.
+3. Start with Phase 0 (scope correction) and Phase 1 (measurements). Do not start HMI simplification until Phase 3 shadow mode is reliable.
+4. Do not add new models or LoRAs until the classifier and context guard are fixed.
 
 ---
 
