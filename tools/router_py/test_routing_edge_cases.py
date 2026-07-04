@@ -54,7 +54,7 @@ ROUTING_TEST_CASES = [
     ("How to jump start a car", "LOCAL", "diy"),
     ("How do I patch a hole in drywall", "LOCAL", "diy"),
     ("How to unclog a sink drain", "LOCAL", "diy"),
-    ("Step by step instructions for CPR", "LOCAL", "diy"),
+    ("Step by step instructions for CPR", "AUGMENTED", "diy"),
     # ---- Ambiguous boundaries (weather-like but not weather) ----
     ("What is the weather like on Mars?", "LOCAL", "ambiguous"),
     ("Current price of a gallon of milk", "LOCAL", "ambiguous"),

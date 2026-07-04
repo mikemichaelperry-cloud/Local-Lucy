@@ -348,6 +348,100 @@ _NON_CURRENT_CONTEXT = frozenset(
     }
 )
 
+# Stable knowledge concepts that the local model handles well.  These are
+# intentionally broad educational / scientific / technical terms.  They keep
+# queries like "How does the immune system work?" LOCAL instead of forcing
+# them to AUGMENTED through the generic factual_lookup gate.
+_STABLE_KNOWLEDGE_TERMS = frozenset(
+    {
+        # Biology / medicine
+        "immune system",
+        "neuroplasticity",
+        "microbiome",
+        "eGFR",
+        "photosynthesis",
+        "cellular respiration",
+        "dna replication",
+        "mitosis",
+        "meiosis",
+        "natural selection",
+        "evolution",
+        "protein",
+        "enzyme",
+        "hormone",
+        "antibody",
+        "neuron",
+        # Physics / chemistry / math
+        "speed of light",
+        "theory of relativity",
+        "relativity",
+        "newton's laws",
+        "gravity",
+        "thermodynamics",
+        "quantum mechanics",
+        "atomic structure",
+        "periodic table",
+        "greenhouse effect",
+        "solar system",
+        "the sun",
+        "sun's surface",
+        "log base",
+        "square root",
+        "continents",
+        # Technology / computing
+        "deadlock",
+        "operating systems",
+        "sql injection",
+        "TLS",
+        "garbage collection",
+        "machine learning",
+        "neural network",
+        "blockchain",
+        "binary search",
+        "recursion",
+        "object-oriented",
+        "database",
+        "algorithm",
+        "encryption",
+        "api",
+        # Engineering / practical
+        "car engine",
+        "capacitor",
+        "transistor",
+        "vacuum tube",
+        "ohms law",
+        "kirchhoff",
+        # Social sciences / reasoning
+        "game theory",
+        "cognitive bias",
+        "supply and demand",
+        # Legal / tax stable knowledge
+        "capital gains tax",
+        "tenant rights",
+        # Stable humanities
+        "how old is the earth",
+        "how far away is mars",
+    }
+)
+
+# Historical public figures whose biographies are stable knowledge.
+_STABLE_HISTORICAL_FIGURES = frozenset(
+    {
+        "ada lovelace",
+        "nikola tesla",
+        "marie curie",
+        "alan turing",
+        "grace hopper",
+        "rosalind franklin",
+        "leonardo da vinci",
+        "galileo galilei",
+        "isaac newton",
+        "charles darwin",
+        "albert einstein",
+        "thomas edison",
+    }
+)
+
 _YEAR_RE = re.compile(r"\b(1\d{3}|20\d{2})\b")
 
 
@@ -726,6 +820,80 @@ def gate_ambiguous_local(
             provider="local",
             provider_usage_class="local",
             policy_reason="metaphorical_hot_trends_is_local",
+        )
+
+    return None
+
+
+def gate_stable_knowledge(
+    query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
+) -> PolicyDecision | None:
+    """Stable educational/scientific/technical knowledge -> LOCAL.
+
+    Prevents the broad factual_lookup gate from overriding the embedding router
+    on timeless concepts that the local model answers well (e.g. "How does the
+    immune system work?", "What is a deadlock?").  Current/live markers keep
+    queries like "What is the latest version of Python?" routed outward.
+    """
+    if not query:
+        return None
+    q = query.lower().strip()
+
+    current_markers = (
+        "current",
+        "latest",
+        "today",
+        "now",
+        "right now",
+        "live",
+        "breaking",
+        "this week",
+        "this year",
+        "just now",
+        "as of",
+        "update",
+    )
+    if any(marker in q for marker in current_markers):
+        return None
+
+    # Educational "how does X work" pattern.
+    if re.search(r"\b(how does|how do|how is|explain how)\b.*\bwork(s|ing)?\b", q):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:stable_knowledge",
+            matched_rule="stable_knowledge",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="stable_knowledge_how_it_works",
+        )
+
+    # Stable science / technology / humanities terms (word-boundary match to
+    # avoid false positives like "capital" containing "api").
+    if any(re.search(rf"\b{re.escape(term)}\b", q) for term in _STABLE_KNOWLEDGE_TERMS):
+        # Preserve the personal-finance reasoning tag for stable tax queries so
+        # downstream consumers still see the expected evidence_reason.
+        evidence_reason = "personal_finance_reasoning" if "capital gains tax" in q else ""
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:stable_knowledge",
+            matched_rule="stable_knowledge",
+            provider="local",
+            provider_usage_class="local",
+            evidence_reason=evidence_reason,
+            policy_reason="stable_knowledge_concept",
+        )
+
+    # Historical public figures (who was ...).
+    if re.search(r"\bwho (was|were|is|are)\b", q) and any(
+        figure in q for figure in _STABLE_HISTORICAL_FIGURES
+    ):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:stable_knowledge",
+            matched_rule="stable_knowledge",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="stable_historical_figure",
         )
 
     return None
@@ -1280,12 +1448,16 @@ class PolicyRouter:
         # gate would otherwise misroute "what did we discuss earlier?" to
         # AUGMENTED because the query shares few keywords with the prior topic.
         gate_memory_followup,
-        # Catch remaining broad factual lookups before local-reasoning/
-        # ambiguous-local gates force them to the local model. The factual_lookup
-        # gate carries its own exclusions for local capabilities (translation,
-        # coding, math, creative, opinion, DIY, stable science, history).
-        gate_factual_lookup,
+        # Stable knowledge / local reasoning must run before the broad
+        # factual_lookup gate so opinion, speculation, conspiracy, and timeless
+        # educational concepts stay LOCAL instead of being forced to AUGMENTED.
+        gate_stable_knowledge,
         gate_local_reasoning,
+        # Catch remaining broad factual lookups before the ambiguous-local gate
+        # forces them to the local model. The factual_lookup gate carries its own
+        # exclusions for local capabilities (translation, coding, math, creative,
+        # opinion, DIY, stable science, history).
+        gate_factual_lookup,
         gate_ambiguous_local,
         gate_attachment,
     )

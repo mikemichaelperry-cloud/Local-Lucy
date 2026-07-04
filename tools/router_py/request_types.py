@@ -150,6 +150,10 @@ class RoutingDecision:
     matched_rule: str = ""  # name of the matching gate or semantic result
     trace: dict[str, Any] = field(default_factory=dict)
 
+    # Confidence flag set when the embedding classifier was uncertain and an
+    # LLM arbiter was consulted (or unavailable).
+    low_confidence: bool = False
+
 
 @dataclass(frozen=True)
 class ExecutionResult:

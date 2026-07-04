@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from router_py.classify import (
     ClassificationResult,
     RoutingDecision,
+    _call_llm_arbiter,
     _map_to_intent_family,
     _make_local_decision,
     _make_augmented_decision,
@@ -360,6 +362,26 @@ class TestContinuationFollowUpInheritance(unittest.TestCase):
         )
         decision = select_route(classification, query="Tell me more")
         self.assertEqual(decision.route, "LOCAL")
+
+
+class TestLLMArbiter(unittest.TestCase):
+    """Confidence-triggered LLM arbiter path."""
+
+    def test_arbiter_overrides_low_confidence_route(self):
+        """When confidence < 0.60 and margin < 0.15, arbiter route wins."""
+        with patch("router_py.classify._call_llm_arbiter", return_value="NEWS"):
+            classification = classify_intent("Who won the World Cup final?")
+            decision = select_route(classification, query="Who won the World Cup final?")
+            self.assertEqual(decision.route, "NEWS")
+            self.assertTrue(decision.low_confidence)
+            self.assertIn("llm_arbiter", decision.trace.get("guards_fired", []))
+
+    def test_arbiter_unavailable_marks_low_confidence(self):
+        """If Ollama is unavailable the router decision is kept but flagged."""
+        with patch("router_py.classify._call_llm_arbiter", return_value=None):
+            classification = classify_intent("Who won the World Cup final?")
+            decision = select_route(classification, query="Who won the World Cup final?")
+            self.assertTrue(decision.low_confidence)
 
 
 class TestSocialGreetingRouting(unittest.TestCase):

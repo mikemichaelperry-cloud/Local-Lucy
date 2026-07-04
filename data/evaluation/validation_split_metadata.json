@@ -1,0 +1,29 @@
+{
+  "seed": 42,
+  "val_size": 0.15,
+  "total_examples": 1457,
+  "train_examples": 1238,
+  "validation_examples": 219,
+  "train_route_distribution": {
+    "AUGMENTED": 173,
+    "EPHEMERAL": 27,
+    "EVIDENCE": 74,
+    "FINANCE": 142,
+    "LOCAL": 507,
+    "NEWS": 110,
+    "TIME": 82,
+    "WEATHER": 123
+  },
+  "validation_route_distribution": {
+    "AUGMENTED": 31,
+    "EPHEMERAL": 5,
+    "EVIDENCE": 13,
+    "FINANCE": 25,
+    "LOCAL": 90,
+    "NEWS": 19,
+    "TIME": 14,
+    "WEATHER": 22
+  },
+  "validation_path": "data/evaluation/routing_validation_corpus.jsonl",
+  "backup_path": "models/router/comprehensive_examples.json.phase4.bak"
+}

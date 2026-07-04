@@ -12,6 +12,8 @@ import json
 import os
 import re
 import sys
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,6 +35,68 @@ _FEEDBACK_BUF_MTIME: float = 0.0
 _FEEDBACK_BUF_PATH: Path | None = None
 
 _LOGGER = get_logger("router_py.classify")
+
+# Routes the LLM arbiter is allowed to choose from.
+_LLM_ARBITER_ROUTES = (
+    "LOCAL",
+    "AUGMENTED",
+    "NEWS",
+    "EVIDENCE",
+    "TIME",
+    "WEATHER",
+    "FINANCE",
+    "CLARIFY",
+)
+
+
+def _call_llm_arbiter(query: str) -> str | None:
+    """Ask a small local Ollama model to resolve a low-confidence route.
+
+    Returns one of the allowed route names, or None if Ollama is unreachable
+    or returns an unparseable answer.  The arbiter is intentionally optional;
+    callers must fall back to the router's own decision when this returns None.
+    """
+    model = os.environ.get("LUCY_ARB_MODEL", "llama3.2")
+    base_url = os.environ.get("LUCY_OLLAMA_URL", "http://127.0.0.1:11434")
+    prompt = (
+        "You are a routing assistant. Choose the single best route for the user query.\n"
+        "Valid routes: LOCAL, AUGMENTED, NEWS, EVIDENCE, TIME, WEATHER, FINANCE, CLARIFY.\n"
+        "LOCAL = creative, opinion, personal, coding, math, stable knowledge.\n"
+        "AUGMENTED = current factual lookup needing external sources.\n"
+        "NEWS = news headlines.\n"
+        "EVIDENCE = medical, legal, or source-verified facts.\n"
+        "TIME = current time.\n"
+        "WEATHER = weather forecast.\n"
+        "FINANCE = live market data.\n"
+        "CLARIFY = ambiguous or missing information.\n\n"
+        f"Query: {query}\n"
+        "Route:"
+    )
+    try:
+        payload = json.dumps(
+            {
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.0},
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            f"{base_url}/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+        text = result.get("response", "").strip().upper()
+        for route in _LLM_ARBITER_ROUTES:
+            if route in text:
+                return route
+        return None
+    except Exception:
+        return None
+
 
 # Deterministic policy-gate layer.  Run before the embedding router so keyword
 # guards (time, weather, finance, news, etc.) are explicit, explainable, and
@@ -992,6 +1056,20 @@ def select_route(
             top_k_neighbours = result.get("top_k_neighbours", [])
             ephemeral = result.get("ephemeral", False)
 
+            # Confidence-triggered LLM arbiter: when the embedding classifier is
+            # uncertain (low confidence and low margin), ask a small local model
+            # before applying the remaining safety overrides.  If Ollama is
+            # unavailable we keep the router's decision but mark it low-confidence.
+            low_confidence = False
+            confidence_margin = result.get("confidence_margin", 0.0)
+            if confidence < 0.60 and confidence_margin < 0.15:
+                low_confidence = True
+                llm_route = _call_llm_arbiter(query)
+                if llm_route:
+                    route = llm_route
+                    embedding_route = f"llm_arbiter:{llm_route}"
+                    guards_fired = guards_fired + ["llm_arbiter"]
+
             # Conflict analysis override: the embedding router sometimes returns LOCAL
             # for live-conflict analysis questions (e.g. "Will Russia win in Ukraine").
             # Force AUGMENTED so the user gets real-time, cited information.
@@ -1040,6 +1118,7 @@ def select_route(
                 "classifier_confidence": result.get("classifier_confidence", 0.0),
                 "confidence_margin": result.get("confidence_margin", 0.0),
                 "confidence_entropy": result.get("confidence_entropy", 0.0),
+                "guards_fired": guards_fired,
             }
             embedding_meta = {
                 "decision_stage": "embedding",
@@ -1061,6 +1140,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_local",
                     ephemeral=ephemeral,
+                    low_confidence=low_confidence,
                     **embedding_meta,
                 )
             elif route == "NEWS":
@@ -1076,6 +1156,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_news",
                     ephemeral=True,
+                    low_confidence=low_confidence,
                     **embedding_meta,
                 )
             elif route == "TIME":
@@ -1091,6 +1172,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_time",
                     ephemeral=True,
+                    low_confidence=low_confidence,
                     **embedding_meta,
                 )
             elif route == "WEATHER":
@@ -1106,6 +1188,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_weather",
                     ephemeral=True,
+                    low_confidence=low_confidence,
                     **embedding_meta,
                 )
             elif route == "FINANCE":
@@ -1121,6 +1204,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_finance",
                     ephemeral=True,
+                    low_confidence=low_confidence,
                     **embedding_meta,
                 )
             else:  # AUGMENTED or EVIDENCE
@@ -1161,6 +1245,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason=policy_reason,
                     ephemeral=ephemeral,
+                    low_confidence=low_confidence,
                     **embedding_meta,
                 )
 
@@ -1219,6 +1304,7 @@ def select_route(
                                     requires_evidence=decision.requires_evidence,
                                     policy_reason="continuation_followup_inherit",
                                     ephemeral=decision.ephemeral,
+                                    low_confidence=decision.low_confidence,
                                     trace=decision.trace,
                                 )
                                 guards_fired = guards_fired + ["continuation_followup_inherit"]
@@ -1257,6 +1343,7 @@ def select_route(
                                 requires_evidence=False,
                                 policy_reason="memory_followup_override",
                                 ephemeral=decision.ephemeral,
+                                low_confidence=decision.low_confidence,
                             )
                             guards_fired = guards_fired + ["memory_followup_override"]
 

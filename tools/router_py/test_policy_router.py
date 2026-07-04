@@ -77,7 +77,6 @@ class TestFinanceGate:
         assert decision.reason_code == "policy:finance_ephemeral"
 
 
-
 class TestTimeWeatherNewsGates:
     def test_time_query(self, router: PolicyRouter) -> None:
         decision = router.apply("What time is it in Tokyo?", _clf())
@@ -95,7 +94,6 @@ class TestTimeWeatherNewsGates:
         assert decision.route == "NEWS"
 
 
-
 class TestEvidenceRequestGate:
     def test_verify_this(self, router: PolicyRouter) -> None:
         decision = router.apply("Verify this claim for me", _clf())
@@ -110,7 +108,6 @@ class TestEvidenceRequestGate:
         assert decision.route == "AUGMENTED"
 
 
-
 class TestConflictAnalysisGate:
     def test_will_russia_win(self, router: PolicyRouter) -> None:
         decision = router.apply("Will Russia win in Ukraine?", _clf())
@@ -119,14 +116,12 @@ class TestConflictAnalysisGate:
         assert decision.reason_code == "policy:conflict_analysis"
 
 
-
 class TestPublicFigureAgeGate:
     def test_bill_clinton_age(self, router: PolicyRouter) -> None:
         decision = router.apply("How old is Bill Clinton?", _clf())
         assert decision is not None
         assert decision.route == "AUGMENTED"
         assert decision.reason_code == "policy:public_figure_age"
-
 
 
 class TestCurrentInformationGate:
@@ -166,9 +161,7 @@ class TestTravelTourismGate:
         assert decision.reason_code == "policy:travel_tourism"
 
     def test_spain_tourist_attractions(self, router: PolicyRouter) -> None:
-        decision = router.apply(
-            "What are the main tourist attractions in Spain?", _clf()
-        )
+        decision = router.apply("What are the main tourist attractions in Spain?", _clf())
         assert decision is not None
         assert decision.route == "AUGMENTED"
         assert decision.reason_code == "policy:travel_tourism"
@@ -182,9 +175,12 @@ class TestTravelTourismGate:
 
 
 class TestNegativeCases:
-    def test_stable_fact_no_gate(self, router: PolicyRouter) -> None:
+    def test_stable_fact_routes_local(self, router: PolicyRouter) -> None:
+        # Stable scientific concepts are handled well by the local model.
         decision = router.apply("What is the theory of relativity?", _clf())
-        assert decision is None
+        assert decision is not None
+        assert decision.route == "LOCAL"
+        assert decision.reason_code == "policy:stable_knowledge"
 
     def test_diy_no_gate(self, router: PolicyRouter) -> None:
         decision = router.apply("How do I change a car tire?", _clf())

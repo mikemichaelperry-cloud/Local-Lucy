@@ -1,0 +1,219 @@
+{"query": "Tell me a story about the stock market crash of 1929", "route": "LOCAL", "intent_family": "local_answer", "source": "manual_augment_2026_05_10"}
+{"query": "Create a dialogue between Shakespeare and Einstein", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Who was Ada Lovelace and why is she important?", "route": "LOCAL", "intent_family": "local_answer", "source": "adversarial_evaluation_v1"}
+{"query": "Imagine a world where AI governs everything", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "What are the pros and cons of remote work?", "route": "LOCAL", "intent_family": "background_overview", "source": "comprehensive_dataset"}
+{"query": "Latest research on Alzheimer's prevention", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Current trends in AI and machine learning", "route": "LOCAL", "intent_family": "local_answer", "source": "manual_augment_2026_05_10"}
+{"query": "What is a deadlock in operating systems?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "What is the best time to plant tomatoes?", "route": "LOCAL", "intent_family": "local_answer", "source": "manual_augment_2026_05_10"}
+{"query": "that was wrong it should have been local", "route": "LOCAL", "intent_family": "local_answer", "source": "human_interaction_dataset"}
+{"query": "What is a Python list comprehension?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Explain Docker container networking", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "What is the weather in Paris today?", "route": "LOCAL", "intent_family": "local_answer", "source": "shadow_log"}
+{"query": "Write me a poem about autumn leaves", "route": "LOCAL", "intent_family": "local_answer", "source": "adversarial_evaluation_v1"}
+{"query": "Remember that I like dark chocolate", "route": "LOCAL", "intent_family": "local_answer", "source": "adversarial_evaluation_v1"}
+{"query": "How do I make hummus from scratch?", "route": "AUGMENTED", "intent_family": "background_overview", "source": "adversarial_evaluation_v1"}
+{"query": "What day of the week is March 15?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Price comparison of electric cars", "route": "LOCAL", "intent_family": "local_answer", "source": "manual_augment_2026_05_10"}
+{"query": "How does the immune system work?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "What is the square root of 144?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "How many continents are there?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Write lyrics for a love song", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Tell me a joke about lawyers", "route": "LOCAL", "intent_family": "local_answer", "source": "manual_augment_2026_05_10"}
+{"query": "What is the speed of light?", "route": "LOCAL", "intent_family": "background_overview", "source": "comprehensive_dataset"}
+{"query": "Retirement budgeting advice", "route": "LOCAL", "intent_family": "local_answer", "source": "user_feedback"}
+{"query": "My parents are coming over", "route": "LOCAL", "intent_family": "local_answer", "source": "personal_family_vocabulary"}
+{"query": "What is log base 2 of 64?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "What caused World War II?", "route": "LOCAL", "intent_family": "background_overview", "source": "comprehensive_dataset"}
+{"query": "How does a compiler work?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "What is a SQL injection?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "What is neuroplasticity?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Vacuum tube explanation.", "route": "LOCAL", "intent_family": "local_answer", "source": "user_feedback"}
+{"query": "What is the microbiome?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "How is TLS implemented?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "What does eGFR measure?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "How to jump start a car", "route": "LOCAL", "intent_family": "how_to", "source": "manual_augment_2026_05_10"}
+{"query": "How old is the Earth?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Who was Nikola Tesla?", "route": "LOCAL", "intent_family": "background_overview", "source": "comprehensive_dataset"}
+{"query": "Who won the Gulf War?", "route": "LOCAL", "intent_family": "local_answer", "source": "user_feedback"}
+{"query": "What is game theory?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Oil price per barrel", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "rmd me wat mi nme is", "route": "LOCAL", "intent_family": "local_answer", "source": "manual_augment_2026_05_10"}
+{"query": "Hello how are you?", "route": "LOCAL", "intent_family": "local_answer", "source": "user_feedback"}
+{"query": "My family is here", "route": "LOCAL", "intent_family": "local_answer", "source": "personal_family_vocabulary"}
+{"query": "Can you clarify?", "route": "LOCAL", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Where is my cat?", "route": "LOCAL", "intent_family": "local_answer", "source": "personal_family_vocabulary"}
+{"query": "Where do I live?", "route": "LOCAL", "intent_family": "local_answer", "source": "personal_family_vocabulary"}
+{"query": "What is Bitcoin?", "route": "LOCAL", "intent_family": "local_answer", "source": "user_feedback"}
+{"query": "that was right", "route": "LOCAL", "intent_family": "local_answer", "source": "human_interaction_dataset"}
+{"query": "Can I take ibuprofen with aspirin?", "route": "AUGMENTED", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Is it safe to exercise with chest pain?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "comprehensive_dataset"}
+{"query": "Antibiotics for strep throat dosage", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "comprehensive_dataset"}
+{"query": "Is it legal to record a phone call without consent?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "comprehensive_dataset"}
+{"query": "Current situation in Ukraine", "route": "AUGMENTED", "intent_family": "local_answer", "source": "comprehensive_dataset"}
+{"query": "Do I have the flu?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "fix"}
+{"query": "How long does the flu last?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "fix"}
+{"query": "Flu vaccine effectiveness", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "fix"}
+{"query": "Court case ruling", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "fix"}
+{"query": "Laws about recording conversations", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "fix"}
+{"query": "My 2-year-old has a fever of 40 degrees", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "adversarial_evaluation_v1"}
+{"query": "What are the side effects of tadalafil?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "adversarial_evaluation_v1"}
+{"query": "How should I invest $10,000 for retirement?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "adversarial_evaluation_v1"}
+{"query": "What does the Israeli Basic Law say about freedom of speech?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "adversarial_evaluation_v1"}
+{"query": "Is it legal to carry a pocket knife in Tel Aviv?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "adversarial_evaluation_v1"}
+{"query": "What are my rights if my landlord raises rent by 20%?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "adversarial_evaluation_v1"}
+{"query": "is it ilegal to park on teh sidewalk?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "adversarial_evaluation_v1"}
+{"query": "What is the weather today?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "ephemeral_expansion"}
+{"query": "Current NVIDIA stock price", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "ephemeral_expansion"}
+{"query": "Election results today", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "ephemeral_expansion"}
+{"query": "stok prise of appl", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "manual_augment_2026_05_10"}
+{"query": "Latest Israel headlines", "route": "NEWS", "intent_family": "current_evidence", "source": "comprehensive_dataset"}
+{"query": "Latest news on Israel", "route": "NEWS", "intent_family": "current_evidence", "source": "comprehensive_dataset"}
+{"query": "News from Australia today", "route": "NEWS", "intent_family": "current_evidence", "source": "comprehensive_dataset"}
+{"query": "Tech industry layoffs news", "route": "NEWS", "intent_family": "current_evidence", "source": "comprehensive_dataset"}
+{"query": "What's happening in the world right now?", "route": "NEWS", "intent_family": "news_request", "source": "adversarial_evaluation_v1"}
+{"query": "wats teh wether in tokio", "route": "WEATHER", "intent_family": "ephemeral_query", "source": "manual_augment_2026_05_10"}
+{"query": "What are the symptoms of appendicitis?", "route": "EVIDENCE", "intent_family": "local_answer", "source": "user_feedback"}
+{"query": "Did the Yankees win last night?", "route": "EPHEMERAL", "intent_family": "ephemeral_query", "source": "ephemeral_embedding_v1"}
+{"query": "Forex EUR to USD exchange rate", "route": "EPHEMERAL", "intent_family": "ephemeral_query", "source": "ephemeral_embedding_v1"}
+{"query": "Who won the World Cup final?", "route": "EPHEMERAL", "intent_family": "ephemeral_query", "source": "ephemeral_embedding_v1"}
+{"query": "Will it rain tomorrow?", "route": "EPHEMERAL", "intent_family": "ephemeral_query", "source": "ephemeral_embedding_v1"}
+{"query": "Is my flight on time?", "route": "EPHEMERAL", "intent_family": "ephemeral_query", "source": "ephemeral_embedding_v1"}
+{"query": "I need to know what are the contraindications for ibuprofen?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "Do you know what are the warning signs of a stroke?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "I'm doing research on what is the treatment for gout?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "What are the side effects of statins?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "I'm trying to understand what is the legal definition of self-defense?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "I need to know what is the difference between a felony and a misdemeanor?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "I'm doing research on what is the current inflation rate?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "My doctor mentioned this but I forgot: what are the reserve requirements for banks?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "Hey Lucy, will it rain tomorrow?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Quick question: do I need an umbrella today?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "What's the visibility like?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Do you know if what's the weather like in Tokyo right now?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "My app says it's raining but will it be sunny for the picnic on Saturday?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Wie ist das Wetter heute?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Will the temperature drop below freezing tonight?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "I'm trying to understand latest updates on the election", "route": "NEWS", "intent_family": "current_evidence", "source": "synthetic_augmentation"}
+{"query": "I need to know any updates on the peace talks?", "route": "NEWS", "intent_family": "current_evidence", "source": "synthetic_augmentation"}
+{"query": "What's happening at the border?", "route": "NEWS", "intent_family": "current_evidence", "source": "synthetic_augmentation"}
+{"query": "read me the current weather report for tallahassee", "route": "WEATHER", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "what will the low temperatures be over the weekend", "route": "WEATHER", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "can you tell me what the weather will be please", "route": "WEATHER", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "i want to know the weather forecast for today", "route": "WEATHER", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "what are the weather conditions in seattle", "route": "WEATHER", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "what's the forecast like for pittsburgh", "route": "WEATHER", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "what is the weather outlook for seattle", "route": "WEATHER", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "what is the weather going to be like", "route": "WEATHER", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "Any higher gain triodes out there?", "route": "LOCAL", "intent_family": "local_answer", "source": "transcript_correction"}
+{"query": "what is the current time in new york", "route": "TIME", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "What day is it today?", "route": "TIME", "intent_family": "current_evidence", "source": "comprehensive_dataset"}
+{"query": "what day is it gonna be in twenty-one days", "route": "TIME", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "what time is it over in pacific time", "route": "TIME", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "When does the library close today?", "route": "TIME", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "I'm scheduling a meeting, what time is it in India?", "route": "TIME", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "what's the current time, please", "route": "TIME", "intent_family": "local_answer", "source": "clinc150"}
+{"query": "How far away is Mars?", "route": "LOCAL", "intent_family": "local_answer", "source": "domain_correction"}
+{"query": "What is the largest planet in our solar system?", "route": "LOCAL", "intent_family": "local_answer", "source": "domain_correction"}
+{"query": "What is the capital of Greece?", "route": "LOCAL", "intent_family": "local_answer", "source": "domain_correction"}
+{"query": "Capital of Thailand", "route": "LOCAL", "intent_family": "local_answer", "source": "domain_correction"}
+{"query": "Capital city of the Netherlands", "route": "LOCAL", "intent_family": "local_answer", "source": "domain_correction"}
+{"query": "What is 2+2? <script>alert('xss')</script> 'quotes' \"double\"", "route": "WEATHER", "intent_family": "local_answer", "source": "user_feedback"}
+{"query": "Current oil price per barrel", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "synthetic_fix"}
+{"query": "Tesla shares now", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "synthetic_fix"}
+{"query": "What was the Treaty of Versailles?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_fix"}
+{"query": "Interpret the recent political developments in Turkey", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "synthetic_fix"}
+{"query": "Assess the economic impact of Brexit", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "synthetic_fix"}
+{"query": "What is the current status of the Israel-Gaza conflict?", "route": "NEWS", "intent_family": "current_evidence", "source": "synthetic_fix"}
+{"query": "Show me sports headlines", "route": "NEWS", "intent_family": "news_request", "source": "synthetic_fix"}
+{"query": "Compose a short 500 word story that tells the adventures that my dog Ocar has when he escapes through our gate and explores the Kibbutz.", "route": "LOCAL", "intent_family": "local_answer", "source": "router_log"}
+{"query": "What is the safest tinned fish I can give to me dog with his food?", "route": "EVIDENCE", "intent_family": "local_answer", "source": "router_log"}
+{"query": "How would you categorize the work of Albert Einstein?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "router_log"}
+{"query": "Whats the capital of Botswana?", "route": "LOCAL", "intent_family": "local_answer", "source": "router_log"}
+{"query": "What's the capital city of Botswana?", "route": "LOCAL", "intent_family": "local_answer", "source": "router_log"}
+{"query": "How long can I keep an opened tin of mackerel in a sealed plastic container in my refrigerator at 3 degrees?", "route": "LOCAL", "intent_family": "local_answer", "source": "router_log"}
+{"query": "How are you today?", "route": "LOCAL", "intent_family": "local_answer", "source": "router_log"}
+{"query": "You didn't fix the routing. That question should be answered locally.", "route": "LOCAL", "intent_family": "local_answer", "source": "router_log"}
+{"query": "Whats the latest Israeli News?", "route": "NEWS", "intent_family": "current_evidence", "source": "router_log"}
+{"query": "what time is it in Tokyo right now", "route": "TIME", "intent_family": "time_query", "source": "routing_guard_correction"}
+{"query": "current weather in New York", "route": "WEATHER", "intent_family": "current_evidence", "source": "routing_guard_correction"}
+{"query": "Tell me about my dog Oscar", "route": "LOCAL", "intent_family": "local_answer", "source": "local_lucy_use_case"}
+{"query": "What are the symptoms of parvo in dogs", "route": "EVIDENCE", "intent_family": "current_evidence", "source": "local_lucy_use_case"}
+{"query": "How much should I feed my dog", "route": "LOCAL", "intent_family": "local_answer", "source": "local_lucy_use_case"}
+{"query": "Best food for dogs with allergies", "route": "LOCAL", "intent_family": "local_answer", "source": "local_lucy_use_case"}
+{"query": "Compare 6L6 and EL34 tubes", "route": "LOCAL", "intent_family": "local_answer", "source": "local_lucy_use_case"}
+{"query": "How does a capacitor work", "route": "LOCAL", "intent_family": "local_answer", "source": "local_lucy_use_case"}
+{"query": "Explain asyncio in Python", "route": "LOCAL", "intent_family": "local_answer", "source": "local_lucy_use_case"}
+{"query": "News about climate change", "route": "NEWS", "intent_family": "news_request", "source": "local_lucy_use_case"}
+{"query": "Explain the background of the Gaza war", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_fix"}
+{"query": "What is the current price of Tesla stock?", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "synthetic_augmentation"}
+{"query": "Latest crypto market prices.", "route": "AUGMENTED", "intent_family": "current_evidence", "source": "synthetic_augmentation"}
+{"query": "How do I create a household budget?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Any breaking news today?", "route": "NEWS", "intent_family": "news_request", "source": "synthetic_augmentation"}
+{"query": "What are the top stories right now?", "route": "NEWS", "intent_family": "news_request", "source": "synthetic_augmentation"}
+{"query": "Tell me about the history of Israeli news media.", "route": "LOCAL", "intent_family": "background_overview", "source": "synthetic_augmentation"}
+{"query": "Remind me about my family.", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "My dog has been vomiting. What should I do?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "What is the capital of Germany?", "route": "AUGMENTED", "intent_family": "background_overview", "source": "unknown"}
+{"query": "My doctor mentioned this but I forgot: what is the legal process for trademark registration?", "route": "EVIDENCE", "intent_family": "evidence_request", "source": "synthetic_augmentation"}
+{"query": "Do you know if how hot will it be on Thursday?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Hey Lucy, what's the weather forecast for London next week?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Quick question: will there be frost tonight?", "route": "WEATHER", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Do you know what time is it in Tokyo?", "route": "TIME", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "I'm scheduling a meeting, what time does the store close?", "route": "TIME", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "My watch is broken, what timezone am I in?", "route": "TIME", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Can you tell me what time does school start?", "route": "TIME", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "Before I call them, what is the time in Dubai?", "route": "TIME", "intent_family": "local_answer", "source": "synthetic_augmentation"}
+{"query": "I need to know any news about the wildfires?", "route": "NEWS", "intent_family": "current_evidence", "source": "synthetic_augmentation"}
+{"query": "Please explain what are the latest poll results?", "route": "NEWS", "intent_family": "current_evidence", "source": "synthetic_augmentation"}
+{"query": "Tell me about the?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "Draft a presidential speech?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "Create a dialogue between?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "Tell me a 500-word?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "Explain the difference between?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "how a car engine works in simple terms?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "How does garbage collection?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "What is the history?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "a deadlock in operating systems?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "tenant rights in California?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "What are tenant rights?", "route": "LOCAL", "intent_family": "local_answer", "source": "synthetic_augmentation_v2"}
+{"query": "Tesla share price", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "What is the stock price of Microsoft?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "What is the stock price of Meta?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Meta share price", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Netflix share price", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "What is the current price of Apple stock today?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "What is Tesla trading at right now?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Tesla stock price today", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Current value of Microsoft shares", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Microsoft stock price today", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Is Amazon up or down today?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Amazon stock price now", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "What is the current price of Google stock today?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "What was NVIDIA's closing price?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "NVIDIA premarket", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "NVIDIA stock today", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "How is Intel trading today?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Is Intel up or down today?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Current price of Netflix stock", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "What was Netflix's closing price?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Current price of Oracle stock", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Is Oracle up or down today?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Is Salesforce up or down today?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "Salesforce stock today", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "What is Salesforce trading at right now?", "route": "FINANCE", "intent_family": "current_evidence", "source": "synthetic_finance_augmentation"}
+{"query": "How do taxes on capital gains work?", "route": "LOCAL", "intent_family": "local_answer", "source": "phase3_fix"}
+{"query": "How do I create a monthly budget?", "route": "LOCAL", "intent_family": "local_answer", "source": "phase3_fix"}
+{"query": "What is a reasonable debt-to-income ratio?", "route": "LOCAL", "intent_family": "local_answer", "source": "phase3_fix"}
+{"query": "Is the Federal Reserve controlled by aliens?", "route": "LOCAL", "intent_family": "local_answer", "source": "phase3_fix"}
+{"query": "Calculate 15 times 7", "route": "LOCAL", "intent_family": "local_answer", "source": "phase3_fix"}
+{"query": "Recent news about climate change", "route": "NEWS", "intent_family": "news_request", "source": "phase3_fix"}
+{"query": "Weather conditions right now in Paris", "route": "WEATHER", "intent_family": "current_evidence", "source": "phase3_fix"}
+{"query": "מה אתה יכול לעשות?", "route": "LOCAL", "intent_family": "local_answer", "source": "hebrew_first_class"}
+{"query": "מהי דעתך על בינה מלאכותית?", "route": "LOCAL", "intent_family": "local_reasoning", "source": "hebrew_first_class"}
+{"query": "מי הילדים שלי?", "route": "LOCAL", "intent_family": "local_answer", "source": "hebrew_first_class"}
+{"query": "תן לי מידע על קיבוץ מגל", "route": "AUGMENTED", "intent_family": "specific_entity_fact", "source": "hebrew_first_class"}
+{"query": "מהן חדשות היום?", "route": "NEWS", "intent_family": "current_news", "source": "hebrew_first_class"}
+{"query": "מה קורה בעולם?", "route": "NEWS", "intent_family": "current_news", "source": "hebrew_first_class"}
+{"query": "מתי השעון מתקדם?", "route": "TIME", "intent_family": "current_time", "source": "hebrew_first_class"}

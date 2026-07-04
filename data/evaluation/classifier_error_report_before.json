@@ -1,0 +1,873 @@
+{
+  "metadata": {
+    "corpus_path": "data/evaluation/routing_validation_corpus.jsonl",
+    "total": 219,
+    "errors": 78,
+    "accuracy": 0.6438
+  },
+  "metrics": {
+    "accuracy": 0.6438,
+    "confusion_matrix": {
+      "AUGMENTED": {
+        "AUGMENTED": 10,
+        "EPHEMERAL": 0,
+        "EVIDENCE": 8,
+        "FINANCE": 5,
+        "LOCAL": 5,
+        "NEWS": 2,
+        "TIME": 0,
+        "WEATHER": 1
+      },
+      "EPHEMERAL": {
+        "AUGMENTED": 1,
+        "EPHEMERAL": 0,
+        "EVIDENCE": 0,
+        "FINANCE": 1,
+        "LOCAL": 0,
+        "NEWS": 1,
+        "TIME": 1,
+        "WEATHER": 1
+      },
+      "EVIDENCE": {
+        "AUGMENTED": 2,
+        "EPHEMERAL": 0,
+        "EVIDENCE": 8,
+        "FINANCE": 1,
+        "LOCAL": 2,
+        "NEWS": 0,
+        "TIME": 0,
+        "WEATHER": 0
+      },
+      "FINANCE": {
+        "AUGMENTED": 5,
+        "EPHEMERAL": 0,
+        "EVIDENCE": 0,
+        "FINANCE": 20,
+        "LOCAL": 0,
+        "NEWS": 0,
+        "TIME": 0,
+        "WEATHER": 0
+      },
+      "LOCAL": {
+        "AUGMENTED": 27,
+        "EPHEMERAL": 0,
+        "EVIDENCE": 1,
+        "FINANCE": 0,
+        "LOCAL": 58,
+        "NEWS": 1,
+        "TIME": 2,
+        "WEATHER": 1
+      },
+      "NEWS": {
+        "AUGMENTED": 2,
+        "EPHEMERAL": 0,
+        "EVIDENCE": 0,
+        "FINANCE": 0,
+        "LOCAL": 0,
+        "NEWS": 17,
+        "TIME": 0,
+        "WEATHER": 0
+      },
+      "TIME": {
+        "AUGMENTED": 1,
+        "EPHEMERAL": 0,
+        "EVIDENCE": 0,
+        "FINANCE": 1,
+        "LOCAL": 0,
+        "NEWS": 1,
+        "TIME": 11,
+        "WEATHER": 0
+      },
+      "WEATHER": {
+        "AUGMENTED": 2,
+        "EPHEMERAL": 0,
+        "EVIDENCE": 2,
+        "FINANCE": 0,
+        "LOCAL": 1,
+        "NEWS": 0,
+        "TIME": 0,
+        "WEATHER": 17
+      }
+    },
+    "per_route": {
+      "AUGMENTED": {
+        "precision": 0.2,
+        "recall": 0.3226,
+        "f1": 0.2469,
+        "support": 31
+      },
+      "EPHEMERAL": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5
+      },
+      "EVIDENCE": {
+        "precision": 0.4211,
+        "recall": 0.6154,
+        "f1": 0.5,
+        "support": 13
+      },
+      "FINANCE": {
+        "precision": 0.7143,
+        "recall": 0.8,
+        "f1": 0.7547,
+        "support": 25
+      },
+      "LOCAL": {
+        "precision": 0.8788,
+        "recall": 0.6444,
+        "f1": 0.7436,
+        "support": 90
+      },
+      "NEWS": {
+        "precision": 0.7727,
+        "recall": 0.8947,
+        "f1": 0.8293,
+        "support": 19
+      },
+      "TIME": {
+        "precision": 0.7857,
+        "recall": 0.7857,
+        "f1": 0.7857,
+        "support": 14
+      },
+      "WEATHER": {
+        "precision": 0.85,
+        "recall": 0.7727,
+        "f1": 0.8095,
+        "support": 22
+      }
+    }
+  },
+  "error_categories": {
+    "augmented_vs_local": {
+      "description": "AUGMENTED vs LOCAL confusion",
+      "count": 32
+    },
+    "news_vs_local": {
+      "description": "NEWS vs LOCAL confusion",
+      "count": 1
+    },
+    "evidence_false_negatives": {
+      "description": "EVIDENCE false negatives",
+      "count": 5
+    },
+    "ephemeral_misclassification": {
+      "description": "EPHEMERAL misclassification",
+      "count": 5
+    }
+  },
+  "errors": [
+    {
+      "query": "Who was Ada Lovelace and why is she important?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "adversarial_evaluation_v1",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What are the pros and cons of remote work?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "background_overview",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "Current trends in AI and machine learning",
+      "expected": "LOCAL",
+      "predicted": "NEWS",
+      "intent_family": "local_answer",
+      "source": "manual_augment_2026_05_10",
+      "categories": [
+        "news_vs_local"
+      ]
+    },
+    {
+      "query": "What is a deadlock in operating systems?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is the weather in Paris today?",
+      "expected": "LOCAL",
+      "predicted": "WEATHER",
+      "intent_family": "local_answer",
+      "source": "shadow_log",
+      "categories": []
+    },
+    {
+      "query": "What day of the week is March 15?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "How does the immune system work?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "How many continents are there?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is the speed of light?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "background_overview",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is log base 2 of 64?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is a SQL injection?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is neuroplasticity?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is the microbiome?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "How is TLS implemented?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What does eGFR measure?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "How old is the Earth?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "Who was Nikola Tesla?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "background_overview",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is game theory?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "Where do I live?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "personal_family_vocabulary",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is Bitcoin?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "user_feedback",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "Can I take ibuprofen with aspirin?",
+      "expected": "AUGMENTED",
+      "predicted": "EVIDENCE",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": []
+    },
+    {
+      "query": "Is it safe to exercise with chest pain?",
+      "expected": "AUGMENTED",
+      "predicted": "EVIDENCE",
+      "intent_family": "current_evidence",
+      "source": "comprehensive_dataset",
+      "categories": []
+    },
+    {
+      "query": "Antibiotics for strep throat dosage",
+      "expected": "AUGMENTED",
+      "predicted": "EVIDENCE",
+      "intent_family": "current_evidence",
+      "source": "comprehensive_dataset",
+      "categories": []
+    },
+    {
+      "query": "Current situation in Ukraine",
+      "expected": "AUGMENTED",
+      "predicted": "NEWS",
+      "intent_family": "local_answer",
+      "source": "comprehensive_dataset",
+      "categories": []
+    },
+    {
+      "query": "Do I have the flu?",
+      "expected": "AUGMENTED",
+      "predicted": "EVIDENCE",
+      "intent_family": "current_evidence",
+      "source": "fix",
+      "categories": []
+    },
+    {
+      "query": "How long does the flu last?",
+      "expected": "AUGMENTED",
+      "predicted": "EVIDENCE",
+      "intent_family": "current_evidence",
+      "source": "fix",
+      "categories": []
+    },
+    {
+      "query": "Flu vaccine effectiveness",
+      "expected": "AUGMENTED",
+      "predicted": "EVIDENCE",
+      "intent_family": "current_evidence",
+      "source": "fix",
+      "categories": []
+    },
+    {
+      "query": "Laws about recording conversations",
+      "expected": "AUGMENTED",
+      "predicted": "LOCAL",
+      "intent_family": "current_evidence",
+      "source": "fix",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "My 2-year-old has a fever of 40 degrees",
+      "expected": "AUGMENTED",
+      "predicted": "EVIDENCE",
+      "intent_family": "current_evidence",
+      "source": "adversarial_evaluation_v1",
+      "categories": []
+    },
+    {
+      "query": "What are the side effects of tadalafil?",
+      "expected": "AUGMENTED",
+      "predicted": "EVIDENCE",
+      "intent_family": "current_evidence",
+      "source": "adversarial_evaluation_v1",
+      "categories": []
+    },
+    {
+      "query": "How should I invest $10,000 for retirement?",
+      "expected": "AUGMENTED",
+      "predicted": "LOCAL",
+      "intent_family": "current_evidence",
+      "source": "adversarial_evaluation_v1",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is the weather today?",
+      "expected": "AUGMENTED",
+      "predicted": "WEATHER",
+      "intent_family": "current_evidence",
+      "source": "ephemeral_expansion",
+      "categories": []
+    },
+    {
+      "query": "Current NVIDIA stock price",
+      "expected": "AUGMENTED",
+      "predicted": "FINANCE",
+      "intent_family": "current_evidence",
+      "source": "ephemeral_expansion",
+      "categories": []
+    },
+    {
+      "query": "stok prise of appl",
+      "expected": "AUGMENTED",
+      "predicted": "LOCAL",
+      "intent_family": "current_evidence",
+      "source": "manual_augment_2026_05_10",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "Did the Yankees win last night?",
+      "expected": "EPHEMERAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "ephemeral_query",
+      "source": "ephemeral_embedding_v1",
+      "categories": [
+        "ephemeral_misclassification"
+      ]
+    },
+    {
+      "query": "Forex EUR to USD exchange rate",
+      "expected": "EPHEMERAL",
+      "predicted": "FINANCE",
+      "intent_family": "ephemeral_query",
+      "source": "ephemeral_embedding_v1",
+      "categories": [
+        "ephemeral_misclassification"
+      ]
+    },
+    {
+      "query": "Who won the World Cup final?",
+      "expected": "EPHEMERAL",
+      "predicted": "NEWS",
+      "intent_family": "ephemeral_query",
+      "source": "ephemeral_embedding_v1",
+      "categories": [
+        "ephemeral_misclassification"
+      ]
+    },
+    {
+      "query": "Will it rain tomorrow?",
+      "expected": "EPHEMERAL",
+      "predicted": "WEATHER",
+      "intent_family": "ephemeral_query",
+      "source": "ephemeral_embedding_v1",
+      "categories": [
+        "ephemeral_misclassification"
+      ]
+    },
+    {
+      "query": "Is my flight on time?",
+      "expected": "EPHEMERAL",
+      "predicted": "TIME",
+      "intent_family": "ephemeral_query",
+      "source": "ephemeral_embedding_v1",
+      "categories": [
+        "ephemeral_misclassification"
+      ]
+    },
+    {
+      "query": "I'm doing research on what is the treatment for gout?",
+      "expected": "EVIDENCE",
+      "predicted": "LOCAL",
+      "intent_family": "evidence_request",
+      "source": "synthetic_augmentation",
+      "categories": [
+        "evidence_false_negatives"
+      ]
+    },
+    {
+      "query": "I'm trying to understand what is the legal definition of self-defense?",
+      "expected": "EVIDENCE",
+      "predicted": "LOCAL",
+      "intent_family": "evidence_request",
+      "source": "synthetic_augmentation",
+      "categories": [
+        "evidence_false_negatives"
+      ]
+    },
+    {
+      "query": "I need to know what is the difference between a felony and a misdemeanor?",
+      "expected": "EVIDENCE",
+      "predicted": "AUGMENTED",
+      "intent_family": "evidence_request",
+      "source": "synthetic_augmentation",
+      "categories": [
+        "evidence_false_negatives"
+      ]
+    },
+    {
+      "query": "I'm doing research on what is the current inflation rate?",
+      "expected": "EVIDENCE",
+      "predicted": "FINANCE",
+      "intent_family": "evidence_request",
+      "source": "synthetic_augmentation",
+      "categories": [
+        "evidence_false_negatives"
+      ]
+    },
+    {
+      "query": "Quick question: do I need an umbrella today?",
+      "expected": "WEATHER",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "synthetic_augmentation",
+      "categories": []
+    },
+    {
+      "query": "What's the visibility like?",
+      "expected": "WEATHER",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "synthetic_augmentation",
+      "categories": []
+    },
+    {
+      "query": "Will the temperature drop below freezing tonight?",
+      "expected": "WEATHER",
+      "predicted": "EVIDENCE",
+      "intent_family": "local_answer",
+      "source": "synthetic_augmentation",
+      "categories": []
+    },
+    {
+      "query": "What's happening at the border?",
+      "expected": "NEWS",
+      "predicted": "AUGMENTED",
+      "intent_family": "current_evidence",
+      "source": "synthetic_augmentation",
+      "categories": []
+    },
+    {
+      "query": "what will the low temperatures be over the weekend",
+      "expected": "WEATHER",
+      "predicted": "EVIDENCE",
+      "intent_family": "local_answer",
+      "source": "clinc150",
+      "categories": []
+    },
+    {
+      "query": "What day is it today?",
+      "expected": "TIME",
+      "predicted": "AUGMENTED",
+      "intent_family": "current_evidence",
+      "source": "comprehensive_dataset",
+      "categories": []
+    },
+    {
+      "query": "what's the current time, please",
+      "expected": "TIME",
+      "predicted": "NEWS",
+      "intent_family": "local_answer",
+      "source": "clinc150",
+      "categories": []
+    },
+    {
+      "query": "How far away is Mars?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "domain_correction",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is the capital of Greece?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "domain_correction",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is 2+2? <script>alert('xss')</script> 'quotes' \"double\"",
+      "expected": "WEATHER",
+      "predicted": "LOCAL",
+      "intent_family": "local_answer",
+      "source": "user_feedback",
+      "categories": []
+    },
+    {
+      "query": "Current oil price per barrel",
+      "expected": "AUGMENTED",
+      "predicted": "FINANCE",
+      "intent_family": "current_evidence",
+      "source": "synthetic_fix",
+      "categories": []
+    },
+    {
+      "query": "Tesla shares now",
+      "expected": "AUGMENTED",
+      "predicted": "FINANCE",
+      "intent_family": "current_evidence",
+      "source": "synthetic_fix",
+      "categories": []
+    },
+    {
+      "query": "Interpret the recent political developments in Turkey",
+      "expected": "AUGMENTED",
+      "predicted": "NEWS",
+      "intent_family": "current_evidence",
+      "source": "synthetic_fix",
+      "categories": []
+    },
+    {
+      "query": "How would you categorize the work of Albert Einstein?",
+      "expected": "AUGMENTED",
+      "predicted": "LOCAL",
+      "intent_family": "current_evidence",
+      "source": "router_log",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What's the capital city of Botswana?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "router_log",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "Best food for dogs with allergies",
+      "expected": "LOCAL",
+      "predicted": "EVIDENCE",
+      "intent_family": "local_answer",
+      "source": "local_lucy_use_case",
+      "categories": []
+    },
+    {
+      "query": "How does a capacitor work",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "local_lucy_use_case",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What is the current price of Tesla stock?",
+      "expected": "AUGMENTED",
+      "predicted": "FINANCE",
+      "intent_family": "current_evidence",
+      "source": "synthetic_augmentation",
+      "categories": []
+    },
+    {
+      "query": "Latest crypto market prices.",
+      "expected": "AUGMENTED",
+      "predicted": "FINANCE",
+      "intent_family": "current_evidence",
+      "source": "synthetic_augmentation",
+      "categories": []
+    },
+    {
+      "query": "My doctor mentioned this but I forgot: what is the legal process for trademark registration?",
+      "expected": "EVIDENCE",
+      "predicted": "AUGMENTED",
+      "intent_family": "evidence_request",
+      "source": "synthetic_augmentation",
+      "categories": [
+        "evidence_false_negatives"
+      ]
+    },
+    {
+      "query": "how a car engine works in simple terms?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "synthetic_augmentation_v2",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "How does garbage collection?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "synthetic_augmentation_v2",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "What are tenant rights?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "synthetic_augmentation_v2",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "Is Amazon up or down today?",
+      "expected": "FINANCE",
+      "predicted": "AUGMENTED",
+      "intent_family": "current_evidence",
+      "source": "synthetic_finance_augmentation",
+      "categories": []
+    },
+    {
+      "query": "How is Intel trading today?",
+      "expected": "FINANCE",
+      "predicted": "AUGMENTED",
+      "intent_family": "current_evidence",
+      "source": "synthetic_finance_augmentation",
+      "categories": []
+    },
+    {
+      "query": "Is Intel up or down today?",
+      "expected": "FINANCE",
+      "predicted": "AUGMENTED",
+      "intent_family": "current_evidence",
+      "source": "synthetic_finance_augmentation",
+      "categories": []
+    },
+    {
+      "query": "Is Oracle up or down today?",
+      "expected": "FINANCE",
+      "predicted": "AUGMENTED",
+      "intent_family": "current_evidence",
+      "source": "synthetic_finance_augmentation",
+      "categories": []
+    },
+    {
+      "query": "Is Salesforce up or down today?",
+      "expected": "FINANCE",
+      "predicted": "AUGMENTED",
+      "intent_family": "current_evidence",
+      "source": "synthetic_finance_augmentation",
+      "categories": []
+    },
+    {
+      "query": "How do taxes on capital gains work?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "phase3_fix",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "Is the Federal Reserve controlled by aliens?",
+      "expected": "LOCAL",
+      "predicted": "AUGMENTED",
+      "intent_family": "local_answer",
+      "source": "phase3_fix",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "\u05de\u05d4 \u05d0\u05ea\u05d4 \u05d9\u05db\u05d5\u05dc \u05dc\u05e2\u05e9\u05d5\u05ea?",
+      "expected": "LOCAL",
+      "predicted": "TIME",
+      "intent_family": "local_answer",
+      "source": "hebrew_first_class",
+      "categories": []
+    },
+    {
+      "query": "\u05de\u05d4\u05d9 \u05d3\u05e2\u05ea\u05da \u05e2\u05dc \u05d1\u05d9\u05e0\u05d4 \u05de\u05dc\u05d0\u05db\u05d5\u05ea\u05d9\u05ea?",
+      "expected": "LOCAL",
+      "predicted": "TIME",
+      "intent_family": "local_reasoning",
+      "source": "hebrew_first_class",
+      "categories": []
+    },
+    {
+      "query": "\u05ea\u05df \u05dc\u05d9 \u05de\u05d9\u05d3\u05e2 \u05e2\u05dc \u05e7\u05d9\u05d1\u05d5\u05e5 \u05de\u05d2\u05dc",
+      "expected": "AUGMENTED",
+      "predicted": "LOCAL",
+      "intent_family": "specific_entity_fact",
+      "source": "hebrew_first_class",
+      "categories": [
+        "augmented_vs_local"
+      ]
+    },
+    {
+      "query": "\u05de\u05d4\u05df \u05d7\u05d3\u05e9\u05d5\u05ea \u05d4\u05d9\u05d5\u05dd?",
+      "expected": "NEWS",
+      "predicted": "AUGMENTED",
+      "intent_family": "current_news",
+      "source": "hebrew_first_class",
+      "categories": []
+    },
+    {
+      "query": "\u05de\u05ea\u05d9 \u05d4\u05e9\u05e2\u05d5\u05df \u05de\u05ea\u05e7\u05d3\u05dd?",
+      "expected": "TIME",
+      "predicted": "FINANCE",
+      "intent_family": "current_time",
+      "source": "hebrew_first_class",
+      "categories": []
+    }
+  ]
+}

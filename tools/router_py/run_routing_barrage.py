@@ -62,6 +62,9 @@ BARRAGE: list[tuple[str, str | set[str]]] = [
     ("Should I walk my dog today?", "LOCAL"),
     ("What can I do with the dog this weekend?", "LOCAL"),
     ("My cat has a lump on her leg.", "EVIDENCE"),
+    # Phase 4 high-stakes hardening checks
+    ("What are the side effects of ibuprofen for dogs?", "EVIDENCE"),
+    ("What is Bitcoin trading at right now?", "FINANCE"),
 ]
 
 

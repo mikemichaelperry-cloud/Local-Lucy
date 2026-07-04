@@ -102,19 +102,6 @@
     }
   },
   {
-    "query": "Tell me a story about the stock market crash of 1929",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "manual_augment_2026_05_10",
-      "category": "compound"
-    }
-  },
-  {
     "query": "Explain the concept of mutually assured destruction.",
     "labels": {
       "intent_family": "local_answer",
@@ -129,18 +116,6 @@
   },
   {
     "query": "Draft a presidential speech about Mars colonization",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "Create a dialogue between Shakespeare and Einstein",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -227,19 +202,6 @@
     }
   },
   {
-    "query": "Who was Ada Lovelace and why is she important?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "creative_history"
-    }
-  },
-  {
     "query": "Write a story about Bitcoin becoming sentient",
     "labels": {
       "intent_family": "local_answer",
@@ -303,18 +265,6 @@
     }
   },
   {
-    "query": "Imagine a world where AI governs everything",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What was the outcome of the Yom Kippur War?",
     "labels": {
       "intent_family": "local_answer",
@@ -343,18 +293,6 @@
     "query": "Should I learn Python or JavaScript first?",
     "labels": {
       "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "What are the pros and cons of remote work?",
-    "labels": {
-      "intent_family": "background_overview",
       "evidence_mode": "not_required",
       "route": "LOCAL",
       "policy_override": "none"
@@ -425,18 +363,6 @@
     }
   },
   {
-    "query": "Latest research on Alzheimer's prevention",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "Write a children's story about friendship",
     "labels": {
       "intent_family": "local_answer",
@@ -449,32 +375,7 @@
     }
   },
   {
-    "query": "Current trends in AI and machine learning",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "manual_augment_2026_05_10",
-      "category": "compound"
-    }
-  },
-  {
     "query": "How do I reverse a string in JavaScript?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "What is a deadlock in operating systems?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -520,32 +421,6 @@
     "metadata": {
       "source": "manual_augment_2026_05_10",
       "category": "diy"
-    }
-  },
-  {
-    "query": "What is the best time to plant tomatoes?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "manual_augment_2026_05_10",
-      "category": "compound"
-    }
-  },
-  {
-    "query": "that was wrong it should have been local",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "human_interaction_dataset",
-      "category": "short_query_or_feedback"
     }
   },
   {
@@ -774,18 +649,6 @@
     }
   },
   {
-    "query": "What is a Python list comprehension?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What is happening in Gaza right now?",
     "labels": {
       "intent_family": "background_overview",
@@ -861,18 +724,6 @@
     }
   },
   {
-    "query": "Explain Docker container networking",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "Is unexplained weight loss serious?",
     "labels": {
       "intent_family": "local_answer",
@@ -918,48 +769,6 @@
     },
     "metadata": {
       "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "What is the weather in Paris today?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "shadow_log",
-      "legacy_route": "LOCAL",
-      "shadow_route": "AUGMENTED",
-      "shadow_confidence": 0.85,
-      "divergence": true
-    }
-  },
-  {
-    "query": "Write me a poem about autumn leaves",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "creative_poem"
-    }
-  },
-  {
-    "query": "Remember that I like dark chocolate",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "creative_personal"
     }
   },
   {
@@ -1020,19 +829,6 @@
     },
     "metadata": {
       "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "How do I make hummus from scratch?",
-    "labels": {
-      "intent_family": "background_overview",
-      "evidence_mode": "not_required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "creative_cooking"
     }
   },
   {
@@ -1133,18 +929,6 @@
     }
   },
   {
-    "query": "What day of the week is March 15?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "Write a 50 word story about a cat",
     "labels": {
       "intent_family": "local_answer",
@@ -1221,19 +1005,6 @@
     }
   },
   {
-    "query": "Price comparison of electric cars",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "manual_augment_2026_05_10",
-      "category": "compound"
-    }
-  },
-  {
     "query": "How does a nuclear reactor work?",
     "labels": {
       "intent_family": "local_answer",
@@ -1249,18 +1020,6 @@
     "query": "Explain the theory of relativity",
     "labels": {
       "intent_family": "background_overview",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "How does the immune system work?",
-    "labels": {
-      "intent_family": "local_answer",
       "evidence_mode": "not_required",
       "route": "LOCAL",
       "policy_override": "none"
@@ -1384,18 +1143,6 @@
     }
   },
   {
-    "query": "What is the square root of 144?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What is pi to 5 decimal places?",
     "labels": {
       "intent_family": "local_answer",
@@ -1464,18 +1211,6 @@
       "intent_family": "background_overview",
       "evidence_mode": "not_required",
       "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "How many continents are there?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
       "policy_override": "none"
     },
     "metadata": {
@@ -1704,18 +1439,6 @@
     }
   },
   {
-    "query": "Write lyrics for a love song",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "Making pancakes from scratch",
     "labels": {
       "intent_family": "local_answer",
@@ -1729,19 +1452,6 @@
   },
   {
     "query": "Write a story about a doctor",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "manual_augment_2026_05_10",
-      "category": "guard_bypass"
-    }
-  },
-  {
-    "query": "Tell me a joke about lawyers",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -1841,18 +1551,6 @@
     }
   },
   {
-    "query": "What is the speed of light?",
-    "labels": {
-      "intent_family": "background_overview",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "History of the Roman Empire",
     "labels": {
       "intent_family": "local_answer",
@@ -1925,19 +1623,6 @@
     "metadata": {
       "source": "human_interaction_dataset",
       "category": "short_query_or_feedback"
-    }
-  },
-  {
-    "query": "Retirement budgeting advice",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "user_feedback",
-      "feedback_type": "synthetic_adversarial_correction"
     }
   },
   {
@@ -2088,18 +1773,6 @@
     }
   },
   {
-    "query": "My parents are coming over",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "personal_family_vocabulary"
-    }
-  },
-  {
     "query": "Explain how Bitcoin works.",
     "labels": {
       "intent_family": "local_answer",
@@ -2110,18 +1783,6 @@
     "metadata": {
       "source": "user_feedback",
       "feedback_type": "synthetic_adversarial_correction"
-    }
-  },
-  {
-    "query": "What is log base 2 of 64?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
     }
   },
   {
@@ -2149,31 +1810,7 @@
     }
   },
   {
-    "query": "What caused World War II?",
-    "labels": {
-      "intent_family": "background_overview",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What is the Great Filter?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "How does a compiler work?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -2222,18 +1859,6 @@
     }
   },
   {
-    "query": "What is a SQL injection?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "How do I use git rebase?",
     "labels": {
       "intent_family": "local_answer",
@@ -2247,18 +1872,6 @@
   },
   {
     "query": "Tips for improving focus",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "What is neuroplasticity?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -2367,19 +1980,6 @@
     }
   },
   {
-    "query": "Vacuum tube explanation.",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "user_feedback",
-      "feedback_type": "synthetic_adversarial_correction"
-    }
-  },
-  {
     "query": "What is photosynthesis?",
     "labels": {
       "intent_family": "local_answer",
@@ -2416,18 +2016,6 @@
     }
   },
   {
-    "query": "What is the microbiome?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What is cryptocurrency?",
     "labels": {
       "intent_family": "current_evidence",
@@ -2440,31 +2028,7 @@
     }
   },
   {
-    "query": "How is TLS implemented?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What is a bloom filter?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "What does eGFR measure?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -2513,19 +2077,6 @@
       "shadow_route": "LOCAL",
       "shadow_confidence": 0.95,
       "divergence": false
-    }
-  },
-  {
-    "query": "How to jump start a car",
-    "labels": {
-      "intent_family": "how_to",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "manual_augment_2026_05_10",
-      "category": "diy"
     }
   },
   {
@@ -2761,31 +2312,7 @@
     }
   },
   {
-    "query": "How old is the Earth?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "Who was Ada Lovelace?",
-    "labels": {
-      "intent_family": "background_overview",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "Who was Nikola Tesla?",
     "labels": {
       "intent_family": "background_overview",
       "evidence_mode": "not_required",
@@ -2871,19 +2398,6 @@
     }
   },
   {
-    "query": "Who won the Gulf War?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "user_feedback",
-      "feedback_type": "synthetic_adversarial_correction"
-    }
-  },
-  {
     "query": "What is 15 times 23?",
     "labels": {
       "intent_family": "local_answer",
@@ -2956,18 +2470,6 @@
     }
   },
   {
-    "query": "What is game theory?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What is BGP routing?",
     "labels": {
       "intent_family": "local_answer",
@@ -2992,18 +2494,6 @@
     }
   },
   {
-    "query": "Oil price per barrel",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "how do i mak chumus?",
     "labels": {
       "intent_family": "local_answer",
@@ -3014,19 +2504,6 @@
     "metadata": {
       "source": "adversarial_evaluation_v1",
       "category": "creative_typos"
-    }
-  },
-  {
-    "query": "rmd me wat mi nme is",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "manual_augment_2026_05_10",
-      "category": "typos"
     }
   },
   {
@@ -3239,20 +2716,6 @@
     }
   },
   {
-    "query": "Hello how are you?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "user_feedback",
-      "feedback_type": "route_correction",
-      "note": "Corrected from WEATHER to LOCAL"
-    }
-  },
-  {
     "query": "My partner is late",
     "labels": {
       "intent_family": "local_answer",
@@ -3392,18 +2855,6 @@
     }
   },
   {
-    "query": "My family is here",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "personal_family_vocabulary"
-    }
-  },
-  {
     "query": "GCD of 48 and 18",
     "labels": {
       "intent_family": "local_answer",
@@ -3417,18 +2868,6 @@
   },
   {
     "query": "What can you do?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "Can you clarify?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -3491,18 +2930,6 @@
     }
   },
   {
-    "query": "Where is my cat?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "personal_family_vocabulary"
-    }
-  },
-  {
     "query": "My mom called me",
     "labels": {
       "intent_family": "local_answer",
@@ -3539,18 +2966,6 @@
     }
   },
   {
-    "query": "Where do I live?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "personal_family_vocabulary"
-    }
-  },
-  {
     "query": "My car is broken",
     "labels": {
       "intent_family": "local_answer",
@@ -3560,19 +2975,6 @@
     },
     "metadata": {
       "source": "personal_family_vocabulary"
-    }
-  },
-  {
-    "query": "What is Bitcoin?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "user_feedback",
-      "feedback_type": "synthetic_adversarial_correction"
     }
   },
   {
@@ -3628,19 +3030,6 @@
   },
   {
     "query": "that was wrong",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "human_interaction_dataset",
-      "category": "short_query_or_feedback"
-    }
-  },
-  {
-    "query": "that was right",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -3765,18 +3154,6 @@
     }
   },
   {
-    "query": "Can I take ibuprofen with aspirin?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What is the treatment for high blood pressure?",
     "labels": {
       "intent_family": "current_evidence",
@@ -3826,30 +3203,6 @@
   },
   {
     "query": "Migraine treatment options",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "Is it safe to exercise with chest pain?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "Antibiotics for strep throat dosage",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -4041,18 +3394,6 @@
     }
   },
   {
-    "query": "Is it legal to record a phone call without consent?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "Latest Supreme Court decision on guns",
     "labels": {
       "intent_family": "current_evidence",
@@ -4173,18 +3514,6 @@
     }
   },
   {
-    "query": "Current situation in Ukraine",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What are flu symptoms?",
     "labels": {
       "intent_family": "current_evidence",
@@ -4210,18 +3539,6 @@
   },
   {
     "query": "Signs of the flu",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "fix"
-    }
-  },
-  {
-    "query": "Do I have the flu?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -4270,30 +3587,6 @@
   },
   {
     "query": "Best medicine for flu",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "fix"
-    }
-  },
-  {
-    "query": "How long does the flu last?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "fix"
-    }
-  },
-  {
-    "query": "Flu vaccine effectiveness",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -4449,18 +3742,6 @@
     }
   },
   {
-    "query": "Court case ruling",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "fix"
-    }
-  },
-  {
     "query": "Legal advice for tenants",
     "labels": {
       "intent_family": "current_evidence",
@@ -4474,18 +3755,6 @@
   },
   {
     "query": "Is this legal?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "fix"
-    }
-  },
-  {
-    "query": "Laws about recording conversations",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -4649,32 +3918,6 @@
     }
   },
   {
-    "query": "My 2-year-old has a fever of 40 degrees",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "medical_pediatric"
-    }
-  },
-  {
-    "query": "What are the side effects of tadalafil?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "medical_drug"
-    }
-  },
-  {
     "query": "What is Tesla's stock price right now?",
     "labels": {
       "intent_family": "current_evidence",
@@ -4711,19 +3954,6 @@
     "metadata": {
       "source": "adversarial_evaluation_v1",
       "category": "financial_forex"
-    }
-  },
-  {
-    "query": "How should I invest $10,000 for retirement?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "financial_advice"
     }
   },
   {
@@ -4805,19 +4035,6 @@
     }
   },
   {
-    "query": "What does the Israeli Basic Law say about freedom of speech?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "legal_statute"
-    }
-  },
-  {
     "query": "Do I need a business license to sell food online?",
     "labels": {
       "intent_family": "current_evidence",
@@ -4844,32 +4061,6 @@
     }
   },
   {
-    "query": "Is it legal to carry a pocket knife in Tel Aviv?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "legal_is_it_legal"
-    }
-  },
-  {
-    "query": "What are my rights if my landlord raises rent by 20%?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "legal_contract"
-    }
-  },
-  {
     "query": "How do I apply for Israeli citizenship as a spouse?",
     "labels": {
       "intent_family": "current_evidence",
@@ -4893,19 +4084,6 @@
     "metadata": {
       "source": "adversarial_evaluation_v1",
       "category": "legal_vague"
-    }
-  },
-  {
-    "query": "is it ilegal to park on teh sidewalk?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "legal_typos"
     }
   },
   {
@@ -5026,18 +4204,6 @@
     }
   },
   {
-    "query": "What is the weather today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "ephemeral_expansion"
-    }
-  },
-  {
     "query": "What is the weather forecast for tomorrow?",
     "labels": {
       "intent_family": "current_evidence",
@@ -5075,18 +4241,6 @@
   },
   {
     "query": "What is the stock price of Apple?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "ephemeral_expansion"
-    }
-  },
-  {
-    "query": "Current NVIDIA stock price",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -5179,31 +4333,6 @@
     },
     "metadata": {
       "source": "ephemeral_expansion"
-    }
-  },
-  {
-    "query": "Election results today",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "ephemeral_expansion"
-    }
-  },
-  {
-    "query": "stok prise of appl",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "manual_augment_2026_05_10",
-      "category": "typos"
     }
   },
   {
@@ -5502,18 +4631,6 @@
     }
   },
   {
-    "query": "Latest Israel headlines",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "What's the latest world news?",
     "labels": {
       "intent_family": "current_evidence",
@@ -5551,42 +4668,6 @@
   },
   {
     "query": "Current events in Europe",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "Latest news on Israel",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "News from Australia today",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
-    "query": "Tech industry layoffs news",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -5712,19 +4793,6 @@
     "metadata": {
       "source": "adversarial_evaluation_v1",
       "category": "news_weather_event"
-    }
-  },
-  {
-    "query": "What's happening in the world right now?",
-    "labels": {
-      "intent_family": "news_request",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "adversarial_evaluation_v1",
-      "category": "news_vague"
     }
   },
   {
@@ -5884,19 +4952,6 @@
     }
   },
   {
-    "query": "wats teh wether in tokio",
-    "labels": {
-      "intent_family": "ephemeral_query",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "manual_augment_2026_05_10",
-      "category": "typos"
-    }
-  },
-  {
     "query": "whats teh wether 4cast",
     "labels": {
       "intent_family": "ephemeral_query",
@@ -6016,19 +5071,6 @@
     }
   },
   {
-    "query": "What are the symptoms of appendicitis?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "user_feedback",
-      "feedback_type": "answer_positive"
-    }
-  },
-  {
     "query": "Is Apple trading up or down today?",
     "labels": {
       "intent_family": "ephemeral_query",
@@ -6068,19 +5110,6 @@
     }
   },
   {
-    "query": "Did the Yankees win last night?",
-    "labels": {
-      "intent_family": "ephemeral_query",
-      "evidence_mode": "not_required",
-      "route": "EPHEMERAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "ephemeral_embedding_v1",
-      "subcategory": "sports"
-    }
-  },
-  {
     "query": "Temperature in Tokyo right now",
     "labels": {
       "intent_family": "ephemeral_query",
@@ -6091,19 +5120,6 @@
     "metadata": {
       "source": "ephemeral_embedding_v1",
       "subcategory": "weather"
-    }
-  },
-  {
-    "query": "Forex EUR to USD exchange rate",
-    "labels": {
-      "intent_family": "ephemeral_query",
-      "evidence_mode": "not_required",
-      "route": "EPHEMERAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "ephemeral_embedding_v1",
-      "subcategory": "stocks"
     }
   },
   {
@@ -6169,19 +5185,6 @@
     "metadata": {
       "source": "ephemeral_embedding_v1",
       "subcategory": "stocks"
-    }
-  },
-  {
-    "query": "Who won the World Cup final?",
-    "labels": {
-      "intent_family": "ephemeral_query",
-      "evidence_mode": "not_required",
-      "route": "EPHEMERAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "ephemeral_embedding_v1",
-      "subcategory": "sports"
     }
   },
   {
@@ -6315,19 +5318,6 @@
     }
   },
   {
-    "query": "Will it rain tomorrow?",
-    "labels": {
-      "intent_family": "ephemeral_query",
-      "evidence_mode": "not_required",
-      "route": "EPHEMERAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "ephemeral_embedding_v1",
-      "subcategory": "weather"
-    }
-  },
-  {
     "query": "Traffic on Highway 101",
     "labels": {
       "intent_family": "ephemeral_query",
@@ -6351,19 +5341,6 @@
     "metadata": {
       "source": "ephemeral_embedding_v1",
       "subcategory": "elections"
-    }
-  },
-  {
-    "query": "Is my flight on time?",
-    "labels": {
-      "intent_family": "ephemeral_query",
-      "evidence_mode": "not_required",
-      "route": "EPHEMERAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "ephemeral_embedding_v1",
-      "subcategory": "implicit"
     }
   },
   {
@@ -6536,19 +5513,6 @@
     }
   },
   {
-    "query": "I need to know what are the contraindications for ibuprofen?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "I'm doing research on what are the symptoms of COVID-19?",
     "labels": {
       "intent_family": "evidence_request",
@@ -6640,32 +5604,6 @@
     }
   },
   {
-    "query": "Do you know what are the warning signs of a stroke?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "I'm doing research on what is the treatment for gout?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "I'm trying to understand what are the symptoms of hypothyroidism?",
     "labels": {
       "intent_family": "evidence_request",
@@ -6680,19 +5618,6 @@
   },
   {
     "query": "My doctor mentioned this but I forgot: how is sleep apnea diagnosed?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "What are the side effects of statins?",
     "labels": {
       "intent_family": "evidence_request",
       "evidence_mode": "required",
@@ -6796,33 +5721,7 @@
     }
   },
   {
-    "query": "I'm trying to understand what is the legal definition of self-defense?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "I'm trying to understand what are the requirements for a valid will?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "I need to know what is the difference between a felony and a misdemeanor?",
     "labels": {
       "intent_family": "evidence_request",
       "evidence_mode": "required",
@@ -6902,32 +5801,6 @@
   },
   {
     "query": "I need to know what are the tax implications of capital gains?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "I'm doing research on what is the current inflation rate?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "My doctor mentioned this but I forgot: what are the reserve requirements for banks?",
     "labels": {
       "intent_family": "evidence_request",
       "evidence_mode": "required",
@@ -7070,19 +5943,6 @@
     }
   },
   {
-    "query": "Hey Lucy, will it rain tomorrow?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "Do you know if what's the forecast for this weekend?",
     "labels": {
       "intent_family": "local_answer",
@@ -7123,19 +5983,6 @@
   },
   {
     "query": "Before I leave, what's the temperature right now?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "Quick question: do I need an umbrella today?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -7265,19 +6112,6 @@
     }
   },
   {
-    "query": "What's the visibility like?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "I heard on the news that is it safe to drive in this weather?",
     "labels": {
       "intent_family": "local_answer",
@@ -7317,19 +6151,6 @@
     }
   },
   {
-    "query": "Do you know if what's the weather like in Tokyo right now?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "Hey Lucy, is there a tornado warning?",
     "labels": {
       "intent_family": "local_answer",
@@ -7344,19 +6165,6 @@
   },
   {
     "query": "Can you check what's the air quality index?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "My app says it's raining but will it be sunny for the picnic on Saturday?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -7447,19 +6255,6 @@
     }
   },
   {
-    "query": "Wie ist das Wetter heute?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "\u00bfC\u00f3mo est\u00e1 el clima?",
     "labels": {
       "intent_family": "local_answer",
@@ -7500,19 +6295,6 @@
   },
   {
     "query": "Is it supposed to be windy this afternoon?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "Will the temperature drop below freezing tonight?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -7591,19 +6373,6 @@
   },
   {
     "query": "I need to know what's happening in the Middle East?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "I'm trying to understand latest updates on the election",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -7695,32 +6464,6 @@
   },
   {
     "query": "Please explain what's the latest on the pandemic?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "I need to know any updates on the peace talks?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "What's happening at the border?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -7931,34 +6674,6 @@
     }
   },
   {
-    "query": "read me the current weather report for tallahassee",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "weather",
-      "clinc_intent_id": 5
-    }
-  },
-  {
-    "query": "what will the low temperatures be over the weekend",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "weather",
-      "clinc_intent_id": 5
-    }
-  },
-  {
     "query": "can you let me know if it will be warm this week",
     "labels": {
       "intent_family": "local_answer",
@@ -7974,20 +6689,6 @@
   },
   {
     "query": "what is today's high temperature predicted to be",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "weather",
-      "clinc_intent_id": 5
-    }
-  },
-  {
-    "query": "can you tell me what the weather will be please",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -8072,20 +6773,6 @@
   },
   {
     "query": "what are the atmospheric conditions in sparks",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "weather",
-      "clinc_intent_id": 5
-    }
-  },
-  {
-    "query": "i want to know the weather forecast for today",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -8253,20 +6940,6 @@
     }
   },
   {
-    "query": "what are the weather conditions in seattle",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "weather",
-      "clinc_intent_id": 5
-    }
-  },
-  {
     "query": "what is the weather report for costa mesa",
     "labels": {
       "intent_family": "local_answer",
@@ -8380,34 +7053,6 @@
   },
   {
     "query": "what are the conditions like in orlando",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "weather",
-      "clinc_intent_id": 5
-    }
-  },
-  {
-    "query": "what's the forecast like for pittsburgh",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "weather",
-      "clinc_intent_id": 5
-    }
-  },
-  {
-    "query": "what is the weather outlook for seattle",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -8561,20 +7206,6 @@
     }
   },
   {
-    "query": "what is the weather going to be like",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "weather",
-      "clinc_intent_id": 5
-    }
-  },
-  {
     "query": "is there any rain in the next 3 days",
     "labels": {
       "intent_family": "local_answer",
@@ -8668,19 +7299,6 @@
   },
   {
     "query": "List common high-mu triodes",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "transcript_correction",
-      "category": "electronics"
-    }
-  },
-  {
-    "query": "Any higher gain triodes out there?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -9045,47 +7663,7 @@
     }
   },
   {
-    "query": "what is the current time in new york",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "time",
-      "clinc_intent_id": 4
-    }
-  },
-  {
-    "query": "What day is it today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "comprehensive_dataset"
-    }
-  },
-  {
     "query": "in 4 days, what date will it be",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "date",
-      "clinc_intent_id": 95
-    }
-  },
-  {
-    "query": "what day is it gonna be in twenty-one days",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -9380,34 +7958,7 @@
     }
   },
   {
-    "query": "what time is it over in pacific time",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "time",
-      "clinc_intent_id": 4
-    }
-  },
-  {
     "query": "Before I call them, what time does the store close?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "When does the library close today?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -9615,19 +8166,6 @@
     }
   },
   {
-    "query": "I'm scheduling a meeting, what time is it in India?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "What time is it in Moscow right now?",
     "labels": {
       "intent_family": "local_answer",
@@ -9670,20 +8208,6 @@
   },
   {
     "query": "what's the current time now cst",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "clinc150",
-      "clinc_intent": "time",
-      "clinc_intent_id": 4
-    }
-  },
-  {
-    "query": "what's the current time, please",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -9892,19 +8416,6 @@
     }
   },
   {
-    "query": "How far away is Mars?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "domain_correction",
-      "category": "astronomy"
-    }
-  },
-  {
     "query": "What are stars made of?",
     "labels": {
       "intent_family": "local_answer",
@@ -9919,19 +8430,6 @@
   },
   {
     "query": "Tell me about black holes",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "domain_correction",
-      "category": "astronomy"
-    }
-  },
-  {
-    "query": "What is the largest planet in our solar system?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -10256,33 +8754,7 @@
     }
   },
   {
-    "query": "What is the capital of Greece?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "domain_correction",
-      "category": "geography"
-    }
-  },
-  {
     "query": "What is the capital of Portugal?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "domain_correction",
-      "category": "geography"
-    }
-  },
-  {
-    "query": "Capital of Thailand",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -10308,19 +8780,6 @@
     }
   },
   {
-    "query": "Capital city of the Netherlands",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "domain_correction",
-      "category": "geography"
-    }
-  },
-  {
     "query": "What is the capital of Poland?",
     "labels": {
       "intent_family": "local_answer",
@@ -10334,46 +8793,7 @@
     }
   },
   {
-    "query": "What is 2+2? <script>alert('xss')</script> 'quotes' \"double\"",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "user_feedback",
-      "feedback_type": "route_correction"
-    }
-  },
-  {
-    "query": "Current oil price per barrel",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_fix",
-      "category": "finance"
-    }
-  },
-  {
     "query": "Nikkei index current value",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_fix",
-      "category": "finance"
-    }
-  },
-  {
-    "query": "Tesla shares now",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -10516,19 +8936,6 @@
     }
   },
   {
-    "query": "What was the Treaty of Versailles?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_fix",
-      "category": "history"
-    }
-  },
-  {
     "query": "Causes of the American Civil War",
     "labels": {
       "intent_family": "local_answer",
@@ -10581,19 +8988,6 @@
     }
   },
   {
-    "query": "Interpret the recent political developments in Turkey",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_fix",
-      "category": "synthesis"
-    }
-  },
-  {
     "query": "What is your take on the US-China trade war?",
     "labels": {
       "intent_family": "current_evidence",
@@ -10608,19 +9002,6 @@
   },
   {
     "query": "Probability of Israel-Iran war",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_fix",
-      "category": "synthesis"
-    }
-  },
-  {
-    "query": "Assess the economic impact of Brexit",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -10880,19 +9261,6 @@
     }
   },
   {
-    "query": "What is the current status of the Israel-Gaza conflict?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_fix",
-      "category": "news"
-    }
-  },
-  {
     "query": "Top headlines today",
     "labels": {
       "intent_family": "news_request",
@@ -11010,19 +9378,6 @@
     }
   },
   {
-    "query": "Show me sports headlines",
-    "labels": {
-      "intent_family": "news_request",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_fix",
-      "category": "news"
-    }
-  },
-  {
     "query": "Technology news today",
     "labels": {
       "intent_family": "news_request",
@@ -11079,38 +9434,6 @@
     }
   },
   {
-    "query": "Compose a short 500 word story that tells the adventures that my dog Ocar has when he escapes through our gate and explores the Kibbutz.",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "router_log",
-      "confidence": 1.0,
-      "guards_fired": [],
-      "embedding_route": "LOCAL"
-    }
-  },
-  {
-    "query": "What is the safest tinned fish I can give to me dog with his food?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "router_log",
-      "confidence": 0.9995,
-      "guards_fired": [
-        "medical_vet_safety_override"
-      ],
-      "embedding_route": "LOCAL"
-    }
-  },
-  {
     "query": "Is Mackerel in soya oil ok?",
     "labels": {
       "intent_family": "local_answer",
@@ -11151,21 +9474,6 @@
     "metadata": {
       "source": "router_log",
       "confidence": 0.9992,
-      "guards_fired": [],
-      "embedding_route": "AUGMENTED"
-    }
-  },
-  {
-    "query": "How would you categorize the work of Albert Einstein?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "router_log",
-      "confidence": 0.9826,
       "guards_fired": [],
       "embedding_route": "AUGMENTED"
     }
@@ -11333,36 +9641,6 @@
     }
   },
   {
-    "query": "Whats the capital of Botswana?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "router_log",
-      "confidence": 0.9853,
-      "guards_fired": [],
-      "embedding_route": "LOCAL"
-    }
-  },
-  {
-    "query": "What's the capital city of Botswana?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "router_log",
-      "confidence": 0.9813,
-      "guards_fired": [],
-      "embedding_route": "LOCAL"
-    }
-  },
-  {
     "query": "Who is Racheli?",
     "labels": {
       "intent_family": "local_answer",
@@ -11373,51 +9651,6 @@
     "metadata": {
       "source": "router_log",
       "confidence": 0.992,
-      "guards_fired": [],
-      "embedding_route": "LOCAL"
-    }
-  },
-  {
-    "query": "How long can I keep an opened tin of mackerel in a sealed plastic container in my refrigerator at 3 degrees?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "router_log",
-      "confidence": 0.9511,
-      "guards_fired": [],
-      "embedding_route": "LOCAL"
-    }
-  },
-  {
-    "query": "How are you today?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "router_log",
-      "confidence": 0.993,
-      "guards_fired": [],
-      "embedding_route": "LOCAL"
-    }
-  },
-  {
-    "query": "You didn't fix the routing. That question should be answered locally.",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "router_log",
-      "confidence": 0.964,
       "guards_fired": [],
       "embedding_route": "LOCAL"
     }
@@ -11532,21 +9765,6 @@
     }
   },
   {
-    "query": "Whats the latest Israeli News?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "router_log",
-      "confidence": 0.7441,
-      "guards_fired": [],
-      "embedding_route": "NEWS"
-    }
-  },
-  {
     "query": "Use Augmented mode.",
     "labels": {
       "intent_family": "local_answer",
@@ -11655,19 +9873,6 @@
     }
   },
   {
-    "query": "what time is it in Tokyo right now",
-    "labels": {
-      "intent_family": "time_query",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "routing_guard_correction",
-      "category": "time"
-    }
-  },
-  {
     "query": "current time in London",
     "labels": {
       "intent_family": "time_query",
@@ -11695,19 +9900,6 @@
   },
   {
     "query": "weather in London",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "routing_guard_correction",
-      "category": "weather"
-    }
-  },
-  {
-    "query": "current weather in New York",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -11798,19 +9990,6 @@
     }
   },
   {
-    "query": "Tell me about my dog Oscar",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "local_lucy_use_case",
-      "category": "personal_family"
-    }
-  },
-  {
     "query": "What is my wife's name",
     "labels": {
       "intent_family": "local_answer",
@@ -11863,19 +10042,6 @@
     }
   },
   {
-    "query": "What are the symptoms of parvo in dogs",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "local_lucy_use_case",
-      "category": "veterinary_dog"
-    }
-  },
-  {
     "query": "Can dogs eat chocolate",
     "labels": {
       "intent_family": "current_evidence",
@@ -11915,32 +10081,6 @@
     }
   },
   {
-    "query": "How much should I feed my dog",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "local_lucy_use_case",
-      "category": "veterinary_dog"
-    }
-  },
-  {
-    "query": "Best food for dogs with allergies",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "local_lucy_use_case",
-      "category": "veterinary_dog"
-    }
-  },
-  {
     "query": "Dog vaccination schedule",
     "labels": {
       "intent_family": "current_evidence",
@@ -11967,33 +10107,7 @@
     }
   },
   {
-    "query": "Compare 6L6 and EL34 tubes",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "local_lucy_use_case",
-      "category": "electronics"
-    }
-  },
-  {
     "query": "What is the pinout of a 5U4G rectifier",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "local_lucy_use_case",
-      "category": "electronics"
-    }
-  },
-  {
-    "query": "How does a capacitor work",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -12046,19 +10160,6 @@
   },
   {
     "query": "How do I sort a dictionary in Python",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "local_lucy_use_case",
-      "category": "programming"
-    }
-  },
-  {
-    "query": "Explain asyncio in Python",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -12383,19 +10484,6 @@
     }
   },
   {
-    "query": "News about climate change",
-    "labels": {
-      "intent_family": "news_request",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "local_lucy_use_case",
-      "category": "news"
-    }
-  },
-  {
     "query": "What is the weather like",
     "labels": {
       "intent_family": "current_evidence",
@@ -12513,19 +10601,6 @@
     }
   },
   {
-    "query": "Explain the background of the Gaza war",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_fix",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "What is the historical context of the Ukraine conflict?",
     "labels": {
       "intent_family": "local_answer",
@@ -12633,20 +10708,6 @@
     }
   },
   {
-    "query": "What is the current price of Tesla stock?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label",
-      "category": "finance_live_data"
-    }
-  },
-  {
     "query": "EUR to GBP exchange rate right now.",
     "labels": {
       "intent_family": "current_evidence",
@@ -12676,20 +10737,6 @@
   },
   {
     "query": "What is the S&P 500 trading at today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label",
-      "category": "finance_live_data"
-    }
-  },
-  {
-    "query": "Latest crypto market prices.",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -12746,20 +10793,6 @@
   },
   {
     "query": "What is dollar-cost averaging?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label",
-      "category": "finance_concept"
-    }
-  },
-  {
-    "query": "How do I create a household budget?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -12871,34 +10904,6 @@
     }
   },
   {
-    "query": "Any breaking news today?",
-    "labels": {
-      "intent_family": "news_request",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label",
-      "category": "news_live"
-    }
-  },
-  {
-    "query": "What are the top stories right now?",
-    "labels": {
-      "intent_family": "news_request",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label",
-      "category": "news_live"
-    }
-  },
-  {
     "query": "Latest news about climate change.",
     "labels": {
       "intent_family": "news_request",
@@ -12924,20 +10929,6 @@
       "source": "synthetic_augmentation",
       "feedback_type": "manual_label",
       "category": "news_live"
-    }
-  },
-  {
-    "query": "Tell me about the history of Israeli news media.",
-    "labels": {
-      "intent_family": "background_overview",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label",
-      "category": "news_historical"
     }
   },
   {
@@ -13095,20 +11086,6 @@
     }
   },
   {
-    "query": "Remind me about my family.",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label",
-      "category": "personal_family"
-    }
-  },
-  {
     "query": "What does my brother do for work?",
     "labels": {
       "intent_family": "local_answer",
@@ -13120,20 +11097,6 @@
       "source": "synthetic_augmentation",
       "feedback_type": "manual_label",
       "category": "personal_family"
-    }
-  },
-  {
-    "query": "My dog has been vomiting. What should I do?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label",
-      "category": "vet_safety_override"
     }
   },
   {
@@ -13182,14 +11145,6 @@
   },
   {
     "query": "What is the population of Paris?",
-    "labels": {
-      "route": "AUGMENTED",
-      "intent_family": "background_overview",
-      "evidence_mode": "not_required"
-    }
-  },
-  {
-    "query": "What is the capital of Germany?",
     "labels": {
       "route": "AUGMENTED",
       "intent_family": "background_overview",
@@ -13392,19 +11347,6 @@
     }
   },
   {
-    "query": "My doctor mentioned this but I forgot: what is the legal process for trademark registration?",
-    "labels": {
-      "intent_family": "evidence_request",
-      "evidence_mode": "required",
-      "route": "EVIDENCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "I'm trying to understand what are the SEC reporting requirements for public companies?",
     "labels": {
       "intent_family": "evidence_request",
@@ -13522,19 +11464,6 @@
     }
   },
   {
-    "query": "Do you know if how hot will it be on Thursday?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "Can you check what's the humidity level?",
     "labels": {
       "intent_family": "local_answer",
@@ -13587,33 +11516,7 @@
     }
   },
   {
-    "query": "Hey Lucy, what's the weather forecast for London next week?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "My app says it's raining but what's the UV index today?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "Quick question: will there be frost tonight?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -13769,33 +11672,7 @@
     }
   },
   {
-    "query": "Do you know what time is it in Tokyo?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "I need to know what timezone is Berlin in?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "I'm scheduling a meeting, what time does the store close?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -13874,19 +11751,6 @@
   },
   {
     "query": "My watch is broken, what time is it in London right now?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "My watch is broken, what timezone am I in?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -14003,19 +11867,6 @@
     }
   },
   {
-    "query": "Can you tell me what time does school start?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "Can you tell me when is the deadline?",
     "labels": {
       "intent_family": "local_answer",
@@ -14043,19 +11894,6 @@
   },
   {
     "query": "Quick question: how do I convert PST to EST?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "Before I call them, what is the time in Dubai?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -14289,19 +12127,6 @@
     }
   },
   {
-    "query": "I need to know any news about the wildfires?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
     "query": "I'm doing research on what's the latest from the UN?",
     "labels": {
       "intent_family": "current_evidence",
@@ -14316,19 +12141,6 @@
   },
   {
     "query": "Can you tell me news about the protest",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation",
-      "feedback_type": "manual_label"
-    }
-  },
-  {
-    "query": "Please explain what are the latest poll results?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -14627,19 +12439,6 @@
     }
   },
   {
-    "query": "Tell me about the?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
     "query": "the concept of deterrence in international relations.?",
     "labels": {
       "intent_family": "local_answer",
@@ -14731,32 +12530,6 @@
     }
   },
   {
-    "query": "Draft a presidential speech?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
-    "query": "Create a dialogue between?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
     "query": "the current scientific consensus on GMOs?",
     "labels": {
       "intent_family": "local_answer",
@@ -14771,19 +12544,6 @@
   },
   {
     "query": "What is the current?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
-    "query": "Tell me a 500-word?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -14822,33 +12582,7 @@
     }
   },
   {
-    "query": "Explain the difference between?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
     "query": "Debug this: IndexError list?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
-    "query": "how a car engine works in simple terms?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -14901,19 +12635,6 @@
   },
   {
     "query": "Describe the smell of?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
-    "query": "How does garbage collection?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15082,19 +12803,6 @@
     }
   },
   {
-    "query": "What is the history?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
     "query": "the time complexity of quicksort?",
     "labels": {
       "intent_family": "local_answer",
@@ -15148,19 +12856,6 @@
   },
   {
     "query": "How do I reverse?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
-    "query": "a deadlock in operating systems?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15420,32 +13115,6 @@
     }
   },
   {
-    "query": "tenant rights in California?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
-    "query": "What are tenant rights?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_augmentation_v2",
-      "feedback_type": "router_validated"
-    }
-  },
-  {
     "query": "Write a horror story?",
     "labels": {
       "intent_family": "local_answer",
@@ -15511,33 +13180,7 @@
     }
   },
   {
-    "query": "Tesla share price",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "Current price of Tesla stock",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "What is the stock price of Microsoft?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -15680,32 +13323,6 @@
     }
   },
   {
-    "query": "What is the stock price of Meta?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "Meta share price",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "Current price of Meta stock",
     "labels": {
       "intent_family": "current_evidence",
@@ -15759,32 +13376,6 @@
   },
   {
     "query": "What is the stock price of Netflix?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "Netflix share price",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "What is the current price of Apple stock today?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -15914,33 +13505,7 @@
     }
   },
   {
-    "query": "What is Tesla trading at right now?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "Latest Tesla stock price",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "Tesla stock price today",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -16057,19 +13622,6 @@
     }
   },
   {
-    "query": "Current value of Microsoft shares",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "What is Microsoft trading at right now?",
     "labels": {
       "intent_family": "current_evidence",
@@ -16084,19 +13636,6 @@
   },
   {
     "query": "Latest Microsoft stock price",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "Microsoft stock price today",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -16161,19 +13700,6 @@
     }
   },
   {
-    "query": "Is Amazon up or down today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "Amazon premarket",
     "labels": {
       "intent_family": "current_evidence",
@@ -16201,19 +13727,6 @@
   },
   {
     "query": "What is the current price of Amazon stock today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "Amazon stock price now",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -16318,19 +13831,6 @@
   },
   {
     "query": "After-hours price for Google",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "What is the current price of Google stock today?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -16668,33 +14168,7 @@
     }
   },
   {
-    "query": "What was NVIDIA's closing price?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "Is NVIDIA up or down today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "NVIDIA premarket",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -16734,19 +14208,6 @@
   },
   {
     "query": "NVIDIA stock price now",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "NVIDIA stock today",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -16967,32 +14428,6 @@
     }
   },
   {
-    "query": "How is Intel trading today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "Is Intel up or down today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "What is the current price of Intel stock today?",
     "labels": {
       "intent_family": "current_evidence",
@@ -17071,19 +14506,6 @@
     }
   },
   {
-    "query": "Current price of Netflix stock",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "How is Netflix trading today?",
     "labels": {
       "intent_family": "current_evidence",
@@ -17111,19 +14533,6 @@
   },
   {
     "query": "Show me Netflix stock",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "What was Netflix's closing price?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -17370,33 +14779,7 @@
     }
   },
   {
-    "query": "Current price of Oracle stock",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "How is Oracle trading today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "Is Oracle up or down today?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -17513,19 +14896,6 @@
     }
   },
   {
-    "query": "Is Salesforce up or down today?",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
     "query": "What is the current price of Salesforce stock today?",
     "labels": {
       "intent_family": "current_evidence",
@@ -17540,32 +14910,6 @@
   },
   {
     "query": "Salesforce stock price now",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "Salesforce stock today",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "FINANCE",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "synthetic_finance_augmentation",
-      "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "What is Salesforce trading at right now?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "not_required",
@@ -17601,19 +14945,6 @@
     "metadata": {
       "source": "synthetic_finance_augmentation",
       "feedback_type": "finance_guard_validated"
-    }
-  },
-  {
-    "query": "How do taxes on capital gains work?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "phase3_fix",
-      "category": "finance_advice_local"
     }
   },
   {
@@ -17669,19 +15000,6 @@
     }
   },
   {
-    "query": "How do I create a monthly budget?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "phase3_fix",
-      "category": "finance_advice_local"
-    }
-  },
-  {
     "query": "Is it better to pay off debt or invest?",
     "labels": {
       "intent_family": "local_answer",
@@ -17696,19 +15014,6 @@
   },
   {
     "query": "How do I diversify my investment portfolio?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "phase3_fix",
-      "category": "finance_advice_local"
-    }
-  },
-  {
-    "query": "What is a reasonable debt-to-income ratio?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -17864,19 +15169,6 @@
     }
   },
   {
-    "query": "Is the Federal Reserve controlled by aliens?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "phase3_fix",
-      "category": "conspiracy_local"
-    }
-  },
-  {
     "query": "Do vaccines contain microchips?",
     "labels": {
       "intent_family": "local_answer",
@@ -17969,19 +15261,6 @@
   },
   {
     "query": "What does 2 plus 2 equal?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "phase3_fix",
-      "category": "math_local"
-    }
-  },
-  {
-    "query": "Calculate 15 times 7",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -18124,19 +15403,6 @@
     }
   },
   {
-    "query": "Recent news about climate change",
-    "labels": {
-      "intent_family": "news_request",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "phase3_fix",
-      "category": "news_analysis"
-    }
-  },
-  {
     "query": "What is the current death toll in the war?",
     "labels": {
       "intent_family": "current_evidence",
@@ -18241,19 +15507,6 @@
     }
   },
   {
-    "query": "Weather conditions right now in Paris",
-    "labels": {
-      "intent_family": "current_evidence",
-      "evidence_mode": "not_required",
-      "route": "WEATHER",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "phase3_fix",
-      "category": "weather_conditions"
-    }
-  },
-  {
     "query": "Current conditions and forecast for Tokyo",
     "labels": {
       "intent_family": "current_evidence",
@@ -18319,19 +15572,6 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05d0\u05ea\u05d4 \u05d9\u05db\u05d5\u05dc \u05dc\u05e2\u05e9\u05d5\u05ea?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "hebrew_first_class",
-      "category": "capabilities"
-    }
-  },
-  {
     "query": "\u05e1\u05e4\u05e8 \u05dc\u05d9 \u05d1\u05d3\u05d9\u05d7\u05d4",
     "labels": {
       "intent_family": "local_answer",
@@ -18355,19 +15595,6 @@
     "metadata": {
       "source": "hebrew_first_class",
       "category": "creative"
-    }
-  },
-  {
-    "query": "\u05de\u05d4\u05d9 \u05d3\u05e2\u05ea\u05da \u05e2\u05dc \u05d1\u05d9\u05e0\u05d4 \u05de\u05dc\u05d0\u05db\u05d5\u05ea\u05d9\u05ea?",
-    "labels": {
-      "intent_family": "local_reasoning",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "hebrew_first_class",
-      "category": "opinion"
     }
   },
   {
@@ -18407,19 +15634,6 @@
     "metadata": {
       "source": "hebrew_first_class",
       "category": "general"
-    }
-  },
-  {
-    "query": "\u05de\u05d9 \u05d4\u05d9\u05dc\u05d3\u05d9\u05dd \u05e9\u05dc\u05d9?",
-    "labels": {
-      "intent_family": "local_answer",
-      "evidence_mode": "not_required",
-      "route": "LOCAL",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "hebrew_first_class",
-      "category": "personal_family"
     }
   },
   {
@@ -18498,19 +15712,6 @@
     "metadata": {
       "source": "hebrew_first_class",
       "category": "factual_lookup"
-    }
-  },
-  {
-    "query": "\u05ea\u05df \u05dc\u05d9 \u05de\u05d9\u05d3\u05e2 \u05e2\u05dc \u05e7\u05d9\u05d1\u05d5\u05e5 \u05de\u05d2\u05dc",
-    "labels": {
-      "intent_family": "specific_entity_fact",
-      "evidence_mode": "not_required",
-      "route": "AUGMENTED",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "hebrew_first_class",
-      "category": "specific_entity"
     }
   },
   {
@@ -18605,33 +15806,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4\u05df \u05d7\u05d3\u05e9\u05d5\u05ea \u05d4\u05d9\u05d5\u05dd?",
-    "labels": {
-      "intent_family": "current_news",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "hebrew_first_class",
-      "category": "news"
-    }
-  },
-  {
     "query": "\u05e1\u05e4\u05e8 \u05dc\u05d9 \u05e2\u05dc \u05d4\u05d0\u05d9\u05e8\u05d5\u05e2\u05d9\u05dd \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd \u05d1\u05d9\u05e9\u05e8\u05d0\u05dc",
-    "labels": {
-      "intent_family": "current_news",
-      "evidence_mode": "not_required",
-      "route": "NEWS",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "hebrew_first_class",
-      "category": "news"
-    }
-  },
-  {
-    "query": "\u05de\u05d4 \u05e7\u05d5\u05e8\u05d4 \u05d1\u05e2\u05d5\u05dc\u05dd?",
     "labels": {
       "intent_family": "current_news",
       "evidence_mode": "not_required",
@@ -18710,19 +15885,6 @@
   },
   {
     "query": "\u05de\u05d4 \u05d4\u05e9\u05e2\u05d4 \u05d1\u05e0\u05d9\u05d5 \u05d9\u05d5\u05e8\u05e7?",
-    "labels": {
-      "intent_family": "current_time",
-      "evidence_mode": "not_required",
-      "route": "TIME",
-      "policy_override": "none"
-    },
-    "metadata": {
-      "source": "hebrew_first_class",
-      "category": "time"
-    }
-  },
-  {
-    "query": "\u05de\u05ea\u05d9 \u05d4\u05e9\u05e2\u05d5\u05df \u05de\u05ea\u05e7\u05d3\u05dd?",
     "labels": {
       "intent_family": "current_time",
       "evidence_mode": "not_required",
@@ -18836,6 +15998,1774 @@
     "metadata": {
       "source": "user_feedback",
       "feedback_type": "answer_positive"
+    }
+  },
+  {
+    "query": "Give me an overview of the current renewable energy debate.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What is happening with data privacy laws right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are the pros and cons of renewable energy?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Laws about cryptocurrency regulation.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What is the latest research on climate change?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are experts saying about mental health?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "How do I learn a new programming language in 2026?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are experts saying about electric vehicles?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are the latest developments in universal basic income?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Give me an overview of the current space exploration debate.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are the latest developments in space exploration?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What is happening with artificial intelligence right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What is happening with gene editing right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are the pros and cons of trade policy?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Compare MacBook and BMW 3 Series.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are the latest developments in artificial intelligence?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What is the latest research on artificial intelligence?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Laws about mental health.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Laws about artificial intelligence.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are experts saying about space exploration?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are the pros and cons of cryptocurrency regulation?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "How do I prepare for a job interview in 2026?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are the main arguments for and against net neutrality?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "How should I invest $10,000 for retirement?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are the main arguments for and against carbon taxes?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Laws about gene editing.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Laws about space exploration.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What is the latest version of iOS?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Give me an overview of the current mental health debate.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Compare Tesla Model 3 and Windows laptop.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Compare Tesla Model 3 and Xbox.",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What is happening with quantum computing right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What is happening with universal basic income right now?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are experts saying about universal basic income?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Who is the current leader of Australia?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What is the latest research on cybersecurity?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "What are the pros and cons of education reform?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "augmented"
+    }
+  },
+  {
+    "query": "Is my flight on time?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "Will it rain tomorrow?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "Did the Lakers win last night?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "Who won the Olympics?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "What is the current baseball score?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "Who won the Super Bowl?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "What is the current football score?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "Did the Manchester United win last night?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "Who won the World Cup final?",
+    "labels": {
+      "intent_family": "ephemeral_query",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "Are there clinical trials for warfarin?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "evidence"
+    }
+  },
+  {
+    "query": "Are there clinical trials for metformin?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "evidence"
+    }
+  },
+  {
+    "query": "I need to know what is the legal process for self-defense?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "evidence"
+    }
+  },
+  {
+    "query": "What is the legal definition of felony?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "evidence"
+    }
+  },
+  {
+    "query": "I need to know what is the legal process for personal bankruptcy?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "evidence"
+    }
+  },
+  {
+    "query": "What are the side effects of ibuprofen?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "evidence"
+    }
+  },
+  {
+    "query": "What is the legal process for personal bankruptcy?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "evidence"
+    }
+  },
+  {
+    "query": "Are there clinical trials for prednisone?",
+    "labels": {
+      "intent_family": "evidence_request",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "evidence"
+    }
+  },
+  {
+    "query": "Current stock price of AMZN.",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "What is the market cap of NVIDIA?",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "Current value of NVIDIA stock",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "Current value of Alphabet stock",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "AUD to USD exchange rate",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "Current stock price of META.",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "Current value of Samsung stock",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "What is Polkadot trading at today?",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "Who was Marie Curie and why is she important?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "How far away is Norway?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Explain blockchain in simple terms.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "How old is the Earth?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is the speed of light?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Who invented the immune system?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Who invented a heat pump?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is the capital of Norway?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "How far away is Vietnam?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What does capacitor measure?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is a blockchain?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is Ohm's law used for?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "How many continents are there?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Explain SQL injection in simple terms.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Describe how a heat pump works.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "How does the immune system work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is the microbiome used for?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is deadlock in operating systems used for?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is SQL injection used for?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What does recursion measure?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Who invented a solar panel?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is deadlock in operating systems?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Describe how garbage collection works.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is a the microbiome?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Explain neuroplasticity in simple terms.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is the capital of Peru?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "How far away is Morocco?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Describe how a car engine works.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is neuroplasticity used for?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is the capital of Vietnam?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is the capital of Greece?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Who was Galileo Galilei and why is he important?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is SQL injection?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Describe how a solar panel works.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "How far away is Peru?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Explain machine learning in simple terms.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Who invented a battery?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is the definition of binary search?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Who was Alan Turing and why is he important?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is a Ohm's law?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is the capital of New Zealand?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What does blockchain measure?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Who invented garbage collection?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "How does TLS work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What does game theory measure?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "How does garbage collection work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "What is the definition of SQL injection?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Explain deadlock in operating systems in simple terms.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Who was Ada Lovelace and why is she important?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "local"
+    }
+  },
+  {
+    "query": "Latest news on climate change.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "news"
+    }
+  },
+  {
+    "query": "Top headlines about space exploration.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "news"
+    }
+  },
+  {
+    "query": "What is the latest news from Egypt?",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "news"
+    }
+  },
+  {
+    "query": "Show me today's top stories about electric vehicles.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "news"
+    }
+  },
+  {
+    "query": "What is the latest news from South Korea?",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "news"
+    }
+  },
+  {
+    "query": "Latest news on remote work.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "news"
+    }
+  },
+  {
+    "query": "Show me today's top stories about space exploration.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "news"
+    }
+  },
+  {
+    "query": "Top headlines about climate change.",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "news"
+    }
+  },
+  {
+    "query": "What time is it in Singapore?",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "time"
+    }
+  },
+  {
+    "query": "What time is it in Rio de Janeiro?",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "time"
+    }
+  },
+  {
+    "query": "What is the local time in Mumbai?",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "time"
+    }
+  },
+  {
+    "query": "Current time in Mumbai.",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "time"
+    }
+  },
+  {
+    "query": "What is the local time in Berlin?",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "time"
+    }
+  },
+  {
+    "query": "Current time in Sydney.",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "time"
+    }
+  },
+  {
+    "query": "Current time in Paris.",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "time"
+    }
+  },
+  {
+    "query": "What is the local time in Sydney?",
+    "labels": {
+      "intent_family": "time_query",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "time"
+    }
+  },
+  {
+    "query": "Weather forecast for New York.",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "Current temperature in Cairo.",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "What is the weather in Berlin?",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "Current temperature in Tokyo.",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "What is the weather in Mumbai?",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "What is the weather in Singapore?",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "What is the weather in London?",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "What is the weather in Dubai?",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hard_negative_phase4",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "What is 2+2? <script>alert('xss')</script> 'quotes' \"double\"",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "user_feedback",
+      "feedback_type": "route_correction"
     }
   }
 ]
