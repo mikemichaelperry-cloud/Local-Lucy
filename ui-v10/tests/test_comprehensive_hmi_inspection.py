@@ -176,36 +176,77 @@ def inspect_level(window: MainWindow, level: str) -> None:
 
     # --- Control Panel ---
     cp = window.control_panel
-    record("control_panel", level, "mode_selector exists", cp._mode_selector is not None)
-    record("control_panel", level, "memory_selector exists", cp._memory_selector is not None)
-    record("control_panel", level, "evidence_selector exists", cp._evidence_selector is not None)
-    record("control_panel", level, "voice_selector exists", cp._voice_selector is not None)
-    record(
-        "control_panel",
-        level,
-        "augmentation_policy exists",
-        cp._augmentation_policy_selector is not None,
-    )
-    record(
-        "control_panel",
-        level,
-        "provider_selector exists",
-        cp._augmented_provider_selector is not None,
-    )
-    record("control_panel", level, "learner_selector exists", cp._learner_selector is not None)
-    record("control_panel", level, "model_selector exists", cp._model_selector is not None)
+    is_eng = level == "engineering"
 
-    # Profile group visibility
-    profile_visible = not cp._profile_group.isHidden()
+    # Selector visibility: advanced selectors hidden at operator, visible at engineering;
+    # memory and voice stay visible in the default view.
+    selectors = [
+        ("mode_selector", cp._mode_selector, False),
+        ("memory_selector", cp._memory_selector, True),
+        ("evidence_selector", cp._evidence_selector, False),
+        ("voice_selector", cp._voice_selector, True),
+        ("augmentation_policy_selector", cp._augmentation_policy_selector, False),
+        ("provider_selector", cp._augmented_provider_selector, False),
+        ("learner_selector", cp._learner_selector, False),
+        ("model_selector", cp._model_selector, False),
+        ("conversation_selector", cp._conversation_selector, False),
+    ]
+    for name, selector, visible_at_operator in selectors:
+        expected = is_eng or visible_at_operator
+        visible = selector is not None and selector.isVisible()
+        record(
+            "control_panel",
+            level,
+            f"{name} visible",
+            visible == expected,
+            f"visible={visible} expected={expected}",
+        )
+
+    # Persona selector removed from primary HMI
+    has_persona = hasattr(cp, "_persona_selector") and cp._persona_selector is not None
     record(
         "control_panel",
         level,
-        "profile_group visible at engineering",
-        profile_visible if level == "engineering" else not profile_visible,
-        f"visible={profile_visible}",
+        "persona_selector removed",
+        not has_persona,
+        f"has_persona={has_persona}",
     )
 
-    # --- Status Panel ---
+    # Default-view route/model status and trust/source summary
+    route_model = cp._route_model_status_label
+    record("control_panel", level, "route_model_status_label present", route_model is not None)
+    if route_model is not None:
+        record(
+            "control_panel",
+            level,
+            "route_model_status_label visible",
+            route_model.isVisible(),
+            f"visible={route_model.isVisible()}",
+        )
+
+    trust_source = cp._trust_source_summary_label
+    record("control_panel", level, "trust_source_summary_label present", trust_source is not None)
+    if trust_source is not None:
+        record(
+            "control_panel",
+            level,
+            "trust_source_summary_label visible",
+            trust_source.isVisible(),
+            f"visible={trust_source.isVisible()}",
+        )
+
+    # Engineering panel visibility
+    eng_group = cp._engineering_group
+    record("control_panel", level, "engineering_group present", eng_group is not None)
+    if eng_group is not None:
+        record(
+            "control_panel",
+            level,
+            "engineering_group visible",
+            eng_group.isVisible() == is_eng,
+            f"visible={eng_group.isVisible()}",
+        )
+
     sp = window.status_panel
 
     # Runtime summary labels
@@ -251,29 +292,30 @@ def inspect_level(window: MainWindow, level: str) -> None:
         text = req_summary[key].text() if exists else "MISSING"
         record("request_summary", level, f"label '{key}'", exists, f"text={text!r}")
 
-    # Request detail labels
-    req_detail = sp._request_detail_labels
-    for key in (
-        "Request ID",
-        "Request Text",
-        "Error",
-        "Route Reason",
-        "Route Confidence",
-        "Operator Note",
-        "Action Hint",
-        "Verification Status",
-        "Estimated Confidence",
-        "Source Basis",
-        "Augmented Direct Request",
-        "Augmented Provider Status",
-        "Evidence Created",
-        "Primary Outcome",
-        "Recovery Lane",
-        "Control State",
-    ):
-        exists = key in req_detail
-        text = req_detail[key].text() if exists else "MISSING"
-        record("request_detail", level, f"label '{key}'", exists, f"text={text!r}")
+    # Request detail labels (engineering only)
+    if level == "engineering":
+        req_detail = sp._request_detail_labels
+        for key in (
+            "Request ID",
+            "Request Text",
+            "Error",
+            "Route Reason",
+            "Route Confidence",
+            "Operator Note",
+            "Action Hint",
+            "Verification Status",
+            "Estimated Confidence",
+            "Source Basis",
+            "Augmented Direct Request",
+            "Augmented Provider Status",
+            "Evidence Created",
+            "Primary Outcome",
+            "Recovery Lane",
+            "Control State",
+        ):
+            exists = key in req_detail
+            text = req_detail[key].text() if exists else "MISSING"
+            record("request_detail", level, f"label '{key}'", exists, f"text={text!r}")
 
     # Event log panel visibility
     event_visible = not window.event_log_panel.isHidden()
@@ -475,15 +517,39 @@ def main() -> int:
             expected_paid="no",
         )
 
+        # Default view indicators should reflect the latest injected route/trust
+        cp = window.control_panel
+        record(
+            "control_panel",
+            "engineering",
+            "route_model_status_label reflects route",
+            "Route:" in cp._route_model_status_label.text()
+            and "TIME" in cp._route_model_status_label.text(),
+            f"text={cp._route_model_status_label.text()!r}",
+        )
+        record(
+            "control_panel",
+            "engineering",
+            "trust_source_summary_label reflects trust",
+            "Trust:" in cp._trust_source_summary_label.text(),
+            f"text={cp._trust_source_summary_label.text()!r}",
+        )
+
         # --- Phase 3: Control panel state accuracy ---
         print("\n--- Control Panel State Accuracy ---")
-        cp = window.control_panel
         record(
             "control_state",
             "engineering",
             "mode_selector default value",
             cp._mode_selector.currentText() in {"auto", "online", "offline"},
             f"value={cp._mode_selector.currentText()!r}",
+        )
+        record(
+            "control_state",
+            "engineering",
+            "model_selector has Auto as first option",
+            cp._model_selector.count() > 0 and cp._model_selector.itemText(0).startswith("Auto"),
+            f"items={[cp._model_selector.itemText(i) for i in range(cp._model_selector.count())]}",
         )
         record(
             "control_state",
@@ -612,14 +678,6 @@ def main() -> int:
         elp = window.event_log_panel
         record(
             "event_log", "engineering", "event_log_panel visible at engineering", not elp.isHidden()
-        )
-        log_text = elp.toPlainText() if hasattr(elp, "toPlainText") else ""
-        record(
-            "event_log",
-            "engineering",
-            "event_log has content or is ready",
-            True,
-            f"length={len(log_text)}",
         )
 
     finally:

@@ -22,17 +22,6 @@ from PySide6.QtWidgets import (
 from app.ui_levels import ENGINEERING, POWER, level_at_least
 from app.widgets.vu_meter import VoiceVUMeter
 
-try:
-    import sys
-    from pathlib import Path
-
-    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
-    from memory.memory_service import get_current_user_identity as _get_current_user_identity
-except Exception:
-
-    def _get_current_user_identity() -> str | None:
-        return None
-
 
 class ControlPanel(QFrame):
     refresh_requested = Signal()
@@ -52,8 +41,6 @@ class ControlPanel(QFrame):
     ptt_released_requested = Signal()
     reload_profile_requested = Signal()
     shutdown_requested = Signal()
-    persona_clear_requested = Signal()
-    persona_change_requested = Signal(str)
 
     # Model label mapping: backend value → display label
     _MODEL_LABELS: dict[str, str] = {
@@ -70,11 +57,11 @@ class ControlPanel(QFrame):
         self.setMinimumWidth(280)
         self._scroll_area: QScrollArea | None = None
         self._content_widget: QWidget | None = None
-        self._mode_note: QLabel | None = None
-        self._feature_note: QLabel | None = None
+        self._operator_note: QLabel | None = None
+        self._engineering_note: QLabel | None = None
         self._profile_note: QLabel | None = None
-        self._mode_group: QGroupBox | None = None
-        self._feature_group: QGroupBox | None = None
+        self._operator_group: QGroupBox | None = None
+        self._engineering_group: QGroupBox | None = None
         self._voice_ptt_group: QGroupBox | None = None
         self._profile_group: QGroupBox | None = None
         self._voice_ptt_button: QPushButton | None = None
@@ -92,9 +79,17 @@ class ControlPanel(QFrame):
         self._open_logs_button: QPushButton | None = None
         self._open_state_button: QPushButton | None = None
         self._safe_actions_note: QLabel | None = None
-        self._persona_indicator: QLabel | None = None
-        self._clear_persona_button: QPushButton | None = None
         self._model_recommendation_label: QLabel | None = None
+        self._route_model_status_label: QLabel | None = None
+        self._trust_source_summary_label: QLabel | None = None
+        self._eng_selected_route_label: QLabel | None = None
+        self._eng_selected_model_label: QLabel | None = None
+        self._eng_confidence_margin_label: QLabel | None = None
+        self._eng_provider_chain_label: QLabel | None = None
+        self._eng_source_freshness_label: QLabel | None = None
+        self._eng_latency_breakdown_label: QLabel | None = None
+        self._eng_manual_override_label: QLabel | None = None
+        self._eng_context_items_label: QLabel | None = None
         self._current_values = {
             "mode": "",
             "conversation": "",
@@ -149,36 +144,17 @@ class ControlPanel(QFrame):
         title.setObjectName("sectionTitle")
         layout.addWidget(title)
 
-        layout.addWidget(self._build_mode_group())
-        layout.addWidget(self._build_feature_group())
+        layout.addWidget(self._build_operator_group())
+        layout.addWidget(self._build_engineering_group())
         layout.addWidget(self._build_voice_group())
         layout.addWidget(self._build_voice_status_group())
         layout.addWidget(self._build_profile_group())
         layout.addWidget(self._build_safe_actions_group())
         layout.addStretch(1)
 
-    def _build_mode_group(self) -> QGroupBox:
-        group = QGroupBox("Mode Selection")
-        self._mode_group = group
-
-        layout = QVBoxLayout(group)
-        layout.setSpacing(8)
-
-        self._mode_selector = QComboBox()
-        self._mode_selector.addItems(["auto", "online", "offline"])
-        self._mode_selector.activated.connect(self._handle_mode_activated)
-        layout.addWidget(self._build_labeled_row("mode", self._mode_selector))
-
-        note = QLabel("Mode control unavailable.")
-        note.setWordWrap(True)
-        layout.addWidget(note)
-        self._mode_note = note
-        group.setDisabled(True)
-        return group
-
-    def _build_feature_group(self) -> QGroupBox:
-        group = QGroupBox("Runtime Toggles")
-        self._feature_group = group
+    def _build_operator_group(self) -> QGroupBox:
+        group = QGroupBox("Controls")
+        self._operator_group = group
 
         layout = QVBoxLayout(group)
         layout.setSpacing(8)
@@ -187,6 +163,47 @@ class ControlPanel(QFrame):
         self._memory_selector.addItems(["on", "off"])
         self._memory_selector.activated.connect(self._handle_memory_activated)
 
+        self._voice_selector = QComboBox()
+        self._voice_selector.addItems(["on", "off"])
+        self._voice_selector.activated.connect(self._handle_voice_activated)
+
+        self._route_model_status_label = QLabel("Route: — | Model: —")
+        self._route_model_status_label.setObjectName("cardValue")
+        self._route_model_status_label.setWordWrap(True)
+        self._route_model_status_label.setToolTip(
+            "Current routing decision and active model status."
+        )
+
+        self._trust_source_summary_label = QLabel("Trust: — | Source: —")
+        self._trust_source_summary_label.setObjectName("cardLabel")
+        self._trust_source_summary_label.setWordWrap(True)
+        self._trust_source_summary_label.setToolTip(
+            "Trust classification and source basis for the latest answer."
+        )
+
+        layout.addWidget(self._build_labeled_row("memory", self._memory_selector))
+        layout.addWidget(self._build_labeled_row("voice", self._voice_selector))
+        layout.addWidget(self._route_model_status_label)
+        layout.addWidget(self._trust_source_summary_label)
+
+        note = QLabel("Controls unavailable.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        self._operator_note = note
+        group.setDisabled(True)
+        return group
+
+    def _build_engineering_group(self) -> QGroupBox:
+        group = QGroupBox("Engineering")
+        self._engineering_group = group
+
+        layout = QVBoxLayout(group)
+        layout.setSpacing(8)
+
+        self._mode_selector = QComboBox()
+        self._mode_selector.addItems(["auto", "online", "offline"])
+        self._mode_selector.activated.connect(self._handle_mode_activated)
+
         self._conversation_selector = QComboBox()
         self._conversation_selector.addItems(["on", "off"])
         self._conversation_selector.activated.connect(self._handle_conversation_activated)
@@ -194,10 +211,6 @@ class ControlPanel(QFrame):
         self._evidence_selector = QComboBox()
         self._evidence_selector.addItems(["on", "off"])
         self._evidence_selector.activated.connect(self._handle_evidence_activated)
-
-        self._voice_selector = QComboBox()
-        self._voice_selector.addItems(["on", "off"])
-        self._voice_selector.activated.connect(self._handle_voice_activated)
 
         self._augmentation_policy_selector = QComboBox()
         self._augmentation_policy_selector.addItems(
@@ -228,42 +241,41 @@ class ControlPanel(QFrame):
             "Engineering read-out of the last automatic model recommendation (Auto mode only)."
         )
 
-        self._persona_indicator = QLabel("No active persona")
-        self._persona_indicator.setObjectName("cardLabel")
-        self._persona_indicator.setToolTip(
-            "Active user persona. Choose manually below, or set by saying 'I am Michael'. "
-            "If a LoRA-tagged model exists, Lucy uses it; otherwise "
-            "she falls back to prompt-level persona injection."
-        )
+        self._eng_selected_route_label = QLabel("Selected route: —")
+        self._eng_selected_route_label.setObjectName("cardLabel")
+        self._eng_selected_route_label.setWordWrap(True)
 
-        self._persona_selector = QComboBox()
-        self._persona_selector.addItems(["auto", "Michael"])
-        self._persona_selector.setToolTip(
-            "Force a persona for all models, or leave as auto to let Lucy detect it from your words."
-        )
-        self._persona_selector.activated.connect(self._handle_persona_activated)
+        self._eng_selected_model_label = QLabel("Selected model: —")
+        self._eng_selected_model_label.setObjectName("cardLabel")
+        self._eng_selected_model_label.setWordWrap(True)
 
-        self._clear_persona_button = QPushButton("Clear")
-        self._clear_persona_button.setToolTip("Forget the active user identity")
-        self._clear_persona_button.clicked.connect(self._handle_clear_persona)
+        self._eng_confidence_margin_label = QLabel("Confidence: — | Margin: —")
+        self._eng_confidence_margin_label.setObjectName("cardLabel")
+        self._eng_confidence_margin_label.setWordWrap(True)
 
-        persona_row = QFrame()
-        persona_layout = QHBoxLayout(persona_row)
-        persona_layout.setContentsMargins(0, 0, 0, 0)
-        persona_layout.setSpacing(8)
-        persona_layout.addWidget(QLabel("persona"))
-        persona_layout.addStretch(1)
-        persona_layout.addWidget(self._persona_selector)
-        persona_layout.addWidget(self._persona_indicator)
-        persona_layout.addWidget(self._clear_persona_button)
+        self._eng_provider_chain_label = QLabel("Provider chain: —")
+        self._eng_provider_chain_label.setObjectName("cardLabel")
+        self._eng_provider_chain_label.setWordWrap(True)
 
-        layout.addWidget(self._build_labeled_row("model", self._model_selector))
-        layout.addWidget(self._model_recommendation_label)
-        layout.addWidget(persona_row)
+        self._eng_source_freshness_label = QLabel("Source freshness: —")
+        self._eng_source_freshness_label.setObjectName("cardLabel")
+        self._eng_source_freshness_label.setWordWrap(True)
+
+        self._eng_latency_breakdown_label = QLabel("Latency: —")
+        self._eng_latency_breakdown_label.setObjectName("cardLabel")
+        self._eng_latency_breakdown_label.setWordWrap(True)
+
+        self._eng_manual_override_label = QLabel("Manual model override: —")
+        self._eng_manual_override_label.setObjectName("cardLabel")
+        self._eng_manual_override_label.setWordWrap(True)
+
+        self._eng_context_items_label = QLabel("Context items: accepted=—, rejected=—")
+        self._eng_context_items_label.setObjectName("cardLabel")
+        self._eng_context_items_label.setWordWrap(True)
+
+        layout.addWidget(self._build_labeled_row("mode", self._mode_selector))
         layout.addWidget(self._build_labeled_row("conversation", self._conversation_selector))
-        layout.addWidget(self._build_labeled_row("memory", self._memory_selector))
         layout.addWidget(self._build_labeled_row("evidence", self._evidence_selector))
-        layout.addWidget(self._build_labeled_row("voice", self._voice_selector))
         layout.addWidget(
             self._build_labeled_row("augmented policy", self._augmentation_policy_selector)
         )
@@ -271,10 +283,21 @@ class ControlPanel(QFrame):
             self._build_labeled_row("augmented provider", self._augmented_provider_selector)
         )
         layout.addWidget(self._build_labeled_row("auto-learn", self._learner_selector))
-        note = QLabel("Feature toggles unavailable.")
+        layout.addWidget(self._build_labeled_row("model", self._model_selector))
+        layout.addWidget(self._model_recommendation_label)
+        layout.addWidget(self._eng_selected_route_label)
+        layout.addWidget(self._eng_selected_model_label)
+        layout.addWidget(self._eng_confidence_margin_label)
+        layout.addWidget(self._eng_provider_chain_label)
+        layout.addWidget(self._eng_source_freshness_label)
+        layout.addWidget(self._eng_latency_breakdown_label)
+        layout.addWidget(self._eng_manual_override_label)
+        layout.addWidget(self._eng_context_items_label)
+
+        note = QLabel("Engineering controls unavailable.")
         note.setWordWrap(True)
         layout.addWidget(note)
-        self._feature_note = note
+        self._engineering_note = note
         group.setDisabled(True)
         return group
 
@@ -542,11 +565,13 @@ class ControlPanel(QFrame):
     def apply_backend_capabilities(
         self, capability_notes: dict[str, str], backend_available: bool
     ) -> None:
-        if self._mode_note is not None:
-            self._mode_note.setText(capability_notes.get("mode_selection", self._mode_note.text()))
-        if self._feature_note is not None:
-            self._feature_note.setText(
-                capability_notes.get("feature_toggles", self._feature_note.text())
+        if self._engineering_note is not None:
+            self._engineering_note.setText(
+                capability_notes.get("mode_selection", self._engineering_note.text())
+            )
+        if self._operator_note is not None:
+            self._operator_note.setText(
+                capability_notes.get("feature_toggles", self._operator_note.text())
             )
         if self._profile_note is not None:
             self._profile_note.setText(
@@ -556,19 +581,19 @@ class ControlPanel(QFrame):
 
     def set_backend_busy(self, busy: bool) -> None:
         self._backend_busy = busy
-        if self._mode_group is not None:
-            self._mode_group.setEnabled(self._backend_available and not busy)
-        if self._feature_group is not None:
-            self._feature_group.setEnabled(self._backend_available and not busy)
+        if self._operator_group is not None:
+            self._operator_group.setEnabled(self._backend_available and not busy)
+        if self._engineering_group is not None:
+            self._engineering_group.setEnabled(self._backend_available and not busy)
         self._apply_profile_button_state(busy)
         self._refresh_voice_ptt()
 
     def set_backend_enabled(self, enabled: bool) -> None:
         self._backend_available = enabled
-        if self._mode_group is not None:
-            self._mode_group.setEnabled(enabled)
-        if self._feature_group is not None:
-            self._feature_group.setEnabled(enabled)
+        if self._operator_group is not None:
+            self._operator_group.setEnabled(enabled)
+        if self._engineering_group is not None:
+            self._engineering_group.setEnabled(enabled)
         self._refresh_voice_ptt()
 
     def set_profile_reload_available(self, available: bool) -> None:
@@ -580,20 +605,20 @@ class ControlPanel(QFrame):
     def set_interface_level(self, level: str) -> None:
         show_profile_group = level_at_least(level, ENGINEERING)
         show_power_widgets = level_at_least(level, POWER)
-        # Trim the HMI for autonomous operation: mode and runtime toggle selectors
-        # are hidden at operator level. They remain available to engineering/power
-        # users who need to override Lucy's automatic choices.
-        show_controls = level_at_least(level, ENGINEERING)
-        if self._mode_group is not None:
-            self._mode_group.setVisible(show_controls)
-        if self._feature_group is not None:
-            self._feature_group.setVisible(show_controls)
+        # Trim the HMI for autonomous operation: advanced selectors are hidden at
+        # operator level. They remain available to engineering/power users who need
+        # to override Lucy's automatic choices.
+        show_engineering = level_at_least(level, ENGINEERING)
+        if self._operator_group is not None:
+            self._operator_group.setVisible(True)
+        if self._engineering_group is not None:
+            self._engineering_group.setVisible(show_engineering)
         if self._profile_group is not None:
             self._profile_group.setVisible(show_profile_group)
-        if self._mode_note is not None:
-            self._mode_note.setVisible(show_controls)
-        if self._feature_note is not None:
-            self._feature_note.setVisible(show_controls)
+        if self._engineering_note is not None:
+            self._engineering_note.setVisible(show_engineering)
+        if self._operator_note is not None:
+            self._operator_note.setVisible(True)
         # Voice PTT visibility is controlled by voice state, not interface level
         self._refresh_voice_ptt()
         for widget in (
@@ -623,13 +648,6 @@ class ControlPanel(QFrame):
         if not configured_model:
             configured_model = "auto"
 
-        pending_values = pending_values or {}
-        # Persona is read from persistent storage; while a set/clear action is in
-        # flight we must show the requested value optimistically so the dropdown
-        # does not snap back to "auto" before the backend commit completes.
-        pending_persona = pending_values.get("persona")
-        active_persona = pending_persona if pending_persona else _get_current_user_identity()
-
         values = {
             "profile": top_status.get("Profile", "").strip(),
             "mode": top_status.get("Mode", "").strip().lower(),
@@ -641,7 +659,6 @@ class ControlPanel(QFrame):
             "augmented_provider": top_status.get("Augmented Provider", "").strip().lower(),
             "model": configured_model,
             "learner": top_status.get("Learner", "").strip().lower(),
-            "persona": active_persona,
         }
         self._current_values.update(values)
         if self._profile_value_label is not None:
@@ -656,9 +673,131 @@ class ControlPanel(QFrame):
         self._set_selector_value(self._augmented_provider_selector, values["augmented_provider"])
         self._set_selector_value(self._learner_selector, values.get("learner", ""))
         self._set_selector_value(self._model_selector, values.get("model", ""))
-        self._set_persona_selector_value(values.get("persona"))
-        self._update_persona_indicator(values.get("persona"))
         self._refresh_voice_ptt()
+
+    def update_trace_summary(
+        self, snapshot: Any, request_details: dict[str, Any] | None = None
+    ) -> None:
+        """Update the operator route/model indicator and engineering observability labels."""
+        top_status: dict[str, str] = getattr(snapshot, "top_status", {}) or {}
+        runtime_status: dict[str, str] = getattr(snapshot, "runtime_status", {}) or {}
+        active_model_info: dict[str, Any] = getattr(snapshot, "active_model", {}) or {}
+
+        configured_model = top_status.get("Model", runtime_status.get("Model", "unknown"))
+        active_status = str(active_model_info.get("status", "unknown")).lower()
+        if active_status == "running":
+            model_status_text = configured_model
+        else:
+            model_status_text = f"{configured_model} — {active_status}"
+
+        current_route = runtime_status.get("Current Route", top_status.get("Router", "unknown"))
+        if self._route_model_status_label is not None:
+            self._route_model_status_label.setText(
+                f"Route: {current_route} | Model: {model_status_text}"
+            )
+
+        trust = "unknown"
+        source = "unknown"
+        if isinstance(request_details, dict):
+            outcome = request_details.get("outcome")
+            if isinstance(outcome, dict):
+                trust = (
+                    str(outcome.get("operator_trust_label") or "").strip()
+                    or str(outcome.get("trust_class") or "").strip()
+                    or "unknown"
+                )
+                contract = outcome.get("augmented_answer_contract")
+                if isinstance(contract, dict):
+                    basis = contract.get("source_basis")
+                    if isinstance(basis, list):
+                        parts = [str(x).strip() for x in basis if str(x).strip()]
+                        source = ", ".join(parts) if parts else "unknown"
+                    else:
+                        source = str(basis or "").strip() or "unknown"
+                else:
+                    source = str(outcome.get("source_basis") or "").strip() or "unknown"
+        if self._trust_source_summary_label is not None:
+            self._trust_source_summary_label.setText(f"Trust: {trust} | Source: {source}")
+
+        # Engineering observability read-outs
+        if self._eng_selected_route_label is not None:
+            self._eng_selected_route_label.setText(f"Selected route: {current_route}")
+
+        selected_model = configured_model
+        if self._eng_selected_model_label is not None:
+            self._eng_selected_model_label.setText(f"Selected model: {selected_model}")
+
+        confidence = "—"
+        margin = "—"
+        provider_chain = "local"
+        latency = "—"
+        accepted = "—"
+        rejected = "—"
+        if isinstance(request_details, dict):
+            route = request_details.get("route")
+            if isinstance(route, dict):
+                confidence = str(route.get("confidence", "—"))
+                try:
+                    conf_float = float(route.get("confidence", 0))
+                    margin = f"{max(0.0, 1.0 - conf_float):.2f}"
+                except (TypeError, ValueError):
+                    margin = "—"
+            outcome = request_details.get("outcome")
+            if isinstance(outcome, dict):
+                provider = (
+                    str(outcome.get("augmented_provider_used") or "").strip()
+                    or str(outcome.get("augmented_provider") or "").strip()
+                    or str(
+                        (request_details.get("control_state") or {}).get("augmented_provider") or ""
+                    ).strip()
+                    or "none"
+                )
+                call_reason = str(
+                    outcome.get("augmented_provider_call_reason") or "not_needed"
+                ).strip()
+                provider_chain = f"{provider} ({call_reason})"
+                latency = f"{outcome.get('execution_time_ms', '—')} ms"
+                evidence_created = str(outcome.get("evidence_created") or "").lower() in {
+                    "1",
+                    "true",
+                    "yes",
+                }
+                accepted = "yes" if evidence_created else "no"
+        if self._eng_confidence_margin_label is not None:
+            self._eng_confidence_margin_label.setText(
+                f"Confidence: {confidence} | Margin: {margin}"
+            )
+        if self._eng_provider_chain_label is not None:
+            self._eng_provider_chain_label.setText(f"Provider chain: {provider_chain}")
+        if self._eng_latency_breakdown_label is not None:
+            self._eng_latency_breakdown_label.setText(f"Latency: {latency}")
+        if self._eng_context_items_label is not None:
+            self._eng_context_items_label.setText(
+                f"Context items: accepted={accepted}, rejected={rejected}"
+            )
+
+        snapshot_timestamp = getattr(snapshot, "snapshot_timestamp", None)
+        freshness = "unknown"
+        if snapshot_timestamp:
+            try:
+                from datetime import datetime, timezone
+
+                ts = datetime.fromisoformat(str(snapshot_timestamp))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                age = (datetime.now(timezone.utc) - ts).total_seconds()
+                freshness = f"{int(age)}s ago"
+            except Exception:
+                freshness = str(snapshot_timestamp)
+        if self._eng_source_freshness_label is not None:
+            self._eng_source_freshness_label.setText(f"Source freshness: {freshness}")
+
+        manual_model = self._current_values.get("model", "auto")
+        if self._eng_manual_override_label is not None:
+            if manual_model and manual_model != "auto":
+                self._eng_manual_override_label.setText(f"Manual model override: {manual_model}")
+            else:
+                self._eng_manual_override_label.setText("Manual model override: none (Auto)")
 
     def update_voice_runtime(self, voice_runtime: dict[str, Any]) -> None:
         self._voice_runtime = dict(voice_runtime)
@@ -819,45 +958,10 @@ class ControlPanel(QFrame):
             self.model_change_requested,
         )
 
-    def _set_persona_selector_value(self, persona: str | None) -> None:
-        """Set the persona selector to reflect the active identity."""
-        if self._persona_selector is None:
-            return
-        self._persona_selector.blockSignals(True)
-        value = persona.capitalize() if persona else "auto"
-        index = self._persona_selector.findText(value)
-        self._persona_selector.setCurrentIndex(index if index >= 0 else 0)
-        self._persona_selector.blockSignals(False)
-
-    def _update_persona_indicator(self, persona: str | None) -> None:
-        """Update the persona indicator and clear button state."""
-        if self._persona_indicator is None:
-            return
-        if persona:
-            self._persona_indicator.setText(f"Speaking as: {persona}")
-            if self._clear_persona_button is not None:
-                self._clear_persona_button.setEnabled(True)
-        else:
-            self._persona_indicator.setText("No active persona")
-            if self._clear_persona_button is not None:
-                self._clear_persona_button.setEnabled(False)
-
     def set_model_recommendation(self, text: str) -> None:
         """Update the engineering-only model recommendation read-out."""
         if self._model_recommendation_label is not None:
             self._model_recommendation_label.setText(f"Model recommendation: {text}")
-
-    def _handle_clear_persona(self) -> None:
-        """Emit a request to clear the active user identity."""
-        self.persona_clear_requested.emit()
-
-    def _handle_persona_activated(self, index: int) -> None:
-        """Emit a request to set or clear the active persona."""
-        value = self._persona_selector.itemText(index)
-        if value == "auto":
-            self.persona_clear_requested.emit()
-        else:
-            self.persona_change_requested.emit(value.lower())
 
     def _emit_if_changed(self, key: str, requested_value: str, signal: Signal) -> None:
         if requested_value == self._current_values.get(key, ""):

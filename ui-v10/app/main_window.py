@@ -438,6 +438,9 @@ class OperatorConsoleWindow(QMainWindow):
             self._latest_state_snapshot.current_state,
         )
         self.control_panel.update_voice_runtime(self._latest_state_snapshot.voice_runtime)
+        self.control_panel.update_trace_summary(
+            self._latest_state_snapshot, self._latest_request_details
+        )
 
         # Update voice transcription preview in conversation panel
         voice_transcription = str(
@@ -497,12 +500,6 @@ class OperatorConsoleWindow(QMainWindow):
         )
         self.control_panel.learner_change_requested.connect(
             lambda value: self._execute_backend_action("learner_toggle", value, "learner toggle")
-        )
-        self.control_panel.persona_clear_requested.connect(
-            lambda: self._execute_backend_action("persona_clear", "", "clear persona")
-        )
-        self.control_panel.persona_change_requested.connect(
-            lambda value: self._execute_backend_action("persona_set", value, f"set persona {value}")
         )
 
         self.control_panel.ptt_pressed_requested.connect(self._handle_voice_ptt_pressed)
@@ -650,18 +647,9 @@ class OperatorConsoleWindow(QMainWindow):
                 return
             self._last_model_switch_time = time.time()
 
-        # Optimistically show the requested persona while the backend commit is
-        # in flight; otherwise update_control_state reads persistent storage
-        # (which still reflects the old identity) and the dropdown snaps back.
-        pending_values: dict[str, str] = {}
-        if action == "persona_set":
-            pending_values["persona"] = requested_value
-        elif action == "persona_clear":
-            pending_values["persona"] = ""
         self.control_panel.update_control_state(
             self._latest_state_snapshot.top_status,
             self._latest_state_snapshot.current_state,
-            pending_values=pending_values,
         )
         self._set_backend_busy(True)
         self._pending_action_label = action_label
