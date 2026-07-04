@@ -62,7 +62,7 @@ main(){
     fi
   fi
 
-  # Fallback 1: BOI page tokens often look like "... דולר USD 3.1360 ...".
+  # Fallback 1: BOI page tokens often look like "... USD 3.1360 ...".
   if [ -z "$rate" ]; then
     rate="$(grep -Eo 'USD[[:space:]]+[0-9]+\.[0-9]+' "$pack" | head -n1 | awk '{print $2}' || true)"
   fi

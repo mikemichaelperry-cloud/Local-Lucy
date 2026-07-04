@@ -15,7 +15,7 @@ from typing import Any, Mapping
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from voice.backends import kokoro_backend, piper_backend
+from voice.backends import edge_tts_backend, kokoro_backend, piper_backend
 
 
 class TtsAdapterError(RuntimeError):
@@ -93,7 +93,10 @@ def probe_backend(
 ) -> dict[str, Any]:
     values = env or os.environ
     requested = normalize_engine(
-        requested_engine or values.get("LUCY_VOICE_TTS_ENGINE") or catalog_defaults().get("engine") or "auto"
+        requested_engine
+        or values.get("LUCY_VOICE_TTS_ENGINE")
+        or catalog_defaults().get("engine")
+        or "auto"
     )
     available_engines = detect_available_engines(values)
     selected = resolve_selected_backend(
@@ -136,13 +139,32 @@ def synthesize_text(
     env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     values = env or os.environ
-    requested = normalize_engine(
-        requested_engine or values.get("LUCY_VOICE_TTS_ENGINE") or catalog_defaults().get("engine") or "auto"
+    raw_requested = normalize_engine(
+        requested_engine
+        or values.get("LUCY_VOICE_TTS_ENGINE")
+        or catalog_defaults().get("engine")
+        or "auto"
     )
-    requested_device = resolve_device_for_engine(requested, env=values) if requested in {"piper", "kokoro"} else "none"
     clean = str(text or "").strip()
+    # For empty text we cannot detect language; report device based on the raw request.
+    empty_device = (
+        resolve_device_for_engine(raw_requested, env=values)
+        if raw_requested in {"piper", "kokoro"}
+        else "none"
+    )
     if not clean:
-        return failure_contract(requested_engine=requested, engine=requested, device=requested_device, error="text is empty")
+        return failure_contract(
+            requested_engine=raw_requested,
+            engine=raw_requested,
+            device=empty_device,
+            error="text is empty",
+        )
+    requested = resolve_engine_for_text(clean, raw_requested, env=values)
+    requested_device = (
+        resolve_device_for_engine(requested, env=values)
+        if requested in {"piper", "kokoro"}
+        else "none"
+    )
     selected = resolve_selected_backend(
         requested_engine=requested,
         requested_voice=requested_voice,
@@ -158,7 +180,11 @@ def synthesize_text(
         )
 
     attempts = [selected]
-    if selected.engine == requested and selected.fallback_engine and selected.fallback_engine != selected.engine:
+    if (
+        selected.engine == requested
+        and selected.fallback_engine
+        and selected.fallback_engine != selected.engine
+    ):
         fallback_selected = resolve_explicit_backend(selected.fallback_engine, env=values)
         if fallback_selected is not None and fallback_selected.engine != selected.engine:
             attempts.append(fallback_selected)
@@ -173,7 +199,7 @@ def synthesize_text(
             sample_rate, duration_ms = read_wav_metadata(output_path)
             return {
                 "ok": True,
-                "requested_engine": requested,
+                "requested_engine": raw_requested,
                 "engine": attempt.engine,
                 "device": attempt.device,
                 "voice": actual_voice,
@@ -192,10 +218,12 @@ def synthesize_text(
                     output_path.unlink()
                 except OSError:
                     pass
+    last_attempt = attempts[-1] if attempts else None
     return failure_contract(
-        requested_engine=requested,
-        engine=attempts[-1].engine if attempts else requested,
-        voice=attempts[-1].voice if attempts else "",
+        requested_engine=raw_requested,
+        engine=last_attempt.engine if last_attempt else requested,
+        device=last_attempt.device if last_attempt else requested_device,
+        voice=last_attempt.voice if last_attempt else "",
         synth_latency_ms=max(now_ms() - overall_start, 0),
         fallback_used=False,
         error=last_error or "tts synthesis failed",
@@ -224,7 +252,15 @@ def run_backend_synthesis(
             output_path=output_path,
             voice=selected.voice,
             env=env,
-    )
+        )
+    if selected.engine == "edge_tts":
+        return edge_tts_backend.synthesize(
+            root=root,
+            text=text,
+            output_path=output_path,
+            voice=selected.voice,
+            env=env,
+        )
     raise TtsAdapterError(f"unsupported backend: {selected.engine}")
 
 
@@ -237,7 +273,9 @@ def resolve_selected_backend(
 ) -> SelectedBackend | None:
     if requested_engine == "auto":
         for engine in auto_order():
-            selected = resolve_explicit_backend(engine, requested_voice=requested_voice, fallback_engine=fallback_engine, env=env)
+            selected = resolve_explicit_backend(
+                engine, requested_voice=requested_voice, fallback_engine=fallback_engine, env=env
+            )
             if selected is not None:
                 return selected
         return None
@@ -249,7 +287,9 @@ def resolve_selected_backend(
     )
     if selected is not None:
         return selected
-    fallback_name = normalize_engine(fallback_engine or catalog_engine(requested_engine).get("fallback_engine") or "")
+    fallback_name = normalize_engine(
+        fallback_engine or catalog_engine(requested_engine).get("fallback_engine") or ""
+    )
     if fallback_name and fallback_name != requested_engine:
         return resolve_explicit_backend(fallback_name, env=env)
     return None
@@ -268,14 +308,18 @@ def resolve_explicit_backend(
         return None
     voice = resolve_voice_for_engine(normalized, explicit_voice=requested_voice, env=env)
     device = resolve_device_for_engine(normalized, env=env)
-    fallback = normalize_engine(fallback_engine or catalog_engine(normalized).get("fallback_engine") or "")
-    return SelectedBackend(engine=normalized, voice=voice, binary=str(binary), device=device, fallback_engine=fallback)
+    fallback = normalize_engine(
+        fallback_engine or catalog_engine(normalized).get("fallback_engine") or ""
+    )
+    return SelectedBackend(
+        engine=normalized, voice=voice, binary=str(binary), device=device, fallback_engine=fallback
+    )
 
 
 def detect_available_engines(env: Mapping[str, str] | None = None) -> list[str]:
     values = env or os.environ
     available: list[str] = []
-    for engine in ("piper", "kokoro"):
+    for engine in ("piper", "kokoro", "edge_tts"):
         if detect_backend_binary(engine, values) is not None:
             available.append(engine)
     return available
@@ -288,10 +332,14 @@ def detect_backend_binary(engine: str, env: Mapping[str, str] | None = None) -> 
         return piper_backend.detect_binary(root, values)
     if engine == "kokoro":
         return kokoro_backend.detect_binary(root, values)
+    if engine == "edge_tts":
+        return edge_tts_backend.detect_binary(root, values)
     return None
 
 
-def resolve_voice_for_engine(engine: str, *, explicit_voice: str | None = None, env: Mapping[str, str] | None = None) -> str:
+def resolve_voice_for_engine(
+    engine: str, *, explicit_voice: str | None = None, env: Mapping[str, str] | None = None
+) -> str:
     values = env or os.environ
     if explicit_voice and explicit_voice.strip():
         return explicit_voice.strip()
@@ -299,6 +347,8 @@ def resolve_voice_for_engine(engine: str, *, explicit_voice: str | None = None, 
         return piper_backend.resolve_voice_name(values)
     if engine == "kokoro":
         return kokoro_backend.resolve_voice_name(values)
+    if engine == "edge_tts":
+        return edge_tts_backend.resolve_voice_name(values)
     return ""
 
 
@@ -308,6 +358,8 @@ def resolve_device_for_engine(engine: str, *, env: Mapping[str, str] | None = No
         return "cpu"
     if engine == "kokoro":
         return kokoro_backend.resolve_device(values)
+    if engine == "edge_tts":
+        return "cloud"
     return "none"
 
 
@@ -348,10 +400,33 @@ def read_wav_metadata(wav_path: Path) -> tuple[int, int]:
 
 
 def normalize_engine(raw: str | None) -> str:
-    value = str(raw or "").strip().lower()
-    if value in {"piper", "kokoro", "auto", "none"}:
+    value = str(raw or "").strip().lower().replace("-", "_")
+    if value in {"piper", "kokoro", "edge_tts", "auto", "none"}:
         return value
     return "auto" if not value else value
+
+
+def resolve_engine_for_text(
+    text: str,
+    requested_engine: str,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> str:
+    """Pick a concrete engine given text and an engine preference.
+
+    English-only Local Lucy: auto routing always uses the Kokoro/Piper/Edge
+    English pipeline. Language-specific env overrides are ignored.
+    """
+    normalized = normalize_engine(requested_engine)
+    if normalized != "auto":
+        return normalized
+
+    values = env or os.environ
+    latin_engine = normalize_engine(values.get("LUCY_VOICE_LATIN_ENGINE", ""))
+    if latin_engine not in {"", "auto", "none"}:
+        return latin_engine
+
+    return "kokoro"
 
 
 def resolve_root() -> Path:
@@ -391,9 +466,10 @@ def catalog_engine(engine: str) -> dict[str, Any]:
 
 def auto_order() -> list[str]:
     raw = catalog_defaults().get("auto_order")
+    allowed = {"piper", "kokoro", "edge_tts"}
     if isinstance(raw, list):
-        return [normalize_engine(item) for item in raw if normalize_engine(item) in {"piper", "kokoro"}]
-    return ["kokoro", "piper"]
+        return [normalize_engine(item) for item in raw if normalize_engine(item) in allowed]
+    return ["kokoro", "edge_tts", "piper"]
 
 
 def failure_contract(
@@ -445,42 +521,52 @@ if __name__ == "__main__":
 # TTS Engine Usage Logging
 # =============================================================================
 
+
 class TTSUsageLogger:
     """Logger for TTS engine usage."""
+
     def __init__(self):
         self.log_dir = Path.home() / ".local" / "share" / "lucy" / "logs"
         self.log_file = self.log_dir / "tts_engine.log"
         self.log_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def log(self, level: str, msg: str):
         from datetime import datetime
+
         ts = datetime.now().isoformat()
         try:
             with open(self.log_file, "a") as f:
                 f.write(f"{ts} [{level}] {msg}\n")
         except Exception:
             pass
-    
+
     def info(self, msg: str):
         self.log("INFO", msg)
+
 
 _tts_logger = TTSUsageLogger()
 
 # Monkey-patch synthesize_text to log usage
 _original_synthesize_text = synthesize_text
 
-def _logged_synthesize_text(*, text: str, requested_engine: str | None = None, **kwargs) -> dict[str, Any]:
+
+def _logged_synthesize_text(
+    *, text: str, requested_engine: str | None = None, **kwargs
+) -> dict[str, Any]:
     """Wrapper that logs TTS engine selection."""
     result = _original_synthesize_text(text=text, requested_engine=requested_engine, **kwargs)
-    
+
     # Log the engine that was actually used
     actual_engine = result.get("engine", "unknown")
     requested = requested_engine or "auto"
     fallback_used = result.get("fallback_used", False)
-    
-    _tts_logger.info(f"TTS synthesis: requested={requested}, actual={actual_engine}, fallback={fallback_used}")
-    
+
+    _tts_logger.info(
+        f"TTS synthesis: requested={requested}, actual={actual_engine}, fallback={fallback_used}"
+    )
+
     return result
+
 
 # Replace the function
 synthesize_text = _logged_synthesize_text

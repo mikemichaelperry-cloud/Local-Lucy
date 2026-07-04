@@ -48,7 +48,7 @@ Memory Used:    ~1.9 GB (persistent)
 ## Ollama LLM
 
 ### Configuration
-- **Model:** local-lucy (8B parameters)
+- **Model:** local-lucy-llama31 (llama3.1:8b)
 - **Quantization:** Q4_K / Q6_K
 - **Device:** CUDA (all layers)
 - **GPU Layers:** 33/33 (100% offloaded)
@@ -67,6 +67,18 @@ CUDA0 model buffer size = 4403.49 MiB
 - **VRAM per Request:** ~4.4 GB base
 
 ---
+
+## LoRA Training VRAM Requirements
+
+Training persona LoRA adapters is more memory-intensive than inference. On the RTX 3060 12 GB, adapters must be trained one at a time.
+
+| Base model | Parameters | LoRA config | VRAM on RTX 3060 12 GB |
+|---|---|---|---|
+| Llama 3.1 8B Instruct | ~8B | rank 16, seq 2048, 4-bit | ✅ Fits (~10 GB peak) |
+| Mistral-Nemo-Instruct-2407 | ~12B | rank 8, seq 1024, 4-bit | ❌ OOM at `prepare_model_for_kbit_training` |
+| Qwen3 14B | ~14B | rank 4, seq 512, 4-bit | ❌ OOM at `prepare_model_for_kbit_training` |
+
+Because Mistral-Nemo 12B and Qwen3 14B cannot be trained on this GPU, those selectable tags (`local-lucy-mistral`, `local-lucy`, `local-lucy-fast`, `local-lucy-qwen3`) fall back to prompt-level persona injection at runtime. Only Llama 3.1 8B has trained LoRA adapters. See `docs/runbooks/PERSONAS.md` for the full status and training commands.
 
 ## Optimization Status
 
@@ -115,7 +127,7 @@ nvidia-smi | grep kokoro_session_worker
 journalctl -u ollama -f | grep -E "(GPU|CUDA|offloaded)"
 
 # PyTorch CUDA check (in venv)
-cd /home/mike/lucy/ui-v7 && source .venv/bin/activate
+cd /home/mike/lucy-v10/ui-v10 && source .venv/bin/activate
 python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 ```
 
@@ -124,7 +136,7 @@ python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 ## Troubleshooting
 
 ### Kokoro Falls Back to CPU
-**Symptoms:** Slow TTS, no GPU memory usage  
+**Symptoms:** Slow TTS, no GPU memory usage
 **Fix:**
 ```bash
 # Check PyTorch CUDA
@@ -137,7 +149,7 @@ python3 tools/voice/kokoro_session_worker.py serve
 ```
 
 ### Ollama Not Using GPU
-**Symptoms:** High CPU usage, slow inference  
+**Symptoms:** High CPU usage, slow inference
 **Fix:**
 ```bash
 # Check Ollama logs
@@ -148,7 +160,7 @@ sudo systemctl restart ollama
 ```
 
 ### Out of Memory
-**Symptoms:** Crashes, CUDA OOM errors  
+**Symptoms:** Crashes, CUDA OOM errors
 **Solutions:**
 1. Close other GPU applications
 2. Reduce Ollama context size

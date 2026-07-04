@@ -52,7 +52,11 @@ def _news_region_filter(text: str) -> Optional[str]:
         "british": "GB",
         "united kingdom": "GB",
     }
-    topical = has_news_term(text) or has_conflict_term(text) or _has_re(text, r"\bdevelopments?|talks?|hostilities\b")
+    topical = (
+        has_news_term(text)
+        or has_conflict_term(text)
+        or _has_re(text, r"\bdevelopments?|talks?|hostilities\b")
+    )
     for key, value in mapping.items():
         if _has_re(text, rf"\b{re.escape(key)}\b") and topical:
             return value
@@ -121,11 +125,13 @@ def _prefer_domains_for_primary_doc(text: str) -> List[str]:
 def _identity_variant(text: str) -> str:
     if _has_re(text, r"\b(who are you|what is your name|what's your name|whats your name)\b"):
         return "self"
-    if _has_re(text, r"\b(who am i|what is my name|what's my name|whats my name|who is (mike|michael))\b"):
+    if _has_re(
+        text, r"\b(who am i|what is my name|what's my name|whats my name|who is (mike|michael))\b"
+    ):
         return "user"
     if _has_re(
         text,
-        r"\b(who is oscar|tell me about oscar|who is racheli|who is rachele|who is rachel|tell me about racheli|tell me about rachel|what is our relationship|who are we to each other)\b",
+        r"\b(who is oscar|tell me about oscar|what is our relationship|who are we to each other)\b",
     ):
         return "relationship"
     return ""
@@ -151,7 +157,7 @@ def _is_conversational(text: str) -> bool:
 def _is_creative_writing(text: str) -> bool:
     """
     Detect creative writing requests that should ALWAYS use local model.
-    
+
     Creative writing (stories, poems, fiction) works best with local model because:
     - No identity preamble issues ("I'm Local Lucy...")
     - Better privacy for personal/fictional content
@@ -159,8 +165,8 @@ def _is_creative_writing(text: str) -> bool:
     - Avoids unnecessary augmentation costs/latency
     """
     # Normalize: lowercase, strip quotes
-    t = text.lower().strip().replace('"', '').replace("'", "")
-    
+    t = text.lower().strip().replace('"', "").replace("'", "")
+
     # Primary creative writing patterns (flexible matching)
     # Pattern: action + (optional adjectives) + creative_type
     creative_patterns = [
@@ -179,21 +185,21 @@ def _is_creative_writing(text: str) -> bool:
         # "write a [short] story/poem/scene/..." (without "me")
         r"\bwrite\s+(a|an)\s+([\w\s]+)?\b(story|poem|tale|fiction|poetry|haiku|verse|scene|scenario)",
     ]
-    
+
     for pattern in creative_patterns:
         if _has_re(t, pattern):
             return True
-    
+
     # Direct story/poem requests (at start of query)
     direct_patterns = [
         r"^(write|tell|create|imagine|draft)\s+(me\s+)?(a|an)\s+([\w\s]+)?\b(story|poem|poetry|fiction|tale|haiku|verse)",
         r"^(a|an)\s+([\w\s]+)?\b(story|poem|tale|fable)\s+(about|on|regarding)",
     ]
-    
+
     for pattern in direct_patterns:
         if _has_re(t, pattern):
             return True
-    
+
     return False
 
 
@@ -233,7 +239,9 @@ def _is_primary_doc_request(text: str) -> bool:
         r"\b(datasheet|data sheet|manual|application note|app note|reference manual|pdf|tube manual|vacuum tube|valve)\b",
     ):
         return True
-    if _has_re(text, r"\b[a-z]{1,4}\d{2,6}[a-z0-9-]*\b") and _has_re(text, r"\b(source|link|pdf|manual|datasheet)\b"):
+    if _has_re(text, r"\b[a-z]{1,4}\d{2,6}[a-z0-9-]*\b") and _has_re(
+        text, r"\b(source|link|pdf|manual|datasheet)\b"
+    ):
         return True
     return False
 
@@ -270,7 +278,9 @@ def _is_current_fact(text: str) -> bool:
         return True
     if _has_temporal_freshness_term(text):
         return True
-    if _has_re(text, r"\b(price|stock price|weather|temperature|schedule|availability|in stock|delivery)\b"):
+    if _has_re(
+        text, r"\b(price|stock price|weather|temperature|schedule|availability|in stock|delivery)\b"
+    ):
         return True
     if _has_re(text, r"\b(inflation rate|cpi|consumer price index)\b"):
         return True
@@ -283,7 +293,9 @@ def _is_current_conflict_news(text: str) -> bool:
         r"\b(war|conflict|military action|ceasefire|talks?|hostilities|fighting|strikes?|offensive|tensions?|standoff)\b",
     ):
         return False
-    return _has_temporal_freshness_term(text) or _has_re(text, r"\b(predict|prediction|outcome|forecast|probability|likelihood|chance|odds|risk)\b")
+    return _has_temporal_freshness_term(text) or _has_re(
+        text, r"\b(predict|prediction|outcome|forecast|probability|likelihood|chance|odds|risk)\b"
+    )
 
 
 def _is_news_query(text: str) -> bool:
@@ -303,13 +315,17 @@ def _is_news_query(text: str) -> bool:
         r"\b(latest on|latest developments?|what happened|what(?:'s|s)? happening|what happening|main headlines|ceasefire|war|conflict|talks?|tensions?|standoff)\b",
     ) and _is_current_fact(text):
         return True
-    if _has_re(text, r"\b(stock market|market)\b") and _has_re(text, r"\b(today|latest|recent|now)\b"):
+    if _has_re(text, r"\b(stock market|market)\b") and _has_re(
+        text, r"\b(today|latest|recent|now)\b"
+    ):
         return True
     return False
 
 
 def _is_evidence_check(text: str) -> bool:
-    if _has_re(text, r"\b(verify|evidence|source|sources|citation|citations|cite|url|link)\b") and not is_probable_culinary_source_misrecognition(text):
+    if _has_re(
+        text, r"\b(verify|evidence|source|sources|citation|citations|cite|url|link)\b"
+    ) and not is_probable_culinary_source_misrecognition(text):
         return True
     if _has_re(text, r"\b(wikipedia|wiki)\b"):
         return True
@@ -329,7 +345,9 @@ def _is_medical_query(text: str) -> bool:
 
 
 def _is_mixed_ambiguous(text: str) -> bool:
-    if _has_re(text, r"\btravel\s+(information|info|advice)\b") and not _contains_any(text, list(TRAVEL_DESTINATIONS)):
+    if _has_re(text, r"\btravel\s+(information|info|advice)\b") and not _contains_any(
+        text, list(TRAVEL_DESTINATIONS)
+    ):
         return True
     if _has_re(text, r"\btell me about\b") and _contains_any(text, list(TRAVEL_DESTINATIONS)):
         return True
@@ -350,9 +368,14 @@ def _is_conceptual_inflation_query(text: str) -> bool:
 def _is_current_product_recommendation(text: str) -> bool:
     if not _has_re(text, r"\b(recommend|recommendation|best|suggest|buy)\b"):
         return False
-    if not _has_re(text, r"\b(laptop|notebook|phone|smartphone|tablet|camera|tv|monitor|headphones?|earbuds?|pc|computer)\b"):
+    if not _has_re(
+        text,
+        r"\b(laptop|notebook|phone|smartphone|tablet|camera|tv|monitor|headphones?|earbuds?|pc|computer)\b",
+    ):
         return False
-    return _has_temporal_freshness_term(text) or _has_re(text, r"\b(current|latest|new|today|right now)\b")
+    return _has_temporal_freshness_term(text) or _has_re(
+        text, r"\b(current|latest|new|today|right now)\b"
+    )
 
 
 def _is_unanchored_ambiguous_followup(text: str) -> bool:
@@ -380,9 +403,9 @@ def _is_unanchored_ambiguous_followup(text: str) -> bool:
 
 
 def _shopping_clarification(text: str) -> Optional[str]:
-    if _has_re(text, r"\b(in stock|price|buy|delivery|availability|where can i get)\b") and not _has_re(
-        text, r"\b(israel|israeli|tel aviv|jerusalem|haifa|nis|₪)\b"
-    ):
+    if _has_re(
+        text, r"\b(in stock|price|buy|delivery|availability|where can i get)\b"
+    ) and not _has_re(text, r"\b(israel|israeli|tel aviv|jerusalem|haifa|nis|₪)\b"):
         return "Do you want Israel local delivery?"
     return None
 
@@ -391,7 +414,9 @@ def _confidence(value: float) -> float:
     return round(max(0.0, min(1.0, value)), 2)
 
 
-def _legacy_plan_from_classification(result: Dict[str, object], normalized: Dict[str, object]) -> Dict[str, object]:
+def _legacy_plan_from_classification(
+    result: Dict[str, object], normalized: Dict[str, object]
+) -> Dict[str, object]:
     intent_class = str(result["intent_class"])
     subcategory = str(result.get("subcategory") or "general")
     clarification_question = result.get("clarification_question")
@@ -481,7 +506,9 @@ def _legacy_plan_from_classification(result: Dict[str, object], normalized: Dict
             legacy["category"] = "electronics"
             legacy["min_sources"] = 1
             legacy["allow_domains_file"] = "config/trust/generated/engineering_runtime.txt"
-            legacy["prefer_domains"] = _prefer_domains_for_primary_doc(normalized["question_text_lower"])
+            legacy["prefer_domains"] = _prefer_domains_for_primary_doc(
+                normalized["question_text_lower"]
+            )
         elif subcategory == "reference":
             legacy["intent"] = "WEB_DOC"
             legacy["category"] = "reference"
@@ -522,7 +549,7 @@ def classify_question(question: str, surface: str = "cli") -> Dict[str, object]:
     # Check for creative writing requests - these should ALWAYS use local model
     # to avoid identity preamble issues and unnecessary augmentation
     is_creative = _is_creative_writing(q)
-    
+
     result: Dict[str, object] = {
         "schema_version": "phase1",
         "intent_class": "local_knowledge",
@@ -659,7 +686,9 @@ def classify_question(question: str, surface: str = "cli") -> Dict[str, object]:
             result.update(
                 {
                     "intent_class": "evidence_check",
-                    "confidence": _confidence(max(0.97, float(medical_detector.get("confidence_score") or 0.0))),
+                    "confidence": _confidence(
+                        max(0.97, float(medical_detector.get("confidence_score") or 0.0))
+                    ),
                     "style_mode": "informational",
                     "candidate_routes": ["EVIDENCE"],
                     "subcategory": "medical",
@@ -696,7 +725,10 @@ def classify_question(question: str, surface: str = "cli") -> Dict[str, object]:
                     "subcategory": "reference",
                 }
             )
-        elif _has_re(q, r"\b(verify|evidence|source|sources|citation|citations|cite|url|link|fetch|browse|search web|search the web|look up)\b") and not is_probable_culinary_source_misrecognition(q):
+        elif _has_re(
+            q,
+            r"\b(verify|evidence|source|sources|citation|citations|cite|url|link|fetch|browse|search web|search the web|look up)\b",
+        ) and not is_probable_culinary_source_misrecognition(q):
             result.update(
                 {
                     "intent_class": "evidence_check",
@@ -719,7 +751,9 @@ def classify_question(question: str, surface: str = "cli") -> Dict[str, object]:
                     "subcategory": "pet_food",
                 }
             )
-        elif _is_current_fact(q) and _has_re(q, r"\b(in stock|buy|delivery|availability|where can i get|local delivery)\b"):
+        elif _is_current_fact(q) and _has_re(
+            q, r"\b(in stock|buy|delivery|availability|where can i get|local delivery)\b"
+        ):
             clarification_question = _shopping_clarification(q)
             result.update(
                 {

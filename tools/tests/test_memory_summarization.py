@@ -7,12 +7,13 @@ Uses a temporary in-memory SQLite DB and mocks the Ollama call.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 # Ensure tools/ is on path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -158,6 +159,28 @@ class TestMemorySummarization(unittest.TestCase):
         prompt_text = ms.format_turns_for_prompt(turns)
         self.assertIn("User: What is Ohm's law?", prompt_text)
         self.assertIn("Assistant: V = I × R.", prompt_text)
+
+    def test_summarize_turns_strips_think_tags_and_prefixes(self):
+        """Summary output should be cleaned of chain-of-thought artifacts."""
+        turns = [
+            {"role": "user", "text": "What is Ohm's law?"},
+            {"role": "assistant", "text": "V = I × R."},
+        ]
+        raw_response = (
+            "answers<think>\nLet me think about this.\n</think>\nSummary: We discussed Ohm's law."
+        )
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({"response": raw_response}).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
+
+        with patch.object(ms.urllib.request, "urlopen", return_value=mock_response):
+            cleaned = ms._summarize_turns_with_ollama(turns)
+
+        self.assertNotIn("<think>", cleaned)
+        self.assertNotIn("answers", cleaned.lower())
+        self.assertNotIn("Summary:", cleaned)
+        self.assertIn("Ohm's law", cleaned)
 
 
 if __name__ == "__main__":

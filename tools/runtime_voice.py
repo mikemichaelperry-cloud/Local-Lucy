@@ -28,6 +28,7 @@ from runtime_control import (
     locked_state_file,
     resolve_state_file,
 )
+
 from voice.playback import PlaybackError, detect_audio_player, play_wav_file
 
 try:
@@ -37,10 +38,10 @@ except ImportError:
 
 try:
     from voice.whisper_worker import (
+        WhisperWorkerError,
         ensure_whisper_worker,
         stop_whisper_worker,
         transcribe_with_worker,
-        WhisperWorkerError,
     )
 except ImportError:
     ensure_whisper_worker = None  # type: ignore[assignment]
@@ -58,8 +59,9 @@ try:
     router_py_path = Path(__file__).resolve().parent / "router_py"
     if str(router_py_path) not in sys.path:
         sys.path.insert(0, str(router_py_path.parent))
-    
-    from router_py.voice_tool import VoicePipeline, VoiceResult, VADConfig
+
+    from router_py.voice_tool import VADConfig, VoicePipeline, VoiceResult
+
     _VOICE_TOOL_AVAILABLE = True
 except ImportError:
     _VOICE_TOOL_AVAILABLE = False
@@ -123,8 +125,7 @@ _GPU_ERROR_KEYWORDS = ("cuda", "cublas", "gpu", "out of memory", "oom")
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
-    
-    
+
     enforce_authority_contract(expected_authority_root=Path(__file__).resolve().parents[1])
 
     runtime_file = resolve_voice_runtime_file(args.runtime_file)
@@ -157,7 +158,9 @@ def main() -> int:
             print(json.dumps(payload, sort_keys=True))
             return 0
         if args.command == "internal-record":
-            return run_internal_recorder(Path(args.output).expanduser(), Path(args.runtime_file).expanduser())
+            return run_internal_recorder(
+                Path(args.output).expanduser(), Path(args.runtime_file).expanduser()
+            )
         if args.command == "internal-prewarm-tts":
             # Internal command: prewarm TTS worker to reduce latency
             backend = detect_backend()
@@ -175,20 +178,43 @@ def main() -> int:
                             write_voice_runtime(runtime_file, runtime_state)
                     except Exception:
                         pass
-                print(json.dumps({"ok": success, "engine": "kokoro", "prewarmed": success}, sort_keys=True))
+                print(
+                    json.dumps(
+                        {"ok": success, "engine": "kokoro", "prewarmed": success}, sort_keys=True
+                    )
+                )
             else:
-                print(json.dumps({"ok": False, "engine": backend.tts_engine or "none", "prewarmed": False}, sort_keys=True))
+                print(
+                    json.dumps(
+                        {"ok": False, "engine": backend.tts_engine or "none", "prewarmed": False},
+                        sort_keys=True,
+                    )
+                )
             return 0
         if args.command == "internal-prewarm-stt":
             # Internal command: prewarm STT (whisper-server) worker to reduce latency
             backend = detect_backend(include_tts=False)
-            if ensure_whisper_worker is not None and backend.stt_engine == "whisper" and backend.available:
+            if (
+                ensure_whisper_worker is not None
+                and backend.stt_engine == "whisper"
+                and backend.available
+            ):
                 model_path = resolve_whisper_model_path()
                 port = ensure_whisper_worker(model_path)
                 success = port is not None
-                print(json.dumps({"ok": success, "engine": "whisper", "prewarmed": success, "port": port}, sort_keys=True))
+                print(
+                    json.dumps(
+                        {"ok": success, "engine": "whisper", "prewarmed": success, "port": port},
+                        sort_keys=True,
+                    )
+                )
             else:
-                print(json.dumps({"ok": False, "engine": backend.stt_engine or "none", "prewarmed": False}, sort_keys=True))
+                print(
+                    json.dumps(
+                        {"ok": False, "engine": backend.stt_engine or "none", "prewarmed": False},
+                        sort_keys=True,
+                    )
+                )
             return 0
         if args.command == "speak":
             backend = detect_backend()
@@ -209,7 +235,9 @@ def main() -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Authoritative Local Lucy voice PTT runtime endpoint.")
+    parser = argparse.ArgumentParser(
+        description="Authoritative Local Lucy voice PTT runtime endpoint."
+    )
     parser.add_argument(
         "--state-file",
         help="Override the authoritative runtime control state file path.",
@@ -232,7 +260,9 @@ def build_parser() -> argparse.ArgumentParser:
     internal_prewarm = subparsers.add_parser("internal-prewarm-tts")
     internal_prewarm.help = "Internal: prewarm TTS worker to reduce latency (auto-called by HMI)"
     internal_prewarm_stt = subparsers.add_parser("internal-prewarm-stt")
-    internal_prewarm_stt.help = "Internal: prewarm STT worker to reduce latency (auto-called by HMI)"
+    internal_prewarm_stt.help = (
+        "Internal: prewarm STT worker to reduce latency (auto-called by HMI)"
+    )
     speak_parser = subparsers.add_parser("speak")
     speak_parser.add_argument("--text", required=True, help="Text to synthesize and speak")
     return parser
@@ -273,7 +303,9 @@ DEFAULT_CAPTURE_DIR = str(default_runtime_namespace_root() / "voice" / "ui_ptt")
 
 
 def resolve_request_tool() -> Path:
-    raw = os.environ.get("LUCY_RUNTIME_REQUEST_TOOL") or str(resolve_root() / "tools" / "runtime_request.py")
+    raw = os.environ.get("LUCY_RUNTIME_REQUEST_TOOL") or str(
+        resolve_root() / "tools" / "runtime_request.py"
+    )
     return Path(raw).expanduser()
 
 
@@ -309,7 +341,7 @@ def resolve_voice_python(requested_engine: str | None = None) -> str:
     if explicit:
         explicit_path = Path(explicit).expanduser()
         if explicit_path.exists() and os.access(explicit_path, os.X_OK):
-            if preferred_engine in {"kokoro", "piper"} and adapter_tool.exists():
+            if preferred_engine in {"kokoro", "piper", "edge_tts"} and adapter_tool.exists():
                 payload = run_tts_adapter_command(
                     python_bin=str(explicit_path),
                     command="probe",
@@ -323,7 +355,7 @@ def resolve_voice_python(requested_engine: str | None = None) -> str:
     # ISOLATION: Only ui-v10 is used, no ui-v7 fallback
     candidate = workspace_root / "ui-v10" / ".venv" / "bin" / "python3"
     if candidate.exists() and os.access(candidate, os.X_OK):
-        if preferred_engine in {"kokoro", "piper"} and adapter_tool.exists():
+        if preferred_engine in {"kokoro", "piper", "edge_tts"} and adapter_tool.exists():
             payload = run_tts_adapter_command(
                 python_bin=str(candidate),
                 command="probe",
@@ -336,7 +368,7 @@ def resolve_voice_python(requested_engine: str | None = None) -> str:
     last_error = ""
     for fallback in (Path(sys.executable), Path("/usr/bin/python3")):
         if fallback.exists() and os.access(fallback, os.X_OK):
-            if preferred_engine in {"kokoro", "piper"} and adapter_tool.exists():
+            if preferred_engine in {"kokoro", "piper", "edge_tts"} and adapter_tool.exists():
                 payload = run_tts_adapter_command(
                     python_bin=str(fallback),
                     command="probe",
@@ -427,7 +459,11 @@ def ensure_kokoro_worker() -> bool:
     worker_pid = read_pid_file(pid_file)
 
     # Fast path: socket is alive and PID file matches a running process
-    if worker_pid is not None and is_process_running(worker_pid) and _is_kokoro_socket_alive(socket_path):
+    if (
+        worker_pid is not None
+        and is_process_running(worker_pid)
+        and _is_kokoro_socket_alive(socket_path)
+    ):
         return True
 
     # Stale worker: process may be running but socket is dead, or socket exists
@@ -459,7 +495,9 @@ def ensure_kokoro_worker() -> bool:
     return socket_path.exists()
 
 
-def kokoro_worker_request(payload: dict[str, Any], *, timeout_seconds: float = 120.0) -> dict[str, Any]:
+def kokoro_worker_request(
+    payload: dict[str, Any], *, timeout_seconds: float = 120.0
+) -> dict[str, Any]:
     socket_path = resolve_kokoro_worker_socket()
     if not socket_path.exists():
         return {"ok": False, "error": "kokoro worker unavailable"}
@@ -482,7 +520,11 @@ def kokoro_worker_request(payload: dict[str, Any], *, timeout_seconds: float = 1
         client.close()
     line = raw.decode("utf-8", errors="replace").strip()
     parsed = parse_json_payload(line)
-    return parsed if parsed is not None else {"ok": False, "error": line or "kokoro worker invalid response"}
+    return (
+        parsed
+        if parsed is not None
+        else {"ok": False, "error": line or "kokoro worker invalid response"}
+    )
 
 
 def prewarm_kokoro_worker() -> bool:
@@ -592,7 +634,9 @@ def write_voice_runtime(runtime_file: Path, state: dict[str, Any]) -> None:
             tmp_path = Path(handle.name)
         os.replace(tmp_path, runtime_file)
     except OSError as exc:
-        raise RuntimeVoiceError(f"unable to write voice runtime file {runtime_file}: {exc}") from exc
+        raise RuntimeVoiceError(
+            f"unable to write voice runtime file {runtime_file}: {exc}"
+        ) from exc
 
 
 def load_voice_runtime_locked(runtime_file: Path) -> dict[str, Any]:
@@ -664,7 +708,15 @@ def detect_stt() -> tuple[str, str]:
             return "whisper", str(whisper_path)
     for candidate in (
         bundled_whisper_binary(root),
-        *(Path(p) for p in (shutil.which("whisper"), shutil.which("whisper-cli"), shutil.which("whisper-cpp")) if p),
+        *(
+            Path(p)
+            for p in (
+                shutil.which("whisper"),
+                shutil.which("whisper-cli"),
+                shutil.which("whisper-cpp"),
+            )
+            if p
+        ),
     ):
         if not candidate.exists() or not candidate.is_file():
             continue
@@ -681,7 +733,7 @@ def detect_stt() -> tuple[str, str]:
             return "vosk", str(vosk_path)
     system_vosk = shutil.which("vosk-transcriber")
     if system_vosk:
-        _voice_logger.info(f"STT engine selected: vosk (system)")
+        _voice_logger.info("STT engine selected: vosk (system)")
         return "vosk", system_vosk
     _voice_logger.info("STT engine selected: none (unavailable)")
     return "", ""
@@ -694,12 +746,15 @@ def detect_stt_device(stt_engine: str) -> str:
     # Check if whisper-server is running with --no-gpu
     try:
         from voice.whisper_worker import resolve_whisper_worker_pid_file
+
         pid_file = resolve_whisper_worker_pid_file()
         if pid_file.exists():
             pid = int(pid_file.read_text(encoding="utf-8").strip())
             cmdline_path = Path(f"/proc/{pid}/cmdline")
             if cmdline_path.exists():
-                cmdline = cmdline_path.read_text(encoding="utf-8", errors="replace").replace("\x00", " ")
+                cmdline = cmdline_path.read_text(encoding="utf-8", errors="replace").replace(
+                    "\x00", " "
+                )
                 if "--no-gpu" in cmdline:
                     return "cpu"
                 return "gpu"
@@ -761,10 +816,12 @@ def detect_tts() -> tuple[str, str, str, str]:
         requested_engine=requested_engine,
     )
     engine = clean_text(payload.get("engine")) if payload.get("ok") else "none"
-    if engine not in {"piper", "kokoro"}:
-        _voice_logger.info(f"TTS engine selected: none (requested: {requested_engine}, probe failed)")
+    if engine not in {"piper", "kokoro", "edge_tts"}:
+        _voice_logger.info(
+            f"TTS engine selected: none (requested: {requested_engine}, probe failed)"
+        )
         return "none", "", "none", "none"
-    device = clean_text(payload.get("device")) or ("cpu" if engine == "piper" else "unknown")
+    device = clean_text(payload.get("device")) or ("cpu" if engine == "piper" else "cloud")
     player = detect_audio_player() or "none"
     _voice_logger.info(f"TTS engine selected: {engine} (device: {device}, player: {player})")
     return engine, engine, device, player
@@ -803,7 +860,9 @@ def synchronize_state(
             state["last_error"] = "voice recorder exited unexpectedly"
 
     processing_pid = parse_pid(state.get("processing_pid"))
-    if state.get("processing") and (processing_pid is None or not is_process_running(processing_pid)):
+    if state.get("processing") and (
+        processing_pid is None or not is_process_running(processing_pid)
+    ):
         state["processing"] = False
         state["processing_pid"] = None
         if prior_status == "processing":
@@ -1053,7 +1112,9 @@ def finalize_voice_state(
 ) -> None:
     with locked_state_file(runtime_file):
         current_state = load_or_create_state(state_file, refresh_timestamp=False)
-        runtime_state = synchronize_state(load_voice_runtime_locked(runtime_file), backend, current_state)
+        runtime_state = synchronize_state(
+            load_voice_runtime_locked(runtime_file), backend, current_state
+        )
         runtime_state.update(
             {
                 "listening": False,
@@ -1097,7 +1158,9 @@ def build_turn_payload(
     return payload
 
 
-def start_recorder(backend: VoiceBackend, capture_path: Path, runtime_file: Path) -> subprocess.Popen[str]:
+def start_recorder(
+    backend: VoiceBackend, capture_path: Path, runtime_file: Path
+) -> subprocess.Popen[str]:
     capture_path.parent.mkdir(parents=True, exist_ok=True)
     command = [
         sys.executable,
@@ -1129,9 +1192,28 @@ def start_recorder(backend: VoiceBackend, capture_path: Path, runtime_file: Path
 
 def recorder_command(backend: VoiceBackend, capture_path: Path) -> list[str]:
     if backend.recorder_engine == "arecord":
-        return [backend.recorder_bin, "-q", "-f", "S16_LE", "-r", "16000", "-c", "1", str(capture_path)]
+        return [
+            backend.recorder_bin,
+            "-q",
+            "-f",
+            "S16_LE",
+            "-r",
+            "16000",
+            "-c",
+            "1",
+            str(capture_path),
+        ]
     if backend.recorder_engine == "pw-record":
-        return [backend.recorder_bin, "--channels", "1", "--rate", "16000", "--format", "s16", str(capture_path)]
+        return [
+            backend.recorder_bin,
+            "--channels",
+            "1",
+            "--rate",
+            "16000",
+            "--format",
+            "s16",
+            str(capture_path),
+        ]
     raise RuntimeVoiceError("no recorder available")
 
 
@@ -1154,7 +1236,9 @@ def _handle_internal_record_signal(signum: int, frame: Any) -> None:
     _INTERNAL_RECORD_STOP = True
 
 
-def run_internal_recorder(output_path: Path, runtime_file: Path, max_duration_seconds: int | None = None) -> int:
+def run_internal_recorder(
+    output_path: Path, runtime_file: Path, max_duration_seconds: int | None = None
+) -> int:
     if max_duration_seconds is None:
         max_duration_seconds = int(os.environ.get("LUCY_VOICE_PTT_MAX_SECONDS", "60"))
         if max_duration_seconds <= 0:
@@ -1197,7 +1281,10 @@ def run_internal_recorder(output_path: Path, runtime_file: Path, max_duration_se
             recording_start_time = time.monotonic()
             while not _INTERNAL_RECORD_STOP:
                 if time.monotonic() - recording_start_time >= max_duration_seconds:
-                    print(f"internal recorder stopped after reaching max duration ({max_duration_seconds}s)", file=sys.stderr)
+                    print(
+                        f"internal recorder stopped after reaching max duration ({max_duration_seconds}s)",
+                        file=sys.stderr,
+                    )
                     break
                 chunk = process.stdout.read(2048)
                 if not chunk:
@@ -1233,7 +1320,9 @@ def run_internal_recorder(output_path: Path, runtime_file: Path, max_duration_se
 def audio_levels_file_for_runtime(runtime_file: Path | None = None) -> Path:
     if runtime_file is not None:
         return runtime_file.expanduser().parent / "voice_audio_levels.json"
-    runtime_root = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(resolve_root()))).expanduser()
+    runtime_root = Path(
+        os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(resolve_root()))
+    ).expanduser()
     return runtime_root / "state" / "voice_audio_levels.json"
 
 
@@ -1304,7 +1393,11 @@ def stop_recorder(record_pid: int | None) -> None:
         raise_with_state("voice recorder pid missing", PTT_STOP_CAPTURE_FAILED)
     if not is_process_running(record_pid):
         return
-    for sig, timeout_seconds in ((signal.SIGINT, 1.0), (signal.SIGTERM, 2.0), (signal.SIGKILL, 0.5)):
+    for sig, timeout_seconds in (
+        (signal.SIGINT, 1.0),
+        (signal.SIGTERM, 2.0),
+        (signal.SIGKILL, 0.5),
+    ):
         try:
             os.kill(record_pid, sig)
         except ProcessLookupError:
@@ -1327,9 +1420,25 @@ def transcribe_capture(backend: VoiceBackend, capture_path: Path) -> Transcripti
     else:
         raise_with_state("voice stt unavailable", PTT_STOP_TRANSCRIBE_FAILED)
     normalized = normalize_transcript(result.text)
-    if normalized.lower() in {"[blank_audio]", "[inaudible]", "[silence]", "[no_speech]", "[no speech]"}:
-        return TranscriptionResult(text="", backend=result.backend, fallback_used=result.fallback_used, fallback_reason=result.fallback_reason)
-    return TranscriptionResult(text=normalized, backend=result.backend, fallback_used=result.fallback_used, fallback_reason=result.fallback_reason)
+    if normalized.lower() in {
+        "[blank_audio]",
+        "[inaudible]",
+        "[silence]",
+        "[no_speech]",
+        "[no speech]",
+    }:
+        return TranscriptionResult(
+            text="",
+            backend=result.backend,
+            fallback_used=result.fallback_used,
+            fallback_reason=result.fallback_reason,
+        )
+    return TranscriptionResult(
+        text=normalized,
+        backend=result.backend,
+        fallback_used=result.fallback_used,
+        fallback_reason=result.fallback_reason,
+    )
 
 
 def _is_gpu_error(stderr_text: str) -> bool:
@@ -1338,17 +1447,49 @@ def _is_gpu_error(stderr_text: str) -> bool:
 
 
 def resolve_whisper_model_path() -> Path:
-    """Resolve the whisper model file path from env or defaults."""
+    """Resolve the whisper model file path from env or defaults.
+
+    If the configured model is an English-only *.en.bin variant and a
+    multilingual counterpart (same size class, no .en suffix) exists on disk,
+    prefer the multilingual model so auto-language detection can work.
+    The original English-only model remains available as a fallback.
+    """
     root = resolve_root()
     model = clean_text(os.environ.get("LUCY_VOICE_WHISPER_MODEL"))
-    if not model:
-        model = str(root / "runtime" / "voice" / "models" / f"ggml-{os.environ.get('LUCY_VOICE_MODEL', 'small.en')}.bin")
-    model_path = Path(model).expanduser()
-    if not model_path.exists():
-        fallback = root / "models" / "ggml-base.bin"
+    if model:
+        return _resolve_whisper_model_path_from_spec(root, model)
+
+    model_name = os.environ.get("LUCY_VOICE_MODEL", "small.en")
+    default_path = root / "runtime" / "voice" / "models" / f"ggml-{model_name}.bin"
+
+    # If config points to English-only, see if a multilingual sibling exists.
+    if model_name.endswith(".en"):
+        multilingual_name = model_name[:-3]
+        multilingual_path = root / "runtime" / "voice" / "models" / f"ggml-{multilingual_name}.bin"
+        if multilingual_path.exists():
+            return multilingual_path
+
+    if default_path.exists():
+        return default_path
+
+    # Final fallbacks: bundled multilingual small, then base.
+    for fallback_name in ("small", "base"):
+        fallback = root / "runtime" / "voice" / "models" / f"ggml-{fallback_name}.bin"
         if fallback.exists():
-            model_path = fallback
-    return model_path
+            return fallback
+    fallback = root / "models" / "ggml-base.bin"
+    if fallback.exists():
+        return fallback
+    return default_path
+
+
+def _resolve_whisper_model_path_from_spec(root: Path, spec: str) -> Path:
+    """Resolve a model from an explicit path or model-name spec."""
+    model_path = Path(spec).expanduser()
+    if model_path.exists():
+        return model_path
+    # Treat bare spec as a model name like 'small' or 'base.en'.
+    return root / "runtime" / "voice" / "models" / f"ggml-{spec}.bin"
 
 
 def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionResult:
@@ -1377,15 +1518,7 @@ def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionRe
         except Exception:
             pass  # Defensive: any unexpected error falls through
 
-    root = resolve_root()
-    model = clean_text(os.environ.get("LUCY_VOICE_WHISPER_MODEL"))
-    if not model:
-        model = str(root / "runtime" / "voice" / "models" / f"ggml-{os.environ.get('LUCY_VOICE_MODEL', 'small.en')}.bin")
-    model_path = Path(model).expanduser()
-    if not model_path.exists():
-        fallback = root / "models" / "ggml-base.bin"
-        if fallback.exists():
-            model_path = fallback
+    model_path = resolve_whisper_model_path()
     prefix = tempfile.NamedTemporaryFile(
         "w",
         encoding="utf-8",
@@ -1418,7 +1551,17 @@ def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionRe
         return ""
 
     try:
-        command = [stt_bin, "-m", str(model_path), "-f", str(capture_path), "-otxt", "-of", str(prefix_base), "--no-timestamps"]
+        command = [
+            stt_bin,
+            "-m",
+            str(model_path),
+            "-f",
+            str(capture_path),
+            "-otxt",
+            "-of",
+            str(prefix_base),
+            "--no-timestamps",
+        ]
         lang = clean_text(os.environ.get("LUCY_VOICE_STT_LANG"))
         if lang and lang.lower() != "auto":
             command[1:1] = ["-l", lang]
@@ -1458,7 +1601,11 @@ def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionRe
             )
 
         # CPU fallback also failed
-        cpu_error = first_nonempty_line(completed_cpu.stderr) or first_nonempty_line(completed_cpu.stdout) or error_text
+        cpu_error = (
+            first_nonempty_line(completed_cpu.stderr)
+            or first_nonempty_line(completed_cpu.stdout)
+            or error_text
+        )
         raise_with_state(cpu_error, PTT_STOP_TRANSCRIBE_FAILED)
 
     except subprocess.TimeoutExpired as exc:
@@ -1499,11 +1646,25 @@ def transcribe_with_vosk(stt_bin: str, capture_path: Path) -> str:
 def normalize_transcript(text: str) -> str:
     normalized = clean_text(text.replace("\r", " ").replace("\n", " "))
     # Strip whisper timestamp lines that may leak through
-    normalized = re.sub(r"\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]", "", normalized)
+    normalized = re.sub(
+        r"\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]", "", normalized
+    )
     normalized = re.sub(r"\s+", " ", normalized)
     normalized = normalized.strip()
     # Filter known silence hallucinations from small.en
-    if normalized.lower() in {"you", "i", "a", "the", "um", "uh", "hm", "mm", "mhm", "uh huh", "hmm"}:
+    if normalized.lower() in {
+        "you",
+        "i",
+        "a",
+        "the",
+        "um",
+        "uh",
+        "hm",
+        "mm",
+        "mhm",
+        "uh huh",
+        "hmm",
+    }:
         return ""
     return normalized
 
@@ -1523,7 +1684,7 @@ def _resolve_control_state() -> dict[str, Any]:
         state_file = default_runtime_namespace_root() / "state" / "current_state.json"
     else:
         state_file = Path(state_file).expanduser()
-    
+
     try:
         with open(state_file, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -1573,9 +1734,9 @@ def _write_history_entry(
 ) -> None:
     """Write a history entry to the jsonl file (matching runtime_request.py format)."""
     from datetime import datetime, timezone
-    
+
     _debug_log(f"Writing history entry: request_id={request_id}, history_file={history_file}")
-    
+
     entry = {
         "authority": _resolve_authority(),
         "completed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -1588,7 +1749,7 @@ def _write_history_entry(
         "route": route,
         "status": status,
     }
-    
+
     try:
         history_file.parent.mkdir(parents=True, exist_ok=True)
         with open(history_file, "a", encoding="utf-8") as f:
@@ -1604,18 +1765,18 @@ def submit_transcript(transcript: str) -> dict[str, Any]:
     """Submit transcript to Lucy using unified pipeline entry point."""
     import sys
     from pathlib import Path
-    
+
     # Add router_py to path
     router_py_path = Path(__file__).parent / "router_py"
     if str(router_py_path) not in sys.path:
         sys.path.insert(0, str(router_py_path))
-    
+
     from router_py.main import run
-    
+
     # Voice pipeline uses the default model (llama3.1:8b, ~8.5GB VRAM).
     # With lower VRAM usage than qwen3:14b, GPU can run Whisper + LLM + TTS.
     outcome = run(transcript, surface="voice", timeout=125, model="local-lucy-llama31")
-    
+
     request_id = f"voice_{int(time.time() * 1000)}"
     status = "completed" if outcome.status == "completed" else outcome.status
     route = {
@@ -1628,7 +1789,7 @@ def submit_transcript(transcript: str) -> dict[str, Any]:
     }
     error = outcome.error_message or ""
     response_text = outcome.response_text or ""
-    
+
     # Write to history file for HMI display
     try:
         _write_history_entry(
@@ -1644,7 +1805,7 @@ def submit_transcript(transcript: str) -> dict[str, Any]:
     except Exception as hist_exc:
         # Log but don't fail the request if history write fails
         print(f"Warning: failed to write history entry: {hist_exc}", file=sys.stderr)
-    
+
     # Build payload matching runtime_request.py format
     return {
         "status": status,
@@ -1708,7 +1869,11 @@ def run_tts_adapter_command(
 
     payload = parse_json_payload(completed.stdout)
     if payload is None:
-        error_text = first_nonempty_line(completed.stderr) or first_nonempty_line(completed.stdout) or "tts adapter failed"
+        error_text = (
+            first_nonempty_line(completed.stderr)
+            or first_nonempty_line(completed.stdout)
+            or "tts adapter failed"
+        )
         return {"ok": False, "error": error_text}
     return payload
 
@@ -1770,7 +1935,11 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
                 is_first_chunk = index == 0
                 engine_name = clean_text(payload.get("engine"))
                 prepad_ms = resolve_tts_prepad_ms(engine_name, is_first_chunk=is_first_chunk)
-                prime_ms = resolve_kokoro_first_chunk_player_prime_ms() if is_first_chunk and engine_name == "kokoro" else 0
+                prime_ms = (
+                    resolve_kokoro_first_chunk_player_prime_ms()
+                    if is_first_chunk and engine_name == "kokoro"
+                    else 0
+                )
                 player = None if backend.audio_player == "none" else backend.audio_player
 
                 # Start synthesizing next chunk in background (if any)
@@ -1812,7 +1981,9 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
                     except Exception as exc:
                         raise RuntimeVoiceError(f"background synthesis failed: {exc}") from exc
                     if not payload.get("ok"):
-                        raise RuntimeVoiceError(clean_text(payload.get("error")) or "tts synthesis failed")
+                        raise RuntimeVoiceError(
+                            clean_text(payload.get("error")) or "tts synthesis failed"
+                        )
 
         return "completed"
     except (PlaybackError, RuntimeVoiceError) as exc:
@@ -1824,25 +1995,30 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
 def sanitize_tts_text(text: str) -> str:
     cleaned = text.replace("\r", "\n")
     cleaned = strip_tts_only_boilerplate(cleaned)
-    
+
     # Strip HTML tags for TTS
     # Remove script and style elements first
-    cleaned = re.sub(r'<script[^>]*>.*?</script>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
-    cleaned = re.sub(r'<style[^>]*>.*?</style>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+    cleaned = re.sub(r"<script[^>]*>.*?</script>", "", cleaned, flags=re.DOTALL | re.IGNORECASE)
+    cleaned = re.sub(r"<style[^>]*>.*?</style>", "", cleaned, flags=re.DOTALL | re.IGNORECASE)
     # Replace common HTML elements with newlines or spaces
-    cleaned = re.sub(r'<br\s*/?>', '\n', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'</p>', '\n', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'<p[^>]*>', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"<br\s*/?>", "\n", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"</p>", "\n", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"<p[^>]*>", "", cleaned, flags=re.IGNORECASE)
     # Extract link text from anchor tags
-    cleaned = re.sub(r'<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>', lambda m: m.group(2), cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'<a[^>]*>([^<]*)</a>', lambda m: m.group(1), cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r'<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>',
+        lambda m: m.group(2),
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"<a[^>]*>([^<]*)</a>", lambda m: m.group(1), cleaned, flags=re.IGNORECASE)
     # Remove all remaining HTML tags
-    cleaned = re.sub(r'<[^>]+>', '', cleaned)
+    cleaned = re.sub(r"<[^>]+>", "", cleaned)
     # Decode common HTML entities
-    cleaned = cleaned.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-    cleaned = cleaned.replace('&quot;', '"').replace('&#39;', "'").replace('&#x27;', "'")
-    cleaned = cleaned.replace('&nbsp;', ' ').replace('&#160;', ' ')
-    
+    cleaned = cleaned.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    cleaned = cleaned.replace("&quot;", '"').replace("&#39;", "'").replace("&#x27;", "'")
+    cleaned = cleaned.replace("&nbsp;", " ").replace("&#160;", " ")
+
     cleaned = re.sub(r"[ \t]+", " ", cleaned)
     cleaned = re.sub(r"https?://\S+", "", cleaned)
     cleaned = cleaned.replace("`", "")
@@ -1880,7 +2056,9 @@ def split_tts_chunks(text: str) -> list[str]:
         if len(line) <= max_chunk_chars:
             units.append(line)
             continue
-        parts = [clean_text(part) for part in re.split(r'(?<=[.!?;:])\s+', line) if clean_text(part)]
+        parts = [
+            clean_text(part) for part in re.split(r"(?<=[.!?;:])\s+", line) if clean_text(part)
+        ]
         if not parts:
             continue
         current = ""
@@ -1948,7 +2126,11 @@ def resolve_tts_chunk_pause_ms() -> int:
 
 def resolve_tts_chunk_max_chars(*, multiline: bool = False) -> int:
     default_value = "1200" if multiline else "480"
-    env_name = "LUCY_VOICE_TTS_MULTILINE_CHUNK_MAX_CHARS" if multiline else "LUCY_VOICE_TTS_CHUNK_MAX_CHARS"
+    env_name = (
+        "LUCY_VOICE_TTS_MULTILINE_CHUNK_MAX_CHARS"
+        if multiline
+        else "LUCY_VOICE_TTS_CHUNK_MAX_CHARS"
+    )
     raw = clean_text(os.environ.get(env_name)) or default_value
     try:
         max_chars = int(raw)
@@ -1966,7 +2148,9 @@ def strip_tts_only_boilerplate(text: str) -> str:
             continue
         if re.match(r"^(From current sources:|Key items:|Sources:)$", line, flags=re.IGNORECASE):
             continue
-        if re.match(r"^Latest items extracted from allowlisted sources as of\b", line, flags=re.IGNORECASE):
+        if re.match(
+            r"^Latest items extracted from allowlisted sources as of\b", line, flags=re.IGNORECASE
+        ):
             continue
         if re.match(r"^Conflicts/uncertainty:", line, flags=re.IGNORECASE):
             continue
@@ -2094,15 +2278,15 @@ def handle_status_python() -> dict[str, Any]:
             "last_transcript": "",
             "last_request_id": "",
         }
-    
+
     global _python_voice_pipeline
-    
+
     pipeline = VoicePipeline()
     backend = pipeline._detect_backend()
-    
+
     # Determine status
     is_listening = _python_voice_pipeline is not None and _python_voice_capture_path is not None
-    
+
     return {
         "schema_version": 2,
         "available": backend.available,
@@ -2129,37 +2313,37 @@ def handle_ptt_start_python(
     runtime_file: Path, state_file: Path, capture_dir: Path
 ) -> dict[str, Any]:
     """Handle PTT start using Python voice pipeline.
-    
+
     Launches background recorder process that continues until ptt-stop.
     """
     import subprocess
-    
+
     capture_dir.mkdir(parents=True, exist_ok=True)
     capture_path = capture_dir / f"ptt_{time.strftime('%Y%m%dT%H%M%S')}_{os.getpid()}.wav"
-    
+
     # Check voice is enabled
     with locked_state_file(runtime_file):
         current_state = load_or_create_state(state_file, refresh_timestamp=False)
         voice_enabled = clean_text(current_state.get("voice")).lower() == "on"
-        
+
         if not voice_enabled:
             raise_with_state("voice disabled", PTT_START_DISABLED)
-        
+
         # Check backend
         pipeline = VoicePipeline()
         backend = pipeline._detect_backend()
-        
+
         if not backend.available:
             raise_with_state(backend.reason, PTT_START_UNAVAILABLE)
-        
+
         # Launch background recorder
         recorder_script = Path(__file__).parent / "router_py" / "voice_recorder.py"
         if not recorder_script.exists():
             raise_with_state(f"Recorder script not found: {recorder_script}", PTT_START_UNAVAILABLE)
-        
+
         # Use a stop file for reliable signaling (signals can be lost)
-        stop_file = capture_path.with_suffix('.stop')
-        
+        stop_file = capture_path.with_suffix(".stop")
+
         try:
             # Launch background recorder with IMMEDIATE audio capture
             # The recorder starts arecord FIRST, then writes PID to minimize latency
@@ -2167,15 +2351,18 @@ def handle_ptt_start_python(
                 [
                     sys.executable,
                     str(recorder_script),
-                    "--output", str(capture_path),
-                    "--runtime-file", str(runtime_file),
-                    "--stop-file", str(stop_file),
+                    "--output",
+                    str(capture_path),
+                    "--runtime-file",
+                    str(runtime_file),
+                    "--stop-file",
+                    str(stop_file),
                 ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,  # Detach from parent
             )
-            
+
             # Return IMMEDIATELY - don't wait for PID to be written
             # The recorder will update the runtime file asynchronously
             # This minimizes latency between button press and audio capture
@@ -2200,9 +2387,9 @@ def handle_ptt_start_python(
                 "last_request_id": "",
             }
             write_voice_runtime(runtime_file, runtime_state)
-            
+
             return normalize_voice_runtime(runtime_state)
-            
+
         except Exception as e:
             raise_with_state(f"Failed to start recorder: {e}", PTT_START_FAILED)
 
@@ -2211,53 +2398,53 @@ def handle_ptt_stop_python(
     runtime_file: Path, state_file: Path, capture_dir: Path
 ) -> dict[str, Any]:
     """Handle PTT stop using Python voice pipeline.
-    
+
     Signals background recorder to stop, then processes the recorded audio.
     """
     import asyncio
     import os
     import signal
-    
-    
+
     # Read recorder PID and capture path from runtime file
     with locked_state_file(runtime_file):
         current_state = load_or_create_state(state_file, refresh_timestamp=False)
         runtime_state = load_voice_runtime_locked(runtime_file)
-        
+
         if not runtime_state.get("listening"):
             raise_with_state("voice not listening", PTT_STOP_NOT_LISTENING)
-        
+
         record_pid = runtime_state.get("record_pid")
         capture_path_str = runtime_state.get("capture_path")
-    
+
     # Signal recorder to stop using stop file (more reliable than signals)
     capture_path = Path(capture_path_str) if capture_path_str else None
-    stop_file = capture_path.with_suffix('.stop') if capture_path else None
-    
+    stop_file = capture_path.with_suffix(".stop") if capture_path else None
+
     if stop_file:
         try:
             stop_file.touch()  # Create stop file
         except Exception as e:
             print(f"Warning: Failed to create stop file: {e}", file=sys.stderr)
-    
+
     # Also try SIGTERM as backup
     if record_pid:
         try:
             os.kill(record_pid, signal.SIGTERM)
         except ProcessLookupError:
             pass  # Process already exited
-        except Exception as e:
+        except Exception:
             pass  # Ignore errors
-        
+
         # Wait for recorder to finish (up to 3 seconds)
         import time
+
         for _ in range(30):
             try:
                 os.kill(record_pid, 0)  # Check if process exists
                 time.sleep(0.1)
             except ProcessLookupError:
                 break  # Process exited
-    
+
     # Check if audio file exists
     if not capture_path or not capture_path.exists():
         # No audio recorded - update state and return
@@ -2281,16 +2468,16 @@ def handle_ptt_stop_python(
             "error": "No audio recorded",
             "tts_status": "none",
         }
-    
+
     # Clear history file to start fresh for this interaction
     _clear_history_file()
-    
+
     # Process the recorded audio using STREAMING pipeline
     # Import streaming pipeline
     import sys as _sys
+
     _sys.path.insert(0, str(Path(__file__).parent / "router_py"))
-    from streaming_voice import StreamingVoicePipeline
-    
+
     # Update state to processing
     with locked_state_file(runtime_file):
         runtime_state = load_voice_runtime_locked(runtime_file)
@@ -2299,7 +2486,7 @@ def handle_ptt_stop_python(
         runtime_state["processing_pid"] = os.getpid()
         runtime_state["last_updated"] = iso_now()
         write_voice_runtime(runtime_file, runtime_state)
-    
+
     # Voice is an input modality only. Transcribe and return transcript to UI;
     # UI submits through normal text pipeline (memory, routing, evidence,
     # augmented, telemetry all preserved).
@@ -2379,9 +2566,10 @@ def handle_ptt_stop_python(
 # Voice Engine Logging
 # =============================================================================
 
+
 class VoiceEngineLogger:
     """Logger for voice engine detection and usage."""
-    
+
     def __init__(self):
         # ISOLATION: Use V8-specific logs if available
         v8_logs = os.environ.get("LUCY_LOGS_DIR")
@@ -2391,14 +2579,15 @@ class VoiceEngineLogger:
             self.log_dir = Path.home() / ".local" / "share" / "lucy-v10" / "logs"
         self.log_file = self.log_dir / "voice_engine.log"
         self._ensure_log_dir()
-    
+
     def _ensure_log_dir(self):
         """Ensure log directory exists."""
         self.log_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def log(self, level: str, message: str) -> None:
         """Write log entry."""
         from datetime import datetime
+
         timestamp = datetime.now().isoformat()
         entry = f"{timestamp} [{level}] {message}\n"
         try:
@@ -2406,10 +2595,10 @@ class VoiceEngineLogger:
                 f.write(entry)
         except Exception:
             pass
-    
+
     def info(self, message: str) -> None:
         self.log("INFO", message)
-    
+
     def debug(self, message: str) -> None:
         self.log("DEBUG", message)
 

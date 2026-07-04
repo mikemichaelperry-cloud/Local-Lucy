@@ -4,48 +4,47 @@ tags:
 - sentence-similarity
 - feature-extraction
 - generated_from_trainer
-- dataset_size:348
-- loss:MultipleNegativesRankingLoss
-base_model: sentence-transformers/all-MiniLM-L6-v2
+- dataset_size:1454
+- loss:BatchHardTripletLoss
 widget:
-- source_sentence: sounds good
+- source_sentence: I heard on the news that is it going to be foggy in the morning?
   sentences:
-  - What is the official unemployment rate in Israel?
-  - How does the immune system work?
-  - How do I handle exceptions in Python?
-- source_sentence: What does eGFR measure?
+  - META price
+  - How likely is a nuclear escalation?
+  - I need to know what are the contraindications for ibuprofen?
+- source_sentence: What was the outcome?
   sentences:
-  - Latest research on climate change
-  - Any new developments in the Russia-Ukraine conflict?
-  - definitely
-- source_sentence: cancel that
+  - What is 8 multiplied by 9?
+  - How do I file taxes as a freelancer in Israel?
+  - How does garbage collection?
+- source_sentence: Who won the match last night?
   sentences:
-  - Is that true?
-  - Bitcoin price today
-  - Is Israel likely to attack Iran this week?
-- source_sentence: Explain general relativity simply
+  - what's the current weather situation for tallahassee
+  - what time is it over in pacific time
+  - How am I doing today?
+- source_sentence: What are the symptoms of appendicitis?
   sentences:
-  - Tell me about the history of the Israeli-Palestinian conflict.
-  - Peer-reviewed studies on intermittent fasting
-  - What is 2+2? <script>alert('xss')</script> 'quotes' "double"
-- source_sentence: whatever
+  - Temperature outside right now
+  - How do I install Docker on Ubuntu?
+  - Recent advances in renewable energy
+- source_sentence: what is the weather for tomorrow in georgia
   sentences:
-  - How does a nuclear reactor work?
-  - uh
-  - Cybersecurity breach news
+  - Latest news about Israel
+  - Current conditions in New York
+  - Market cap of Amazon
 pipeline_tag: sentence-similarity
 library_name: sentence-transformers
 ---
 
-# SentenceTransformer based on sentence-transformers/all-MiniLM-L6-v2
+# SentenceTransformer
 
-This is a [sentence-transformers](https://www.SBERT.net) model finetuned from [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2). It maps sentences & paragraphs to a 384-dimensional dense vector space and can be used for retrieval.
+This is a [sentence-transformers](https://www.SBERT.net) model trained. It maps sentences & paragraphs to a 384-dimensional dense vector space and can be used for retrieval.
 
 ## Model Details
 
 ### Model Description
 - **Model Type:** Sentence Transformer
-- **Base model:** [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) <!-- at revision c9745ed1d9f207416be6d2e6f8de32d1f16199bf -->
+<!-- - **Base model:** [Unknown](https://huggingface.co/unknown) -->
 - **Maximum Sequence Length:** 256 tokens
 - **Output Dimensionality:** 384 dimensions
 - **Similarity Function:** Cosine Similarity
@@ -87,9 +86,9 @@ from sentence_transformers import SentenceTransformer
 model = SentenceTransformer("sentence_transformers_model_id")
 # Run inference
 sentences = [
-    'whatever',
-    'uh',
-    'How does a nuclear reactor work?',
+    'what is the weather for tomorrow in georgia',
+    'Current conditions in New York',
+    'Latest news about Israel',
 ]
 embeddings = model.encode(sentences)
 print(embeddings.shape)
@@ -98,9 +97,9 @@ print(embeddings.shape)
 # Get the similarity scores for the embeddings
 similarities = model.similarity(embeddings, embeddings)
 print(similarities)
-# tensor([[1.0000, 0.3124, 0.0246],
-#         [0.3124, 1.0000, 0.1619],
-#         [0.0246, 0.1619, 1.0000]])
+# tensor([[1.0000, 0.2312, 0.0514],
+#         [0.2312, 1.0000, 0.3144],
+#         [0.0514, 0.3144, 1.0000]])
 ```
 <!--
 ### Direct Usage (Transformers)
@@ -144,46 +143,39 @@ You can finetune this model on your own dataset.
 
 #### Unnamed Dataset
 
-* Size: 348 training samples
-* Columns: <code>sentence_0</code> and <code>sentence_1</code>
+* Size: 1,454 training samples
+* Columns: <code>sentence_0</code> and <code>label</code>
 * Approximate statistics based on the first 100 samples:
-  |          | sentence_0                                                                       | sentence_1                                                                       |
-  |:---------|:---------------------------------------------------------------------------------|:---------------------------------------------------------------------------------|
-  | type     | string                                                                           | string                                                                           |
-  | modality | text                                                                             | text                                                                             |
-  | details  | <ul><li>min: 3 tokens</li><li>mean: 7.99 tokens</li><li>max: 14 tokens</li></ul> | <ul><li>min: 3 tokens</li><li>mean: 7.72 tokens</li><li>max: 28 tokens</li></ul> |
+  |          | sentence_0                                                                        | label                                                                                                                                                        |
+  |:---------|:----------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+  | type     | string                                                                            | int                                                                                                                                                          |
+  | modality | text                                                                              |                                                                                                                                                              |
+  | details  | <ul><li>min: 5 tokens</li><li>mean: 10.18 tokens</li><li>max: 27 tokens</li></ul> | <ul><li>0: ~13.46%</li><li>1: ~0.96%</li><li>2: ~6.73%</li><li>3: ~7.69%</li><li>4: ~47.12%</li><li>5: ~6.73%</li><li>6: ~6.73%</li><li>7: ~10.58%</li></ul> |
 * Samples:
-  | sentence_0                                                | sentence_1                                    |
-  |:----------------------------------------------------------|:----------------------------------------------|
-  | <code>What day is it today?</code>                        | <code>wat tyme is it in new york?</code>      |
-  | <code>yo</code>                                           | <code>How do I bake sourdough bread?</code>   |
-  | <code>Good evening Lucy, how are you this evening?</code> | <code>How's the weather looking, yeah?</code> |
-* Loss: [<code>MultipleNegativesRankingLoss</code>](https://sbert.net/docs/package_reference/sentence_transformer/losses.html#multiplenegativesrankingloss) with these parameters:
+  | sentence_0                                                            | label          |
+  |:----------------------------------------------------------------------|:---------------|
+  | <code>I'm scheduling a meeting, how many time zones are there?</code> | <code>6</code> |
+  | <code>Current trends in AI and machine learning</code>                | <code>4</code> |
+  | <code>Do you know if when is hurricane season?</code>                 | <code>7</code> |
+* Loss: [<code>BatchHardTripletLoss</code>](https://sbert.net/docs/package_reference/sentence_transformer/losses.html#batchhardtripletloss) with these parameters:
   ```json
   {
-      "scale": 20.0,
-      "similarity_fct": "cos_sim",
-      "gather_across_devices": false,
-      "directions": [
-          "query_to_doc"
-      ],
-      "partition_mode": "joint",
-      "hardness_mode": null,
-      "hardness_strength": 0.0
+      "distance_metric": "cosine_distance",
+      "margin": 0.5
   }
   ```
 
 ### Training Hyperparameters
 #### Non-Default Hyperparameters
 
-- `per_device_train_batch_size`: 32
-- `per_device_eval_batch_size`: 32
+- `per_device_train_batch_size`: 64
+- `per_device_eval_batch_size`: 64
 - `multi_dataset_batch_sampler`: round_robin
 
 #### All Hyperparameters
 <details><summary>Click to expand</summary>
 
-- `per_device_train_batch_size`: 32
+- `per_device_train_batch_size`: 64
 - `num_train_epochs`: 3
 - `max_steps`: -1
 - `learning_rate`: 5e-05
@@ -227,7 +219,7 @@ You can finetune this model on your own dataset.
 - `trackio_space_id`: None
 - `trackio_bucket_id`: None
 - `trackio_static_space_id`: None
-- `per_device_eval_batch_size`: 32
+- `per_device_eval_batch_size`: 64
 - `prediction_loss_only`: True
 - `eval_on_start`: False
 - `eval_do_concat_batches`: True
@@ -286,15 +278,15 @@ You can finetune this model on your own dataset.
 </details>
 
 ### Training Time
-- **Training**: 2.0 seconds
+- **Training**: 3.3 seconds
 
 ### Framework Versions
 - Python: 3.10.12
-- Sentence Transformers: 5.5.0
-- Transformers: 5.6.2
-- PyTorch: 2.11.0+cu130
-- Accelerate: 1.13.0
-- Datasets: 4.8.5
+- Sentence Transformers: 5.5.1
+- Transformers: 5.9.0
+- PyTorch: 2.12.0+cu130
+- Accelerate: 1.14.0
+- Datasets: 5.0.0
 - Tokenizers: 0.22.2
 
 ## Citation
@@ -314,16 +306,15 @@ You can finetune this model on your own dataset.
 }
 ```
 
-#### MultipleNegativesRankingLoss
+#### BatchHardTripletLoss
 ```bibtex
-@misc{oord2019representationlearningcontrastivepredictive,
-      title={Representation Learning with Contrastive Predictive Coding},
-      author={Aaron van den Oord and Yazhe Li and Oriol Vinyals},
-      year={2019},
-      eprint={1807.03748},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/1807.03748},
+@misc{hermans2017defense,
+    title={In Defense of the Triplet Loss for Person Re-Identification},
+    author={Alexander Hermans and Lucas Beyer and Bastian Leibe},
+    year={2017},
+    eprint={1703.07737},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
 }
 ```
 

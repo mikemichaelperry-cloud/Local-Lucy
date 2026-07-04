@@ -10,6 +10,10 @@ cd "$SCRIPT_DIR"
 # Source user .env for API keys (if present)
 if [ -f "${SCRIPT_DIR}/.env" ]; then
     source "${SCRIPT_DIR}/.env"
+else
+    echo "[START_LUCY] WARNING: ${SCRIPT_DIR}/.env not found."
+    echo "[START_LUCY] Augmented providers (OpenAI/Kimi) and NewsAPI will fail until API keys are configured."
+    echo "[START_LUCY] Copy ${SCRIPT_DIR}/.env.example to ${SCRIPT_DIR}/.env and add your keys."
 fi
 
 # Source latency optimizations (token limits for long responses)

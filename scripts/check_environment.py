@@ -5,8 +5,6 @@ Run this on a fresh machine to verify all dependencies are present
 before attempting to launch Local Lucy.
 """
 
-import json
-import os
 import shutil
 import subprocess
 import sys
@@ -35,8 +33,9 @@ def check_python() -> bool:
     if version >= (3, 10):
         _ok(f"Python {version.major}.{version.minor}.{version.micro}")
         return True
-    _fail(f"Python {version.major}.{version.minor} — requires 3.10+",
-          "Install Python 3.10 or newer")
+    _fail(
+        f"Python {version.major}.{version.minor} — requires 3.10+", "Install Python 3.10 or newer"
+    )
     return False
 
 
@@ -46,8 +45,9 @@ def check_venv() -> bool:
     if venv_python.exists():
         _ok(f"venv found at {venv_python}")
         return True
-    _warn("venv not found at ui-v10/.venv",
-          "Run: make install   (or: python3 -m venv ui-v10/.venv)")
+    _warn(
+        "venv not found at ui-v10/.venv", "Run: make install   (or: python3 -m venv ui-v10/.venv)"
+    )
     return False
 
 
@@ -55,8 +55,7 @@ def check_ollama() -> bool:
     print("[3/8] Ollama daemon")
     ollama_bin = shutil.which("ollama")
     if not ollama_bin:
-        _fail("ollama not found in PATH",
-              "Install from https://ollama.com and start the service")
+        _fail("ollama not found in PATH", "Install from https://ollama.com and start the service")
         return False
 
     try:
@@ -72,8 +71,7 @@ def check_ollama() -> bool:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 
-    _fail("ollama installed but daemon not responding",
-          "Start ollama:  ollama serve")
+    _fail("ollama installed but daemon not responding", "Start ollama:  ollama serve")
     return False
 
 
@@ -90,25 +88,33 @@ def check_models() -> bool:
             text=True,
             timeout=10,
         )
-        installed = [line.split()[0] for line in result.stdout.splitlines() if line.strip()]
+        installed = [
+            line.split()[0]
+            for line in result.stdout.splitlines()
+            if line.strip() and not line.startswith("NAME")
+        ]
+        # Ollama names include a tag (e.g., "local-lucy-llama31:latest");
+        # allow lookups with or without the :latest suffix.
+        installed_set = set(installed)
+        for name in list(installed):
+            if ":" in name:
+                installed_set.add(name.split(":", 1)[0])
     except (subprocess.TimeoutExpired, FileNotFoundError):
         _fail("cannot query ollama for models")
         return False
 
     for model in required:
-        if model in installed:
+        if model in installed_set:
             _ok(f"model '{model}' installed")
         else:
-            _fail(f"required model '{model}' not found",
-                  f"Pull it:  ollama pull {model}")
+            _fail(f"required model '{model}' not found", f"Pull it:  ollama pull {model}")
             ok = False
 
     for model in recommended:
-        if model in installed:
+        if model in installed_set:
             _ok(f"optional model '{model}' installed")
         else:
-            _warn(f"optional model '{model}' not found",
-                  f"Pull it:  ollama pull {model}")
+            _warn(f"optional model '{model}' not found", f"Pull it:  ollama pull {model}")
 
     return ok
 
@@ -130,8 +136,9 @@ def check_cuda() -> bool:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 
-    _warn("CUDA / nvidia-smi not available",
-          "GPU inference unavailable; CPU-only mode will be slower")
+    _warn(
+        "CUDA / nvidia-smi not available", "GPU inference unavailable; CPU-only mode will be slower"
+    )
     return False
 
 
@@ -139,11 +146,11 @@ def check_pyside6() -> bool:
     print("[6/8] PySide6")
     try:
         import PySide6
+
         _ok(f"PySide6 {PySide6.__version__}")
         return True
     except ImportError:
-        _fail("PySide6 not installed",
-              "Run: make install")
+        _fail("PySide6 not installed", "Run: make install")
         return False
 
 
@@ -163,8 +170,7 @@ def check_dependencies() -> bool:
             __import__(module)
             _ok(name)
         except ImportError:
-            _fail(f"{name} not installed",
-                  "Run: make install")
+            _fail(f"{name} not installed", "Run: make install")
             ok = False
     return ok
 
@@ -173,6 +179,7 @@ def check_searxng() -> bool:
     print("[8/8] SearXNG (optional)")
     try:
         import urllib.request
+
         req = urllib.request.Request("http://127.0.0.1:8080/", method="GET")
         with urllib.request.urlopen(req, timeout=2) as resp:
             if resp.status == 200:
@@ -181,8 +188,10 @@ def check_searxng() -> bool:
     except Exception:
         pass
 
-    _warn("SearXNG not reachable on http://127.0.0.1:8080",
-          "Start it: cd services/searxng && bash start.sh")
+    _warn(
+        "SearXNG not reachable on http://127.0.0.1:8080",
+        "Start it: cd services/searxng && bash start.sh",
+    )
     return False
 
 

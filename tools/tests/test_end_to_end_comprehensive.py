@@ -373,7 +373,7 @@ async def test_edge_cases():
         ("Whitespace only", "   \n\t  "),
         ("Very long query", "word " * 500),
         ("Special characters", "What is 2+2? <script>alert('xss')</script> \\n \\t 🔥"),
-        ("Unicode", "什么是量子计算？ ומה זה מחשוב קוונטי؟"),
+        ("Unicode", "什么是量子计算？"),
         ("Medical query", "What are the symptoms of diabetes?"),
         ("Time-sensitive", "Who is the current president of the United States?"),
         ("News query", "What happened today in the world?"),

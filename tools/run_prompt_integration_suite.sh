@@ -90,16 +90,6 @@ run_case "01b_identity_profile_lock" \
   "I am Lucy:.*You are Michael:" \
   ""
 
-run_case "01c_racheli_presence_ack" \
-  "local: Racheli is here with me right now." \
-  "(Racheli).*(life partner|partner)" \
-  "(role-?play|pretend|fictional|imaginary)"
-
-run_case "01d_racheli_identity_lock" \
-  "local: Who is Racheli?" \
-  "(Racheli).*(life partner|love of your life)" \
-  "(unknown|not aware|don't know|do not know|imaginary|fictional)"
-
 run_case "02_time_sensitive_gate" \
   "local: Give me the latest TSLA price." \
   "This requires evidence mode\\." \

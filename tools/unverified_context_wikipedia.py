@@ -33,6 +33,7 @@ def _http_json(url: str, timeout: float = 2.5) -> dict:
 
 
 # Common words that should not be used on their own to judge title relevance.
+_HEBREW_RE = re.compile(r"[\u0590-\u05FF]")
 _STOP_WORDS = {
     "the",
     "a",
@@ -247,6 +248,11 @@ def _is_tourism_query(query: str) -> bool:
     return any(term in q for term in ("tourism", "tourist", "attraction", "sightsee", "vacation"))
 
 
+def _is_hebrew_query(query: str) -> bool:
+    """Return True if the query contains Hebrew characters."""
+    return bool(_HEBREW_RE.search(query))
+
+
 def _title_matches_query(title: str, query: str, tail: str | None = None) -> bool:
     """Return True if the fetched article title is plausibly about the query.
 
@@ -265,18 +271,30 @@ def _title_matches_query(title: str, query: str, tail: str | None = None) -> boo
         return False
 
     # No place tail: check that at least one meaningful keyword appears.
+    # For Hebrew, prefer a title that shares Hebrew characters. If the title is
+    # entirely non-Hebrew, we are likely in English-Wikipedia fallback mode, so
+    # accept the API's top result rather than returning no answer at all.
+    if _is_hebrew_query(query):
+        he_chars = _HEBREW_RE.findall(query)
+        if he_chars and any(c in title_lower for c in set(he_chars)):
+            return True
+        # English fallback: accept if the title has no Hebrew characters.
+        if not _HEBREW_RE.search(title):
+            return True
+        return False
+
     words = [
         w for w in re.findall(r"[a-zA-Z]+", query.lower()) if len(w) > 3 and w not in _STOP_WORDS
     ]
     return any(w in title_lower for w in words)
 
 
-def _try_direct_summary(title: str) -> dict[str, Any] | None:
+def _try_direct_summary(title: str, lang: str = "en") -> dict[str, Any] | None:
     """Fetch a Wikipedia page summary by exact page title."""
     if not title:
         return None
     try:
-        url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(
+        url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(
             title, safe=""
         )
         payload = _http_json(url)
@@ -292,13 +310,13 @@ def _try_direct_summary(title: str) -> dict[str, Any] | None:
     return None
 
 
-def _try_search(query: str) -> dict[str, Any] | None:
+def _try_search(query: str, lang: str = "en") -> dict[str, Any] | None:
     """Search Wikipedia and return the top article summary."""
     if not query:
         return None
     try:
         url = (
-            "https://en.wikipedia.org/w/api.php?action=query&format=json&list=search&srlimit=1&srsearch="
+            f"https://{lang}.wikipedia.org/w/api.php?action=query&format=json&list=search&srlimit=1&srsearch="
             + urllib.parse.quote(query, safe="")
         )
         payload = _http_json(url)
@@ -309,9 +327,51 @@ def _try_search(query: str) -> dict[str, Any] | None:
         title = _normalize_text(str(first.get("title", "")))
         if not title:
             return None
-        return _try_direct_summary(title)
+        return _try_direct_summary(title, lang=lang)
     except Exception:
         return None
+
+
+def _fetch_wikipedia_context(query: str, lang: str = "en") -> dict[str, Any] | None:
+    """Fetch a relevant Wikipedia article for *query* with a place/topic fallback.
+
+    Natural-language queries such as "What are the main tourist attractions in
+    Japan?" often return an unrelated top search result (e.g. Tourism in China).
+    We therefore validate the top result's title and, when it does not match the
+    query, try a more targeted lookup using the trailing place/topic phrase.
+    """
+    tail = _extract_place_tail(query)
+
+    # 1. Direct summary by the (cleaned) query title.
+    result = _try_direct_summary(query, lang=lang)
+    if result is not None and _title_matches_query(result["title"], query, tail):
+        return result
+
+    # 2. Wikipedia search for the cleaned query.
+    result = _try_search(query, lang=lang)
+    if result is not None and _title_matches_query(result["title"], query, tail):
+        return result
+
+    # 3. Fallback to the trailing place/topic, with a tourism-specific rewrite.
+    if tail:
+        fallback_queries = []
+        if _is_tourism_query(query):
+            fallback_queries.append(f"Tourism in {tail}")
+        fallback_queries.append(tail)
+
+        for fallback in fallback_queries:
+            # Skip if we already tried this exact string as the cleaned query.
+            if fallback.lower() == query.lower():
+                continue
+            result = _try_direct_summary(fallback, lang=lang)
+            if result is not None and _title_matches_query(result["title"], query, tail):
+                return result
+            result = _try_search(fallback, lang=lang)
+            if result is not None and _title_matches_query(result["title"], query, tail):
+                return result
+
+    # No relevant article found.
+    return None
 
 
 def fetch_context(query: str) -> dict[str, Any]:
@@ -328,53 +388,18 @@ def fetch_context(query: str) -> dict[str, Any]:
     if cached_payload is not None:
         return cached_payload
 
-    result = _fetch_wikipedia_context(normalized_query)
+    # Hebrew query: try Hebrew Wikipedia first, then fall back to English.
+    if _is_hebrew_query(normalized_query):
+        result = _fetch_wikipedia_context(normalized_query, lang="he")
+        if result is not None:
+            _store_cached_payload(normalized_query, result)
+            return result
+
+    result = _fetch_wikipedia_context(normalized_query, lang="en")
     if result is not None:
         _store_cached_payload(normalized_query, result)
         return result
     return {"ok": False}
-
-
-def _fetch_wikipedia_context(query: str) -> dict[str, Any] | None:
-    """Fetch a relevant Wikipedia article for *query* with a place/topic fallback.
-
-    Natural-language queries such as "What are the main tourist attractions in
-    Japan?" often return an unrelated top search result (e.g. Tourism in China).
-    We therefore validate the top result's title and, when it does not match the
-    query, try a more targeted lookup using the trailing place/topic phrase.
-    """
-    tail = _extract_place_tail(query)
-
-    # 1. Direct summary by the (cleaned) query title.
-    result = _try_direct_summary(query)
-    if result is not None and _title_matches_query(result["title"], query, tail):
-        return result
-
-    # 2. Wikipedia search for the cleaned query.
-    result = _try_search(query)
-    if result is not None and _title_matches_query(result["title"], query, tail):
-        return result
-
-    # 3. Fallback to the trailing place/topic, with a tourism-specific rewrite.
-    if tail:
-        fallback_queries = []
-        if _is_tourism_query(query):
-            fallback_queries.append(f"Tourism in {tail}")
-        fallback_queries.append(tail)
-
-        for fallback in fallback_queries:
-            # Skip if we already tried this exact string as the cleaned query.
-            if fallback.lower() == query.lower():
-                continue
-            result = _try_direct_summary(fallback)
-            if result is not None and _title_matches_query(result["title"], query, tail):
-                return result
-            result = _try_search(fallback)
-            if result is not None and _title_matches_query(result["title"], query, tail):
-                return result
-
-    # No relevant article found.
-    return None
 
 
 def main() -> int:

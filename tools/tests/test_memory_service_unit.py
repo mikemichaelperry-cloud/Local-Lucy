@@ -188,7 +188,9 @@ class TestMemoryServiceUnit(unittest.TestCase):
             "Project Atlas uses Go.": [-1.0, 0.0],
         }
 
-        with patch.object(ms, "_compute_fact_embedding", side_effect=lambda text: embeddings.get(text)):
+        with patch.object(
+            ms, "_compute_fact_embedding", side_effect=lambda text: embeddings.get(text)
+        ):
             ms.store_persistent_fact("Rex is your dog.", category="pets")
             ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
             ms.store_persistent_fact("Project Atlas uses Go.", category="project")
@@ -208,7 +210,9 @@ class TestMemoryServiceUnit(unittest.TestCase):
             "Your daughter Anna lives in Haifa.": [0.02, 0.98],
         }
 
-        with patch.object(ms, "_compute_fact_embedding", side_effect=lambda text: embeddings.get(text)):
+        with patch.object(
+            ms, "_compute_fact_embedding", side_effect=lambda text: embeddings.get(text)
+        ):
             ms.store_persistent_fact("Rex is your dog.", category="pets")
             ms.store_persistent_fact("Your daughter Anna lives in Haifa.", category="family")
 
@@ -243,7 +247,9 @@ class TestMemoryServiceUnit(unittest.TestCase):
             "I drive a Tesla.": [0.95, 0.05],
         }
 
-        with patch.object(ms, "_compute_fact_embedding", side_effect=lambda text: embeddings.get(text)):
+        with patch.object(
+            ms, "_compute_fact_embedding", side_effect=lambda text: embeddings.get(text)
+        ):
             facts = ms.get_relevant_persistent_facts(
                 "What car do I drive?",
                 limit=3,
@@ -280,6 +286,44 @@ class TestMemoryServiceUnit(unittest.TestCase):
         self.assertEqual(rev_family_before, rev_family_after)
         rev_car = ms.get_persistent_facts_revision("car")
         self.assertNotEqual(rev_car, rev_family_before)
+
+    # ------------------------------------------------------------------
+    # User identity detection and persistence
+    # ------------------------------------------------------------------
+
+    def test_detect_user_identity_variants(self):
+        self.assertEqual(ms.detect_user_identity("I am Michael"), "Michael")
+        self.assertEqual(ms.detect_user_identity("My name is Mike"), "Michael")
+        self.assertEqual(ms.detect_user_identity("This is Mikey"), "Michael")
+        self.assertEqual(ms.detect_user_identity("Michael here."), "Michael")
+
+    def test_detect_user_identity_rejects_non_identity_queries(self):
+        self.assertIsNone(ms.detect_user_identity("Who is Michael?"))
+        self.assertIsNone(ms.detect_user_identity("I am going home"))
+        self.assertIsNone(ms.detect_user_identity("What is your name?"))
+
+    def test_set_and_get_current_user_identity(self):
+        ms.set_current_user_identity("Michael")
+        self.assertEqual(ms.get_current_user_identity(), "Michael")
+        ms.set_current_user_identity("Mike")
+        self.assertEqual(ms.get_current_user_identity(), "Michael")
+
+    def test_set_current_user_identity_replaces_previous(self):
+        ms.set_current_user_identity("Michael")
+        ms.set_current_user_identity("Mike")
+        identity_facts = ms.get_persistent_facts(category="identity")
+        self.assertEqual(len(identity_facts), 1)
+        self.assertIn("Michael", identity_facts[0])
+
+    def test_clear_current_user_identity(self):
+        ms.set_current_user_identity("Michael")
+        self.assertEqual(ms.get_current_user_identity(), "Michael")
+        ms.clear_current_user_identity()
+        self.assertIsNone(ms.get_current_user_identity())
+
+    def test_unrecognized_persona_raises(self):
+        with self.assertRaises(ValueError):
+            ms.set_current_user_identity("Alice")
 
 
 if __name__ == "__main__":

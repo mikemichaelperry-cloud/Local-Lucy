@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Kimi provider - Moonshot AI API integration."""
+
 from __future__ import annotations
 
 import json
@@ -9,6 +10,13 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+
+try:
+    from _env_loader import load_project_dotenv
+
+    load_project_dotenv()
+except Exception:
+    pass
 
 
 def _emit(payload: dict[str, Any], *, rc: int) -> int:
@@ -41,22 +49,31 @@ def main() -> int:
             rc=0,
         )
 
-    api_key = os.environ.get("KIMI_API_KEY", "").strip() or os.environ.get("MOONSHOT_API_KEY", "").strip()
+    api_key = (
+        os.environ.get("KIMI_API_KEY", "").strip() or os.environ.get("MOONSHOT_API_KEY", "").strip()
+    )
     if not api_key:
-        return _fail("missing_kimi_configuration")
+        return _fail(
+            "missing_kimi_configuration: set KIMI_API_KEY or MOONSHOT_API_KEY in lucy-v10/.env or environment"
+        )
 
     api_base = os.environ.get("KIMI_API_BASE_URL", "https://api.moonshot.ai/v1").strip().rstrip("/")
     model = os.environ.get("KIMI_MODEL", "moonshot-v1-8k").strip()
     if not api_base or not model:
-        return _fail("missing_kimi_configuration")
+        return _fail(
+            "missing_kimi_configuration: set KIMI_API_BASE_URL/KIMI_MODEL in lucy-v10/.env or environment"
+        )
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     system_text = (
-        "You are a current-events analyst. The user may ask about geopolitical, military, "
-        "economic, or scientific developments. Answer as of the current date. "
-        "If the topic involves rapidly changing events, explicitly note that situations evolve. "
-        "Be concise but specific. Include approximate dates or timeframes when relevant. "
-        "If you lack information beyond your training cutoff, say so directly."
+        "You are a factual research assistant. The user has been routed here because "
+        "the question requires accurate, verifiable information. "
+        "Answer as of the current date. Be concise but specific. "
+        "Include approximate dates or timeframes when relevant. "
+        "Cite your sources for every factual claim (e.g., 'According to Wikipedia...', 'Source: ...'). "
+        "If you cannot verify a claim, omit it or say it is unknown. "
+        "If you lack information beyond your training cutoff, say so directly. "
+        "Do not invent facts, people, places, dates, or sources."
     )
     user_text = f"Today is {now}.\n\n{question}"
 
@@ -84,10 +101,10 @@ def main() -> int:
             raw = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         return _fail(f"kimi_http_error_{e.code}")
-    except urllib.error.URLError:
-        return _fail("kimi_network_error")
-    except Exception:
-        return _fail("kimi_request_failed")
+    except urllib.error.URLError as e:
+        return _fail(f"kimi_network_error: {e.reason}")
+    except Exception as e:
+        return _fail(f"kimi_request_failed: {e}")
 
     try:
         parsed = json.loads(raw)

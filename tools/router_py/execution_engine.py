@@ -179,6 +179,18 @@ try:
 except ImportError:
     HAS_LOCAL_ANSWER_PY = False
 
+# Import automatic local-model selector
+try:
+    from router_py.model_selector import select_local_model
+
+    HAS_MODEL_SELECTOR = True
+except ImportError:
+    HAS_MODEL_SELECTOR = False
+
+    def select_local_model(*_args, **_kwargs) -> str:  # type: ignore[misc]
+        return "local-lucy-llama31"
+
+
 # Import news provider for live news fetching
 try:
     from router_py.news_provider import NewsProvider, NewsResult
@@ -730,7 +742,7 @@ class ExecutionEngine:
         # it via config["model"]. Without this, START_LUCY.sh's hardcoded
         # LUCY_LOCAL_MODEL=local-lucy always wins.
         configured_model = self.config.get("model")
-        if configured_model:
+        if configured_model and str(configured_model).lower() not in ("auto", ""):
             env["LUCY_LOCAL_MODEL"] = str(configured_model)
             self._logger.info(f"[MODEL] Subprocess env set to: {configured_model}")
         return env
@@ -1411,6 +1423,18 @@ class ExecutionEngine:
         if session_memory:
             env["LUCY_SESSION_MEMORY_CONTEXT"] = session_memory
             self._logger.debug(f"Added session memory context ({len(session_memory)} chars)")
+
+        # Automatic local-model selection when no model is pinned.
+        current_model = env.get("LUCY_LOCAL_MODEL", "")
+        if not current_model or str(current_model).lower() == "auto":
+            selector_context = {
+                "persona": context.get("persona") if context else None,
+                "active_persona": context.get("active_persona") if context else None,
+                "intent_family": getattr(intent, "intent_family", ""),
+            }
+            chosen_model = select_local_model(question, route, selector_context)
+            env["LUCY_LOCAL_MODEL"] = chosen_model
+            self._logger.info(f"[MODEL] Auto-selected local model: {chosen_model}")
 
         local_direct_used = True
         local_direct_fallback = False
@@ -2986,8 +3010,12 @@ class ExecutionEngine:
                 },
             )
 
-        # Determine provider chain - start with requested or default
+        # Determine provider chain. In autonomous mode the route already carries
+        # the provider chosen by the router (e.g. wikipedia for entity facts,
+        # openai for evidence requests). Otherwise fall back to the HMI/default.
         primary_provider = context.get("augmented_provider", "wikipedia")
+        if primary_provider in ("auto", ""):
+            primary_provider = getattr(route, "provider", "") or "wikipedia"
         if primary_provider == "none" or not primary_provider:
             primary_provider = "wikipedia"
 

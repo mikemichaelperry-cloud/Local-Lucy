@@ -65,10 +65,14 @@ class TestMemoryTopicShift(unittest.TestCase):
 
     def test_topic_shift_detected_for_dissimilar_queries(self):
         """Einstein → car engine should be detected as a topic shift."""
-        with patch.object(ms, "_get_embedding", side_effect=[
-            [1.0, 0.0, 0.0],   # Einstein query embedding
-            [0.0, 1.0, 0.0],   # Car query embedding (orthogonal)
-        ]):
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],  # Einstein query embedding
+                [0.0, 1.0, 0.0],  # Car query embedding (orthogonal)
+            ],
+        ):
             result = ms._is_topic_shift(
                 "What's the simplest and cheapest modification you can make to your car to increase engine power?",
                 "What did Albert Einstein discover?",
@@ -77,10 +81,14 @@ class TestMemoryTopicShift(unittest.TestCase):
 
     def test_topic_shift_not_detected_for_similar_queries(self):
         """Follow-up about Einstein should NOT be a topic shift."""
-        with patch.object(ms, "_get_embedding", side_effect=[
-            [0.95, 0.05, 0.0],  # Follow-up embedding (close to original)
-            [1.0, 0.0, 0.0],    # Original Einstein embedding
-        ]):
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [0.95, 0.05, 0.0],  # Follow-up embedding (close to original)
+                [1.0, 0.0, 0.0],  # Original Einstein embedding
+            ],
+        ):
             result = ms._is_topic_shift(
                 "Tell me more about his theory of relativity",
                 "What did Albert Einstein discover?",
@@ -107,11 +115,15 @@ class TestMemoryTopicShift(unittest.TestCase):
         """LUCY_MEMORY_TOPIC_SHIFT_THRESHOLD should control sensitivity."""
         os.environ["LUCY_MEMORY_TOPIC_SHIFT_THRESHOLD"] = "0.10"
         # Similarity = 0.5, threshold = 0.10 → should be a shift
-        with patch.object(ms, "_get_embedding", side_effect=[
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-        ]):
-            result = ms._is_topic_shift("current", "previous")
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+            ],
+        ):
+            result = ms._is_topic_shift("current query text", "previous query text")
         self.assertTrue(result)
 
     # ------------------------------------------------------------------
@@ -123,10 +135,14 @@ class TestMemoryTopicShift(unittest.TestCase):
         ms.store_turn("user", "What did Albert Einstein discover?")
         ms.store_turn("assistant", "Einstein developed the theory of relativity.")
 
-        with patch.object(ms, "_get_embedding", side_effect=[
-            [1.0, 0.0, 0.0],   # previous turn embedding
-            [0.0, 1.0, 0.0],   # current query embedding
-        ]):
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],  # previous turn embedding
+                [0.0, 1.0, 0.0],  # current query embedding
+            ],
+        ):
             ctx, telem = ms.assemble_context_with_telemetry(
                 query="What's the simplest and cheapest modification you can make to your car to increase engine power?",
                 depth="shallow",
@@ -142,10 +158,14 @@ class TestMemoryTopicShift(unittest.TestCase):
         ms.store_turn("user", "What did Albert Einstein discover?")
         ms.store_turn("assistant", "Einstein developed the theory of relativity.")
 
-        with patch.object(ms, "_get_embedding", side_effect=[
-            [0.95, 0.05, 0.0],  # previous turn embedding
-            [1.0, 0.0, 0.0],    # current query embedding (very similar)
-        ]):
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [0.95, 0.05, 0.0],  # previous turn embedding
+                [1.0, 0.0, 0.0],  # current query embedding (very similar)
+            ],
+        ):
             ctx, telem = ms.assemble_context_with_telemetry(
                 query="Tell me more about his theory of relativity",
                 depth="shallow",
@@ -166,10 +186,14 @@ class TestMemoryTopicShift(unittest.TestCase):
         ms.store_turn("user", "What did Albert Einstein discover?")
         ms.store_turn("assistant", "Einstein developed the theory of relativity.")
 
-        with patch.object(ms, "_get_embedding", side_effect=[
-            [1.0, 0.0, 0.0],   # previous turn embedding
-            [0.0, 1.0, 0.0],   # current query embedding
-        ]):
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],  # previous turn embedding
+                [0.0, 1.0, 0.0],  # current query embedding
+            ],
+        ):
             ctx, telem = ms.assemble_context_with_telemetry(
                 query="What's the simplest and cheapest modification you can make to your car to increase engine power?",
                 depth="deep",
@@ -185,10 +209,14 @@ class TestMemoryTopicShift(unittest.TestCase):
         ms.store_turn("user", "What did Albert Einstein discover?")
         ms.store_turn("assistant", "Einstein developed the theory of relativity.")
 
-        with patch.object(ms, "_get_embedding", side_effect=[
-            [0.95, 0.05, 0.0],  # previous turn embedding
-            [1.0, 0.0, 0.0],    # current query embedding
-        ]):
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [0.95, 0.05, 0.0],  # previous turn embedding
+                [1.0, 0.0, 0.0],  # current query embedding
+            ],
+        ):
             ctx, telem = ms.assemble_context_with_telemetry(
                 query="Tell me more about his theory of relativity",
                 depth="deep",
@@ -226,6 +254,7 @@ class TestMemoryTopicShift(unittest.TestCase):
         # cross-session recall to match). The current-session turns should be
         # blocked by topic shift, but semantic recall may still inject tubes.
         call_count = [0]
+
         def _mock_embedding(text):
             call_count[0] += 1
             if "car" in text.lower() or "engine" in text.lower():
@@ -253,10 +282,14 @@ class TestMemoryTopicShift(unittest.TestCase):
         ms.store_turn("user", "How do I make sourdough bread?")
         ms.store_turn("assistant", "Mix flour, water, and starter...")
 
-        with patch.object(ms, "_get_embedding", side_effect=[
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-        ]):
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+            ],
+        ):
             ctx, telem = ms.assemble_context_with_telemetry(
                 query="What is Apple's stock price today?",
                 depth="shallow",
@@ -271,10 +304,14 @@ class TestMemoryTopicShift(unittest.TestCase):
         ms.store_turn("user", "What's the weather in London?")
         ms.store_turn("assistant", "It's cloudy with a chance of rain.")
 
-        with patch.object(ms, "_get_embedding", side_effect=[
-            [0.95, 0.05, 0.0],
-            [1.0, 0.0, 0.0],
-        ]):
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [0.95, 0.05, 0.0],
+                [1.0, 0.0, 0.0],
+            ],
+        ):
             ctx, telem = ms.assemble_context_with_telemetry(
                 query="Will it rain tomorrow?",
                 depth="shallow",
@@ -282,6 +319,254 @@ class TestMemoryTopicShift(unittest.TestCase):
             )
 
         self.assertIn("London", ctx)
+        self.assertNotIn("memory_topic_shift_detected", telem)
+
+    # ------------------------------------------------------------------
+    # Vague follow-ups must keep recent turns and ignore stale summaries
+    # ------------------------------------------------------------------
+
+    def test_vague_followup_keeps_recent_turns(self):
+        """A vague follow-up like 'Full details please.' must keep recent turns."""
+        ms.store_turn("user", "Have a look at your Architecture then give a better answer.")
+        ms.store_turn("assistant", "My architecture includes PySide6/Qt6 HMI and Ollama.")
+
+        # Force a low-similarity embedding so the naive gate would block; the
+        # vague-followup override must keep context anyway.
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],  # previous turn embedding
+                [0.0, 1.0, 0.0],  # current query embedding (orthogonal)
+            ],
+        ):
+            ctx, telem = ms.assemble_context_with_telemetry(
+                query="Full details please.",
+                depth="deep",
+                mode="local",
+            )
+
+        self.assertIn("Architecture", ctx)
+        self.assertNotIn("memory_topic_shift_detected", telem)
+
+    def test_vague_followup_drops_stale_summary(self):
+        """A vague follow-up must not be answered from a stale session summary."""
+        conn = ms._get_connection()
+        conn.execute(
+            "INSERT INTO session_summaries (session_id, summary_text, summarized_turn_count) VALUES (?, ?, ?)",
+            ("default", "The user keeps asking about general relativity.", 10),
+        )
+        conn.commit()
+
+        ms.store_turn("user", "Have a look at your Architecture then give a better answer.")
+        ms.store_turn("assistant", "My architecture includes PySide6/Qt6 HMI and Ollama.")
+
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+            ],
+        ):
+            ctx, telem = ms.assemble_context_with_telemetry(
+                query="Full details please.",
+                depth="deep",
+                mode="local",
+            )
+
+        self.assertIn("Architecture", ctx)
+        self.assertNotIn("general relativity", ctx.lower())
+        self.assertNotIn("Session summary", ctx)
+
+    def test_vague_followup_variants(self):
+        """Various vague detail requests should all be treated as follow-ups."""
+        variants = [
+            "Full details please.",
+            "all details",
+            "give me the details",
+            "tell me everything",
+            "details please",
+        ]
+        for q in variants:
+            with self.subTest(query=q):
+                self.assertTrue(
+                    ms._is_vague_followup(q),
+                    f"{q!r} should be detected as a vague follow-up",
+                )
+
+    # ------------------------------------------------------------------
+    # Greetings / social openers must not pull stale context
+    # ------------------------------------------------------------------
+
+    def test_greeting_after_different_topic_blocks_context(self):
+        """A greeting after an unrelated topic must not inject stale context."""
+        ms.store_turn("user", "What is general relativity?")
+        ms.store_turn(
+            "assistant",
+            "General relativity is a theory of gravitation developed by Albert Einstein.",
+        )
+
+        # MiniLM embedding is used by default; mock it to return orthogonal
+        # vectors so the topic-shift gate is unambiguous.
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],  # previous turn embedding
+                [0.0, 1.0, 0.0],  # current greeting embedding
+            ],
+        ):
+            ctx, telem = ms.assemble_context_with_telemetry(
+                query="Hi Lucy, how are you this evening?",
+                depth="auto",
+                mode="local",
+            )
+
+        self.assertEqual(ctx, "")
+        self.assertEqual(telem["memory_topic_shift_detected"], "true")
+        self.assertEqual(telem["memory_context_used"], "false")
+
+    def test_greeting_variants_force_shallow_context(self):
+        """Standalone greetings should be classified as shallow."""
+        greetings = [
+            "Hi Lucy",
+            "Hello",
+            "hey there",
+            "Good evening",
+            "How are you?",
+            "How are you doing?",
+            "How's it going?",
+            "What's up?",
+            "Hi Lucy, how are you this evening?",
+        ]
+        for q in greetings:
+            with self.subTest(query=q):
+                self.assertEqual(
+                    ms._detect_context_depth(q),
+                    "shallow",
+                    f"{q!r} should be a shallow-context greeting",
+                )
+
+    def test_temporal_this_does_not_force_deep_context(self):
+        """'this evening/morning/etc.' is temporal, not a conversational reference."""
+        self.assertEqual(ms._detect_context_depth("this evening"), "shallow")
+        self.assertEqual(ms._detect_context_depth("Call me this morning"), "shallow")
+
+    # ------------------------------------------------------------------
+    # Explicit continuation markers must keep context
+    # ------------------------------------------------------------------
+
+    def test_explicit_continuation_markers_are_vague_followups(self):
+        """Phrases like 'Back to...' and 'One more thing about...' keep context."""
+        continuations = [
+            "Back to what we discussed earlier",
+            "Returning to the budget question",
+            "As for the timeline",
+            "Speaking of relativity",
+            "Regarding your last point",
+            "One more thing about the project",
+            "Another question: why is it slow?",
+            "Also, what about the cost?",
+            "Plus we need to consider safety",
+            "What about this evening?",
+            "How about using Python?",
+        ]
+        for q in continuations:
+            with self.subTest(query=q):
+                self.assertTrue(
+                    ms._is_vague_followup(q),
+                    f"{q!r} should be treated as a continuation",
+                )
+
+    def test_hello_one_more_thing_keeps_context(self):
+        """'Hello—one more thing about relativity' should keep recent turns."""
+        ms.store_turn("user", "What is general relativity?")
+        ms.store_turn(
+            "assistant",
+            "General relativity is a theory of gravitation developed by Albert Einstein.",
+        )
+
+        # Force orthogonal embeddings so the naive gate would block.
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],  # previous turn embedding
+                [0.0, 1.0, 0.0],  # current query embedding
+            ],
+        ):
+            ctx, telem = ms.assemble_context_with_telemetry(
+                query="Hello—one more thing about relativity",
+                depth="auto",
+                mode="local",
+            )
+
+        self.assertIn("Einstein", ctx)
+        self.assertNotIn("memory_topic_shift_detected", telem)
+
+    # ------------------------------------------------------------------
+    # Bilingual greetings
+    # ------------------------------------------------------------------
+
+    def test_bilingual_greetings_force_shallow_context(self):
+        """Common non-English greetings should be classified as shallow."""
+        greetings = [
+            # European (common second languages)
+            "Hola",
+            "Buenos días",
+            "Buenas tardes",
+            "¿Qué tal?",
+            "Bonjour",
+            "Bonsoir",
+            "Salut",
+            "Ça va",
+            "Hallo",
+            "Guten Tag",
+            "Ciao",
+            "Buongiorno",
+            "Olá",
+            "Bom dia",
+        ]
+        for q in greetings:
+            with self.subTest(query=q):
+                self.assertEqual(
+                    ms._detect_context_depth(q),
+                    "shallow",
+                    f"{q!r} should be a shallow-context greeting",
+                )
+
+    # ------------------------------------------------------------------
+    # Age-of-context guard
+    # ------------------------------------------------------------------
+
+    def test_old_previous_turn_does_not_trigger_topic_shift(self):
+        """A short follow-up after a long pause should not be treated as a shift."""
+        conn = ms._get_connection()
+        # Insert an old user turn directly so we control the timestamp.
+        old_ts = "2026-01-01T00:00:00Z"
+        conn.execute(
+            "INSERT INTO conversation_turns (session_id, role, text, created_at) VALUES (?, ?, ?, ?)",
+            ("default", "user", "What did Albert Einstein discover?", old_ts),
+        )
+        conn.commit()
+
+        # Even with orthogonal embeddings, the age guard should prevent a shift.
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+            ],
+        ):
+            ctx, telem = ms.assemble_context_with_telemetry(
+                query="What is the fastest car?",
+                depth="shallow",
+                mode="local",
+            )
+
+        self.assertIn("Einstein", ctx)
         self.assertNotIn("memory_topic_shift_detected", telem)
 
 

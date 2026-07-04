@@ -40,6 +40,7 @@ from router_py.request_types import RoutingDecision
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _has_temporal_marker(text: str) -> bool:
     """Check if text contains a year-month-day pattern or UTC marker."""
     if not text:
@@ -80,43 +81,40 @@ def _run_provider_tool(tool_name: str, question: str) -> dict | None:
 # Unit tests — no API calls
 # ---------------------------------------------------------------------------
 
+
 class TestTemporalInjection(unittest.TestCase):
     """Verify that current date/time is injected into prompts."""
 
-    def test_openai_tool_system_prompt_is_current_events(self):
-        """The OpenAI tool must use the current-events analyst system prompt."""
+    def test_openai_tool_system_prompt_is_factual_research_assistant(self):
+        """The OpenAI tool must use the factual research assistant system prompt."""
         tool_path = (
-            Path(__file__).resolve().parent.parent.parent
-            / "tools"
-            / "unverified_context_openai.py"
+            Path(__file__).resolve().parent.parent.parent / "tools" / "unverified_context_openai.py"
         )
         self.assertTrue(tool_path.exists(), f"Tool not found: {tool_path}")
         source = tool_path.read_text(encoding="utf-8")
-        self.assertIn("current-events analyst", source)
+        self.assertIn("factual research assistant", source)
         self.assertIn("current date", source.lower())
         self.assertIn("Today is", source)
         self.assertIn("datetime.now(timezone.utc)", source)
+        self.assertIn("Cite your sources", source)
 
-    def test_kimi_tool_system_prompt_is_current_events(self):
-        """The Kimi tool must use the current-events analyst system prompt."""
+    def test_kimi_tool_system_prompt_is_factual_research_assistant(self):
+        """The Kimi tool must use the factual research assistant system prompt."""
         tool_path = (
-            Path(__file__).resolve().parent.parent.parent
-            / "tools"
-            / "unverified_context_kimi.py"
+            Path(__file__).resolve().parent.parent.parent / "tools" / "unverified_context_kimi.py"
         )
         self.assertTrue(tool_path.exists(), f"Tool not found: {tool_path}")
         source = tool_path.read_text(encoding="utf-8")
-        self.assertIn("current-events analyst", source)
+        self.assertIn("factual research assistant", source)
         self.assertIn("current date", source.lower())
         self.assertIn("Today is", source)
         self.assertIn("datetime.now(timezone.utc)", source)
+        self.assertIn("Cite your sources", source)
 
     def test_ui_kimi_tool_matches_root(self):
         """The ui-v10 copy of the Kimi tool must match the root copy."""
         root_tool = (
-            Path(__file__).resolve().parent.parent.parent
-            / "tools"
-            / "unverified_context_kimi.py"
+            Path(__file__).resolve().parent.parent.parent / "tools" / "unverified_context_kimi.py"
         )
         ui_tool = (
             Path(__file__).resolve().parent.parent.parent
@@ -126,8 +124,9 @@ class TestTemporalInjection(unittest.TestCase):
         )
         self.assertTrue(ui_tool.exists(), f"UI tool not found: {ui_tool}")
         ui_text = ui_tool.read_text(encoding="utf-8")
-        self.assertIn("current-events analyst", ui_text)
+        self.assertIn("factual research assistant", ui_text)
         self.assertIn("MOONSHOT_API_KEY", ui_text)
+        self.assertIn("Cite your sources", ui_text)
 
     def test_build_augmented_prompt_includes_date(self):
         """The augmented prompt must include the current date and time."""
@@ -146,9 +145,7 @@ class TestTemporalInjection(unittest.TestCase):
             provider_usage_class="paid",
             evidence_mode="required",
         )
-        prompt = build_augmented_prompt(
-            "What is happening in Ukraine?", evidence, route
-        )
+        prompt = build_augmented_prompt("What is happening in Ukraine?", evidence, route)
         self.assertIn("Current date and time:", prompt)
         self.assertIn("2026-", prompt)  # Year should appear
         self.assertIn("UTC", prompt)
@@ -179,9 +176,7 @@ class TestProviderToolsOutputFormat(unittest.TestCase):
         # tool script parses and the payload structure is correct by inspecting
         # the source.
         tool_path = (
-            Path(__file__).resolve().parent.parent.parent
-            / "tools"
-            / "unverified_context_openai.py"
+            Path(__file__).resolve().parent.parent.parent / "tools" / "unverified_context_openai.py"
         )
         source = tool_path.read_text(encoding="utf-8")
         # Must emit JSON with these keys on success
@@ -197,9 +192,7 @@ class TestProviderToolsOutputFormat(unittest.TestCase):
     def test_kimi_tool_json_schema(self):
         """Kimi tool must output JSON with ok/text/class keys."""
         tool_path = (
-            Path(__file__).resolve().parent.parent.parent
-            / "tools"
-            / "unverified_context_kimi.py"
+            Path(__file__).resolve().parent.parent.parent / "tools" / "unverified_context_kimi.py"
         )
         source = tool_path.read_text(encoding="utf-8")
         self.assertIn('"ok": True', source)
@@ -321,9 +314,10 @@ class TestLiveKimi(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        key = os.environ.get("KIMI_API_KEY", "").strip() or os.environ.get(
-            "MOONSHOT_API_KEY", ""
-        ).strip()
+        key = (
+            os.environ.get("KIMI_API_KEY", "").strip()
+            or os.environ.get("MOONSHOT_API_KEY", "").strip()
+        )
         if not key:
             raise unittest.SkipTest("KIMI_API_KEY / MOONSHOT_API_KEY not set")
 
@@ -398,6 +392,7 @@ class TestLiveKimi(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # CLI runner
 # ---------------------------------------------------------------------------
+
 
 def run_tests():
     loader = unittest.TestLoader()

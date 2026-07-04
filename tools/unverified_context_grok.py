@@ -8,6 +8,13 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+try:
+    from _env_loader import load_project_dotenv
+
+    load_project_dotenv()
+except Exception:
+    pass
+
 
 def _emit(payload: dict[str, Any], *, rc: int) -> int:
     print(json.dumps(payload))
@@ -41,12 +48,14 @@ def main() -> int:
 
     api_key = os.environ.get("GROK_API_KEY", "").strip()
     if not api_key:
-        return _fail("missing_grok_configuration")
+        return _fail("missing_grok_configuration: set GROK_API_KEY in lucy-v10/.env or environment")
 
     api_base = os.environ.get("GROK_API_BASE_URL", "https://api.x.ai/v1").strip().rstrip("/")
     model = os.environ.get("GROK_MODEL", "grok-2-latest").strip()
     if not api_base or not model:
-        return _fail("missing_grok_configuration")
+        return _fail(
+            "missing_grok_configuration: set GROK_API_BASE_URL/GROK_MODEL in lucy-v10/.env or environment"
+        )
 
     payload = {
         "model": model,
@@ -79,12 +88,12 @@ def main() -> int:
     try:
         with urllib.request.urlopen(request, timeout=5.0) as response:
             raw = response.read().decode("utf-8", errors="replace")
-    except urllib.error.HTTPError:
-        return _fail("grok_http_error")
-    except urllib.error.URLError:
-        return _fail("grok_network_error")
-    except Exception:
-        return _fail("grok_request_failed")
+    except urllib.error.HTTPError as e:
+        return _fail(f"grok_http_error_{e.code}")
+    except urllib.error.URLError as e:
+        return _fail(f"grok_network_error: {e.reason}")
+    except Exception as e:
+        return _fail(f"grok_request_failed: {e}")
 
     try:
         parsed = json.loads(raw)

@@ -18,6 +18,11 @@ from typing import Any
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - python-dotenv may be absent in minimal installs
+    load_dotenv = None  # type: ignore[assignment,misc]
+
 
 @dataclass(frozen=True)
 class ActionCapability:
@@ -44,7 +49,14 @@ class RuntimeActionTaskSignals(QObject):
 
 
 class RuntimeActionTask(QRunnable):
-    def __init__(self, bridge: "RuntimeBridge", action: str, requested_value: str, *, context: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        bridge: "RuntimeBridge",
+        action: str,
+        requested_value: str,
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__()
         self._bridge = bridge
         self._action = action
@@ -55,7 +67,9 @@ class RuntimeActionTask(QRunnable):
     @Slot()
     def run(self) -> None:
         try:
-            result = self._bridge.run_action(self._action, self._requested_value, context=self._context)
+            result = self._bridge.run_action(
+                self._action, self._requested_value, context=self._context
+            )
         except Exception as exc:  # pragma: no cover - defensive UI worker guard
             result = CommandResult(
                 action=self._action,
@@ -83,6 +97,7 @@ class RuntimeBridge:
         self.ui_root_env = "LUCY_UI_ROOT"
         self.runtime_namespace_env = "LUCY_RUNTIME_NAMESPACE_ROOT"
         self.contract_required_env = "LUCY_RUNTIME_CONTRACT_REQUIRED"
+        self._load_project_dotenv()
         self._enforce_authority_contract()
         self.snapshot_root = self._resolve_snapshot_root()
         self.control_tool_path = self.snapshot_root / "tools" / "runtime_control.py"
@@ -90,6 +105,7 @@ class RuntimeBridge:
         self.lifecycle_tool_path = self.snapshot_root / "tools" / "runtime_lifecycle.py"
         self.request_tool_path = self.snapshot_root / "tools" / "runtime_request.py"
         self.voice_tool_path = self.snapshot_root / "tools" / "runtime_voice.py"
+        self.memory_tool_path = self.snapshot_root / "tools" / "memory" / "memory_service.py"
         self.voice_python_bin = self._resolve_voice_python_hint()
         self.capabilities = self._discover_capabilities()
         self.profile_capability = self._discover_profile_capability()
@@ -99,6 +115,27 @@ class RuntimeBridge:
         self._prime_voice_state()
         threading.Thread(target=self._background_warmup_ollama, daemon=True).start()
         threading.Thread(target=self._background_warmup_router, daemon=True).start()
+
+    def _load_project_dotenv(self) -> None:
+        """Load lucy-v10/.env so API keys are available to HMI subprocesses.
+
+        Existing environment variables take precedence. This is a safety net
+        for users who start the HMI directly instead of via START_LUCY.sh.
+        """
+        if load_dotenv is None:
+            return
+        authority_root = os.environ.get(self.authority_root_env, "").strip()
+        if authority_root:
+            candidates = [Path(authority_root).expanduser().resolve()]
+        else:
+            candidates = [
+                Path(__file__).resolve().parents[3],
+            ]
+        for root in candidates:
+            env_path = root / ".env"
+            if env_path.exists():
+                load_dotenv(env_path, override=False)
+                break
 
     def _workspace_root(self) -> Path:
         # When authority root is the project root (e.g., /home/mike/lucy-v10),
@@ -136,7 +173,9 @@ class RuntimeBridge:
         if authority_root.name not in ("lucy-v10",):
             raise RuntimeError(f"invalid authority root in authority contract: {authority_root}")
         if not runtime_ns_root.is_absolute():
-            raise RuntimeError(f"invalid runtime namespace root in authority contract: {runtime_ns_root}")
+            raise RuntimeError(
+                f"invalid runtime namespace root in authority contract: {runtime_ns_root}"
+            )
         try:
             bridge_file.relative_to(ui_root)
         except ValueError as exc:
@@ -167,7 +206,11 @@ class RuntimeBridge:
                         shell=False,
                     )
                     payload = self._extract_payload(completed.stdout)
-                    if isinstance(payload, dict) and payload.get("ok") and payload.get("engine") == "kokoro":
+                    if (
+                        isinstance(payload, dict)
+                        and payload.get("ok")
+                        and payload.get("engine") == "kokoro"
+                    ):
                         return str(candidate)
                 except (OSError, subprocess.TimeoutExpired):
                     continue
@@ -179,29 +222,56 @@ class RuntimeBridge:
     def _command_env(self, *, include_voice_python: bool = False) -> dict[str, str]:
         """Build command environment with Python router settings."""
         env = os.environ.copy()
+        # Pin the authority/namespace contract so backend tools resolve the same
+        # paths even if the spawned process sanitizes its environment.
+        env.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(self.snapshot_root))
+        env.setdefault("LUCY_UI_ROOT", os.environ.get(self.ui_root_env, ""))
+        env.setdefault(
+            "LUCY_RUNTIME_NAMESPACE_ROOT", os.environ.get(self.runtime_namespace_env, "")
+        )
+        env.setdefault(
+            "LUCY_RUNTIME_CONTRACT_REQUIRED", os.environ.get(self.contract_required_env, "1")
+        )
         if include_voice_python and self.voice_python_bin:
             env.setdefault("LUCY_VOICE_PYTHON_BIN", self.voice_python_bin)
         # Always include Python router settings so they're propagated to subprocesses
         # These are only active when LUCY_ROUTER_PY=1
         env.setdefault("LUCY_ROUTER_PY", os.environ.get("LUCY_ROUTER_PY", "0"))
-        env.setdefault("LUCY_ROUTER_PY_PERCENTAGE", os.environ.get("LUCY_ROUTER_PY_PERCENTAGE", "0"))
-        env.setdefault("LUCY_ROUTER_PY_DETERMINISTIC", os.environ.get("LUCY_ROUTER_PY_DETERMINISTIC", "true"))
-        env.setdefault("LUCY_ROUTER_PY_EMERGENCY_KILL", os.environ.get("LUCY_ROUTER_PY_EMERGENCY_KILL", "0"))
+        env.setdefault(
+            "LUCY_ROUTER_PY_PERCENTAGE", os.environ.get("LUCY_ROUTER_PY_PERCENTAGE", "0")
+        )
+        env.setdefault(
+            "LUCY_ROUTER_PY_DETERMINISTIC", os.environ.get("LUCY_ROUTER_PY_DETERMINISTIC", "true")
+        )
+        env.setdefault(
+            "LUCY_ROUTER_PY_EMERGENCY_KILL", os.environ.get("LUCY_ROUTER_PY_EMERGENCY_KILL", "0")
+        )
         # Python Voice Pipeline toggle (V8)
         # Set LUCY_VOICE_PY=1 to use Python-native voice pipeline instead of shell
         env.setdefault("LUCY_VOICE_PY", os.environ.get("LUCY_VOICE_PY", "0"))
         # Propagate evidence/control settings from HMI to voice subprocesses
         env.setdefault("LUCY_EVIDENCE_ENABLED", os.environ.get("LUCY_EVIDENCE_ENABLED", "0"))
-        env.setdefault("LUCY_AUGMENTATION_POLICY", os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only"))
-        env.setdefault("LUCY_CONVERSATION_MODE_FORCE", os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0"))
+        env.setdefault(
+            "LUCY_AUGMENTATION_POLICY", os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
+        )
+        env.setdefault(
+            "LUCY_CONVERSATION_MODE_FORCE", os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0")
+        )
         env.setdefault("LUCY_SESSION_MEMORY", os.environ.get("LUCY_SESSION_MEMORY", "0"))
         env.setdefault("LUCY_AUGMENTED_PROVIDER", self._resolve_augmented_provider())
         # Propagate model selection so subprocess paths match direct-Python path
         env.setdefault("LUCY_MODEL", os.environ.get("LUCY_MODEL", "local-lucy-llama31"))
         env.setdefault("LUCY_LOCAL_MODEL", os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-llama31"))
+        # Ollama model used by the memory service for summarization/embedding fallback
+        env.setdefault(
+            "LUCY_OLLAMA_MODEL",
+            os.environ.get("LUCY_OLLAMA_MODEL", os.environ.get("LUCY_MODEL", "local-lucy-llama31")),
+        )
         # Router decision logging — default to project logs directory
         default_log_dir = str(Path(__file__).resolve().parents[3] / "logs" / "router")
-        env.setdefault("LUCY_ROUTER_LOG_DIR", os.environ.get("LUCY_ROUTER_LOG_DIR", default_log_dir))
+        env.setdefault(
+            "LUCY_ROUTER_LOG_DIR", os.environ.get("LUCY_ROUTER_LOG_DIR", default_log_dir)
+        )
         return env
 
     def _resolve_snapshot_root(self) -> Path:
@@ -268,7 +338,12 @@ class RuntimeBridge:
             "model_selection": ActionCapability(
                 name="model_selection",
                 available=available,
-                allowed_values=("local-lucy-llama31", "local-lucy", "local-lucy-fast", "local-lucy-mistral"),
+                allowed_values=(
+                    "local-lucy-llama31",
+                    "local-lucy",
+                    "local-lucy-fast",
+                    "local-lucy-mistral",
+                ),
                 reason=reason,
             ),
             "learner_toggle": ActionCapability(
@@ -358,11 +433,17 @@ class RuntimeBridge:
     def voice_available(self) -> bool:
         return self.voice_capability.available
 
-    def run_action(self, action: str, requested_value: str, *, context: dict[str, Any] | None = None) -> CommandResult:
+    def run_action(
+        self, action: str, requested_value: str, *, context: dict[str, Any] | None = None
+    ) -> CommandResult:
         if action == "submit_request":
-            return self._run_submit_request(requested_value, action=action, augmented_direct_once=False, context=context)
+            return self._run_submit_request(
+                requested_value, action=action, augmented_direct_once=False, context=context
+            )
         if action == "submit_request_force_augmented_once":
-            return self._run_submit_request(requested_value, action=action, augmented_direct_once=True, context=context)
+            return self._run_submit_request(
+                requested_value, action=action, augmented_direct_once=True, context=context
+            )
         if action == "submit_self_review_request":
             return self._run_submit_request(
                 requested_value,
@@ -379,6 +460,10 @@ class RuntimeBridge:
             return self._run_voice_action(action, requested_value)
         if action == "speak":
             return self._run_speak_action(requested_value)
+        if action == "persona_clear":
+            return self._run_clear_persona_action()
+        if action == "persona_set":
+            return self._run_set_persona_action(requested_value)
 
         capability = self.capabilities.get(action)
         if capability is None:
@@ -452,7 +537,7 @@ class RuntimeBridge:
             )
 
         status = "ok" if completed.returncode == 0 else "failed"
-        return CommandResult(
+        result = CommandResult(
             action=action,
             requested_value=requested_value,
             status=status,
@@ -462,6 +547,13 @@ class RuntimeBridge:
             timed_out=False,
             payload=self._extract_payload(completed.stdout),
         )
+        if action == "model_selection" and status == "ok":
+            threading.Thread(
+                target=self._warmup_ollama_model,
+                args=(requested_value,),
+                daemon=True,
+            ).start()
+        return result
 
     def _run_profile_action(self, action: str) -> CommandResult:
         if not self.profile_capability.available:
@@ -532,6 +624,15 @@ class RuntimeBridge:
     def _background_warmup_ollama(self) -> None:
         """Send a dummy prompt to Ollama to pre-load the model and reduce first-token latency."""
         model = self._resolve_current_model()
+        self._warmup_ollama_model(model)
+
+    def _warmup_ollama_model(self, model: str) -> None:
+        """Send a lightweight generate request to load the given model into Ollama.
+
+        This is used both at startup and after a model switch so the HMI's
+        active-model probe reflects the newly selected model as quickly as
+        possible instead of lingering on the previously loaded model.
+        """
         api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate")
         keep_alive = os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "10m")
         body = {
@@ -565,6 +666,7 @@ class RuntimeBridge:
             if str(tools_dir) not in sys.path:
                 sys.path.insert(0, str(tools_dir))
             from router_py.classify import prewarm_router
+
             prewarm_router()
         except Exception:
             pass
@@ -601,15 +703,69 @@ class RuntimeBridge:
 
     def _build_command(self, action: str, requested_value: str) -> list[str] | None:
         command_map = {
-            "mode_selection": ["python3", str(self.control_tool_path), "set-mode", "--value", requested_value],
-            "conversation_toggle": ["python3", str(self.control_tool_path), "set-conversation", "--value", requested_value],
-            "memory_toggle": ["python3", str(self.control_tool_path), "set-memory", "--value", requested_value],
-            "evidence_toggle": ["python3", str(self.control_tool_path), "set-evidence", "--value", requested_value],
-            "voice_toggle": ["python3", str(self.control_tool_path), "set-voice", "--value", requested_value],
-            "augmentation_policy": ["python3", str(self.control_tool_path), "set-augmentation", "--value", requested_value],
-            "augmented_provider": ["python3", str(self.control_tool_path), "set-augmented-provider", "--value", requested_value],
-            "model_selection": ["python3", str(self.control_tool_path), "set-model", "--value", requested_value],
-            "learner_toggle": ["python3", str(self.control_tool_path), "set-learner", "--value", requested_value],
+            "mode_selection": [
+                "python3",
+                str(self.control_tool_path),
+                "set-mode",
+                "--value",
+                requested_value,
+            ],
+            "conversation_toggle": [
+                "python3",
+                str(self.control_tool_path),
+                "set-conversation",
+                "--value",
+                requested_value,
+            ],
+            "memory_toggle": [
+                "python3",
+                str(self.control_tool_path),
+                "set-memory",
+                "--value",
+                requested_value,
+            ],
+            "evidence_toggle": [
+                "python3",
+                str(self.control_tool_path),
+                "set-evidence",
+                "--value",
+                requested_value,
+            ],
+            "voice_toggle": [
+                "python3",
+                str(self.control_tool_path),
+                "set-voice",
+                "--value",
+                requested_value,
+            ],
+            "augmentation_policy": [
+                "python3",
+                str(self.control_tool_path),
+                "set-augmentation",
+                "--value",
+                requested_value,
+            ],
+            "augmented_provider": [
+                "python3",
+                str(self.control_tool_path),
+                "set-augmented-provider",
+                "--value",
+                requested_value,
+            ],
+            "model_selection": [
+                "python3",
+                str(self.control_tool_path),
+                "set-model",
+                "--value",
+                requested_value,
+            ],
+            "learner_toggle": [
+                "python3",
+                str(self.control_tool_path),
+                "set-learner",
+                "--value",
+                requested_value,
+            ],
         }
         return command_map.get(action)
 
@@ -624,10 +780,10 @@ class RuntimeBridge:
     ) -> CommandResult:
         """
         Submit a request to the backend.
-        
+
         Phase 3: Direct Python execution only (flattened chain).
         Bypasses subprocess hops for better performance and reliability.
-        
+
         Previous: runtime_bridge → runtime_request.py → lucy_chat.sh → hybrid_wrapper.sh → main.py
         Current:  runtime_bridge → ExecutionEngine (direct Python call)
         """
@@ -662,10 +818,10 @@ class RuntimeBridge:
     ) -> CommandResult:
         """
         Direct Python execution path via main.py — unified entry point.
-        
+
         Before: runtime_bridge → ExecutionEngine (direct, bypassed main.py)
         After:  runtime_bridge → main.run() → ExecutionEngine
-        
+
         This ensures all execution goes through the single entry point,
         preserving state resolution, feedback detection, locking, and telemetry.
         """
@@ -681,12 +837,12 @@ class RuntimeBridge:
                 timed_out=False,
                 payload=None,
             )
-        
+
         # Add router_py to path for imports
         router_py_path = str(self.snapshot_root / "tools")
         if router_py_path not in sys.path:
             sys.path.insert(0, router_py_path)
-        
+
         try:
             from router_py.main import execute_plan_python
             from router_py.policy import normalize_augmentation_policy
@@ -701,14 +857,14 @@ class RuntimeBridge:
                 timed_out=False,
                 payload=None,
             )
-        
+
         # Get augmentation policy from environment
         policy = normalize_augmentation_policy(
             os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
         )
-        
+
         start_time = os.times()[0]  # User CPU time
-        
+
         try:
             # Call unified entry point directly (main.run() is a thin
             # pass-through; using execute_plan_python eliminates one
@@ -722,10 +878,10 @@ class RuntimeBridge:
                 self_review=self_review,
                 context=context,
             )
-            
+
             # Calculate execution time
             execution_time_ms = int((os.times()[0] - start_time) * 1000)
-            
+
             # Build payload directly from RouterOutcome — no reconstruction.
             # The HMI is a display layer only; it must reflect the core's
             # exact output without reinterpretation.
@@ -734,14 +890,14 @@ class RuntimeBridge:
                 request_text=request_text,
                 execution_time_ms=execution_time_ms,
             )
-            
+
             # NOTE: We do NOT write history entries here.
             # The core ExecutionEngine's StateWriter already writes the
             # canonical entry to request_history.jsonl using the SAME
             # request_id. Dual writes caused duplicate entries and data
             # divergence (runtime_bridge used a different ID schema).
             # The HMI reads from that file via load_recent_request_history().
-            
+
             return CommandResult(
                 action=action,
                 requested_value=requested_value,
@@ -752,7 +908,7 @@ class RuntimeBridge:
                 timed_out=False,
                 payload=payload,
             )
-            
+
         except Exception as e:
             return CommandResult(
                 action=action,
@@ -764,7 +920,7 @@ class RuntimeBridge:
                 timed_out=False,
                 payload=None,
             )
-    
+
     def _build_payload_from_outcome(
         self,
         outcome: Any,
@@ -787,8 +943,8 @@ class RuntimeBridge:
             "memory": os.environ.get("LUCY_SESSION_MEMORY", "1"),
             "evidence": os.environ.get("LUCY_EVIDENCE_ENABLED", "0"),
             "voice": os.environ.get("LUCY_VOICE_ENABLED", "0"),
-            "augmentation_policy": os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only"),
-            "augmented_provider": os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia"),
+            "augmentation_policy": os.environ.get("LUCY_AUGMENTATION_POLICY", "auto"),
+            "augmented_provider": os.environ.get("LUCY_AUGMENTED_PROVIDER", "auto"),
             "model": os.environ.get("LUCY_MODEL", "local"),
             "profile": os.environ.get("LUCY_PROFILE", "default"),
         }
@@ -820,19 +976,23 @@ class RuntimeBridge:
             "augmented_provider_used": outcome.provider if is_augmented else "none",
             "augmented_provider_usage_class": outcome.provider_usage_class or "local",
             "augmented_provider_call_reason": (
-                "direct" if is_augmented and outcome.outcome_code == "augmented_answer"
-                else "fallback" if is_augmented and outcome.outcome_code == "augmented_fallback"
-                else "error" if is_augmented and not is_completed
+                "direct"
+                if is_augmented and outcome.outcome_code == "augmented_answer"
+                else "fallback"
+                if is_augmented and outcome.outcome_code == "augmented_fallback"
+                else "error"
+                if is_augmented and not is_completed
                 else "not_needed"
             ),
             "augmented_provider_status": (
-                "available" if is_augmented and is_completed
-                else "error" if is_augmented
+                "available"
+                if is_augmented and is_completed
+                else "error"
+                if is_augmented
                 else "none"
             ),
             "augmented_paid_provider_invoked": (
-                "true" if is_augmented and outcome.provider_usage_class == "paid"
-                else "false"
+                "true" if is_augmented and outcome.provider_usage_class == "paid" else "false"
             ),
             "augmented_direct_request": "",
         }
@@ -858,6 +1018,7 @@ class RuntimeBridge:
     def _iso_now(self) -> str:
         """Return ISO format current timestamp."""
         from datetime import datetime, timezone
+
         return datetime.now(timezone.utc).isoformat()
 
     def _resolve_current_model(self) -> str:
@@ -868,13 +1029,13 @@ class RuntimeBridge:
         else:
             namespace_root = Path(os.environ.get(self.runtime_namespace_env, "")).expanduser()
             if not namespace_root:
-                return "local-lucy"
+                return "auto"
             state_file = namespace_root / "state" / "current_state.json"
         try:
             state = json.loads(state_file.read_text(encoding="utf-8"))
-            return state.get("model") or state.get("active_model") or "local-lucy"
+            return state.get("model") or state.get("active_model") or "auto"
         except (OSError, json.JSONDecodeError):
-            return "local-lucy"
+            return "auto"
 
     def _resolve_augmented_provider(self) -> str:
         """Read the active augmented provider from runtime state file."""
@@ -888,7 +1049,9 @@ class RuntimeBridge:
             state_file = namespace_root / "state" / "current_state.json"
         try:
             state = json.loads(state_file.read_text(encoding="utf-8"))
-            return state.get("augmented_provider") or os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
+            return state.get("augmented_provider") or os.environ.get(
+                "LUCY_AUGMENTED_PROVIDER", "auto"
+            )
         except (OSError, json.JSONDecodeError):
             return os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
 
@@ -899,8 +1062,17 @@ class RuntimeBridge:
             return Path(raw).expanduser()
         # Default path matching runtime_request.py
         home = Path.home()
-        workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "request_history.jsonl"
+        workspace_home = (
+            home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
+        )
+        return (
+            workspace_home
+            / ".codex-api-home"
+            / "lucy"
+            / "runtime-v10"
+            / "state"
+            / "request_history.jsonl"
+        )
 
     def _run_lifecycle_action(self, action: str, requested_value: str) -> CommandResult:
         expected_value = "start" if action == "runtime_start" else "stop"
@@ -1030,6 +1202,93 @@ class RuntimeBridge:
             stderr=completed.stderr,
             timed_out=False,
             payload=self._extract_payload(completed.stdout),
+        )
+
+    def _run_clear_persona_action(self) -> CommandResult:
+        """Clear the active user identity/persona via the memory service CLI."""
+        try:
+            completed = subprocess.run(
+                [sys.executable, str(self.memory_tool_path), "--clear-identity"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=self.control_timeout_seconds,
+                shell=False,
+                env=self._command_env(),
+            )
+        except subprocess.TimeoutExpired as exc:
+            return CommandResult(
+                action="persona_clear",
+                requested_value=None,
+                status="timeout",
+                returncode=None,
+                stdout=exc.stdout or "",
+                stderr=exc.stderr or "",
+                timed_out=True,
+                payload=None,
+            )
+        status = "ok" if completed.returncode == 0 else "failed"
+        return CommandResult(
+            action="persona_clear",
+            requested_value=None,
+            status=status,
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            timed_out=False,
+            payload=None,
+        )
+
+    def _run_set_persona_action(self, requested_value: str) -> CommandResult:
+        """Set the active user identity/persona via the memory service CLI."""
+        canonical = requested_value.strip().lower()
+        if canonical not in {"michael"}:
+            return CommandResult(
+                action="persona_set",
+                requested_value=requested_value,
+                status="failed",
+                returncode=1,
+                stdout="",
+                stderr="Persona must be 'michael'",
+                timed_out=False,
+                payload=None,
+            )
+        try:
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(self.memory_tool_path),
+                    "--set-identity",
+                    canonical.capitalize(),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=self.control_timeout_seconds,
+                shell=False,
+                env=self._command_env(),
+            )
+        except subprocess.TimeoutExpired as exc:
+            return CommandResult(
+                action="persona_set",
+                requested_value=requested_value,
+                status="timeout",
+                returncode=None,
+                stdout=exc.stdout or "",
+                stderr=exc.stderr or "",
+                timed_out=True,
+                payload=None,
+            )
+        status = "ok" if completed.returncode == 0 else "failed"
+        return CommandResult(
+            action="persona_set",
+            requested_value=requested_value,
+            status=status,
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            timed_out=False,
+            payload=None,
         )
 
     def _run_speak_action(self, text: str) -> CommandResult:

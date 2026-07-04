@@ -462,7 +462,7 @@ class LocalAnswerConfig:
                 model = json.loads(state_file.read_text(encoding="utf-8")).get("model", "")
             except Exception:
                 pass
-        if not model:
+        if not model or str(model).lower() == "auto":
             model = "local-lucy-llama31"
 
         return cls(
@@ -600,6 +600,8 @@ class LocalAnswer:
         # Start Ollama keep-alive heartbeat to prevent cold-start unload
         start_ollama_heartbeat(self.config.model)
 
+    _semantic_warmup_done = False
+
     @classmethod
     def warmup_ollama(cls, config: Optional[LocalAnswerConfig] = None) -> None:
         """Send a lightweight request to Ollama to keep the model loaded.
@@ -637,6 +639,32 @@ class LocalAnswer:
                 pass
 
         threading.Thread(target=_ping, daemon=True).start()
+
+        # Also warm up the semantic classifier in the background so the first
+        # real query does not pay the MiniLM import/load cost.
+        cls._warmup_semantic_model()
+
+    @classmethod
+    def _warmup_semantic_model(cls) -> None:
+        """Load the MiniLM semantic model in a daemon thread.
+
+        The model is used by the policy router to detect personal/family,
+        medical, and veterinary queries.  Loading it eagerly on startup hides
+        the ~6 s import/initialization cost from the first user query.
+        """
+        if cls._semantic_warmup_done:
+            return
+        cls._semantic_warmup_done = True
+
+        def _load():
+            try:
+                from router_py.policy import _get_semantic_model
+
+                _get_semantic_model()
+            except Exception:
+                pass
+
+        threading.Thread(target=_load, daemon=True, name="semantic-model-warmup").start()
 
     @classmethod
     def start_recurring_warmup(cls, config: Optional[LocalAnswerConfig] = None) -> None:
@@ -756,6 +784,21 @@ class LocalAnswer:
             if re.match(pattern, q, re.IGNORECASE):
                 return False
         return True
+
+    def _is_explicit_memory_query(self, query: str) -> bool:
+        """Return True when the user is explicitly asking about prior conversation."""
+        q = query.strip().lower()
+        memory_phrases = (
+            r"\bwhat\s+did\s+we\s+(discuss|talk|chat)\s+(earlier|before|about)",
+            r"\bwhat\s+were\s+we\s+(discussing|talking|chatting)\s+(about|earlier|before)",
+            r"\bwhat\s+did\s+i\s+(say|mention|ask)\s+(earlier|before)",
+            r"\bwhat\s+did\s+you\s+(say|mention|tell\s+me)\s+(earlier|before)",
+            r"\bwhat\s+was\s+(i|we)\s+(saying|talking|discussing)\s+(about|earlier|before)",
+            r"\bremind\s+me\s+what\s+we\s+(discussed|talked|chatted)\s+(about|earlier|before)",
+            r"\bwhat\s+was\s+our\s+(conversation|discussion)\s+about",
+            r"\bwhat\s+have\s+we\s+been\s+(discussing|talking)\s+about",
+        )
+        return any(re.search(p, q) for p in memory_phrases)
 
     def _context_reset_requested(self, query: str) -> bool:
         """Check if user wants to reset context."""
@@ -1702,11 +1745,46 @@ class LocalAnswer:
             return "Which person or company do you want the current status for?"
         return "Which person or company do you mean?"
 
+    # Model tags known to be based on Qwen3 / other thinking architectures.
+    # These models emit an internal 'thinking' block that can consume the token
+    # budget and leave the visible response empty unless we reserve headroom.
+    _THINKING_MODEL_TAGS: frozenset[str] = frozenset(
+        {
+            "local-lucy",
+            "local-lucy-fast",
+            "local-lucy-qwen3",
+            "local-lucy-qwen3:30b",
+            "qwen3",
+            "qwen3:14b",
+            "qwen3:30b",
+        }
+    )
+
+    def _is_thinking_model(self) -> bool:
+        """Detect models that emit an internal 'thinking' block.
+
+        Checks both the configured tag and common architecture substrings.
+        """
+        model = (self.config.model or "").lower().split(":")[0]
+        if model in self._THINKING_MODEL_TAGS:
+            return True
+        return any(name in model for name in ("qwen3", "deepseek-r1", "o3", "o1"))
+
+    def _thinking_model_token_multiplier(self) -> int:
+        """Return multiplier for num_predict on thinking models."""
+        return 4 if self._is_thinking_model() else 1
+
     async def _call_ollama(
         self, prompt: str, num_predict: int, temperature: Optional[float] = None
     ) -> Tuple[str, int]:
         """Call Ollama API with retry for model-load transitions."""
         start_time = time.time()
+        # Thinking models need extra token headroom so reasoning does not swallow
+        # the visible response. Cap at a sane maximum to protect latency.
+        effective_num_predict = min(
+            num_predict * self._thinking_model_token_multiplier(),
+            self.config.num_predict_long,
+        )
         payload = {
             "model": self.config.model,
             "prompt": prompt,
@@ -1716,13 +1794,14 @@ class LocalAnswer:
                 "temperature": temperature if temperature is not None else self.config.temperature,
                 "top_p": self.config.top_p,
                 "seed": self.config.seed,
-                "num_predict": num_predict,
+                "num_predict": effective_num_predict,
                 "stop": ["\nUser:", "\nAssistant:", "\nUSER QUESTION:", "\nBACKGROUND CONTEXT:"],
             },
         }
         # Retry with exponential backoff for model-load transitions.
         max_attempts = 3
         base_delay = 0.5
+        thinking_retry_done = False
         for attempt in range(max_attempts):
             try:
                 session = await self._get_session()
@@ -1732,9 +1811,31 @@ class LocalAnswer:
                     text = data.get("response", "")
                     # Qwen3 and similar thinking models may emit reasoning in
                     # 'thinking' while leaving 'response' empty when token budget
-                    # is consumed by the thinking phase.
+                    # is consumed by the thinking phase. Retry once with a larger
+                    # budget before falling back to the thinking text.
                     if not text and data.get("thinking"):
-                        text = data["thinking"].strip()
+                        if not thinking_retry_done:
+                            thinking_retry_done = True
+                            payload["options"]["num_predict"] = min(
+                                payload["options"]["num_predict"] * 4,
+                                self.config.num_predict_long,
+                            )
+                            logger.warning(
+                                f"Ollama response empty but thinking present for {self.config.model}; "
+                                f"retrying with num_predict={payload['options']['num_predict']}"
+                            )
+                            continue
+                        # The visible response is empty even after the retry,
+                        # so use the thinking text as a last resort.  Trim it to
+                        # a reasonable length because raw reasoning can be
+                        # thousands of tokens and break downstream checks/UI.
+                        thinking_text = data["thinking"].strip()
+                        max_thinking_fallback_chars = min(480, num_predict * 2)
+                        if len(thinking_text) > max_thinking_fallback_chars:
+                            thinking_text = (
+                                thinking_text[:max_thinking_fallback_chars].rsplit(" ", 1)[0] + "…"
+                            )
+                        text = thinking_text
                         if text:
                             logger.warning(
                                 f"Ollama response empty but thinking present for {self.config.model}; using thinking as fallback"
@@ -1792,7 +1893,12 @@ class LocalAnswer:
         if not self._is_memory_context_allowed(q_eval):
             session_memory = ""
         elif session_memory.strip():
-            session_memory = filter_memory_context(q_eval, session_memory)
+            # If the user is explicitly asking about prior conversation, keep the
+            # memory as-is. Semantic filtering tends to drop generic "what did we
+            # discuss earlier?" turns because the query shares few keywords with
+            # the concrete prior topic.
+            if not self._is_explicit_memory_query(q_eval):
+                session_memory = filter_memory_context(q_eval, session_memory)
             if session_memory.strip():
                 self._diag_append("context_relevance_gate", "reuse_context")
 

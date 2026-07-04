@@ -54,6 +54,7 @@
 | HMI redesign | Forbidden per user constraint |
 | Model weights | Do not retrain or replace embedding index without explicit instruction |
 | Voice runtime | Do not modify whisper.cpp or kokoro integration |
+| Persona LoRA adapters | Training/conversion may be run when explicitly requested; safe to create tags and rerun build scripts |
 
 **Allowed changes:**
 - `execution_engine.py`, `execution_engine_state.py` — state persistence
@@ -121,6 +122,69 @@ python3 -c "import sys; sys.path.insert(0,'tools'); from router_py.main import e
 ```
 
 ---
+
+## Persona LoRA Pipeline
+
+User-specific personas (Michael, Racheli) are triggered by identity declarations such as "I am Michael" or by the HMI Control Panel persona selector (`auto` / `Michael` / `Racheli`). Two mechanisms work together:
+
+1. **Prompt-level persona injection** — `tools/router_py/local_answer.py` injects the matching fragment from `config/personas/<name>.txt` whenever an identity is active. The fragment is injected **after** the self-knowledge block so it is the last high-level instruction before the user turn.
+2. **Model-level LoRA adapters** — If a persona-tagged Ollama model exists (e.g., `local-lucy-llama31-michael`), Local Lucy resolves to that model automatically; otherwise it falls back to the base model + prompt fragment.
+
+### Hardware limits on RTX 3060 12 GB
+
+| Base model | Persona path | Notes |
+|------------|--------------|-------|
+| `local-lucy-llama31` (llama3.1:8b) | LoRA adapter | Trained/converted/registered |
+| `local-lucy-mistral` (mistral-nemo:12b) | **Prompt-level fallback** | LoRA training OOMs at `prepare_model_for_kbit_training` on 12 GB VRAM; prompt fallback is seamless |
+| `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` (qwen3:14b) | **Prompt-level fallback** | LoRA training OOMs at `prepare_model_for_kbit_training` on 12 GB VRAM; fallback is seamless via `local_answer.py` |
+
+### Files
+- `tools/lora/build_datasets.py` — generates `data/lora/datasets/{michael,racheli}.jsonl`
+- `tools/lora/train_persona_lora.py` — QLoRA training per base model/persona
+- `tools/lora/convert_adapters_to_gguf.py` — converts Safetensors adapters to GGUF for Ollama 0.14.x
+- `tools/lora/build_modelfiles.py` — generates `config/Modelfile.<base>-<persona>`
+- `tools/lora/build_persona_models.sh` — creates Ollama tags for existing adapters
+- `tools/lora/train_all_personas.sh` — trains, converts, and registers all adapters end-to-end
+- `tools/lora/evaluate_persona.py` — golden-case evaluator
+- `tests/golden_persona_cases.jsonl` — persona-specific behavioral checks
+
+### Typical workflow
+```bash
+cd ~/lucy-v10
+source ui-v10/.venv/bin/activate
+python3 tools/lora/build_datasets.py
+python3 tools/lora/train_persona_lora.py --dataset data/lora/datasets/michael.jsonl --base-tag local-lucy-llama31 --persona michael
+HF_TOKEN=... python3 tools/lora/convert_adapters_to_gguf.py --adapter-dir models/lora/local-lucy-llama31/michael
+ollama create local-lucy-llama31-michael -f config/Modelfile.local-lucy-llama31-michael
+```
+
+Or run the full pipeline:
+```bash
+HF_TOKEN=... tools/lora/train_all_personas.sh
+```
+
+Evaluate both LoRA and prompt-level paths:
+```bash
+# LoRA path (llama3.1)
+python3 tools/lora/evaluate_persona.py --model local-lucy-llama31-michael --persona michael
+python3 tools/lora/evaluate_persona.py --model local-lucy-llama31-racheli --persona racheli
+
+# Prompt-level fallback path (qwen3 14B)
+python3 tools/lora/evaluate_persona.py --model local-lucy --prompt-persona michael --persona michael
+python3 tools/lora/evaluate_persona.py --model local-lucy --prompt-persona racheli --persona racheli
+```
+
+### Current adapter status
+
+| Base tag | Backend model | Michael | Racheli | Notes |
+|---|---|---|---|---|
+| `local-lucy-llama31` | Llama 3.1 8B | ✅ LoRA | ✅ LoRA | Trained, converted, registered |
+| `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` | Qwen3 14B | ⚠️ Prompt fallback | ⚠️ Prompt fallback | OOM on RTX 3060 12 GB |
+| `local-lucy-mistral` | Mistral-Nemo 12B | ⚠️ Prompt fallback | ⚠️ Prompt fallback | OOM on RTX 3060 12 GB |
+
+### Hardware limitation: Qwen3 14B
+
+`Qwen/Qwen3-14B` OOMs inside `prepare_model_for_kbit_training` even at rank 4 / seq 512 / batch 1 / 4-bit on the RTX 3060 12 GB. The Qwen3-based tags therefore use prompt-level persona injection at runtime. This is handled transparently by `_resolve_persona_model()` in `tools/router_py/local_answer.py`.
 
 ## Feedback Learning System
 

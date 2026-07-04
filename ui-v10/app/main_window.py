@@ -498,6 +498,12 @@ class OperatorConsoleWindow(QMainWindow):
         self.control_panel.learner_change_requested.connect(
             lambda value: self._execute_backend_action("learner_toggle", value, "learner toggle")
         )
+        self.control_panel.persona_clear_requested.connect(
+            lambda: self._execute_backend_action("persona_clear", "", "clear persona")
+        )
+        self.control_panel.persona_change_requested.connect(
+            lambda value: self._execute_backend_action("persona_set", value, f"set persona {value}")
+        )
 
         self.control_panel.ptt_pressed_requested.connect(self._handle_voice_ptt_pressed)
         self.control_panel.ptt_released_requested.connect(self._handle_voice_ptt_released)
@@ -644,9 +650,18 @@ class OperatorConsoleWindow(QMainWindow):
                 return
             self._last_model_switch_time = time.time()
 
+        # Optimistically show the requested persona while the backend commit is
+        # in flight; otherwise update_control_state reads persistent storage
+        # (which still reflects the old identity) and the dropdown snaps back.
+        pending_values: dict[str, str] = {}
+        if action == "persona_set":
+            pending_values["persona"] = requested_value
+        elif action == "persona_clear":
+            pending_values["persona"] = ""
         self.control_panel.update_control_state(
             self._latest_state_snapshot.top_status,
             self._latest_state_snapshot.current_state,
+            pending_values=pending_values,
         )
         self._set_backend_busy(True)
         self._pending_action_label = action_label
@@ -758,9 +773,10 @@ class OperatorConsoleWindow(QMainWindow):
         )
 
         if result.action == "voice_ptt_start":
-            if result.status == "ok" and bool(
-                self._latest_state_snapshot.voice_runtime.get("listening", False)
-            ):
+            if result.status == "ok":
+                # Trust the backend's OK: ptt-start only exits 0 after writing
+                # listening=True to the runtime file. A stale snapshot read here
+                # should not abort an otherwise-successful capture.
                 if self._voice_release_pending:
                     self._voice_release_pending = False
                     self._voice_ptt_active = False
@@ -1346,13 +1362,13 @@ class OperatorConsoleWindow(QMainWindow):
         label = ControlPanel._MODEL_LABELS.get(configured_model, configured_model)
         status = str(active_info.get("status", "unavailable")).lower()
         if status == "running":
-            return f"{label} — running"
+            return label
         if status == "mismatch":
             active_name = str(active_info.get("name", "unknown")).strip() or "unknown"
-            return f"{label} — active: {active_name}"
+            return f"{label} — selected ({active_name} still loaded in Ollama)"
         if status == "unloaded":
             return f"{label} — not loaded"
-        return f"{label} — status unknown"
+        return f"{label} — Ollama unreachable"
 
     def _runtime_status_with_session_counters(self) -> dict[str, str]:
         values = dict(self._latest_state_snapshot.runtime_status)

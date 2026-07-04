@@ -6,7 +6,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QGroupBox, QLabel, QLayout, QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QGroupBox,
+    QLabel,
+    QLayout,
+    QPlainTextEdit,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from app.ui_levels import ENGINEERING, POWER, level_at_least
 
@@ -15,6 +24,18 @@ try:
     from app.widgets.avatar_widget import LucyAvatar
 except Exception:
     LucyAvatar = None  # type: ignore[misc,assignment]
+
+try:
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
+    from memory.memory_service import get_current_user_identity as _get_current_user_identity
+except Exception:
+
+    def _get_current_user_identity() -> str | None:
+        return None
+
 
 DEFAULT_HISTORY_RETENTION_MAX_ENTRIES = 200
 
@@ -63,9 +84,13 @@ class StatusPanel(QFrame):
             # Matches audio_levels_file_for_runtime() in runtime_voice.py.
             runtime_ns = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "")
             if runtime_ns:
-                levels_path = Path(runtime_ns).expanduser().resolve() / "state" / "voice_audio_levels.json"
+                levels_path = (
+                    Path(runtime_ns).expanduser().resolve() / "state" / "voice_audio_levels.json"
+                )
             else:
-                levels_path = Path(__file__).resolve().parents[3] / "state" / "voice_audio_levels.json"
+                levels_path = (
+                    Path(__file__).resolve().parents[3] / "state" / "voice_audio_levels.json"
+                )
             self._avatar.set_levels_file(levels_path)
             layout.addWidget(self._avatar, alignment=Qt.AlignmentFlag.AlignHCenter)
         else:
@@ -104,6 +129,7 @@ class StatusPanel(QFrame):
             [
                 ("Current Route", "unknown"),
                 ("Source Type", "unknown"),
+                ("Active Persona", "none"),
                 ("Conversation", "unknown"),
                 ("Voice State", "unknown"),
                 ("Health", "unknown"),
@@ -210,8 +236,16 @@ class StatusPanel(QFrame):
         self.set_interface_level("operator")
 
     def update_status(self, values: dict[str, str]) -> None:
+        # Active Persona is not part of backend state; derive it from the
+        # memory service so it is visible even when state snapshots omit it.
+        if "Active Persona" not in values or not values.get("Active Persona"):
+            identity = _get_current_user_identity()
+            values = dict(values)
+            values["Active Persona"] = identity if identity else "none"
         for label_text, label_widget in self._runtime_summary_labels.items():
-            label_widget.setText(self._format_runtime_value(label_text, values.get(label_text, "unknown")))
+            label_widget.setText(
+                self._format_runtime_value(label_text, values.get(label_text, "unknown"))
+            )
         for label_text, label_widget in self._runtime_detail_labels.items():
             if label_text in values:
                 label_widget.setText(values[label_text])
@@ -238,10 +272,18 @@ class StatusPanel(QFrame):
             "Verification Status": self._answer_contract_verification_text(payload),
             "Estimated Confidence": self._answer_contract_confidence_text(payload),
             "Source Basis": self._answer_contract_source_basis_text(payload),
-            "Augmented Direct Request": self._nested_text(payload, "outcome", "augmented_direct_request") or "unknown",
-            "Augmented Provider Status": self._nested_text(payload, "outcome", "augmented_provider_status") or "unknown",
-            "Evidence Created": self._nested_text(payload, "outcome", "evidence_created") or "unknown",
-            "Primary Outcome": self._nested_text(payload, "outcome", "primary_outcome_code") or "none",
+            "Augmented Direct Request": self._nested_text(
+                payload, "outcome", "augmented_direct_request"
+            )
+            or "unknown",
+            "Augmented Provider Status": self._nested_text(
+                payload, "outcome", "augmented_provider_status"
+            )
+            or "unknown",
+            "Evidence Created": self._nested_text(payload, "outcome", "evidence_created")
+            or "unknown",
+            "Primary Outcome": self._nested_text(payload, "outcome", "primary_outcome_code")
+            or "none",
             "Recovery Lane": self._nested_text(payload, "outcome", "recovery_lane") or "none",
             "Control State": self._control_state_text(payload),
         }
@@ -297,8 +339,8 @@ class StatusPanel(QFrame):
 
     def _update_legacy_warning(self, snapshot) -> None:
         """Show warning if legacy runtime namespace is detected."""
-        if getattr(snapshot, 'legacy_namespace_detected', False):
-            legacy_path = getattr(snapshot, 'legacy_namespace_path', '')
+        if getattr(snapshot, "legacy_namespace_detected", False):
+            legacy_path = getattr(snapshot, "legacy_namespace_path", "")
             warning_text = (
                 f"⚠️ WARNING: Legacy runtime namespace detected at:\n{legacy_path}\n"
                 "Data may exist in old location. Active namespace is in ~/.codex-api-home/"
@@ -311,17 +353,17 @@ class StatusPanel(QFrame):
 
     def _update_gpu_status(self, snapshot) -> None:
         """Update GPU acceleration status in Runtime Details."""
-        gpu_info = getattr(snapshot, 'gpu_info', {})
+        gpu_info = getattr(snapshot, "gpu_info", {})
         if not gpu_info:
             return
-        
-        gpu_available = gpu_info.get('available', False)
-        gpu_type = gpu_info.get('type', 'none')
-        gpu_model = gpu_info.get('model', '')
-        ollama_on_gpu = gpu_info.get('ollama_on_gpu', False)
-        vram_used = gpu_info.get('vram_used_mb', 0)
-        vram_total = gpu_info.get('vram_total_mb', 0)
-        
+
+        gpu_available = gpu_info.get("available", False)
+        gpu_type = gpu_info.get("type", "none")
+        gpu_model = gpu_info.get("model", "")
+        ollama_on_gpu = gpu_info.get("ollama_on_gpu", False)
+        vram_used = gpu_info.get("vram_used_mb", 0)
+        vram_total = gpu_info.get("vram_total_mb", 0)
+
         if gpu_available and ollama_on_gpu:
             status_text = f"✅ {gpu_type.upper()}: {gpu_model}"
             if vram_total > 0:
@@ -336,7 +378,7 @@ class StatusPanel(QFrame):
             status_text = "❌ CPU only"
             tooltip = "No GPU detected - performance will be slower"
             style = "color: #e74c3c;"  # Red
-        
+
         if "GPU Acceleration" in self._runtime_detail_labels:
             label = self._runtime_detail_labels["GPU Acceleration"]
             label.setText(status_text)
@@ -374,7 +416,15 @@ class StatusPanel(QFrame):
             )
             self._set_card_visibility(
                 self._request_summary_cards,
-                {"Status", "Completed At", "Answer Path", "Trust", "Augmented", "Route Mode", "Outcome Code"},
+                {
+                    "Status",
+                    "Completed At",
+                    "Answer Path",
+                    "Trust",
+                    "Augmented",
+                    "Route Mode",
+                    "Outcome Code",
+                },
             )
         else:
             self._runtime_summary_group.setTitle("Runtime Status")
@@ -447,7 +497,9 @@ class StatusPanel(QFrame):
         layout.addWidget(value)
         return card
 
-    def _set_card_visibility(self, card_registry: dict[str, QFrame], visible_labels: set[str]) -> None:
+    def _set_card_visibility(
+        self, card_registry: dict[str, QFrame], visible_labels: set[str]
+    ) -> None:
         for label, card in card_registry.items():
             card.setVisible(label in visible_labels)
 
@@ -470,7 +522,9 @@ class StatusPanel(QFrame):
         self._set_preserving_scroll(self._advanced_state_view, "\n".join(state_lines))
 
         if self._latest_request_payload is None:
-            self._set_preserving_scroll(self._advanced_request_view, "No persisted request entry selected.")
+            self._set_preserving_scroll(
+                self._advanced_request_view, "No persisted request entry selected."
+            )
             return
         self._set_preserving_scroll(
             self._advanced_request_view,
@@ -566,7 +620,9 @@ class StatusPanel(QFrame):
         if history_path is None:
             return 0, "none"
         archive_pattern = f"{history_path.stem}.*{history_path.suffix}"
-        archive_paths = sorted(path for path in history_path.parent.glob(archive_pattern) if path.is_file())
+        archive_paths = sorted(
+            path for path in history_path.parent.glob(archive_pattern) if path.is_file()
+        )
         if not archive_paths:
             return 0, "none"
         return len(archive_paths), str(archive_paths[-1])
@@ -644,7 +700,17 @@ class StatusPanel(QFrame):
         control_state = payload.get("control_state")
         if not isinstance(control_state, dict) or not control_state:
             return "unavailable"
-        ordered_keys = ("mode", "conversation", "memory", "evidence", "voice", "augmentation_policy", "augmented_provider", "model", "profile")
+        ordered_keys = (
+            "mode",
+            "conversation",
+            "memory",
+            "evidence",
+            "voice",
+            "augmentation_policy",
+            "augmented_provider",
+            "model",
+            "profile",
+        )
         parts = [
             f"{key}={control_state[key]}"
             for key in ordered_keys
@@ -692,20 +758,33 @@ class StatusPanel(QFrame):
         contract_path = self._nested_text(payload, "outcome", "operator_answer_path")
         if contract_path:
             return contract_path
-        final_mode = self._nested_text(payload, "outcome", "final_mode") or self._nested_text(payload, "route", "mode")
+        final_mode = self._nested_text(payload, "outcome", "final_mode") or self._nested_text(
+            payload, "route", "mode"
+        )
         final_mode_upper = final_mode.upper()
         trust_class = self._nested_text(payload, "outcome", "trust_class").lower()
-        fallback_used = self._nested_text(payload, "outcome", "fallback_used").lower() in {"1", "true", "yes", "on"}
+        fallback_used = self._nested_text(payload, "outcome", "fallback_used").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         fallback_reason = self._nested_text(payload, "outcome", "fallback_reason")
         provider = (
             self._nested_text(payload, "outcome", "augmented_provider_used")
             or self._nested_text(payload, "outcome", "augmented_provider")
             or self._nested_text(payload, "control_state", "augmented_provider")
         ).strip()
-        provider_label = provider.upper() if provider and provider.lower() != "none" else "augmented"
-        forced_augmented = self._nested_text(payload, "outcome", "augmented_direct_request").lower() in {"1", "true", "yes", "on"}
+        provider_label = (
+            provider.upper() if provider and provider.lower() != "none" else "augmented"
+        )
+        forced_augmented = self._nested_text(
+            payload, "outcome", "augmented_direct_request"
+        ).lower() in {"1", "true", "yes", "on"}
         outcome_code = self._nested_text(payload, "outcome", "outcome_code").lower()
-        answer_basis, _live_fetch_status, confidence, _degraded_reason = self._trusted_evidence_metadata(payload)
+        answer_basis, _live_fetch_status, confidence, _degraded_reason = (
+            self._trusted_evidence_metadata(payload)
+        )
         trusted_degraded = self._trusted_evidence_is_degraded(payload)
 
         if trust_class == "trusted" or final_mode_upper == "EVIDENCE":
@@ -763,7 +842,9 @@ class StatusPanel(QFrame):
         if status in {"disabled", "not_used"}:
             return "not used"
 
-        call_reason = self._nested_text(payload, "outcome", "augmented_provider_call_reason").lower()
+        call_reason = self._nested_text(
+            payload, "outcome", "augmented_provider_call_reason"
+        ).lower()
         if provider and provider != "NONE" and call_reason in {"direct", "fallback", "error"}:
             return f"{provider} used"
         if provider == "NONE":
@@ -781,11 +862,21 @@ class StatusPanel(QFrame):
         if contract_note:
             return contract_note
         fallback_reason = self._nested_text(payload, "outcome", "fallback_reason")
-        fallback_used = self._nested_text(payload, "outcome", "fallback_used").lower() in {"1", "true", "yes", "on"}
+        fallback_used = self._nested_text(payload, "outcome", "fallback_used").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         trust_class = self._nested_text(payload, "outcome", "trust_class").lower()
-        final_mode = (self._nested_text(payload, "outcome", "final_mode") or self._nested_text(payload, "route", "mode")).upper()
+        final_mode = (
+            self._nested_text(payload, "outcome", "final_mode")
+            or self._nested_text(payload, "route", "mode")
+        ).upper()
         outcome_code = self._nested_text(payload, "outcome", "outcome_code").lower()
-        answer_basis, live_fetch_status, confidence, degraded_reason = self._trusted_evidence_metadata(payload)
+        answer_basis, live_fetch_status, confidence, degraded_reason = (
+            self._trusted_evidence_metadata(payload)
+        )
         trusted_degraded = self._trusted_evidence_is_degraded(payload)
 
         if fallback_used and fallback_reason == "local_generation_degraded":
@@ -827,7 +918,12 @@ class StatusPanel(QFrame):
         outcome_code = self._nested_text(payload, "outcome", "outcome_code").lower()
         if outcome_code != "validated_insufficient":
             return False
-        return self._nested_text(payload, "outcome", "fallback_used").lower() not in {"1", "true", "yes", "on"}
+        return self._nested_text(payload, "outcome", "fallback_used").lower() not in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     def _augmented_provider_label(self, payload: dict[str, object] | None) -> str:
         provider = ""

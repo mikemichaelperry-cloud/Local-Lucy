@@ -26,6 +26,7 @@ import os
 import re
 import sqlite3
 import threading
+import time
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,21 @@ def _truncate_at_turn_boundary(text: str, max_chars: int) -> str:
         kept.append(turn)
         current_len += add
     return "\n\n".join(kept)
+
+
+# Models that emit reasoning/thinking blocks (e.g., qwen3) can pollute memory
+# with meta-commentary. Strip those blocks before storage or prompt injection.
+# Strip <think>...</think> reasoning blocks. Some truncated summaries may
+# contain an unclosed <think> tag; remove from the tag to the end of text.
+_THINKING_BLOCK_RE = re.compile(r"<think\b.*?(?:</think>|$)", re.DOTALL | re.IGNORECASE)
+
+
+def _strip_thinking_blocks(text: str) -> str:
+    """Remove <think>...</think> reasoning blocks from model output."""
+    if not text:
+        return text
+    return _THINKING_BLOCK_RE.sub("", text).strip()
+
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -251,10 +267,20 @@ def _load_fact_with_embeddings(conn: sqlite3.Connection, category: str | None = 
 _CONN_CACHE: sqlite3.Connection | None = None
 
 
+def _connection_is_closed(conn: sqlite3.Connection) -> bool:
+    """Return True if the given connection has been closed."""
+    try:
+        conn.execute("SELECT 1")
+        return False
+    except sqlite3.ProgrammingError:
+        return True
+
+
 def _get_connection() -> sqlite3.Connection:
-    """Return a cached SQLite connection (per-process)."""
+    """Return a cached SQLite connection (per-process), reopening if it was closed."""
     global _CONN_CACHE
-    if _CONN_CACHE is None:
+    if _CONN_CACHE is None or _connection_is_closed(_CONN_CACHE):
+        _CONN_CACHE = None
         db_path = _resolve_db_path()
         db_path.parent.mkdir(parents=True, exist_ok=True)
         _CONN_CACHE = sqlite3.connect(str(db_path), check_same_thread=False)
@@ -284,6 +310,7 @@ def _close_connection() -> None:
 # Turn storage
 # ---------------------------------------------------------------------------
 
+
 def store_turn(role: str, text: str, *, session_id: str = "default") -> None:
     """
     Store a single conversation turn in SQLite.
@@ -300,7 +327,7 @@ def store_turn(role: str, text: str, *, session_id: str = "default") -> None:
     if role not in {"user", "assistant"}:
         raise ValueError(f"role must be 'user' or 'assistant', got {role!r}")
 
-    text = text.strip()
+    text = _strip_thinking_blocks(text.strip())
     if not text:
         return
 
@@ -325,17 +352,17 @@ def get_recent_turns(session_id: str = "default", limit: int = 6) -> list[dict[s
         limit: Maximum number of turns to return (user+assistant pairs).
 
     Returns:
-        List of dicts: [{"role": "user", "text": "..."}, ...]
+        List of dicts: [{"role": "user", "text": "...", "created_at": "..."}, ...]
         ordered oldest → newest.
     """
     conn = _get_connection()
     cursor = conn.execute(
-        "SELECT role, text FROM conversation_turns WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+        "SELECT role, text, created_at FROM conversation_turns WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
         (session_id, limit),
     )
     rows = cursor.fetchall()
     # Reverse to restore oldest-first ordering
-    return [{"role": row[0], "text": row[1]} for row in reversed(rows)]
+    return [{"role": row[0], "text": row[1], "created_at": row[2]} for row in reversed(rows)]
 
 
 def get_all_turns(session_id: str = "default") -> list[dict[str, Any]]:
@@ -370,13 +397,16 @@ def format_turns_for_prompt(turns: list[dict[str, Any]]) -> str:
     lines: list[str] = []
     for turn in turns:
         role_label = "User" if turn["role"] == "user" else "Assistant"
-        lines.append(f"{role_label}: {turn['text']}")
+        text = _strip_thinking_blocks(turn.get("text", ""))
+        if text:
+            lines.append(f"{role_label}: {text}")
     return "\n\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
 # Persistent facts (human-curated, read-only to Lucy)
 # ---------------------------------------------------------------------------
+
 
 def store_persistent_fact(fact_text: str, category: str | None = None) -> int:
     """Store a persistent fact with its embedding. Returns the new row id."""
@@ -405,9 +435,7 @@ def get_persistent_facts(category: str | None = None) -> list[str]:
             (category,),
         )
     else:
-        cursor = conn.execute(
-            "SELECT fact_text FROM persistent_facts ORDER BY id"
-    )
+        cursor = conn.execute("SELECT fact_text FROM persistent_facts ORDER BY id")
     return [row[0] for row in cursor.fetchall()]
 
 
@@ -444,9 +472,13 @@ def get_relevant_persistent_facts(
         engine_used = _get_fact_embedding_engine_name()
         _LAST_FACT_TELEMETRY["successful_backend"] = engine_used
         _LAST_FACT_TELEMETRY["fallback_used"] = engine_used.startswith("ollama")
-        _LAST_FACT_TELEMETRY["primary_failed"] = "minilm" if engine_used.startswith("ollama") else ""
+        _LAST_FACT_TELEMETRY["primary_failed"] = (
+            "minilm" if engine_used.startswith("ollama") else ""
+        )
         _LAST_FACT_TELEMETRY["fallback_to"] = "ollama" if engine_used.startswith("ollama") else ""
-        _LAST_FACT_TELEMETRY["degradation_level"] = "limited" if engine_used.startswith("ollama") else "none"
+        _LAST_FACT_TELEMETRY["degradation_level"] = (
+            "limited" if engine_used.startswith("ollama") else "none"
+        )
 
         if query_embedding is None:
             _LAST_FACT_TELEMETRY["fallback_reason"] = "embedding_failed"
@@ -504,6 +536,104 @@ def get_persistent_facts_revision(category: str | None = None) -> str:
     return f"{max_id}:{count}:{latest}"
 
 
+# ---------------------------------------------------------------------------
+# User identity (persona selection)
+# ---------------------------------------------------------------------------
+
+_IDENTITY_CATEGORY = "identity"
+_IDENTITY_FACT_PREFIX = "Current user is "
+
+_USER_IDENTITY_RE = re.compile(
+    r"^(?:\s*)(?:"
+    r"i\s+am\s+(?P<name1>[A-Za-z]+)|"
+    r"my\s+name\s+is\s+(?P<name2>[A-Za-z]+)|"
+    r"this\s+is\s+(?P<name3>[A-Za-z]+)|"
+    r"(?P<name4>[A-Za-z]+)\s+speaking|"
+    r"(?P<name5>[A-Za-z]+)\s+here"
+    r")(?:\s*[.!?]?\s*)$",
+    re.IGNORECASE,
+)
+
+# Recognized personas. The key is the canonical name; values are acceptable
+# spoken forms (case-insensitive).
+_RECOGNIZED_PERSONAS: dict[str, set[str]] = {
+    "Michael": {"michael", "mike", "mikey"},
+}
+
+
+def _normalize_identity_name(raw_name: str) -> str | None:
+    """Map a spoken name to a canonical persona name, or None if unknown."""
+    lowered = raw_name.strip().lower()
+    for canonical, aliases in _RECOGNIZED_PERSONAS.items():
+        if lowered in aliases:
+            return canonical
+    return None
+
+
+def detect_user_identity(query: str) -> str | None:
+    """
+    Detect a user identity declaration like 'I am Michael'.
+
+    Returns the canonical persona name (e.g. 'Michael') if the query is a
+    standalone identity declaration for a recognized persona, otherwise None.
+    """
+    if not query or not query.strip():
+        return None
+    match = _USER_IDENTITY_RE.match(query.strip())
+    if not match:
+        return None
+    raw_name = (
+        match.group("name1")
+        or match.group("name2")
+        or match.group("name3")
+        or match.group("name4")
+        or match.group("name5")
+    )
+    if not raw_name:
+        return None
+    return _normalize_identity_name(raw_name)
+
+
+def get_current_user_identity() -> str | None:
+    """Return the canonical name of the currently active user persona, or None."""
+    facts = get_persistent_facts(category=_IDENTITY_CATEGORY)
+    if not facts:
+        return None
+    # The most recently stored identity fact is authoritative.
+    latest = facts[-1]
+    prefix = _IDENTITY_FACT_PREFIX
+    if latest.startswith(prefix):
+        return latest[len(prefix) :].strip() or None
+    return None
+
+
+def set_current_user_identity(name: str) -> int:
+    """
+    Persist the active user identity, replacing any previous identity fact.
+
+    Args:
+        name: Canonical persona name (e.g. 'Michael').
+
+    Returns:
+        The new persistent-fact row id.
+    """
+    canonical = _normalize_identity_name(name)
+    if canonical is None:
+        raise ValueError(f"Unrecognized persona: {name}")
+    conn = _get_connection()
+    # Remove any previous identity facts so only one is active.
+    conn.execute("DELETE FROM persistent_facts WHERE category = ?", (_IDENTITY_CATEGORY,))
+    conn.commit()
+    return store_persistent_fact(f"{_IDENTITY_FACT_PREFIX}{canonical}", category=_IDENTITY_CATEGORY)
+
+
+def clear_current_user_identity() -> None:
+    """Remove the persisted user identity, reverting to the default persona."""
+    conn = _get_connection()
+    conn.execute("DELETE FROM persistent_facts WHERE category = ?", (_IDENTITY_CATEGORY,))
+    conn.commit()
+
+
 def clear_session(session_id: str = "default") -> None:
     """Delete all turns for a session."""
     conn = _get_connection()
@@ -533,6 +663,7 @@ def get_turn_count(session_id: str = "default") -> int:
 # ---------------------------------------------------------------------------
 # Archive
 # ---------------------------------------------------------------------------
+
 
 def _archive_turns(session_id: str = "default") -> None:
     """
@@ -564,6 +695,7 @@ def get_archived_turns(session_id: str = "default") -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Session metadata / naming
 # ---------------------------------------------------------------------------
+
 
 def _record_session_first_query(session_id: str, query_text: str) -> None:
     """Store first user query as session metadata (best effort, silent)."""
@@ -603,6 +735,7 @@ def get_session_display_name(session_id: str = "default") -> str:
 # Summarization
 # ---------------------------------------------------------------------------
 
+
 def _summarize_turns_with_ollama(
     turns: list[dict[str, Any]],
     timeout: float = 30.0,
@@ -623,7 +756,9 @@ def _summarize_turns_with_ollama(
     conversation_text = format_turns_for_prompt(turns)
     prompt = (
         "Summarize the following conversation in 2-3 sentences. "
-        "Preserve key facts, decisions, and user preferences mentioned. Be concise.\n\n"
+        "Preserve key facts, decisions, and user preferences mentioned. Be concise. "
+        "Do not include chain-of-thought, reasoning, or <think> tags. "
+        "Output only the summary.\n\n"
         f"{conversation_text}"
     )
 
@@ -649,6 +784,13 @@ def _summarize_turns_with_ollama(
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             summary = data.get("response", "").strip()
+            if not summary:
+                return None
+            # Strip chain-of-thought / reasoning artifacts some models emit.
+            summary = re.sub(r"<think>.*?</think>", "", summary, flags=re.DOTALL).strip()
+            summary = re.sub(r"\banswers\s*", "", summary, flags=re.IGNORECASE).strip()
+            summary = re.sub(r"^summary:\s*", "", summary, flags=re.IGNORECASE).strip()
+            summary = re.sub(r"\s+", " ", summary).strip()
             return summary if summary else None
     except Exception as exc:
         logger.warning(f"Summarization call failed: {exc}")
@@ -721,7 +863,7 @@ def get_session_summary(session_id: str = "default") -> str | None:
         (session_id,),
     )
     row = cursor.fetchone()
-    return row[0] if row else None
+    return _strip_thinking_blocks(row[0]) if row else None
 
 
 def get_other_session_summaries(
@@ -746,7 +888,47 @@ def get_other_session_summaries(
         (current_session_id, limit),
     )
     rows = cursor.fetchall()
-    return [{"session_id": row[0], "summary_text": row[1]} for row in rows]
+    return [{"session_id": row[0], "summary_text": _strip_thinking_blocks(row[1])} for row in rows]
+
+
+def strip_thinking_blocks_from_db() -> tuple[int, int, int]:
+    """
+    Remove <think>...</think> reasoning blocks from all stored turns and
+    summaries, and delete summaries that become empty after stripping.
+
+    Returns:
+        Tuple of (turns_updated, summaries_updated, summaries_deleted).
+    """
+    conn = _get_connection()
+    turns_updated = 0
+    summaries_updated = 0
+    summaries_deleted = 0
+
+    cursor = conn.execute("SELECT id, text FROM conversation_turns")
+    for row_id, text in cursor.fetchall():
+        cleaned = _strip_thinking_blocks(text)
+        if cleaned != text:
+            conn.execute(
+                "UPDATE conversation_turns SET text = ? WHERE id = ?",
+                (cleaned, row_id),
+            )
+            turns_updated += 1
+
+    cursor = conn.execute("SELECT session_id, summary_text FROM session_summaries")
+    for session_id, summary_text in cursor.fetchall():
+        cleaned = _strip_thinking_blocks(summary_text)
+        if not cleaned:
+            conn.execute("DELETE FROM session_summaries WHERE session_id = ?", (session_id,))
+            summaries_deleted += 1
+        elif cleaned != summary_text:
+            conn.execute(
+                "UPDATE session_summaries SET summary_text = ? WHERE session_id = ?",
+                (cleaned, session_id),
+            )
+            summaries_updated += 1
+
+    conn.commit()
+    return turns_updated, summaries_updated, summaries_deleted
 
 
 # ---------------------------------------------------------------------------
@@ -763,20 +945,37 @@ _EMBEDDING_CACHE_MAXSIZE = 256
 
 def _get_embedding(text: str, timeout: float = 15.0) -> list[float] | None:
     """
-    Call Ollama /api/embeddings to get a vector for the given text.
+    Return a normalized embedding vector for the given text.
+
+    Primary: MiniLM-L6-v2 (local, no network, works for all models).
+    Fallback: Ollama /api/embeddings with LUCY_OLLAMA_MODEL.
 
     Results are cached in a bounded thread-safe dict keyed by SHA-256 of
-    the text to avoid redundant network calls for identical prompts.
+    the text to avoid redundant calls for identical prompts.
 
     Args:
         text: Text to embed.
-        timeout: HTTP timeout in seconds.
+        timeout: HTTP timeout in seconds (only used for Ollama fallback).
 
     Returns:
         List of floats (the embedding vector), or None on failure.
     """
     if not text:
         return None
+
+    # Prefer MiniLM-L6-v2: it is always available in the venv and independent
+    # of whichever generative model is loaded in Ollama.
+    minilm = _get_minilm_model()
+    if minilm is not None:
+        try:
+            import numpy as np
+
+            vec = minilm.encode(text.strip(), convert_to_numpy=True, normalize_embeddings=True)
+            if isinstance(vec, np.ndarray):
+                return vec.tolist()
+            return list(vec)
+        except Exception as exc:
+            logger.debug(f"MiniLM embedding failed: {exc}")
 
     model = os.environ.get("LUCY_OLLAMA_MODEL", "local-lucy")
     key = hashlib.sha256(f"{text.strip()}:{model}".encode("utf-8")).hexdigest()
@@ -911,7 +1110,9 @@ def _find_relevant_sessions_with_diagnostics_impl(
     if not query.strip():
         return [], diagnostics
 
-    threshold = similarity_threshold if similarity_threshold is not None else _similarity_threshold()
+    threshold = (
+        similarity_threshold if similarity_threshold is not None else _similarity_threshold()
+    )
     limit = top_k if top_k is not None else _max_injected_sessions()
     gap = _top_gap_threshold()
 
@@ -944,11 +1145,13 @@ def _find_relevant_sessions_with_diagnostics_impl(
     for session_id, vector in embeddings:
         sim = _cosine_similarity(query_vector, vector)
         if sim >= threshold and session_id in summary_map:
-            scored.append({
-                "session_id": session_id,
-                "summary_text": summary_map[session_id],
-                "similarity": sim,
-            })
+            scored.append(
+                {
+                    "session_id": session_id,
+                    "summary_text": summary_map[session_id],
+                    "similarity": sim,
+                }
+            )
 
     scored.sort(key=lambda x: x["similarity"], reverse=True)
     diagnostics["candidates_above_threshold"] = len(scored)
@@ -1019,11 +1222,144 @@ _DEEP_CONTEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
-_FOLLOWUP_RE = re.compile(
-    r"\b(what about|how about|tell me more|elaborate|continue|go on|expand on|"
-    r"follow up|follow-up|more details|more info|why|how come|and\?|ok and)\b",
+# Temporal uses of "this" (e.g., "this evening") are not conversational
+# references, so exclude them from deep-context detection.
+_TEMPORAL_THIS_RE = re.compile(
+    r"\bthis\s+(?:evening|morning|afternoon|night|today|tonight|week|month|year|"
+    r"weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
     re.IGNORECASE,
 )
+
+_FOLLOWUP_RE = re.compile(
+    r"\b("
+    r"what about|how about|tell me more|elaborate|continue|go on|expand on|"
+    r"follow up|follow-up|more details|more info|why|how come|and\?|ok and|"
+    r"back to|return(?:ing)? to|as for|speaking of|regarding|with regard to|in regards to|"
+    r"one more thing|one more question|another thing|another question|"
+    r"also|plus|in addition|additionally|moreover|furthermore"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Vague follow-up phrases that intentionally reference the immediately preceding
+# conversation but do not name a topic.  These queries must keep recent turns
+# and must NOT be answered from a possibly-stale session summary.
+# Anchored to the whole utterance (with optional trailing "please" and
+# punctuation) so that standalone requests like "Full details please." match,
+# while topic-bearing queries like "What are the full details of X?" do not.
+_VAGUE_FOLLOWUP_RE = re.compile(
+    r"^(?:\s*)(?:"
+    r"tell me more|elaborate|continue|go on|expand on|"
+    r"follow up|follow-up|more details|more info|"
+    r"why|how come|and\?|ok and|"
+    r"full details|all details|complete details|all the details|"
+    r"give me (?:the )?details|details please|tell me everything"
+    r")(?:\s+please)?[\s\W]*$",
+    re.IGNORECASE,
+)
+
+# Explicit continuation markers that may be followed by a topic phrase.
+# "Back to what we discussed earlier", "One more thing about relativity",
+# "What about this evening?" and "Also, why does it work?" all keep context.
+_EXPLICIT_CONTINUATION_RE = re.compile(
+    r"^(?:\s*)(?:"
+    r"(?:and |but |so )?"
+    r"(?:"
+    r"what about|how about|"
+    r"back to|return(?:ing)? to|as for|speaking of|regarding|with regard to|in regards to|"
+    r"one more thing|one more question|another thing|another question|"
+    r"also|plus|in addition|additionally|moreover|furthermore"
+    r")"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Standalone greetings and social openers should never pull deep context.
+_GREETING_PATTERNS = [
+    re.compile(r"^(?:hi+|hello|hey|greetings|howdy|yo|sup)$", re.IGNORECASE),
+    re.compile(r"^good\s+(?:morning|afternoon|evening|night|day)$", re.IGNORECASE),
+    re.compile(
+        r"^how\s+(?:are|is|do|have|was|were)\s+(?:you|it|things|everything)(?:\s+doing)?$",
+        re.IGNORECASE,
+    ),
+    re.compile(r"^how'?s\s+(?:it|things|everything)(?:\s+going)?$", re.IGNORECASE),
+    re.compile(r"^what'?s\s+up$", re.IGNORECASE),
+    re.compile(r"^how\s+are\s+things$", re.IGNORECASE),
+    re.compile(r"^how\s+do\s+you\s+do$", re.IGNORECASE),
+    # Spanish
+    re.compile(r"^hola$", re.IGNORECASE),
+    re.compile(r"^buenos?\s+(?:dias|tardes|noches)$", re.IGNORECASE),
+    re.compile(r"^que\s+tal$", re.IGNORECASE),
+    re.compile(r"^como\s+estas?$", re.IGNORECASE),
+    # French
+    re.compile(r"^bonjour$", re.IGNORECASE),
+    re.compile(r"^bonsoir$", re.IGNORECASE),
+    re.compile(r"^salut$", re.IGNORECASE),
+    re.compile(r"^ca\s+va$", re.IGNORECASE),
+    re.compile(r"^comment\s+(?:allez[- ]vous|vas?[- ]tu)$", re.IGNORECASE),
+    # German
+    re.compile(r"^hallo$", re.IGNORECASE),
+    re.compile(r"^guten\s+(?:tag|morgen|abend|nachmittag)$", re.IGNORECASE),
+    re.compile(r"^wie\s+geht(?:'s| es dir| es ihnen)$", re.IGNORECASE),
+    # Italian
+    re.compile(r"^ciao$", re.IGNORECASE),
+    re.compile(r"^buongiorno$", re.IGNORECASE),
+    re.compile(r"^buonasera$", re.IGNORECASE),
+    re.compile(r"^come\s+stai$", re.IGNORECASE),
+    # Portuguese
+    re.compile(r"^ola$", re.IGNORECASE),
+    re.compile(r"^bom\s+dia$", re.IGNORECASE),
+    re.compile(r"^boa\s+(?:tarde|noite)$", re.IGNORECASE),
+    re.compile(r"^tudo\s+bem$", re.IGNORECASE),
+]
+
+
+def _is_greeting(query: str) -> bool:
+    """Return True when the query is a standalone greeting or social opener."""
+    q = query.strip()
+    if not q:
+        return False
+    # Strip optional name / addressee and temporal suffixes so that
+    # "Hi Lucy, how are you this evening?" is still detected as a greeting.
+    q = re.sub(r"\b(?:lucy|there|friend|buddy|mate)\b", "", q, flags=re.IGNORECASE)
+    q = re.sub(
+        r"\bthis\s+(?:evening|morning|afternoon|night|today|tonight|week|month|year)\b",
+        "",
+        q,
+        flags=re.IGNORECASE,
+    )
+    q = re.sub(r"\b(?:tonight|today|now)\b", "", q, flags=re.IGNORECASE)
+    # Remove punctuation and collapse whitespace
+    q = re.sub(r"[^\w\s]", "", q)
+    q = re.sub(r"\s+", " ", q).strip()
+    return any(p.search(q) for p in _GREETING_PATTERNS)
+
+
+def _strip_greeting_prefix(query: str) -> str:
+    """Remove a leading greeting word and any following separator/punctuation."""
+    q = query.strip()
+    if not q:
+        return q
+    q = re.sub(
+        r"^(?:hi+|hello|hey|greetings|howdy|yo|sup|hola|buenos?\s+(?:dias|tardes|noches)|"
+        r"que\s+tal|como\s+estas?|bonjour|bonsoir|salut|ca\s+va|"
+        r"comment\s+(?:allez[- ]vous|vas?[- ]tu)|hallo|guten\s+(?:tag|morgen|abend|nachmittag)|"
+        r"wie\s+geht(?:'s| es dir| es ihnen)|ciao|buongiorno|buonasera|come\s+stai|"
+        r"ola|bom\s+dia|boa\s+(?:tarde|noite)|tudo\s+bem)"
+        r"(?:\s+\w+)?[\s\W]*",
+        "",
+        q,
+        flags=re.IGNORECASE,
+    )
+    return q.strip()
+
+
+def _has_explicit_continuation(query: str) -> bool:
+    """Return True if the query contains an explicit continuation marker.
+
+    Allows for a leading greeting prefix such as 'Hello—one more thing...'.
+    """
+    return bool(_EXPLICIT_CONTINUATION_RE.search(_strip_greeting_prefix(query)))
 
 
 def _detect_context_depth(query: str) -> str:
@@ -1037,19 +1373,48 @@ def _detect_context_depth(query: str) -> str:
     q = query.strip()
     if not q:
         return "shallow"
+    # Standalone greetings/social openers are self-contained.
+    if _is_greeting(q):
+        return "shallow"
+    # Temporal "this" does not reference prior conversation.
+    if _TEMPORAL_THIS_RE.search(q):
+        q_no_temporal = _TEMPORAL_THIS_RE.sub("", q)
+        if not _DEEP_CONTEXT_RE.search(q_no_temporal):
+            return "shallow"
     # Short pronoun-heavy queries are almost always context-dependent
     if len(q) <= 15 and _DEEP_CONTEXT_RE.search(q):
         return "deep"
-    if _FOLLOWUP_RE.search(q):
+    if _FOLLOWUP_RE.search(q) or _VAGUE_FOLLOWUP_RE.search(q) or _has_explicit_continuation(q):
         return "deep"
     if _DEEP_CONTEXT_RE.search(q):
         return "deep"
     return "shallow"
 
 
+def _is_vague_followup(query: str) -> bool:
+    """
+    Return True when the query is a vague continuation of the prior turn.
+
+    Such queries rely on recent conversation context to make sense and must
+    never be answered from a stale session summary or treated as a topic shift.
+    """
+    q = query.strip()
+    if not q:
+        return False
+    if _VAGUE_FOLLOWUP_RE.search(q):
+        return True
+    if _has_explicit_continuation(q):
+        return True
+    # Short pronoun-heavy queries (already deep-context) are also vague follow-ups.
+    if len(q) <= 15 and _DEEP_CONTEXT_RE.search(q):
+        return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Configurable similarity thresholds
 # ---------------------------------------------------------------------------
+
 
 def _similarity_threshold() -> float:
     """Return configured semantic similarity threshold (default 0.70)."""
@@ -1096,10 +1461,56 @@ def _topic_shift_threshold() -> float:
         return 0.50
 
 
-def _is_topic_shift_impl(current_query: str, previous_text: str, current_embedding: list[float] | None = None) -> bool:
+def _topic_shift_max_age_seconds() -> float:
+    """Return configured max age (seconds) for topic-shift comparison (default 900)."""
+    raw = os.environ.get("LUCY_MEMORY_TOPIC_SHIFT_MAX_AGE_SECONDS", "900").strip()
+    try:
+        v = float(raw)
+        return max(0.0, v)
+    except ValueError:
+        return 900.0
+
+
+def _parse_iso_timestamp(ts: str | None) -> float | None:
+    """Parse an ISO-8601 timestamp string into epoch seconds, or None on failure."""
+    if not ts:
+        return None
+    try:
+        from datetime import datetime, timezone
+
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except Exception:
+        return None
+
+
+def _is_topic_shift_impl(
+    current_query: str,
+    previous_text: str,
+    current_embedding: list[float] | None = None,
+    previous_created_at: str | None = None,
+) -> bool:
     """Internal implementation with optional pre-computed current query embedding."""
     if not current_query.strip() or not previous_text.strip():
         return False
+    # Vague follow-ups intentionally reference prior context; never treat them
+    # as a topic shift regardless of embedding similarity.
+    if _is_vague_followup(current_query):
+        return False
+    # Very short prior turns carry no meaningful topic to pollute a new query.
+    # Skip the embedding gate for them so innocuous placeholders like "Q1" do
+    # not trigger a false topic shift against a standalone follow-up question.
+    if len(previous_text.strip()) < 12:
+        return False
+    # After a long pause the last user turn is a poor anchor for a similarity
+    # gate; short follow-ups should keep context rather than be rejected.
+    previous_ts = _parse_iso_timestamp(previous_created_at)
+    if previous_ts is not None:
+        now = time.time()
+        if now - previous_ts > _topic_shift_max_age_seconds():
+            return False
     try:
         current_emb = _get_embedding_cached(current_query.strip(), current_embedding)
         previous_emb = _get_embedding(previous_text.strip())
@@ -1127,6 +1538,7 @@ def _is_topic_shift(current_query: str, previous_text: str) -> bool:
 # ---------------------------------------------------------------------------
 # Context assembly
 # ---------------------------------------------------------------------------
+
 
 def assemble_context_with_telemetry(
     current_session_id: str = "default",
@@ -1179,12 +1591,22 @@ def assemble_context_with_telemetry(
         if recent_turns:
             # Topic-shift gate: don't inject stale context for radically different queries
             if query.strip():
-                last_user_text = next(
-                    (t["text"] for t in reversed(recent_turns) if t["role"] == "user"), ""
+                last_user_text, last_user_created_at = next(
+                    (
+                        (t["text"], t.get("created_at"))
+                        for t in reversed(recent_turns)
+                        if t["role"] == "user"
+                    ),
+                    ("", None),
                 )
                 if last_user_text:
                     query_embedding = _get_embedding(query.strip())
-                    if _is_topic_shift_impl(query, last_user_text, query_embedding):
+                    if _is_topic_shift_impl(
+                        query,
+                        last_user_text,
+                        query_embedding,
+                        previous_created_at=last_user_created_at,
+                    ):
                         telemetry["memory_topic_shift_detected"] = "true"
                         return "", telemetry
             context = _truncate_at_turn_boundary(format_turns_for_prompt(recent_turns), max_chars)
@@ -1197,19 +1619,30 @@ def assemble_context_with_telemetry(
     # DEEP — LOCAL: current session only. No cross-session recall.
     if mode == "local":
         recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
-        # Topic-shift gate: don't inject stale context for radically different queries
-        if query.strip() and recent_turns:
-            last_user_text = next(
-                (t["text"] for t in reversed(recent_turns) if t["role"] == "user"), ""
+        vague_followup = _is_vague_followup(query)
+        # Topic-shift gate: don't inject stale context for radically different queries.
+        # Vague follow-ups intentionally reference prior context, so bypass the gate.
+        if query.strip() and recent_turns and not vague_followup:
+            last_user_text, last_user_created_at = next(
+                (
+                    (t["text"], t.get("created_at"))
+                    for t in reversed(recent_turns)
+                    if t["role"] == "user"
+                ),
+                ("", None),
             )
             if last_user_text:
                 query_embedding = _get_embedding(query.strip())
-                if _is_topic_shift_impl(query, last_user_text, query_embedding):
+                if _is_topic_shift_impl(
+                    query, last_user_text, query_embedding, previous_created_at=last_user_created_at
+                ):
                     telemetry["memory_topic_shift_detected"] = "true"
                     return "", telemetry
-        current_summary = get_session_summary(current_session_id)
-        if current_summary:
-            parts.append(f"Session summary: {current_summary}")
+        # Vague follow-ups must use recent turns, not a possibly-stale summary.
+        if not vague_followup:
+            current_summary = get_session_summary(current_session_id)
+            if current_summary:
+                parts.append(f"Session summary: {current_summary}")
         if recent_turns:
             parts.append(format_turns_for_prompt(recent_turns))
         if not parts:
@@ -1261,17 +1694,25 @@ def assemble_context_with_telemetry(
 
     # 3. Current session summary and recent turns (topic-shift gated)
     recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
+    vague_followup = _is_vague_followup(query)
     topic_shift = False
-    if query.strip() and recent_turns:
-        last_user_text = next(
-            (t["text"] for t in reversed(recent_turns) if t["role"] == "user"), ""
+    if query.strip() and recent_turns and not vague_followup:
+        last_user_text, last_user_created_at = next(
+            (
+                (t["text"], t.get("created_at"))
+                for t in reversed(recent_turns)
+                if t["role"] == "user"
+            ),
+            ("", None),
         )
-        if last_user_text and _is_topic_shift_impl(query, last_user_text, query_embedding):
+        if last_user_text and _is_topic_shift_impl(
+            query, last_user_text, query_embedding, previous_created_at=last_user_created_at
+        ):
             topic_shift = True
             telemetry["memory_topic_shift_detected"] = "true"
     if not topic_shift:
         current_summary = get_session_summary(current_session_id)
-        if current_summary:
+        if current_summary and not vague_followup:
             parts.append(f"Session summary: {current_summary}")
         if recent_turns:
             parts.append(format_turns_for_prompt(recent_turns))
@@ -1333,3 +1774,36 @@ def assemble_context(
         mode=mode,
     )
     return context
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Local Lucy memory service CLI")
+    parser.add_argument(
+        "--clear-identity", action="store_true", help="Clear the current user identity"
+    )
+    parser.add_argument(
+        "--set-identity", type=str, default=None, help="Set the current user identity (Michael)"
+    )
+    parser.add_argument(
+        "--strip-thinking",
+        action="store_true",
+        help="Strip <think> blocks from all stored turns/summaries",
+    )
+    args = parser.parse_args()
+
+    if args.clear_identity:
+        clear_current_user_identity()
+        print("Current user identity cleared.")
+    elif args.set_identity:
+        row_id = set_current_user_identity(args.set_identity)
+        print(f"Current user identity set to: {args.set_identity} (row {row_id})")
+    elif args.strip_thinking:
+        turns_updated, summaries_updated, summaries_deleted = strip_thinking_blocks_from_db()
+        print(
+            f"Stripped <think> blocks: {turns_updated} turn(s) updated, "
+            f"{summaries_updated} summary(s) updated, {summaries_deleted} summary(s) removed."
+        )
+    else:
+        parser.print_help()

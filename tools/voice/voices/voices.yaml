@@ -2,7 +2,7 @@
   "defaults": {
     "engine": "auto",
     "fallback_engine": "",
-    "auto_order": ["kokoro", "piper"]
+    "auto_order": ["kokoro", "edge_tts", "piper"]
   },
   "engines": {
     "piper": {
@@ -11,6 +11,10 @@
     },
     "kokoro": {
       "voice": "af_bella",
+      "fallback_engine": "piper"
+    },
+    "edge_tts": {
+      "voice": "en-US-AriaNeural",
       "fallback_engine": "piper"
     }
   }

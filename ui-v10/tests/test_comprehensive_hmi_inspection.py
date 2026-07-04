@@ -509,8 +509,8 @@ def main() -> int:
         record(
             "control_state",
             "engineering",
-            "augmentation_policy has 3 options",
-            cp._augmentation_policy_selector.count() == 3,
+            "augmentation_policy has 4 options",
+            cp._augmentation_policy_selector.count() == 4,
             f"items={[cp._augmentation_policy_selector.itemText(i) for i in range(cp._augmentation_policy_selector.count())]}",
         )
 

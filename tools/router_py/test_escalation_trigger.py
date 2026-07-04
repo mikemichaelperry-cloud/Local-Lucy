@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the automatic LOCAL -> AUGMENTED/EVIDENCE escalation trigger."""
+"""Tests for automatic LOCAL -> AUGMENTED/EVIDENCE escalation fallback."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from execution_engine import ExecutionEngine
 from router_py.request_types import ClassificationResult, ExecutionResult, RoutingDecision
 
 
@@ -19,15 +20,12 @@ class TestEscalationTrigger(unittest.TestCase):
 
     def setUp(self):
         """Create an ExecutionEngine with state management mocked out."""
-        # Avoid heavy StateManager/SQLite setup during unit tests.
         self._state_manager_patcher = patch(
             "execution_engine.get_state_manager", return_value=MagicMock()
         )
         self._state_writer_patcher = patch("execution_engine.StateWriter", return_value=MagicMock())
         self._state_manager_patcher.start()
         self._state_writer_patcher.start()
-
-        from execution_engine import ExecutionEngine
 
         self.engine = ExecutionEngine(
             config={"state_dir": str(Path(__file__).parent / "test_state")}
@@ -56,7 +54,7 @@ class TestEscalationTrigger(unittest.TestCase):
         )
 
     def test_admission_phrases_trigger_escalation(self):
-        """Common "I don't know" phrasing must be treated as insufficient."""
+        """Common 'I don't know' phrasing must be treated as insufficient."""
         admissions = [
             "I don't know.",
             "I do not know the answer.",

@@ -5391,9 +5391,9 @@
   {
     "query": "Tell me about your developer.",
     "labels": {
-      "intent_family": "current_evidence",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "AUGMENTED",
+      "route": "LOCAL",
       "policy_override": "none"
     },
     "metadata": {
@@ -5404,9 +5404,9 @@
   {
     "query": "Who created you?",
     "labels": {
-      "intent_family": "current_evidence",
+      "intent_family": "background_overview",
       "evidence_mode": "not_required",
-      "route": "AUGMENTED",
+      "route": "LOCAL",
       "policy_override": "none"
     },
     "metadata": {
@@ -17601,6 +17601,1241 @@
     "metadata": {
       "source": "synthetic_finance_augmentation",
       "feedback_type": "finance_guard_validated"
+    }
+  },
+  {
+    "query": "How do taxes on capital gains work?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "Should I buy life insurance?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "What is the best way to save for retirement?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "How much emergency cash should I keep?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "Should I rent or buy a house?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "How do I create a monthly budget?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "Is it better to pay off debt or invest?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "How do I diversify my investment portfolio?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "What is a reasonable debt-to-income ratio?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "What is your opinion on the Israel-Gaza conflict?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "opinion_local"
+    }
+  },
+  {
+    "query": "What is your opinion on the government's tax policy?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "opinion_local"
+    }
+  },
+  {
+    "query": "Critique the media coverage of the war",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "opinion_local"
+    }
+  },
+  {
+    "query": "Evaluate the diplomatic situation between China and Taiwan",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "opinion_local"
+    }
+  },
+  {
+    "query": "Speculate on the outcome of the peace negotiations",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "opinion_local"
+    }
+  },
+  {
+    "query": "In your opinion, who is the greatest philosopher?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "opinion_local"
+    }
+  },
+  {
+    "query": "Critique this argument about free will",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "opinion_local"
+    }
+  },
+  {
+    "query": "Is the Earth flat?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "conspiracy_local"
+    }
+  },
+  {
+    "query": "Is the moon landing a hoax?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "conspiracy_local"
+    }
+  },
+  {
+    "query": "Are lizard people controlling the government?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "conspiracy_local"
+    }
+  },
+  {
+    "query": "What happened at Area 51?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "conspiracy_local"
+    }
+  },
+  {
+    "query": "Is the Federal Reserve controlled by aliens?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "conspiracy_local"
+    }
+  },
+  {
+    "query": "Do vaccines contain microchips?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "conspiracy_local"
+    }
+  },
+  {
+    "query": "Who won the Six-Day War?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "history_local"
+    }
+  },
+  {
+    "query": "What happened in the 1973 Arab-Israeli war?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "history_local"
+    }
+  },
+  {
+    "query": "What was the result of the Vietnam War?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "history_local"
+    }
+  },
+  {
+    "query": "How did World War II end?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "history_local"
+    }
+  },
+  {
+    "query": "What was the outcome of the Gulf War?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "history_local"
+    }
+  },
+  {
+    "query": "What is two plus two?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "math_local"
+    }
+  },
+  {
+    "query": "What does 2 plus 2 equal?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "math_local"
+    }
+  },
+  {
+    "query": "Calculate 15 times 7",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "math_local"
+    }
+  },
+  {
+    "query": "Solve 100 divided by 4",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "math_local"
+    }
+  },
+  {
+    "query": "What is the square root of 64?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "math_local"
+    }
+  },
+  {
+    "query": "What is 8 multiplied by 9?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "math_local"
+    }
+  },
+  {
+    "query": "What is the strategic significance of the recent military moves?",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_analysis"
+    }
+  },
+  {
+    "query": "Strategic implications of the latest military operations",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_analysis"
+    }
+  },
+  {
+    "query": "What do the recent troop movements mean?",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_analysis"
+    }
+  },
+  {
+    "query": "Recent AI developments",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_analysis"
+    }
+  },
+  {
+    "query": "Latest breakthroughs in artificial intelligence",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_analysis"
+    }
+  },
+  {
+    "query": "Recent advances in renewable energy",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_analysis"
+    }
+  },
+  {
+    "query": "What are the latest developments in the conflict?",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_analysis"
+    }
+  },
+  {
+    "query": "Recent news about climate change",
+    "labels": {
+      "intent_family": "news_request",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_analysis"
+    }
+  },
+  {
+    "query": "What is the current death toll in the war?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_casualties"
+    }
+  },
+  {
+    "query": "How many casualties in the conflict so far?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_casualties"
+    }
+  },
+  {
+    "query": "Latest death toll in Gaza",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_casualties"
+    }
+  },
+  {
+    "query": "Current number of casualties in Ukraine",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_casualties"
+    }
+  },
+  {
+    "query": "What is the latest casualty count?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "news_casualties"
+    }
+  },
+  {
+    "query": "Current weather conditions in Tel Aviv",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "weather_conditions"
+    }
+  },
+  {
+    "query": "What are the current conditions in London?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "weather_conditions"
+    }
+  },
+  {
+    "query": "Current conditions in New York",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "weather_conditions"
+    }
+  },
+  {
+    "query": "Weather conditions right now in Paris",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "weather_conditions"
+    }
+  },
+  {
+    "query": "Current conditions and forecast for Tokyo",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "weather_conditions"
+    }
+  },
+  {
+    "query": "Should I invest in stocks or bonds?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "phase3_fix",
+      "category": "finance_advice_local"
+    }
+  },
+  {
+    "query": "Don't forget my dog Oscar.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "user_feedback",
+      "feedback_type": "answer_positive"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05d4\u05e9\u05dd \u05e9\u05dc\u05da?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "identity_local"
+    }
+  },
+  {
+    "query": "\u05de\u05d9 \u05d0\u05ea?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "identity_local"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05d0\u05ea\u05d4 \u05d9\u05db\u05d5\u05dc \u05dc\u05e2\u05e9\u05d5\u05ea?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "capabilities"
+    }
+  },
+  {
+    "query": "\u05e1\u05e4\u05e8 \u05dc\u05d9 \u05d1\u05d3\u05d9\u05d7\u05d4",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "creative"
+    }
+  },
+  {
+    "query": "\u05db\u05ea\u05d5\u05d1 \u05dc\u05d9 \u05e1\u05d9\u05e4\u05d5\u05e8 \u05e7\u05e6\u05e8",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "creative"
+    }
+  },
+  {
+    "query": "\u05de\u05d4\u05d9 \u05d3\u05e2\u05ea\u05da \u05e2\u05dc \u05d1\u05d9\u05e0\u05d4 \u05de\u05dc\u05d0\u05db\u05d5\u05ea\u05d9\u05ea?",
+    "labels": {
+      "intent_family": "local_reasoning",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "opinion"
+    }
+  },
+  {
+    "query": "\u05d0\u05d9\u05da \u05de\u05d5\u05ea\u05e7\u05e0\u05d9\u05dd \u05e4\u05d9\u05d9\u05ea\u05d5\u05df?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "howto"
+    }
+  },
+  {
+    "query": "\u05ea\u05e8\u05d2\u05d5\u05dd \u05e9\u05dc \u05e9\u05dc\u05d5\u05dd \u05dc\u05d0\u05e0\u05d2\u05dc\u05d9\u05ea",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "translation"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05d4\u05d4\u05d1\u05d3\u05dc \u05d1\u05d9\u05df \u05e7\u05d8\u05df \u05dc\u05d2\u05d3\u05d5\u05dc?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "general"
+    }
+  },
+  {
+    "query": "\u05de\u05d9 \u05d4\u05d9\u05dc\u05d3\u05d9\u05dd \u05e9\u05dc\u05d9?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "\u05db\u05de\u05d4 \u05d9\u05dc\u05d3\u05d9\u05dd \u05d9\u05e9 \u05dc\u05d9?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "\u05e1\u05e4\u05e8 \u05dc\u05d9 \u05e2\u05dc \u05d4\u05db\u05dc\u05d1 \u05e9\u05dc\u05d9",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "personal_family"
+    }
+  },
+  {
+    "query": "\u05de\u05d4\u05d9 \u05e2\u05d9\u05e8 \u05d4\u05d1\u05d9\u05e8\u05d4 \u05e9\u05dc \u05e6\u05e8\u05e4\u05ea?",
+    "labels": {
+      "intent_family": "factual_lookup",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "factual_lookup"
+    }
+  },
+  {
+    "query": "\u05de\u05d9 \u05d4\u05d9\u05d4 \u05d0\u05d3\u05dd \u05d4\u05e8\u05d0\u05e9\u05d5\u05df \u05e9\u05d8\u05e1 \u05dc\u05d7\u05dc\u05dc?",
+    "labels": {
+      "intent_family": "factual_lookup",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "factual_lookup"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05d2\u05d5\u05d1\u05d4\u05d5 \u05e9\u05dc \u05d4\u05e8 \u05d0\u05d5\u05d5\u05e8\u05e1\u05d8?",
+    "labels": {
+      "intent_family": "factual_lookup",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "factual_lookup"
+    }
+  },
+  {
+    "query": "\u05de\u05d4\u05d9 \u05de\u05e9\u05de\u05e2\u05d5\u05ea \u05d4\u05d7\u05d9\u05d9\u05dd?",
+    "labels": {
+      "intent_family": "factual_lookup",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "factual_lookup"
+    }
+  },
+  {
+    "query": "\u05ea\u05df \u05dc\u05d9 \u05de\u05d9\u05d3\u05e2 \u05e2\u05dc \u05e7\u05d9\u05d1\u05d5\u05e5 \u05de\u05d2\u05dc",
+    "labels": {
+      "intent_family": "specific_entity_fact",
+      "evidence_mode": "not_required",
+      "route": "AUGMENTED",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "specific_entity"
+    }
+  },
+  {
+    "query": "\u05d4\u05db\u05dc\u05d1 \u05e9\u05dc\u05d9 \u05de\u05e7\u05d9\u05d0, \u05de\u05d4 \u05dc\u05e2\u05e9\u05d5\u05ea?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "veterinary"
+    }
+  },
+  {
+    "query": "\u05d4\u05d7\u05ea\u05d5\u05dc \u05e9\u05dc\u05d9 \u05dc\u05d0 \u05d0\u05d5\u05db\u05dc \u05db\u05d1\u05e8 \u05d9\u05d5\u05de\u05d9\u05d9\u05dd",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "veterinary"
+    }
+  },
+  {
+    "query": "\u05d4\u05d0\u05dd \u05db\u05dc\u05d1\u05d9\u05dd \u05d9\u05db\u05d5\u05dc\u05d9\u05dd \u05dc\u05d0\u05db\u05d5\u05dc \u05e9\u05d5\u05e7\u05d5\u05dc\u05d3?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "veterinary"
+    }
+  },
+  {
+    "query": "\u05db\u05d0\u05d1 \u05d1\u05d8\u05df \u05d7\u05d6\u05e7 \u05d5\u05d7\u05d5\u05dd \u05de\u05d4 \u05dc\u05e2\u05e9\u05d5\u05ea?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "medical"
+    }
+  },
+  {
+    "query": "\u05de\u05d4\u05df \u05ea\u05d5\u05e4\u05e2\u05d5\u05ea \u05d4\u05dc\u05d5\u05d5\u05d0\u05d9 \u05e9\u05dc \u05d0\u05e1\u05e4\u05d9\u05e8\u05d9\u05df?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "medical"
+    }
+  },
+  {
+    "query": "\u05d4\u05d0\u05dd \u05d7\u05d9\u05e1\u05d5\u05e0\u05d9\u05dd \u05dc\u05d9\u05dc\u05d3\u05d9\u05dd \u05d1\u05d8\u05d5\u05d7\u05d9\u05dd?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "medical"
+    }
+  },
+  {
+    "query": "\u05de\u05d4\u05d5 \u05d4\u05d9\u05e1\u05d5\u05d3 \u05d4\u05e0\u05e4\u05e9\u05d9 \u05d1\u05e4\u05dc\u05d9\u05dc\u05d9\u05dd?",
+    "labels": {
+      "intent_family": "current_evidence",
+      "evidence_mode": "required",
+      "route": "EVIDENCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "legal"
+    }
+  },
+  {
+    "query": "\u05de\u05d4\u05df \u05d7\u05d3\u05e9\u05d5\u05ea \u05d4\u05d9\u05d5\u05dd?",
+    "labels": {
+      "intent_family": "current_news",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "news"
+    }
+  },
+  {
+    "query": "\u05e1\u05e4\u05e8 \u05dc\u05d9 \u05e2\u05dc \u05d4\u05d0\u05d9\u05e8\u05d5\u05e2\u05d9\u05dd \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd \u05d1\u05d9\u05e9\u05e8\u05d0\u05dc",
+    "labels": {
+      "intent_family": "current_news",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "news"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05e7\u05d5\u05e8\u05d4 \u05d1\u05e2\u05d5\u05dc\u05dd?",
+    "labels": {
+      "intent_family": "current_news",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "news"
+    }
+  },
+  {
+    "query": "\u05d7\u05d3\u05e9\u05d5\u05ea \u05e2\u05d3\u05db\u05e0\u05d9\u05d5\u05ea \u05e2\u05dc \u05d8\u05db\u05e0\u05d5\u05dc\u05d5\u05d2\u05d9\u05d4",
+    "labels": {
+      "intent_family": "current_news",
+      "evidence_mode": "not_required",
+      "route": "NEWS",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "news"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05de\u05d6\u05d2 \u05d4\u05d0\u05d5\u05d5\u05d9\u05e8 \u05d4\u05d9\u05d5\u05dd?",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "\u05d4\u05d0\u05dd \u05d9\u05e8\u05d3 \u05d2\u05e9\u05dd \u05de\u05d7\u05e8 \u05d1\u05ea\u05dc \u05d0\u05d1\u05d9\u05d1?",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05d4\u05d8\u05de\u05e4\u05e8\u05d8\u05d5\u05e8\u05d4 \u05d1\u05d9\u05e8\u05d5\u05e9\u05dc\u05d9\u05dd?",
+    "labels": {
+      "intent_family": "current_weather",
+      "evidence_mode": "not_required",
+      "route": "WEATHER",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "weather"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05d4\u05e9\u05e2\u05d4 \u05e2\u05db\u05e9\u05d9\u05d5?",
+    "labels": {
+      "intent_family": "current_time",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "time"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05d4\u05e9\u05e2\u05d4 \u05d1\u05e0\u05d9\u05d5 \u05d9\u05d5\u05e8\u05e7?",
+    "labels": {
+      "intent_family": "current_time",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "time"
+    }
+  },
+  {
+    "query": "\u05de\u05ea\u05d9 \u05d4\u05e9\u05e2\u05d5\u05df \u05de\u05ea\u05e7\u05d3\u05dd?",
+    "labels": {
+      "intent_family": "current_time",
+      "evidence_mode": "not_required",
+      "route": "TIME",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "time"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05de\u05d7\u05d9\u05e8 \u05d4\u05de\u05e0\u05d9\u05d4 \u05e9\u05dc \u05d0\u05e4\u05dc?",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05de\u05d7\u05d9\u05e8 \u05d4\u05d1\u05d9\u05d8\u05e7\u05d5\u05d9\u05df?",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "\u05db\u05de\u05d4 \u05e9\u05d5\u05d5\u05d4 \u05d4\u05d3\u05d5\u05dc\u05e8 \u05d4\u05d9\u05d5\u05dd?",
+    "labels": {
+      "intent_family": "current_finance",
+      "evidence_mode": "not_required",
+      "route": "FINANCE",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "finance"
+    }
+  },
+  {
+    "query": "\u05de\u05d9 \u05de\u05e0\u05e6\u05d7 \u05d1\u05de\u05e9\u05d7\u05e7 \u05e2\u05db\u05e9\u05d9\u05d5?",
+    "labels": {
+      "intent_family": "ephemeral",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "\u05de\u05d4 \u05de\u05e6\u05d1 \u05d4\u05ea\u05e0\u05d5\u05e2\u05d4 \u05d1\u05db\u05d1\u05d9\u05e9 6?",
+    "labels": {
+      "intent_family": "ephemeral",
+      "evidence_mode": "not_required",
+      "route": "EPHEMERAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "hebrew_first_class",
+      "category": "ephemeral"
+    }
+  },
+  {
+    "query": "Remove it from session memory please.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "user_feedback",
+      "feedback_type": "answer_positive"
+    }
+  },
+  {
+    "query": "Using local mode only, answer the question.",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "user_feedback",
+      "feedback_type": "answer_positive"
+    }
+  },
+  {
+    "query": "Do you know that I completely removed the modifications that were supposed to add full hebrew into you?",
+    "labels": {
+      "intent_family": "local_answer",
+      "evidence_mode": "not_required",
+      "route": "LOCAL",
+      "policy_override": "none"
+    },
+    "metadata": {
+      "source": "user_feedback",
+      "feedback_type": "answer_positive"
     }
   }
 ]

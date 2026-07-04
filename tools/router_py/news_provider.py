@@ -28,6 +28,34 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+
+    _dotenv_available = True
+except ImportError:
+    _dotenv_available = False
+
+
+def _load_project_dotenv() -> None:
+    """Load lucy-v10/.env so NEWSAPI_API_KEY is available."""
+    if not _dotenv_available:
+        return
+    for root in (
+        os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT"),
+        os.environ.get("LUCY_ROOT"),
+        str(Path(__file__).resolve().parent.parent.parent),
+    ):
+        if not root:
+            continue
+        env_path = Path(root).expanduser().resolve() / ".env"
+        if env_path.exists():
+            load_dotenv(env_path, override=False)
+            break
+
+
+_load_project_dotenv()
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -39,6 +67,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class NewsResult:
     """Result from news fetching."""
+
     ok: bool
     text: str
     source: str
@@ -54,15 +83,15 @@ def _clean_html(text: str) -> str:
     if not text:
         return ""
     # Remove HTML tags
-    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r"<[^>]+>", "", text)
     # Decode common HTML entities
-    text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-    text = text.replace('&quot;', '"').replace('&#39;', "'")
-    text = text.replace('&nbsp;', ' ').replace('&#160;', ' ')
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    text = text.replace("&quot;", '"').replace("&#39;", "'")
+    text = text.replace("&nbsp;", " ").replace("&#160;", " ")
     # Use html.unescape for any remaining entities
     text = html.unescape(text)
     # Normalize whitespace
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
     return text
 
 
@@ -89,6 +118,7 @@ def _parse_rfc822_date(date_str: str) -> datetime | None:
             dt = datetime.strptime(normalized, fmt)
             if dt.tzinfo is None:
                 from datetime import timezone
+
                 dt = dt.replace(tzinfo=timezone.utc)
             return dt
         except ValueError:
@@ -125,6 +155,7 @@ def _format_time_ago(published: str) -> str:
             now = datetime.now(pub_time.tzinfo)
         else:
             from datetime import timezone
+
             pub_time = pub_time.replace(tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
 
@@ -150,6 +181,7 @@ class RSSNewsProvider:
 
     # Reputable world news RSS feeds (verified working with fresh content)
     RSS_FEEDS = {
+        # World
         "bbc_world": {
             "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
             "name": "BBC World News",
@@ -170,6 +202,32 @@ class RSSNewsProvider:
             "name": "NPR News",
             "region": "world",
         },
+        "reuters_world": {
+            "url": "https://www.reutersagency.com/feed/?best-topics=world-news",
+            "name": "Reuters World",
+            "region": "world",
+        },
+        "al_jazeera": {
+            "url": "https://www.aljazeera.com/xml/rss/all.xml",
+            "name": "Al Jazeera",
+            "region": "world",
+        },
+        "cnn_world": {
+            "url": "http://rss.cnn.com/rss/edition_world.rss",
+            "name": "CNN World",
+            "region": "world",
+        },
+        "dw_world": {
+            "url": "https://rss.dw.com/rdf/rss-en-world",
+            "name": "DW World",
+            "region": "world",
+        },
+        "france24": {
+            "url": "https://www.france24.com/en/rss",
+            "name": "France 24",
+            "region": "world",
+        },
+        # Middle East / Israel
         "bbc_middle_east": {
             "url": "http://feeds.bbci.co.uk/news/world/middle_east/rss.xml",
             "name": "BBC Middle East",
@@ -185,6 +243,52 @@ class RSSNewsProvider:
             "name": "Israel Hayom",
             "region": "middle_east",
         },
+        "jerusalem_post": {
+            "url": "https://www.jpost.com/rss/",
+            "name": "Jerusalem Post",
+            "region": "middle_east",
+        },
+        "haaretz": {
+            "url": "https://www.haaretz.com/rss-feeds/1.147",
+            "name": "Haaretz",
+            "region": "middle_east",
+        },
+        "ynetnews": {
+            "url": "https://www.ynetnews.com/category/3089/rss",
+            "name": "Ynetnews",
+            "region": "middle_east",
+        },
+        "i24news": {
+            "url": "https://www.i24news.tv/en/rss",
+            "name": "i24NEWS",
+            "region": "middle_east",
+        },
+        # Hebrew-language Israeli sources
+        "hebrew_ynet": {
+            "url": "https://www.ynet.co.il/Integration/StoryRss1854.xml",
+            "name": "Ynet (Hebrew)",
+            "region": "israel_hebrew",
+            "language": "he",
+        },
+        "hebrew_wall": {
+            "url": "https://www.walla.co.il/rss",
+            "name": "Walla! (Hebrew)",
+            "region": "israel_hebrew",
+            "language": "he",
+        },
+        "hebrew_mako": {
+            "url": "https://www.mako.co.il/rss/headlines-index.xml",
+            "name": "Mako (Hebrew)",
+            "region": "israel_hebrew",
+            "language": "he",
+        },
+        "hebrew_n12": {
+            "url": "https://www.mako.co.il/rss/news-military.xml",
+            "name": "N12 (Hebrew)",
+            "region": "israel_hebrew",
+            "language": "he",
+        },
+        # Australia
         "guardian_australia": {
             "url": "https://www.theguardian.com/australia-news/rss",
             "name": "The Guardian Australia",
@@ -227,30 +331,123 @@ class RSSNewsProvider:
     MAX_TOTAL_ARTICLES = 15
     # Region keywords to detect in queries
     REGION_KEYWORDS = {
-        "middle_east": ["israel", "israeli", "israel's", "jerusalem", "tel aviv", "haifa",
-                        "palestine", "palestinian", "palestinians", "gaza", "gazan", "hamas",
-                        "west bank", "lebanon", "lebanese", "hezbollah", "beirut",
-                        "netanyahu", "idf", "iron dome", "middle east", "mideast",
-                        "iran", "iranian", "tehran", "syria", "damascus", "yemen",
-                        "saudi", "saudi arabia", "qatar", "doha", "uae", "dubai", "abudhabi",
-                        "baghdad", "iraq", "jordan", "amman", "egypt", "cairo", "sinai",
-                        "ceasefire", "two-state solution", "settlement", "zionist", "zionism",
-                        "knesset", "al-aqsa", "dome of the rock", "golan heights"],
-        "australia": ["australia", "australian", "aussie", "auspol",
-                      "sydney", "melbourne", "canberra", "perth", "brisbane", "adelaide",
-                      "tasmania", "hobart", "darwin", "gold coast", "newcastle", "wollongong",
-                      "anzac", "anzus", "scott morrison", "anthony albanese", "albo",
-                      "liberal party", "labor party", "coles", "woolworths", "qantas"],
+        "middle_east": [
+            "israel",
+            "israeli",
+            "israel's",
+            "jerusalem",
+            "tel aviv",
+            "haifa",
+            "palestine",
+            "palestinian",
+            "palestinians",
+            "gaza",
+            "gazan",
+            "hamas",
+            "west bank",
+            "lebanon",
+            "lebanese",
+            "hezbollah",
+            "beirut",
+            "netanyahu",
+            "idf",
+            "iron dome",
+            "middle east",
+            "mideast",
+            "iran",
+            "iranian",
+            "tehran",
+            "syria",
+            "damascus",
+            "yemen",
+            "saudi",
+            "saudi arabia",
+            "qatar",
+            "doha",
+            "uae",
+            "dubai",
+            "abudhabi",
+            "baghdad",
+            "iraq",
+            "jordan",
+            "amman",
+            "egypt",
+            "cairo",
+            "sinai",
+            "ceasefire",
+            "two-state solution",
+            "settlement",
+            "zionist",
+            "zionism",
+            "knesset",
+            "al-aqsa",
+            "dome of the rock",
+            "golan heights",
+        ],
+        "israel_hebrew": [
+            "ישראל",
+            "ירושלים",
+            "תל אביב",
+            "חיפה",
+            "פלסטין",
+            "עזה",
+            "חמאס",
+            "גדה המערבית",
+            "לבנון",
+            "חיזבאללה",
+            "באר שבע",
+            "נתניהו",
+            'צה"ל',
+            "איראן",
+            "סוריה",
+            "מזרח התיכון",
+            "חדשות ישראל",
+            "חדשות היום",
+        ],
+        "australia": [
+            "australia",
+            "australian",
+            "aussie",
+            "auspol",
+            "sydney",
+            "melbourne",
+            "canberra",
+            "perth",
+            "brisbane",
+            "adelaide",
+            "tasmania",
+            "hobart",
+            "darwin",
+            "gold coast",
+            "newcastle",
+            "wollongong",
+            "anzac",
+            "anzus",
+            "scott morrison",
+            "anthony albanese",
+            "albo",
+            "liberal party",
+            "labor party",
+            "coles",
+            "woolworths",
+            "qantas",
+        ],
     }
+
+    # Hebrew character detection for Hebrew-source preference
+    _HEBREW_RE = re.compile(r"[\u0590-\u05FF]")
 
     @classmethod
     def _detect_region(cls, query: str) -> set[str]:
-        """Detect regions from query keywords."""
+        """Detect regions from query keywords, including Hebrew queries."""
         query_lower = query.lower()
         detected = set()
         for region, keywords in cls.REGION_KEYWORDS.items():
             if any(kw in query_lower for kw in keywords):
                 detected.add(region)
+        # Hebrew-script queries always prefer Hebrew sources alongside any region.
+        if cls._HEBREW_RE.search(query):
+            detected.add("israel_hebrew")
         return detected
 
     @classmethod
@@ -259,14 +456,20 @@ class RSSNewsProvider:
         detected_regions = cls._detect_region(query)
         regional_feeds = []
         world_feeds = []
+        hebrew_feeds = []
 
         for source_id, source_info in cls.RSS_FEEDS.items():
             feed_region = source_info.get("region", "world")
-            if feed_region in detected_regions:
+            if feed_region == "israel_hebrew":
+                hebrew_feeds.append((source_id, source_info))
+            elif feed_region in detected_regions:
                 regional_feeds.append((source_id, source_info))
             elif feed_region == "world":
                 world_feeds.append((source_id, source_info))
 
+        # Hebrew queries: Hebrew sources first, then regional, then world.
+        if "israel_hebrew" in detected_regions:
+            return hebrew_feeds + regional_feeds + world_feeds
         if detected_regions:
             return regional_feeds + world_feeds
         return world_feeds
@@ -365,13 +568,37 @@ class RSSNewsProvider:
                 pub_date = staggered.strftime("%a, %d %b %Y %H:%M:%S %z")
 
             # Filter by query if provided (only for specific search terms)
-            generic_terms = ['latest', 'world news', 'news today', 'current news', 'breaking news', 'news', 'headlines', 'headline', 'todays', "today's"]
+            generic_terms = [
+                "latest",
+                "world news",
+                "news today",
+                "current news",
+                "breaking news",
+                "news",
+                "headlines",
+                "headline",
+                "todays",
+                "today's",
+            ]
             if query and not any(term in query.lower() for term in generic_terms):
                 query_lower = query.lower()
                 search_text = f"{title} {description}".lower()
                 import string
+
                 # Strip punctuation from keywords to avoid "headlines?" not matching "headlines"
-                stopwords = {'what', 'when', 'where', 'which', 'latest', 'current', 'about', 'are', 'the', 'for', 'any'}
+                stopwords = {
+                    "what",
+                    "when",
+                    "where",
+                    "which",
+                    "latest",
+                    "current",
+                    "about",
+                    "are",
+                    "the",
+                    "for",
+                    "any",
+                }
                 keywords = []
                 for w in query_lower.split():
                     w_clean = w.strip(string.punctuation)
@@ -384,24 +611,26 @@ class RSSNewsProvider:
             clean_desc = description.strip()
             if len(clean_desc) > 400:
                 # Try to break at sentence boundary
-                sentence_end = clean_desc.find('. ', 150, 400)
+                sentence_end = clean_desc.find(". ", 150, 400)
                 if sentence_end == -1:
-                    sentence_end = clean_desc.rfind(' ', 350, 400)
+                    sentence_end = clean_desc.rfind(" ", 350, 400)
                 if sentence_end == -1:
                     sentence_end = 380
                 clean_desc = clean_desc[:sentence_end].rstrip() + "."
 
             sort_dt = _parse_rfc822_date(pub_date)
-            articles.append({
-                "title": title,
-                "description": clean_desc,
-                "url": link,
-                "source": source_name,
-                "published": pub_date,
-                "time_ago": _format_time_ago(pub_date),
-                "timestamp": pub_date,
-                "_sort_dt": sort_dt,
-            })
+            articles.append(
+                {
+                    "title": title,
+                    "description": clean_desc,
+                    "url": link,
+                    "source": source_name,
+                    "published": pub_date,
+                    "time_ago": _format_time_ago(pub_date),
+                    "timestamp": pub_date,
+                    "_sort_dt": sort_dt,
+                }
+            )
 
         return articles
 
@@ -435,26 +664,35 @@ class RSSNewsProvider:
         async with aiohttp.ClientSession(connector=connector) as session:
             tasks = []
             for source_id, source_info in feeds:
-                tasks.append(
-                    cls._fetch_rss_feed_async(session, source_id, source_info, query)
-                )
+                tasks.append(cls._fetch_rss_feed_async(session, source_id, source_info, query))
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
-        logger.info(f"NEWS fetch completed in {(time.time() - fetch_start):.2f}s for query: {query!r}")
 
-        for (source_id, source_info), result in zip(feeds, results):
-            if isinstance(result, Exception):
-                errors.append(f"{source_info['name']}: {type(result).__name__}")
-                continue
-            # Apply per-source limits based on region priority
-            feed_region = source_info.get("region", "world")
-            detected = cls._detect_region(query)
-            if detected and feed_region in detected:
-                all_articles.extend(result[:cls.MAX_ARTICLES_PER_SOURCE + 2])
-            elif detected and feed_region == "world":
-                all_articles.extend(result[:1])
-            else:
-                all_articles.extend(result[:cls.MAX_ARTICLES_PER_SOURCE])
+            for (source_id, source_info), result in zip(feeds, results):
+                if isinstance(result, Exception):
+                    errors.append(f"{source_info['name']}: {type(result).__name__}")
+                    continue
+                # Apply per-source limits based on region priority
+                feed_region = source_info.get("region", "world")
+                detected = cls._detect_region(query)
+                if detected and feed_region in detected:
+                    all_articles.extend(result[: cls.MAX_ARTICLES_PER_SOURCE + 2])
+                elif detected and feed_region == "world":
+                    all_articles.extend(result[:1])
+                else:
+                    all_articles.extend(result[: cls.MAX_ARTICLES_PER_SOURCE])
+
+            # Fallback to web search when RSS yields nothing, improving reliability
+            # for breaking or niche topics not yet in feeds.
+            if not all_articles and query:
+                search_articles = await cls._fetch_news_via_search(query, session)
+                if search_articles:
+                    all_articles.extend(search_articles)
+                    errors.append("rss_empty_used_web_search_fallback")
+
+        logger.info(
+            f"NEWS fetch completed in {(time.time() - fetch_start):.2f}s for query: {query!r}"
+        )
 
         if not all_articles:
             return NewsResult(
@@ -496,7 +734,9 @@ class RSSNewsProvider:
 
         # Format response
         formatted = cls._format_news_response(all_articles, query, for_voice=for_voice)
-        html_formatted = cls._format_news_response(all_articles, query, use_html=True, for_voice=for_voice)
+        html_formatted = cls._format_news_response(
+            all_articles, query, use_html=True, for_voice=for_voice
+        )
 
         return NewsResult(
             ok=True,
@@ -520,6 +760,7 @@ class RSSNewsProvider:
             if loop.is_running():
                 # We're inside an async context but being called sync — schedule it
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     future = pool.submit(
                         asyncio.run, cls.fetch_world_news_async(query, for_voice=for_voice)
@@ -534,7 +775,13 @@ class RSSNewsProvider:
             return asyncio.run(cls.fetch_world_news_async(query, for_voice=for_voice))
 
     @classmethod
-    def _format_news_response(cls, articles: list[dict[str, Any]], query: str = "", use_html: bool = False, for_voice: bool = False) -> str:
+    def _format_news_response(
+        cls,
+        articles: list[dict[str, Any]],
+        query: str = "",
+        use_html: bool = False,
+        for_voice: bool = False,
+    ) -> str:
         """Format articles into readable text or HTML.
 
         Args:
@@ -607,7 +854,9 @@ class RSSNewsProvider:
 
         header = f"Latest news about '{query}':" if query else "Latest World News:"
         parts.append(f'<p style="margin: 4px 0;"><b>{html.escape(header)}</b></p>')
-        parts.append(f'<p style="margin: 4px 0; color: #888; font-size: 0.85em;">(Fetched: {html.escape(fetch_time)})</p>')
+        parts.append(
+            f'<p style="margin: 4px 0; color: #888; font-size: 0.85em;">(Fetched: {html.escape(fetch_time)})</p>'
+        )
 
         for i, article in enumerate(articles, 1):
             title = html.escape(article.get("title", ""))
@@ -616,9 +865,13 @@ class RSSNewsProvider:
             description = html.escape(article.get("description", ""))
             url = article.get("url", "")
 
-            parts.append('<div style="margin: 10px 0; padding: 6px 0; border-bottom: 1px solid #3a4a5a;">')
+            parts.append(
+                '<div style="margin: 10px 0; padding: 6px 0; border-bottom: 1px solid #3a4a5a;">'
+            )
             parts.append(f'<p style="margin: 2px 0; font-size: 14px;"><b>{i}. {title}</b></p>')
-            parts.append(f'<p style="margin: 2px 0; color: #888; font-size: 0.85em;">Source: {source} • {time_ago}</p>')
+            parts.append(
+                f'<p style="margin: 2px 0; color: #888; font-size: 0.85em;">Source: {source} • {time_ago}</p>'
+            )
             if description:
                 parts.append(f'<p style="margin: 2px 0; color: #c8d0d6;">{description}</p>')
             if url:
@@ -626,16 +879,81 @@ class RSSNewsProvider:
                 parts.append(
                     f'<p style="margin: 2px 0;">'
                     f'<a href="{safe_url}" style="color: #66b3ff; text-decoration: underline;">Read more</a>'
-                    f'</p>'
+                    f"</p>"
                 )
-            parts.append('</div>')
+            parts.append("</div>")
 
         body = "\n".join(parts)
         return (
             '<html><body style="font-family: sans-serif; font-size: 13px; color: #d8e0e6;">'
-            f'{body}'
-            '</body></html>'
+            f"{body}"
+            "</body></html>"
         )
+
+    @classmethod
+    async def _fetch_news_via_search(
+        cls, query: str, session: aiohttp.ClientSession
+    ) -> list[dict[str, Any]]:
+        """Fallback news fetch using the project's web-search tool.
+
+        This is used when RSS feeds fail or return no relevant articles. It
+        broadens coverage and improves reliability for niche or breaking topics.
+        """
+        search_script = Path(__file__).resolve().parents[3] / "tools" / "internet" / "search_web.py"
+        if not search_script.exists():
+            return []
+
+        # Append "news" to focus search results on current events.
+        search_query = f"{query} news".strip()
+        try:
+            payload = json.dumps({"query": search_query, "max_results": 10})
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                str(search_script),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(search_script.parent.parent.parent),
+                env={**os.environ, "PYTHONPATH": str(search_script.parent.parent.parent)},
+            )
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(payload.encode("utf-8")), timeout=20.0
+            )
+            if proc.returncode != 0:
+                logger.warning(f"News web-search fallback failed: {stderr.decode()[:200]}")
+                return []
+            data = json.loads(stdout.decode("utf-8"))
+            results = data.get("results", [])
+            articles = []
+            for item in results:
+                title = item.get("title", "").strip()
+                snippet = item.get("snippet", "").strip()
+                url = item.get("url", "").strip()
+                if not title:
+                    continue
+                if len(snippet) > 400:
+                    sentence_end = snippet.find(". ", 150, 400)
+                    if sentence_end == -1:
+                        sentence_end = snippet.rfind(" ", 350, 400)
+                    if sentence_end == -1:
+                        sentence_end = 380
+                    snippet = snippet[:sentence_end].rstrip() + "."
+                articles.append(
+                    {
+                        "title": title,
+                        "description": snippet,
+                        "url": url,
+                        "source": item.get("source", "web search"),
+                        "published": "",
+                        "time_ago": "recently",
+                        "timestamp": "",
+                        "_sort_dt": None,
+                    }
+                )
+            return articles
+        except Exception as e:
+            logger.warning(f"News web-search fallback error: {e}")
+            return []
 
 
 class NewsAPIProvider:
@@ -646,7 +964,9 @@ class NewsAPIProvider:
     MAX_ARTICLES = 10
 
     @classmethod
-    def fetch_world_news(cls, query: str = "", api_key: str = "", for_voice: bool = False) -> NewsResult:
+    def fetch_world_news(
+        cls, query: str = "", api_key: str = "", for_voice: bool = False
+    ) -> NewsResult:
         """
         Fetch latest world news from NewsAPI.
 
@@ -664,7 +984,7 @@ class NewsAPIProvider:
                 ok=False,
                 text="",
                 source="newsapi",
-                error="NewsAPI key not configured (set NEWSAPI_API_KEY environment variable)"
+                error="NewsAPI key not configured: set NEWSAPI_API_KEY in lucy-v10/.env or environment",
             )
 
         if query:
@@ -690,17 +1010,11 @@ class NewsAPIProvider:
                 data = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             return NewsResult(
-                ok=False,
-                text="",
-                source="newsapi",
-                error=f"NewsAPI HTTP error: {e.code}"
+                ok=False, text="", source="newsapi", error=f"NewsAPI HTTP error: {e.code}"
             )
         except Exception as e:
             return NewsResult(
-                ok=False,
-                text="",
-                source="newsapi",
-                error=f"NewsAPI request failed: {e}"
+                ok=False, text="", source="newsapi", error=f"NewsAPI request failed: {e}"
             )
 
         if data.get("status") != "ok":
@@ -708,42 +1022,43 @@ class NewsAPIProvider:
                 ok=False,
                 text="",
                 source="newsapi",
-                error=f"NewsAPI error: {data.get('message', 'Unknown error')}"
+                error=f"NewsAPI error: {data.get('message', 'Unknown error')}",
             )
 
         articles = data.get("articles", [])
         if not articles:
-            return NewsResult(
-                ok=False,
-                text="",
-                source="newsapi",
-                error="No articles found"
-            )
+            return NewsResult(ok=False, text="", source="newsapi", error="No articles found")
 
         formatted_articles = []
         for article in articles:
             pub_date = article.get("publishedAt", "")
             desc = article.get("description", "") or ""
             if len(desc) > 400:
-                sentence_end = desc.find('. ', 150, 400)
+                sentence_end = desc.find(". ", 150, 400)
                 if sentence_end == -1:
-                    sentence_end = desc.rfind(' ', 350, 400)
+                    sentence_end = desc.rfind(" ", 350, 400)
                 if sentence_end == -1:
                     sentence_end = 380
                 desc = desc[:sentence_end].rstrip() + "."
 
-            formatted_articles.append({
-                "title": article.get("title", ""),
-                "description": desc,
-                "url": article.get("url", ""),
-                "source": article.get("source", {}).get("name", "Unknown"),
-                "published": pub_date,
-                "time_ago": _format_time_ago(pub_date),
-                "timestamp": pub_date,
-            })
+            formatted_articles.append(
+                {
+                    "title": article.get("title", ""),
+                    "description": desc,
+                    "url": article.get("url", ""),
+                    "source": article.get("source", {}).get("name", "Unknown"),
+                    "published": pub_date,
+                    "time_ago": _format_time_ago(pub_date),
+                    "timestamp": pub_date,
+                }
+            )
 
-        formatted = RSSNewsProvider._format_news_response(formatted_articles, query, use_html=False, for_voice=for_voice)
-        html_formatted = RSSNewsProvider._format_news_response(formatted_articles, query, use_html=True, for_voice=for_voice)
+        formatted = RSSNewsProvider._format_news_response(
+            formatted_articles, query, use_html=False, for_voice=for_voice
+        )
+        html_formatted = RSSNewsProvider._format_news_response(
+            formatted_articles, query, use_html=True, for_voice=for_voice
+        )
 
         return NewsResult(
             ok=True,

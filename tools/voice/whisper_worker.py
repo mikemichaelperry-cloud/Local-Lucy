@@ -15,8 +15,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-from runtime_control import iso_now
-
 try:
     import requests
 
@@ -69,7 +67,9 @@ def _resolve_root() -> Path:
 
 
 def resolve_whisper_server_binary() -> Path:
-    return _resolve_root() / "runtime" / "voice" / "whisper.cpp" / "build" / "bin" / "whisper-server"
+    return (
+        _resolve_root() / "runtime" / "voice" / "whisper.cpp" / "build" / "bin" / "whisper-server"
+    )
 
 
 def resolve_whisper_worker_pid_file() -> Path:
@@ -131,11 +131,29 @@ def _health_check(port: int, timeout: float = 2.0) -> bool:
         return False
 
 
+def resolve_whisper_language(model_path: Path | str | None = None) -> str:
+    """Return the whisper language flag for the active model/configuration.
+
+    Order of precedence:
+      1. LUCY_VOICE_WHISPER_LANGUAGE environment variable
+      2. 'en' for English-only *.en.bin models
+      3. 'auto' for multilingual models
+    """
+    explicit = os.environ.get("LUCY_VOICE_WHISPER_LANGUAGE", "").strip().lower()
+    if explicit and explicit not in {"none", "default"}:
+        return explicit
+    path = str(model_path or "")
+    if ".en.bin" in path:
+        return "en"
+    return "auto"
+
+
 def ensure_whisper_worker(
     model_path: Path | str,
     *,
     use_gpu: bool | None = None,
     port: int | None = None,
+    language: str | None = None,
 ) -> int | None:
     """Start the whisper-server worker if not already running.
 
@@ -144,6 +162,8 @@ def ensure_whisper_worker(
 
     GPU usage is auto-detected via nvidia-smi unless explicitly disabled
     via LUCY_VOICE_WHISPER_GPU=0 or the use_gpu parameter.
+
+    Language defaults to the value returned by resolve_whisper_language(model_path).
     """
     if use_gpu is None:
         use_gpu = _gpu_available()
@@ -167,6 +187,7 @@ def ensure_whisper_worker(
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     resolve_whisper_worker_log_file().parent.mkdir(parents=True, exist_ok=True)
 
+    whisper_language = language if language else resolve_whisper_language(model_path)
     command = [
         str(binary),
         "--model",
@@ -176,7 +197,7 @@ def ensure_whisper_worker(
         "--host",
         "127.0.0.1",
         "--language",
-        "en",
+        whisper_language,
         "--no-timestamps",
         "--beam-size",
         "1",

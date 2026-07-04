@@ -2,6 +2,7 @@
 """Tests for RequestTool."""
 
 import asyncio
+import json
 import sys
 import os
 
@@ -14,16 +15,46 @@ from base_tool_wrapper import ToolConfig, ToolResult
 from request_tool import RequestTool
 
 
-# Skip integration tests when Ollama is not available
+_OLLAMA_READY: bool | None = None
+
+
+# Skip integration tests when Ollama is not available or unresponsive
 def _ollama_is_up() -> bool:
+    global _OLLAMA_READY
+    if _OLLAMA_READY is not None:
+        return _OLLAMA_READY
+
     try:
         import urllib.request
 
         req = urllib.request.Request("http://127.0.0.1:11434/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=2) as resp:
-            return resp.status == 200
+            if resp.status != 200:
+                _OLLAMA_READY = False
+                return _OLLAMA_READY
     except Exception:
-        return False
+        _OLLAMA_READY = False
+        return _OLLAMA_READY
+
+    # Verify the model used by these tests can respond promptly.  Ollama may be
+    # running but stuck loading/swap models; in that case skip rather than hang
+    # the suite for tens of seconds.
+    try:
+        payload = json.dumps(
+            {"model": "local-lucy-fast:latest", "prompt": "hi", "stream": False}
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            "http://127.0.0.1:11434/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            _OLLAMA_READY = resp.status == 200
+            return _OLLAMA_READY
+    except Exception:
+        _OLLAMA_READY = False
+        return _OLLAMA_READY
 
 
 @pytest.mark.asyncio

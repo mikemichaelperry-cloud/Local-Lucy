@@ -22,6 +22,17 @@ from PySide6.QtWidgets import (
 from app.ui_levels import ENGINEERING, POWER, level_at_least
 from app.widgets.vu_meter import VoiceVUMeter
 
+try:
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
+    from memory.memory_service import get_current_user_identity as _get_current_user_identity
+except Exception:
+
+    def _get_current_user_identity() -> str | None:
+        return None
+
 
 class ControlPanel(QFrame):
     refresh_requested = Signal()
@@ -41,10 +52,13 @@ class ControlPanel(QFrame):
     ptt_released_requested = Signal()
     reload_profile_requested = Signal()
     shutdown_requested = Signal()
+    persona_clear_requested = Signal()
+    persona_change_requested = Signal(str)
 
     # Model label mapping: backend value → display label
     _MODEL_LABELS: dict[str, str] = {
-        "local-lucy-llama31": "local-lucy-llama31 (llama3.1 8B, default)",
+        "auto": "Auto (Lucy chooses per query)",
+        "local-lucy-llama31": "local-lucy-llama31 (llama3.1 8B)",
         "local-lucy": "local-lucy (qwen3 14B)",
         "local-lucy-fast": "local-lucy-fast (qwen3 14B)",
         "local-lucy-mistral": "local-lucy-mistral (mistral-nemo 12B)",
@@ -78,6 +92,8 @@ class ControlPanel(QFrame):
         self._open_logs_button: QPushButton | None = None
         self._open_state_button: QPushButton | None = None
         self._safe_actions_note: QLabel | None = None
+        self._persona_indicator: QLabel | None = None
+        self._clear_persona_button: QPushButton | None = None
         self._current_values = {
             "mode": "",
             "conversation": "",
@@ -183,13 +199,15 @@ class ControlPanel(QFrame):
         self._voice_selector.activated.connect(self._handle_voice_activated)
 
         self._augmentation_policy_selector = QComboBox()
-        self._augmentation_policy_selector.addItems(["disabled", "fallback_only", "direct_allowed"])
+        self._augmentation_policy_selector.addItems(
+            ["auto", "disabled", "fallback_only", "direct_allowed"]
+        )
         self._augmentation_policy_selector.activated.connect(
             self._handle_augmentation_policy_activated
         )
 
         self._augmented_provider_selector = QComboBox()
-        self._augmented_provider_selector.addItems(["wikipedia", "openai", "kimi"])
+        self._augmented_provider_selector.addItems(["auto", "wikipedia", "openai", "kimi"])
         self._augmented_provider_selector.activated.connect(
             self._handle_augmented_provider_activated
         )
@@ -202,7 +220,37 @@ class ControlPanel(QFrame):
         self._model_selector.addItems(list(self._MODEL_LABELS.values()))
         self._model_selector.activated.connect(self._handle_model_activated)
 
+        self._persona_indicator = QLabel("No active persona")
+        self._persona_indicator.setObjectName("cardLabel")
+        self._persona_indicator.setToolTip(
+            "Active user persona. Choose manually below, or set by saying 'I am Michael'. "
+            "If a LoRA-tagged model exists, Lucy uses it; otherwise "
+            "she falls back to prompt-level persona injection."
+        )
+
+        self._persona_selector = QComboBox()
+        self._persona_selector.addItems(["auto", "Michael"])
+        self._persona_selector.setToolTip(
+            "Force a persona for all models, or leave as auto to let Lucy detect it from your words."
+        )
+        self._persona_selector.activated.connect(self._handle_persona_activated)
+
+        self._clear_persona_button = QPushButton("Clear")
+        self._clear_persona_button.setToolTip("Forget the active user identity")
+        self._clear_persona_button.clicked.connect(self._handle_clear_persona)
+
+        persona_row = QFrame()
+        persona_layout = QHBoxLayout(persona_row)
+        persona_layout.setContentsMargins(0, 0, 0, 0)
+        persona_layout.setSpacing(8)
+        persona_layout.addWidget(QLabel("persona"))
+        persona_layout.addStretch(1)
+        persona_layout.addWidget(self._persona_selector)
+        persona_layout.addWidget(self._persona_indicator)
+        persona_layout.addWidget(self._clear_persona_button)
+
         layout.addWidget(self._build_labeled_row("model", self._model_selector))
+        layout.addWidget(persona_row)
         layout.addWidget(self._build_labeled_row("conversation", self._conversation_selector))
         layout.addWidget(self._build_labeled_row("memory", self._memory_selector))
         layout.addWidget(self._build_labeled_row("evidence", self._evidence_selector))
@@ -523,18 +571,23 @@ class ControlPanel(QFrame):
     def set_interface_level(self, level: str) -> None:
         show_profile_group = level_at_least(level, ENGINEERING)
         show_power_widgets = level_at_least(level, POWER)
-        for group in (
-            self._mode_group,
-            self._feature_group,
-            self._profile_group,
-        ):
-            if group is not None:
-                group.setVisible(group is not self._profile_group or show_profile_group)
+        # Trim the HMI for autonomous operation: mode and runtime toggle selectors
+        # are hidden at operator level. They remain available to engineering/power
+        # users who need to override Lucy's automatic choices.
+        show_controls = level_at_least(level, ENGINEERING)
+        if self._mode_group is not None:
+            self._mode_group.setVisible(show_controls)
+        if self._feature_group is not None:
+            self._feature_group.setVisible(show_controls)
+        if self._profile_group is not None:
+            self._profile_group.setVisible(show_profile_group)
+        if self._mode_note is not None:
+            self._mode_note.setVisible(show_controls)
+        if self._feature_note is not None:
+            self._feature_note.setVisible(show_controls)
         # Voice PTT visibility is controlled by voice state, not interface level
         self._refresh_voice_ptt()
         for widget in (
-            self._mode_note,
-            self._feature_note,
             self._profile_note,
             self._copy_button,
             self._open_logs_button,
@@ -545,7 +598,10 @@ class ControlPanel(QFrame):
                 widget.setVisible(show_power_widgets)
 
     def update_control_state(
-        self, top_status: dict[str, str], current_state: dict[str, Any] | None = None
+        self,
+        top_status: dict[str, str],
+        current_state: dict[str, Any] | None = None,
+        pending_values: dict[str, str] | None = None,
     ) -> None:
         # Use the authoritative current_state model value so the selector reflects
         # the configured model even when the top-status label is formatted with
@@ -555,6 +611,13 @@ class ControlPanel(QFrame):
             configured_model = str(current_state.get("model", "")).strip()
         if not configured_model:
             configured_model = top_status.get("Model", "").strip()
+
+        pending_values = pending_values or {}
+        # Persona is read from persistent storage; while a set/clear action is in
+        # flight we must show the requested value optimistically so the dropdown
+        # does not snap back to "auto" before the backend commit completes.
+        pending_persona = pending_values.get("persona")
+        active_persona = pending_persona if pending_persona else _get_current_user_identity()
 
         values = {
             "profile": top_status.get("Profile", "").strip(),
@@ -567,6 +630,7 @@ class ControlPanel(QFrame):
             "augmented_provider": top_status.get("Augmented Provider", "").strip().lower(),
             "model": configured_model,
             "learner": top_status.get("Learner", "").strip().lower(),
+            "persona": active_persona,
         }
         self._current_values.update(values)
         if self._profile_value_label is not None:
@@ -581,6 +645,8 @@ class ControlPanel(QFrame):
         self._set_selector_value(self._augmented_provider_selector, values["augmented_provider"])
         self._set_selector_value(self._learner_selector, values.get("learner", ""))
         self._set_selector_value(self._model_selector, values.get("model", ""))
+        self._set_persona_selector_value(values.get("persona"))
+        self._update_persona_indicator(values.get("persona"))
         self._refresh_voice_ptt()
 
     def update_voice_runtime(self, voice_runtime: dict[str, Any]) -> None:
@@ -741,6 +807,41 @@ class ControlPanel(QFrame):
             model_value,
             self.model_change_requested,
         )
+
+    def _set_persona_selector_value(self, persona: str | None) -> None:
+        """Set the persona selector to reflect the active identity."""
+        if self._persona_selector is None:
+            return
+        self._persona_selector.blockSignals(True)
+        value = persona.capitalize() if persona else "auto"
+        index = self._persona_selector.findText(value)
+        self._persona_selector.setCurrentIndex(index if index >= 0 else 0)
+        self._persona_selector.blockSignals(False)
+
+    def _update_persona_indicator(self, persona: str | None) -> None:
+        """Update the persona indicator and clear button state."""
+        if self._persona_indicator is None:
+            return
+        if persona:
+            self._persona_indicator.setText(f"Speaking as: {persona}")
+            if self._clear_persona_button is not None:
+                self._clear_persona_button.setEnabled(True)
+        else:
+            self._persona_indicator.setText("No active persona")
+            if self._clear_persona_button is not None:
+                self._clear_persona_button.setEnabled(False)
+
+    def _handle_clear_persona(self) -> None:
+        """Emit a request to clear the active user identity."""
+        self.persona_clear_requested.emit()
+
+    def _handle_persona_activated(self, index: int) -> None:
+        """Emit a request to set or clear the active persona."""
+        value = self._persona_selector.itemText(index)
+        if value == "auto":
+            self.persona_clear_requested.emit()
+        else:
+            self.persona_change_requested.emit(value.lower())
 
     def _emit_if_changed(self, key: str, requested_value: str, signal: Signal) -> None:
         if requested_value == self._current_values.get(key, ""):

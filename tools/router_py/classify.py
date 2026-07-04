@@ -19,6 +19,7 @@ from router_py.logging_config import get_logger
 
 # Centralized pipeline types (Stage 5 migration)
 from router_py.request_types import ClassificationResult, RoutingDecision
+from router_py.policy_router import PolicyDecision, PolicyRouter
 
 # Add router/core to path for intent_classifier
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -32,6 +33,11 @@ _FEEDBACK_BUF_MTIME: float = 0.0
 _FEEDBACK_BUF_PATH: Path | None = None
 
 _LOGGER = get_logger("router_py.classify")
+
+# Deterministic policy-gate layer.  Run before the embedding router so keyword
+# guards (time, weather, finance, news, etc.) are explicit, explainable, and
+# testable rather than tangled inside the k-NN path.
+_POLICY_ROUTER = PolicyRouter()
 
 
 def _load_feedback_buffer(path: Path) -> dict:
@@ -691,6 +697,36 @@ def _log_decision(
         pass
 
 
+def _routing_decision_from_policy(
+    classification: ClassificationResult,
+    policy_decision: PolicyDecision,
+    query: str = "",
+) -> RoutingDecision:
+    """Convert a deterministic PolicyDecision into a RoutingDecision."""
+    intent_family = classification.intent_family
+    if policy_decision.route in ("NEWS", "TIME", "WEATHER", "FINANCE"):
+        intent_family = "current_evidence"
+
+    decision = RoutingDecision(
+        route=policy_decision.route,
+        mode="AUTO",
+        intent_family=intent_family,
+        confidence=policy_decision.confidence,
+        provider=policy_decision.provider,
+        provider_usage_class=policy_decision.provider_usage_class,
+        evidence_mode=policy_decision.evidence_mode,
+        evidence_reason=policy_decision.evidence_reason,
+        requires_evidence=policy_decision.requires_evidence,
+        policy_reason=policy_decision.policy_reason,
+        ephemeral=policy_decision.ephemeral,
+        decision_stage="policy",
+        reason_code=policy_decision.reason_code,
+        matched_rule=policy_decision.matched_rule,
+        trace=policy_decision.trace,
+    )
+    return decision
+
+
 def select_route(
     classification: ClassificationResult,
     policy: str = "fallback_only",
@@ -738,28 +774,17 @@ def select_route(
     # Shared lowercased query for the embedding path — compute once, reuse everywhere
     q_lower = query.lower()
 
-    # Finance query guard — catch unambiguous live-market queries BEFORE the
-    # short-query guard so that brief queries like "EUR to USD" or "TSLA" are
-    # treated as live data requests, not social utterances.
-    if query and _is_financial_ephemeral(query):
-        decision = RoutingDecision(
-            route="FINANCE",
-            mode="AUTO",
-            intent_family="current_evidence",
-            confidence=1.0,
-            provider="finance",
-            provider_usage_class="free",
-            evidence_mode="",
-            evidence_reason="financial_data",
-            requires_evidence=False,
-            policy_reason="router_finance_guard",
-            ephemeral=True,
-        )
+    # Policy router (Phase 1): deterministic gates run before the embedding
+    # router so operational routes (finance, time, weather, news, medical/vet,
+    # current information, etc.) are explicit, explainable, and testable.
+    policy_decision = _POLICY_ROUTER.apply(query, classification)
+    if policy_decision is not None:
+        decision = _routing_decision_from_policy(classification, policy_decision, query=query)
         _log_decision(
             query or "",
             decision,
-            embedding_route="FINANCE_KEYWORD_GUARD",
-            guards_fired=["finance_keyword_guard"],
+            embedding_route=policy_decision.reason_code,
+            guards_fired=[policy_decision.matched_rule],
         )
         return decision
 
@@ -819,42 +844,6 @@ def select_route(
         if len(q_stripped) >= 5 and q_stripped.isupper() and q_stripped.isalpha():
             return _make_local_decision(classification, query=query)
 
-    # Medical/veterinary emergency override — must run BEFORE the personal/family
-    # guard so that health emergencies are NEVER forced LOCAL, even when the
-    # query contains personal pronouns ("my dog", "my child", etc.).
-    # This is a belt-and-suspenders safety check: the classifier already sets
-    # evidence_mode="required" for these, but we enforce it at the guard level
-    # to protect against stale runtime caches or module-aliasing issues.
-    if classification.evidence_reason in (
-        "medical_context",
-        "medical_body_symptom",
-        "veterinary_context",
-    ):
-        decision = _make_augmented_decision(classification, prefer_paid=False, query=query)
-        _log_decision(
-            query or "",
-            decision,
-            embedding_route="MEDICAL_VET_SAFETY_PRE_GUARD",
-            guards_fired=["medical_vet_safety_pre_guard"],
-        )
-        return decision
-
-    # Personal / family guard: queries about the user's own relations must
-    # stay LOCAL so persistent facts from memory.db can be injected.
-    # SAFETY EXCEPTION: medical/veterinary/legal evidence_mode=required queries
-    # must NOT be forced LOCAL — they need cited, vetted sources.
-    # (Also covered by the pre-guard above; kept as defense-in-depth.)
-    if query and _is_personal_family_query(query):
-        if classification.evidence_mode != "required":
-            decision = _make_local_decision(classification, query=query)
-            _log_decision(
-                query or "",
-                decision,
-                embedding_route="PERSONAL_FAMILY_OVERRIDE",
-                guards_fired=["personal_family_override"],
-            )
-            return decision
-
     # Fallback when no query provided
     if not query:
         if classification.evidence_mode == "required":
@@ -867,131 +856,6 @@ def select_route(
             else:
                 return _make_local_with_fallback(classification, query=query)
         return _make_local_decision(classification, query=query)
-
-    # Time query guard — catch unambiguous time queries that the embedding router
-    # may miss (e.g. "what time is it" sometimes routes to LOCAL).
-    if query and _is_time_query(query):
-        decision = RoutingDecision(
-            route="TIME",
-            mode="AUTO",
-            intent_family="current_evidence",
-            confidence=1.0,
-            provider="timeapi",
-            provider_usage_class="free",
-            evidence_mode="",
-            evidence_reason="time_query",
-            requires_evidence=False,
-            policy_reason="router_time_guard",
-            ephemeral=True,
-        )
-        _log_decision(
-            query or "",
-            decision,
-            embedding_route="TIME_KEYWORD_GUARD",
-            guards_fired=["time_keyword_guard"],
-        )
-        return decision
-
-    # Weather query guard — catch unambiguous weather queries that the embedding
-    # router may miss (e.g. "weather in London" sometimes routes to LOCAL).
-    if query and _is_weather_query(query):
-        decision = RoutingDecision(
-            route="WEATHER",
-            mode="AUTO",
-            intent_family="current_evidence",
-            confidence=1.0,
-            provider="weather",
-            provider_usage_class="free",
-            evidence_mode="",
-            evidence_reason="weather_query",
-            requires_evidence=False,
-            policy_reason="router_weather_guard",
-            ephemeral=True,
-        )
-        _log_decision(
-            query or "",
-            decision,
-            embedding_route="WEATHER_KEYWORD_GUARD",
-            guards_fired=["weather_keyword_guard"],
-        )
-        return decision
-
-    # News query guard — catch unambiguous news queries that the embedding router
-    # may miss (e.g. "What's the latest world news?" sometimes routes LOCAL).
-    # Skip when policy layer already identified this as live conflict (policy > guard).
-    if query and (_is_clear_news_query(query) or _is_news_query_typos(query)):
-        # Unambiguous news phrasing always routes to NEWS, even when the policy
-        # layer flags a live conflict. Headline requests ("latest news", "breaking
-        # news") are distinct from analysis questions ("will Russia win").
-        decision = RoutingDecision(
-            route="NEWS",
-            mode="AUTO",
-            intent_family="current_evidence",
-            confidence=1.0,
-            provider="news",
-            provider_usage_class="local",
-            evidence_mode="",
-            evidence_reason="news_synthesis",
-            requires_evidence=False,
-            policy_reason="router_news_guard",
-            ephemeral=True,
-        )
-        _log_decision(
-            query or "",
-            decision,
-            embedding_route="NEWS_KEYWORD_GUARD",
-            guards_fired=["news_keyword_guard"],
-        )
-        return decision
-
-    # Conflict analysis guard — catch prediction/analysis questions about live
-    # conflicts that the embedding router may route to LOCAL (e.g. "Will Russia
-    # win in Ukraine", "Probability of Israel-Iran war").
-    if query and _is_conflict_analysis_query(query):
-        decision = RoutingDecision(
-            route="AUGMENTED",
-            mode="AUTO",
-            intent_family="current_evidence",
-            confidence=1.0,
-            provider="openai",
-            provider_usage_class="paid",
-            evidence_mode="required",
-            evidence_reason="conflict_live",
-            requires_evidence=True,
-            policy_reason="router_conflict_analysis",
-            ephemeral=True,
-        )
-        _log_decision(
-            query or "",
-            decision,
-            embedding_route="CONFLICT_ANALYSIS_GUARD",
-            guards_fired=["conflict_analysis_guard"],
-        )
-        return decision
-
-    # Recipe query guard — catch recipe requests that the embedding router
-    # may route to LOCAL because training data labels them LOCAL.
-    if query and _is_cooking_query(query):
-        decision = RoutingDecision(
-            route="AUGMENTED",
-            mode="AUTO",
-            intent_family="background_overview",
-            confidence=1.0,
-            provider="wikipedia",
-            provider_usage_class="free",
-            evidence_mode="",
-            evidence_reason="",
-            requires_evidence=False,
-            policy_reason="router_recipe_guard",
-            ephemeral=True,
-        )
-        _log_decision(
-            query or "",
-            decision,
-            embedding_route="RECIPE_KEYWORD_GUARD",
-            guards_fired=["recipe_keyword_guard"],
-        )
-        return decision
 
     # Medical/veterinary follow-up guard: after an EVIDENCE response to a
     # medical or veterinary query, ambiguous follow-ups ("what about that",
@@ -1169,6 +1033,21 @@ def select_route(
                 route = memory_gate_override
                 guards_fired = guards_fired + ["memory_routing_gate"]
 
+            # Diagnostic trace for embedding/router path
+            embedding_trace = {
+                "routing_source": result.get("routing_source", "knn"),
+                "classifier_route": result.get("classifier_route", ""),
+                "classifier_confidence": result.get("classifier_confidence", 0.0),
+                "confidence_margin": result.get("confidence_margin", 0.0),
+                "confidence_entropy": result.get("confidence_entropy", 0.0),
+            }
+            embedding_meta = {
+                "decision_stage": "embedding",
+                "reason_code": f"semantic:{embedding_trace['routing_source']}",
+                "matched_rule": embedding_trace["routing_source"],
+                "trace": embedding_trace,
+            }
+
             if route == "LOCAL":
                 decision = RoutingDecision(
                     route="LOCAL",
@@ -1182,6 +1061,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_local",
                     ephemeral=ephemeral,
+                    **embedding_meta,
                 )
             elif route == "NEWS":
                 decision = RoutingDecision(
@@ -1196,6 +1076,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_news",
                     ephemeral=True,
+                    **embedding_meta,
                 )
             elif route == "TIME":
                 decision = RoutingDecision(
@@ -1210,6 +1091,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_time",
                     ephemeral=True,
+                    **embedding_meta,
                 )
             elif route == "WEATHER":
                 decision = RoutingDecision(
@@ -1224,6 +1106,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_weather",
                     ephemeral=True,
+                    **embedding_meta,
                 )
             elif route == "FINANCE":
                 decision = RoutingDecision(
@@ -1238,6 +1121,7 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason="router_finance",
                     ephemeral=True,
+                    **embedding_meta,
                 )
             else:  # AUGMENTED or EVIDENCE
                 from router_py import provider_resolver
@@ -1277,10 +1161,72 @@ def select_route(
                     requires_evidence=requires_evidence,
                     policy_reason=policy_reason,
                     ephemeral=ephemeral,
+                    **embedding_meta,
                 )
 
-            # Memory follow-up guard: if the query is an explicit memory recall or
-            # follow-up, override AUGMENTED/NEWS/TIME/WEATHER back to LOCAL.
+            # Continuation follow-up inheritance: "more details", "tell me more",
+            # "elaborate", etc. should stay on the previous route so the user gets
+            # a cited/elaborated answer instead of "what do you want me to clarify?".
+            if _CONTINUATION_FOLLOWUP_RE.search(query):
+                try:
+                    _ns_cont = Path(
+                        os.environ.get(
+                            "LUCY_RUNTIME_NAMESPACE_ROOT",
+                            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+                        )
+                    )
+                    _buf_path_cont = _ns_cont / "feedback_buffer.json"
+                    if _buf_path_cont.exists():
+                        _data_cont = _load_feedback_buffer(_buf_path_cont)
+                        _exchanges_cont = _data_cont.get("exchanges", [])
+                        if _exchanges_cont:
+                            _last_route_cont = str(_exchanges_cont[-1].get("route", "")).upper()
+                            if _last_route_cont in (
+                                "AUGMENTED",
+                                "EVIDENCE",
+                                "NEWS",
+                                "TIME",
+                                "WEATHER",
+                                "FINANCE",
+                            ):
+                                # Preserve the prior evidence/live-data route.  Copy the
+                                # current decision's metadata but swap the route/provider.
+                                prior_provider = {
+                                    "AUGMENTED": decision.provider,
+                                    "EVIDENCE": "trusted",
+                                    "NEWS": "news",
+                                    "TIME": "timeapi",
+                                    "WEATHER": "weather",
+                                    "FINANCE": "finance",
+                                }.get(_last_route_cont, decision.provider)
+                                prior_usage = {
+                                    "AUGMENTED": decision.provider_usage_class,
+                                    "EVIDENCE": "local",
+                                    "NEWS": "local",
+                                    "TIME": "free",
+                                    "WEATHER": "free",
+                                    "FINANCE": "free",
+                                }.get(_last_route_cont, decision.provider_usage_class)
+                                decision = RoutingDecision(
+                                    route=_last_route_cont,
+                                    mode="AUTO",
+                                    intent_family=decision.intent_family,
+                                    confidence=decision.confidence,
+                                    provider=prior_provider,
+                                    provider_usage_class=prior_usage,
+                                    evidence_mode=decision.evidence_mode,
+                                    evidence_reason=decision.evidence_reason,
+                                    requires_evidence=decision.requires_evidence,
+                                    policy_reason="continuation_followup_inherit",
+                                    ephemeral=decision.ephemeral,
+                                    trace=decision.trace,
+                                )
+                                guards_fired = guards_fired + ["continuation_followup_inherit"]
+                except Exception:
+                    pass
+
+            # Memory follow-up guard: if the query is an explicit memory recall,
+            # override AUGMENTED/NEWS/TIME/WEATHER back to LOCAL.
             # EVIDENCE routes (medical/vet/financial/legal) are preserved — a follow-up
             # "why?" to a medical answer must stay on the evidence route, not drop to LOCAL.
             # Only active when session memory is enabled, to avoid false positives on
@@ -1293,24 +1239,26 @@ def select_route(
                 if q and (
                     _MEMORY_EXPLICIT_RECALL_RE.search(q) or _MEMORY_FOLLOWUP_STRONG_RE.search(q)
                 ):
-                    # Live-data keywords preserve embedding decision (e.g. "What about the weather?")
-                    q_lower = q.lower()
-                    has_live_data = any(kw in q_lower for kw in _LIVE_DATA_KEYWORDS)
-                    if not has_live_data:
-                        decision = RoutingDecision(
-                            route="LOCAL",
-                            mode="AUTO",
-                            intent_family=decision.intent_family,
-                            confidence=decision.confidence,
-                            provider="local",
-                            provider_usage_class="local",
-                            evidence_mode="",
-                            evidence_reason="memory_followup",
-                            requires_evidence=False,
-                            policy_reason="memory_followup_override",
-                            ephemeral=decision.ephemeral,
-                        )
-                        guards_fired = guards_fired + ["memory_followup_override"]
+                    # Continuation prompts already inherited the prior route above.
+                    if not _CONTINUATION_FOLLOWUP_RE.search(q):
+                        # Live-data keywords preserve embedding decision (e.g. "What about the weather?")
+                        q_lower = q.lower()
+                        has_live_data = any(kw in q_lower for kw in _LIVE_DATA_KEYWORDS)
+                        if not has_live_data:
+                            decision = RoutingDecision(
+                                route="LOCAL",
+                                mode="AUTO",
+                                intent_family=decision.intent_family,
+                                confidence=decision.confidence,
+                                provider="local",
+                                provider_usage_class="local",
+                                evidence_mode="",
+                                evidence_reason="memory_followup",
+                                requires_evidence=False,
+                                policy_reason="memory_followup_override",
+                                ephemeral=decision.ephemeral,
+                            )
+                            guards_fired = guards_fired + ["memory_followup_override"]
 
             _log_decision(
                 query,
@@ -1365,13 +1313,18 @@ def _is_conflict_analysis_query(query: str) -> bool:
         return False
     q = query.lower().strip()
     # Prediction patterns about conflicts
+    # Historical / retrospective conflicts should stay LOCAL.
+    historical_cues = ("was the outcome", "were the outcome", "historical", "history of")
+    if any(cue in q for cue in historical_cues):
+        return False
+
     prediction_patterns = [
         r"will\s+\w+\s+win\s+(in|the|this|a)",
         r"probability\s+of\s+.*\bwar\b",
         r"probability\s+of\s+.*\bconflict\b",
         r"who\s+will\s+win\s+(the|this|a)\s+\w*\bwar\b",
-        r"outcome\s+of\s+.*\bwar\b",
-        r"outcome\s+of\s+.*\bconflict\b",
+        r"outcome\s+of\s+(the|this|current|ongoing)\s+.*\bwar\b",
+        r"outcome\s+of\s+(the|this|current|ongoing)\s+.*\bconflict\b",
         r"chances\s+of\s+.*\bwar\b",
     ]
     return any(re.search(p, q) for p in prediction_patterns)
@@ -1488,11 +1441,13 @@ def _is_weather_query(query: str) -> bool:
         return False
 
     weather_patterns = [
-        r"\bweather\s*(in|at|for|near|today|now)?\b",
+        r"\bweather\s*(in|at|for|near|today|now|outside|like)?\b",
         r"^(current weather|weather today|weather now|what is the weather|what's the weather)",
         r"\btemperature\s+(in|at|for)\b",
         r"\bforecast\s+(for|in)\b",
         r"^(will it rain|is it raining|do i need an umbrella)",
+        # Temperature words with immediate context imply a current local weather ask.
+        r"\b(is it|will it be|why is it)\s+\w*\s*(hot|cold|warm|cool|freezing|chilly|humid|dry)\s+(outside|today|now|right now|out there|tonight|this morning|this afternoon)\b",
     ]
     return any(__import__("re").search(p, q) for p in weather_patterns)
 
@@ -1876,7 +1831,7 @@ def _is_capability_query(query: str) -> bool:
         "Do you have any fallback such as OpenAI or Kimi?"
         "Can you search the web?"
         "What providers do you use?"
-        "Can you translate from Hebrew to English?"
+        "Can you translate from French to English?"
     """
     if not query:
         return False
@@ -1995,7 +1950,6 @@ def _is_capability_query(query: str) -> bool:
         for t in [
             "translate",
             "translation",
-            "hebrew",
             "arabic",
             "english",
             "french",
@@ -2025,7 +1979,6 @@ def _is_capability_query(query: str) -> bool:
     if ("translate" in q or "translation" in q) and any(
         t in q
         for t in [
-            "hebrew",
             "arabic",
             "english",
             "french",
@@ -2052,8 +2005,8 @@ def _is_language_or_translation_query(query: str) -> bool:
     These should route to LOCAL so the model can answer directly
     instead of being misrouted to TIME/NEWS/WEATHER by the embedding.
     Examples:
-        - "can you translate from hebrew to english"
-        - "do you understand hebrew"
+        - "can you translate from french to english"
+        - "do you understand french"
         - "what languages do you know"
     """
     if not query:
@@ -2068,7 +2021,6 @@ def _is_language_or_translation_query(query: str) -> bool:
         "what languages",
         "which languages",
         "how many languages",
-        "speak hebrew",
         "speak arabic",
         "speak french",
         "speak spanish",
@@ -2076,15 +2028,10 @@ def _is_language_or_translation_query(query: str) -> bool:
         "speak chinese",
         "speak japanese",
         "speak russian",
-        "hebrew to english",
-        "english to hebrew",
         "arabic to english",
         "english to arabic",
-        "from hebrew",
-        "to hebrew",
         "from arabic",
         "to arabic",
-        "in hebrew",
         "in arabic",
     ]
     return any(marker in q for marker in language_markers)
@@ -2442,8 +2389,15 @@ _MEMORY_FOLLOWUP_RE = re.compile(
 _MEMORY_EXPLICIT_RECALL_RE = re.compile(
     r"\b(what did I say|what was my|what is my|remind me|do you remember|"
     r"did I tell you|what did we discuss|what did I ask|what did you say|"
-    r"repeat that|say that again|what about that|how about that|"
-    r"tell me more|elaborate|continue|go on|expand on|follow up|more details|more info)\b",
+    r"repeat that|say that again|what about that|how about that)\b",
+    re.IGNORECASE,
+)
+
+# Continuation prompts like "more details" or "tell me more" should inherit the
+# previous route (especially AUGMENTED/EVIDENCE/NEWS) rather than dropping to LOCAL.
+_CONTINUATION_FOLLOWUP_RE = re.compile(
+    r"\b(tell me more|elaborate|continue|go on|expand on|follow up|"
+    r"more details|more info|more context|explain more|can you give me more)\b",
     re.IGNORECASE,
 )
 

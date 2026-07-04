@@ -17,10 +17,10 @@ from router_py import response_formatter
 def is_truthy(value: str | None) -> bool:
     """
     Parse boolean from string.
-    
+
     Args:
         value: String to parse (e.g., "true", "1", "yes", "")
-        
+
     Returns:
         True for "true", "1", "yes", "on" (case-insensitive), False otherwise
     """
@@ -32,10 +32,10 @@ def is_truthy(value: str | None) -> bool:
 def sha256_text(text: str) -> str:
     """
     Generate SHA-256 hash of text.
-    
+
     Args:
         text: String to hash
-        
+
     Returns:
         Hexadecimal SHA-256 hash string (64 characters)
     """
@@ -45,17 +45,17 @@ def sha256_text(text: str) -> str:
 def deterministic_pick_index(seed: str, mod: int) -> int:
     """
     Deterministically select an index from 0 to mod-1 based on seed.
-    
+
     Uses SHA-256 hash of the seed and takes first 8 hex digits to create
     a deterministic pseudo-random selection.
-    
+
     Args:
         seed: Seed string for deterministic selection
         mod: Modulo value (must be positive)
-        
+
     Returns:
         Integer index from 0 to mod-1
-        
+
     Raises:
         ValueError: If mod is not positive
     """
@@ -69,10 +69,10 @@ def deterministic_pick_index(seed: str, mod: int) -> int:
 def provider_usage_class_for(provider: str | None) -> str:
     """
     Map provider name to usage class.
-    
+
     Args:
         provider: Provider name (e.g., "openai", "kimi", "wikipedia", "local")
-        
+
     Returns:
         Usage class: "paid", "free", "local", or "none"
     """
@@ -93,51 +93,72 @@ def is_category_specific_query(question: str, intent_family: str) -> bool:
     """
     Check if query is category-specific (news, medical, finance).
     These queries should try trusted sources first.
-    
+
     Args:
         question: The user question
         intent_family: Classified intent family
-        
+
     Returns:
         True if this is a category-specific query
     """
     q_lower = question.lower()
-    
+
     if intent_family == "current_evidence":
         return True
-    
+
     news_keywords = [
-        "news", "headline", "headlines", "breaking", "latest",
-        "current events", "world news", "today's news"
+        "news",
+        "headline",
+        "headlines",
+        "breaking",
+        "latest",
+        "current events",
+        "world news",
+        "today's news",
     ]
     if any(kw in q_lower for kw in news_keywords):
         return True
-    
+
     medical_keywords = [
-        "medical", "medication", "medicine", "drug", "dose", "dosage",
-        "side effect", "interaction", "contraindication", "health",
-        "prescription", "treatment"
+        "medical",
+        "medication",
+        "medicine",
+        "drug",
+        "dose",
+        "dosage",
+        "side effect",
+        "interaction",
+        "contraindication",
+        "health",
+        "prescription",
+        "treatment",
     ]
     if any(kw in q_lower for kw in medical_keywords):
         return True
-    
+
     finance_keywords = [
-        "finance", "stock", "market", "economy", "currency",
-        "exchange rate", "investment", "financial"
+        "finance",
+        "stock",
+        "market",
+        "economy",
+        "currency",
+        "exchange rate",
+        "investment",
+        "financial",
     ]
     if any(kw in q_lower for kw in finance_keywords):
         return True
-    
+
     return False
 
 
 def normalize_augmentation_policy(raw: str | None) -> str:
     """
     Normalize augmentation policy string to canonical value.
-    
+
     Args:
         raw: Raw policy string (e.g., "disabled", "fallback", "direct")
-        
+
     Returns:
         Canonical policy: "disabled", "fallback_only", or "direct_allowed"
     """
@@ -150,6 +171,9 @@ def normalize_augmentation_policy(raw: str | None) -> str:
         case "fallback_only" | "fallback" | "1" | "true" | "yes" | "on":
             return "fallback_only"
         case "direct_allowed" | "direct" | "2":
+            return "direct_allowed"
+        case "auto":
+            # Autonomous mode: let the router decide when to augment.
             return "direct_allowed"
         case _:
             return "disabled"

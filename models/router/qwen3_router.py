@@ -20,9 +20,12 @@ from policy import requires_evidence_mode
 SYSTEM_PROMPT = (
     "You are a query router for AI assistant Local Lucy. "
     "Classify the query into JSON with keys: intent_family, needs_web, evidence_mode, route. "
-    "intent_family: local_answer|background_overview|technical_explanation|current_evidence|news_request|time_query|creative_writing|clarification. "
+    "intent_family: local_answer|background_overview|technical_explanation|current_evidence|news_request|time_query|finance_request|creative_writing|clarification. "
     "needs_web: true|false. evidence_mode: required|not_required. "
-    "route: LOCAL|LOCAL_WITH_FALLBACK|AUGMENTED|NEWS|TIME|CLARIFY."
+    "route: LOCAL|AUGMENTED|EVIDENCE|NEWS|TIME|WEATHER|FINANCE|EPHEMERAL|CLARIFY. "
+    "Route meanings: LOCAL=answer from parametric knowledge; AUGMENTED=Wikipedia->OpenAI->Kimi fallback; "
+    "EVIDENCE=trusted medical/veterinary sources with citations; NEWS=live news; TIME=current time; "
+    "WEATHER=live weather; FINANCE=live financial data; EPHEMERAL=transient data label; CLARIFY=ask user."
 )
 
 
@@ -68,7 +71,7 @@ class Qwen3Router:
             if requires_evidence and result.get("evidence_mode") != "required":
                 result["evidence_mode"] = "required"
                 result["evidence_reason"] = evidence_reason
-                result["route"] = "AUGMENTED"
+                result["route"] = "EVIDENCE"
 
             result["confidence"] = 0.92
             result["source"] = "qwen3"
@@ -141,7 +144,27 @@ class Qwen3Router:
                 "intent_family": "current_evidence",
                 "needs_web": True,
                 "evidence_mode": "required",
-                "route": "AUGMENTED",
+                "route": "EVIDENCE",
+                "confidence": 0.7,
+                "source": "fallback",
+                "error": error,
+            }
+        elif any(k in q for k in ["weather", "forecast", "temperature", "rain"]):
+            return {
+                "intent_family": "weather_request",
+                "needs_web": True,
+                "evidence_mode": "not_required",
+                "route": "WEATHER",
+                "confidence": 0.7,
+                "source": "fallback",
+                "error": error,
+            }
+        elif any(k in q for k in ["stock", "price", "bitcoin", "crypto"]):
+            return {
+                "intent_family": "finance_request",
+                "needs_web": True,
+                "evidence_mode": "not_required",
+                "route": "FINANCE",
                 "confidence": 0.7,
                 "source": "fallback",
                 "error": error,
@@ -171,7 +194,7 @@ class Qwen3Router:
                 "intent_family": "background_overview",
                 "needs_web": True,
                 "evidence_mode": "not_required",
-                "route": "LOCAL_WITH_FALLBACK",
+                "route": "AUGMENTED",
                 "confidence": 0.6,
                 "source": "fallback",
                 "error": error,

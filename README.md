@@ -60,6 +60,12 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 - Configurable voice, provider, and model settings
 - Cross-platform (Linux primary, extensible)
 
+### 👤 Dual Personas
+- **Michael and Racheli** user-specific personas
+- **LoRA adapters** for the default Llama 3.1 8B model
+- **Prompt-level fallback** for models where LoRA adapters cannot fit in VRAM
+- Active persona displayed in the HMI with one-click clear
+
 ### 🌐 Optional Web Interface
 - Lightweight aioHTTP adapter for remote text access
 - Reuses the same Local Lucy query pipeline as the PyQt HMI
@@ -67,6 +73,13 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 - Request-scoped model selection, validated against configured models
 - Basic/Bearer authentication; loopback-only by default
 - Mobile-friendly single-page UI
+
+### 🎭 User Personas (Michael & Racheli)
+- Two user personas with distinct response styles: **Michael** (dry, precise, pragmatic) and **Racheli** (clear, warm, practical, bilingual)
+- Triggered by saying "I am Michael" or "I am Racheli" in chat or voice
+- **LoRA adapter path**: `local-lucy-llama31-michael` and `local-lucy-llama31-racheli` use trained LoRA adapters on top of llama3.1:8b
+- **Prompt-level fallback**: `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` (qwen3:14b) and `local-lucy-mistral` (mistral-nemo:12b) inject the persona fragment at runtime; LoRA training OOMs on an RTX 3060 12 GB for these larger models
+- The HMI shows the active persona in the Control Panel and Runtime Summary status cards
 
 ## Architecture
 
@@ -134,6 +147,10 @@ pip install -r ui-v10/requirements.txt
 # Default: llama3.1:8b (~8.5 GB VRAM, 4096-token context, follows system prompts)
 ollama pull llama3.1:8b
 ollama create local-lucy-llama31 -f config/Modelfile.local-lucy-llama31
+
+# Optional: persona LoRA tags for Michael and Racheli (trained on Llama 3.1 8B)
+ollama create local-lucy-llama31-michael -f config/Modelfile.local-lucy-llama31-michael
+ollama create local-lucy-llama31-racheli -f config/Modelfile.local-lucy-llama31-racheli
 
 # Legacy options (still selectable in the HMI)
 ollama pull qwen3:14b
@@ -219,6 +236,17 @@ Lucy: [learns — next time routes to LOCAL]
 
 The background learner automatically rebuilds the embedding index from corrections.
 
+### Personas
+
+Local Lucy supports two user-specific personas, **Michael** and **Racheli**. When you say "I am Michael" or "I am Racheli", Lucy stores the active identity and routes LOCAL answers through the matching persona behavior.
+
+- **Llama 3.1 8B** (`local-lucy-llama31-michael` / `local-lucy-llama31-racheli`) uses trained LoRA adapters.
+- **Qwen3 14B** and **Mistral-Nemo 12B** selectable models fall back to prompt-level personas because LoRA training OOMs on the RTX 3060 12 GB.
+- The HMI Control Panel has a **persona selector** (`auto` / `Michael` / `Racheli`) that forces the active identity for all models, independent of voice-declared identity.
+- The active persona is shown in the Control Panel and Runtime Summary status cards, with a one-click **Clear** button to return to auto-detection.
+
+See [docs/runbooks/PERSONAS.md](docs/runbooks/PERSONAS.md) for the full adapter status, training instructions, and hardware limitations.
+
 ### Environment Variables
 
 | Variable | Default | Description |
@@ -244,6 +272,35 @@ These options are preserved for backward compatibility but are no longer needed 
 | `LUCY_ROUTER_LEGACY_PRIMARY=1` | **Deprecated / non-functional** | Keyword-router rollback is no longer supported; the embedding router is the sole authority. |
 
 ## Development
+
+### Training Persona Adapters
+
+Persona LoRA adapters are trained on the RTX 3060 12 GB using QLoRA:
+
+```bash
+cd ~/lucy-v10
+source ui-v10/.venv/bin/activate
+python3 tools/lora/build_datasets.py
+HF_TOKEN=... tools/lora/train_all_personas.sh
+```
+
+The end-to-end script trains, converts, and registers adapters for the models that fit in 12 GB VRAM:
+
+| Base model | Persona | Path |
+|------------|---------|------|
+| `local-lucy-llama31` (llama3.1:8b) | Michael & Racheli | LoRA adapter (`local-lucy-llama31-michael` / `-racheli`) |
+| `local-lucy-mistral` (mistral-nemo:12b) | Michael & Racheli | **Prompt-level fallback** — mistral-nemo 12B cannot be LoRA-trained on 12 GB VRAM (OOM at `prepare_model_for_kbit_training`) |
+| `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` (qwen3:14b) | Michael & Racheli | **Prompt-level fallback** — qwen3 14B cannot be LoRA-trained on 12 GB VRAM (OOM at `prepare_model_for_kbit_training`) |
+
+Evaluate either path against `tests/golden_persona_cases.jsonl`:
+
+```bash
+# LoRA adapter path
+python3 tools/lora/evaluate_persona.py --model local-lucy-llama31-michael --persona michael
+
+# Prompt-level fallback path
+python3 tools/lora/evaluate_persona.py --model local-lucy --prompt-persona michael --persona michael
+```
 
 ### Running Tests
 

@@ -10,7 +10,6 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ADAPTER = REPO_ROOT / "tools" / "voice" / "tts_adapter.py"
 
@@ -40,24 +39,33 @@ def main() -> int:
             """,
         )
 
+        model_path = root / "voice.onnx"
+        model_path.write_bytes(b"stub-model")
+
         env = os.environ.copy()
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
         env["PYTHONPATH"] = str(REPO_ROOT / "tools")
         env["LUCY_VOICE_PIPER_BIN"] = str(bin_dir / "piper")
+        env["LUCY_VOICE_PIPER_MODEL"] = str(model_path)
         env["HOME"] = str(root / "home")
 
         payload = run_adapter(
             dict(env, LUCY_VOICE_KOKORO_VOICE="custom.pt"),
             "synthesize",
-            "--engine", "kokoro",
-            "--fallback-engine", "piper",
+            "--engine",
+            "kokoro",
+            "--fallback-engine",
+            "piper",
             "--output-dir",
             str(out_dir),
             "--text",
             "fallback test",
         )
         assert_ok(payload["ok"] is True, f"fallback should succeed: {payload}")
-        assert_ok(payload["requested_engine"] == "kokoro", f"requested_engine should preserve original request: {payload}")
+        assert_ok(
+            payload["requested_engine"] == "kokoro",
+            f"requested_engine should preserve original request: {payload}",
+        )
         assert_ok(payload["engine"] == "piper", f"unexpected fallback engine: {payload}")
         assert_ok(payload["fallback_used"] is True, f"fallback flag missing: {payload}")
 
@@ -74,9 +82,16 @@ def main() -> int:
             "kokoro should fail explicitly",
         )
         assert_ok(failure["ok"] is False, f"kokoro failure contract expected: {failure}")
-        assert_ok(failure["requested_engine"] == "kokoro", f"failure should preserve requested_engine: {failure}")
-        assert_ok(failure["engine"] == "kokoro", f"failure should preserve attempted engine: {failure}")
-        assert_ok("kokoro" in str(failure["error"]).lower(), f"expected kokoro error detail: {failure}")
+        assert_ok(
+            failure["requested_engine"] == "kokoro",
+            f"failure should preserve requested_engine: {failure}",
+        )
+        assert_ok(
+            failure["engine"] == "kokoro", f"failure should preserve attempted engine: {failure}"
+        )
+        assert_ok(
+            "kokoro" in str(failure["error"]).lower(), f"expected kokoro error detail: {failure}"
+        )
     print("PASS: test_tts_fallback")
     return 0
 
@@ -91,7 +106,9 @@ def run_adapter(env: dict[str, str], *args: str) -> dict[str, object]:
         cwd=str(REPO_ROOT),
     )
     payload = json.loads(completed.stdout)
-    assert_ok(isinstance(payload, dict), f"adapter stdout was not JSON object: {completed.stdout!r}")
+    assert_ok(
+        isinstance(payload, dict), f"adapter stdout was not JSON object: {completed.stdout!r}"
+    )
     return payload
 
 

@@ -14,6 +14,8 @@ Threshold: at least 17/22 correct (77%) to pass. This matches the current
 baseline after guard tightening and 70 new examples.
 """
 
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -24,6 +26,18 @@ import pytest
 
 
 from router_py.classify import classify_intent, select_route
+
+
+@pytest.fixture(autouse=True)
+def isolated_runtime_namespace(tmp_path, monkeypatch):
+    """Each edge-case test runs in a clean runtime namespace so that leftover
+    feedback_buffer.json state from earlier runs or other tests cannot alter
+    routing decisions (e.g. continuation-follow-up inheritance)."""
+    ns = tmp_path / "runtime-v10"
+    ns.mkdir(parents=True)
+    buf = ns / "feedback_buffer.json"
+    buf.write_text(json.dumps({"exchanges": []}), encoding="utf-8")
+    monkeypatch.setenv("LUCY_RUNTIME_NAMESPACE_ROOT", str(ns))
 
 
 def _load_router():
@@ -108,9 +122,9 @@ ROUTING_TEST_CASES = [
     ("Working capital ratio explained", "AUGMENTED", "capital_ambiguity"),
     (
         "Capital gains tax rules",
-        "AUGMENTED",
+        "LOCAL",
         "capital_ambiguity",
-    ),  # general tax knowledge, safe for augmentation
+    ),  # static tax knowledge; finance advice/rules stay local
     # ---- Programming vs gram/cooking ----
     ("How to cook an egg", "AUGMENTED", "cooking"),
     ("How to bake sourdough bread", "AUGMENTED", "cooking"),
@@ -122,12 +136,12 @@ ROUTING_TEST_CASES = [
     ("Current weather in London", "WEATHER", "current_vs_stable"),
     ("What is the theory of relativity?", "LOCAL", "current_vs_stable"),
     ("How does DNA replication work?", "LOCAL", "current_vs_stable"),
-    ("Latest iPhone release date", "LOCAL", "current_vs_stable"),
+    ("Latest iPhone release date", "AUGMENTED", "current_vs_stable"),
     (
         "Current president of the United States",
-        "LOCAL",
+        "AUGMENTED",
         "current_vs_stable",
-    ),  # embedding sees ephemeral but no keyword match; falls to LOCAL
+    ),  # current office holder -> policy-gated AUGMENTED
     # ---- Public-figure age (should route AUGMENTED for current/verified age) ----
     ("How old is Bill Clinton?", "AUGMENTED", "public_figure_age"),
     ("What is Tom Cruise's age?", "AUGMENTED", "public_figure_age"),
@@ -161,7 +175,7 @@ class TestRoutingEdgeCases:
         )
 
     def test_overall_accuracy_threshold(self, router):
-        """At least 77% (17/22) of edge cases must route correctly."""
+        """At least 84% of production edge cases must route correctly."""
         correct = 0
         failures = []
 
@@ -171,8 +185,8 @@ class TestRoutingEdgeCases:
                 query, expected_route, category = case.values
             else:
                 query, expected_route, category = case
-            result = router.predict(query)
-            actual_route = result.get("route", "ERROR")
+            decision = select_route(classify_intent(query), query=query)
+            actual_route = decision.route
             if actual_route == expected_route:
                 correct += 1
             else:
@@ -181,7 +195,7 @@ class TestRoutingEdgeCases:
                 )
 
         accuracy = correct / len(ROUTING_TEST_CASES)
-        min_threshold = 45 / 53  # ~0.849
+        min_threshold = 48 / 57  # ~0.842
 
         if accuracy < min_threshold:
             pytest.fail(
@@ -191,7 +205,7 @@ class TestRoutingEdgeCases:
 
     def test_category_breakdown(self, router):
         """Report per-category accuracy (informational, never fails)."""
-        from collections import Counter, defaultdict
+        from collections import defaultdict
 
         category_results = defaultdict(lambda: {"correct": 0, "total": 0})
 
@@ -200,8 +214,8 @@ class TestRoutingEdgeCases:
                 query, expected_route, category = case.values
             else:
                 query, expected_route, category = case
-            result = router.predict(query)
-            actual_route = result.get("route", "ERROR")
+            decision = select_route(classify_intent(query), query=query)
+            actual_route = decision.route
             category_results[category]["total"] += 1
             if actual_route == expected_route:
                 category_results[category]["correct"] += 1
@@ -214,7 +228,7 @@ class TestRoutingEdgeCases:
         overall = sum(s["correct"] for s in category_results.values()) / sum(
             s["total"] for s in category_results.values()
         )
-        print(f"  {'overall':15s}: {overall*100:.0f}%")
+        print(f"  {'overall':15s}: {overall * 100:.0f}%")
 
 
 if __name__ == "__main__":

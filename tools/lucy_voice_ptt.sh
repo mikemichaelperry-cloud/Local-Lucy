@@ -80,7 +80,7 @@ resolve_voice_python(){
     echo "V8 ISOLATION VIOLATION: ui-v10 Python not found at ${candidate}. V8 cannot use V7 components." >&2
     return 1
   fi
-  
+
   if [[ -n "${preferred_engine}" && -f "${TTS_ADAPTER}" ]]; then
     payload="$("${candidate}" "${TTS_ADAPTER}" probe --engine "${preferred_engine}" 2>/dev/null || true)"
     detected_engine="$(printf '%s' "${payload}" | sed -n 's/.*"engine": "\([^"]*\)".*/\1/p' | head -n 1)"
@@ -89,7 +89,7 @@ resolve_voice_python(){
       return 0
     fi
   fi
-  
+
   echo "${candidate}"
 }
 
@@ -737,7 +737,6 @@ normalize_transcript(){
       -e 's/^[[:space:]]*(\((cough|coughing|sneeze|sneezing|sniff|sniffing|sigh|sighs|hmm|mmm|breath|breathing|laugh|laughter|noise|music|silence|inaudible|clears throat)[[:alpha:][:space:]_-]*\)|\[(cough|coughing|sneeze|sneezing|sniff|sniffing|sigh|sighs|hmm|mmm|breath|breathing|laugh|laughter|noise|music|silence|inaudible|clears throat)[[:alpha:][:space:]_-]*\])[[:space:]]*//I' \
       -e 's/\btin[[:space:]]+tuner\b/tinned tuna/Ig' \
       -e 's/\btin[[:space:]]+tuna\b/tinned tuna/Ig' \
-      -e 's/\b([Rr][Aa]([Kk][Hh]?|[Cc][Hh]?|[Hh])[Aa]?[Ee]?[Ll]([Ii]|[Yy]|[Ee])|[Rr][Aa][Kk][Hh][Ii][Rr][Ii]|[Rr][Aa][Hh][Aa][Ll][Ii]|[Rr][Aa][Cc][Hh][Aa][Ee][Ll][Ii])\b/racheli/g' \
       -e 's/[[:space:]]+/ /g; s/^ +//; s/ +$//'
 }
 

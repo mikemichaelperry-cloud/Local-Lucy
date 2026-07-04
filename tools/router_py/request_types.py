@@ -37,7 +37,9 @@ RouteType = Literal[
 
 ModeType = Literal["AUTO", "FORCED_OFFLINE", "FORCED_ONLINE", "FORCED"]
 
-ProviderType = Literal["local", "wikipedia", "openai", "kimi", "news", "weather", "time", "finance", "trusted"]
+ProviderType = Literal[
+    "local", "wikipedia", "openai", "kimi", "news", "weather", "time", "finance", "trusted"
+]
 
 ProviderUsageClass = Literal["local", "free", "paid"]
 
@@ -139,6 +141,14 @@ class RoutingDecision:
 
     # Ephemeral queries (weather, real-time prices) — exclude from memory
     ephemeral: bool = False
+
+    # Traceability: why and how this route was chosen
+    decision_stage: str = (
+        ""  # policy_gate | semantic_classifier | execution_override | safety_override
+    )
+    reason_code: str = ""  # human-readable reason, e.g. "policy:weather_query"
+    matched_rule: str = ""  # name of the matching gate or semantic result
+    trace: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

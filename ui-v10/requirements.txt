@@ -19,6 +19,17 @@ sentence-transformers>=2.2.0
 kokoro>=0.9.4,<1.0.0
 soundfile>=0.13.0
 
+# Optional cloud TTS fallback for higher-quality Hebrew/Edge voices
+edge-tts>=7.0.0
+
+# Hebrew translation for local LLM output.
+# Local offline model (Helsinki-NLP/opus-mt-en-he via transformers) is preferred;
+# deep-translator is a cloud fallback when the local model is unavailable.
+transformers>=4.30.0
+sentencepiece>=0.1.99
+sacremoses>=0.0.53
+deep-translator>=1.11.0
+
 # Configuration from .env files
 python-dotenv>=1.0.0
 

@@ -1,0 +1,58 @@
+============================================================
+Independent Holdout Evaluation Report
+============================================================
+
+Holdout set: /home/mike/lucy-v10/models/router/holdout_eval_set.jsonl
+Old router index: /home/mike/lucy-v10/models/router/checkpoints/comprehensive_index_20260531_181416.jsonl
+Total holdout examples: 66
+
+--- old_embedding_only ---
+Accuracy: 40/66 (60.6%)
+Per-route:
+  AUGMENTED     1/ 8 ( 12.5%)
+  EVIDENCE      0/ 6 (  0.0%)
+  FINANCE       0/ 5 (  0.0%)
+  LOCAL        29/34 ( 85.3%)
+  NEWS          4/ 6 ( 66.7%)
+  TIME          3/ 3 (100.0%)
+  WEATHER       3/ 4 ( 75.0%)
+
+--- new_embedding_only ---
+Accuracy: 41/66 (62.1%)
+Per-route:
+  AUGMENTED     2/ 8 ( 25.0%)
+  EVIDENCE      0/ 6 (  0.0%)
+  FINANCE       0/ 5 (  0.0%)
+  LOCAL        28/34 ( 82.4%)
+  NEWS          4/ 6 ( 66.7%)
+  TIME          3/ 3 (100.0%)
+  WEATHER       4/ 4 (100.0%)
+
+--- old_embedding+policy ---
+Accuracy: 60/66 (90.9%)
+Per-route:
+  AUGMENTED     7/ 8 ( 87.5%)
+  EVIDENCE      6/ 6 (100.0%)
+  FINANCE       5/ 5 (100.0%)
+  LOCAL        29/34 ( 85.3%)
+  NEWS          6/ 6 (100.0%)
+  TIME          3/ 3 (100.0%)
+  WEATHER       4/ 4 (100.0%)
+
+--- new_embedding+policy ---
+Accuracy: 61/66 (92.4%)
+Per-route:
+  AUGMENTED     8/ 8 (100.0%)
+  EVIDENCE      6/ 6 (100.0%)
+  FINANCE       5/ 5 (100.0%)
+  LOCAL        29/34 ( 85.3%)
+  NEWS          6/ 6 (100.0%)
+  TIME          3/ 3 (100.0%)
+  WEATHER       4/ 4 (100.0%)
+
+--- New vs Old (with policy) ---
+Fixed by new router:   1
+  + What is the current population of Tokyo?                      TIME     -> AUGMENTED
+Broken by new router:  0
+
+============================================================

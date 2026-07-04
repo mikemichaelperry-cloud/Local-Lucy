@@ -2,6 +2,7 @@
 """Ollama API tool wrapper."""
 
 import aiohttp
+import asyncio
 import json
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -14,7 +15,7 @@ except ImportError:
 
 class RequestTool(BaseToolWrapper):
     """Wrapper for Ollama API requests.
-    
+
     Replaces: local_answer.sh, local_runtime.sh shell calls
     Features:
     - Async/await throughout
@@ -22,18 +23,18 @@ class RequestTool(BaseToolWrapper):
     - Streaming support
     - Proper timeout handling
     """
-    
+
     def __init__(
         self,
         config: Optional[ToolConfig] = None,
         base_url: str = "http://127.0.0.1:11434",
-        default_model: str = "llama3.2"
+        default_model: str = "llama3.2",
     ):
         super().__init__(config)
         self.base_url = base_url.rstrip("/")
         self.default_model = default_model
         self._session: Optional[aiohttp.ClientSession] = None
-    
+
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session with connection pooling."""
         if self._session is None or self._session.closed:
@@ -44,12 +45,38 @@ class RequestTool(BaseToolWrapper):
             )
             timeout = aiohttp.ClientTimeout(total=self.config.timeout)
             self._session = aiohttp.ClientSession(
-                connector=connector,
-                timeout=timeout,
-                headers={"Content-Type": "application/json"}
+                connector=connector, timeout=timeout, headers={"Content-Type": "application/json"}
             )
         return self._session
-    
+
+    async def _post_json_with_retry(self, url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """POST JSON to Ollama with transient-error retries.
+
+        Ollama can return 500/503 while loading or swapping models under memory
+        pressure.  A small retry loop makes the tool resilient without masking
+        real client errors.
+        """
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            try:
+                session = await self._get_session()
+                async with session.post(url, json=payload) as response:
+                    response.raise_for_status()
+                    return await response.json()
+            except aiohttp.ClientResponseError as exc:
+                # Retry only server-side / transient HTTP errors.
+                if exc.status >= 500 and attempt < max_attempts:
+                    await asyncio.sleep(0.5 * attempt)
+                    continue
+                raise
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                if attempt < max_attempts:
+                    await asyncio.sleep(0.5 * attempt)
+                    continue
+                raise
+        # Unreachable, but keeps mypy happy.
+        raise RuntimeError("retry loop exited without result")
+
     async def execute(self, **kwargs) -> ToolResult:
         """Execute tool - delegates to generate() for compatibility with BaseToolWrapper."""
         prompt = kwargs.get("prompt", "")
@@ -57,43 +84,32 @@ class RequestTool(BaseToolWrapper):
         stream = kwargs.get("stream", False)
         options = {k: v for k, v in kwargs.items() if k not in ("prompt", "model", "stream")}
         return await self.generate(prompt, model, stream, **options)
-    
+
     async def generate(
-        self,
-        prompt: str,
-        model: Optional[str] = None,
-        stream: bool = False,
-        **options: Any
+        self, prompt: str, model: Optional[str] = None, stream: bool = False, **options: Any
     ) -> ToolResult:
         """Generate text using Ollama generate endpoint.
-        
+
         Args:
             prompt: The prompt text
             model: Model name (default: self.default_model)
             stream: Whether to stream response
             **options: Additional options (temperature, etc.)
-        
+
         Returns:
             ToolResult with generated text
         """
         model = model or self.default_model
         url = f"{self.base_url}/api/generate"
-        
-        payload: Dict[str, Any] = {
-            "model": model,
-            "prompt": prompt,
-            "stream": stream,
-            **options
-        }
-        
+
+        payload: Dict[str, Any] = {"model": model, "prompt": prompt, "stream": stream, **options}
+
         start_time = time.time()
         try:
-            session = await self._get_session()
-            async with session.post(url, json=payload) as response:
-                response.raise_for_status()
-                
-                if stream:
-                    # Handle streaming response
+            if stream:
+                session = await self._get_session()
+                async with session.post(url, json=payload) as response:
+                    response.raise_for_status()
                     chunks: List[str] = []
                     async for line in response.content:
                         if line:
@@ -101,78 +117,52 @@ class RequestTool(BaseToolWrapper):
                             if "response" in data:
                                 chunks.append(data["response"])
                     text = "".join(chunks)
-                else:
-                    # Handle single response
-                    data = await response.json()
-                    text = data.get("response", "")
-                
-                duration_ms = int((time.time() - start_time) * 1000)
-                
-                return ToolResult(
-                    success=True,
-                    data=text,
-                    duration_ms=duration_ms
-                )
-                
+            else:
+                data = await self._post_json_with_retry(url, payload)
+                text = data.get("response", "")
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            return ToolResult(success=True, data=text, duration_ms=duration_ms)
+
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
             self.logger.error(f"Ollama generate failed: {e}")
             return ToolResult(
-                success=False,
-                data=None,
-                error_message=str(e),
-                duration_ms=duration_ms
+                success=False, data=None, error_message=str(e), duration_ms=duration_ms
             )
-    
+
     async def chat(
-        self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
-        **options: Any
+        self, messages: List[Dict[str, str]], model: Optional[str] = None, **options: Any
     ) -> ToolResult:
         """Chat using Ollama chat endpoint.
-        
+
         Args:
             messages: List of {role: str, content: str}
             model: Model name
             **options: Additional options
-        
+
         Returns:
             ToolResult with assistant's response
         """
         model = model or self.default_model
         url = f"{self.base_url}/api/chat"
-        
-        payload: Dict[str, Any] = {
-            "model": model,
-            "messages": messages,
-            "stream": False,
-            **options
-        }
-        
+
+        payload: Dict[str, Any] = {"model": model, "messages": messages, "stream": False, **options}
+
         start_time = time.time()
         try:
-            session = await self._get_session()
-            async with session.post(url, json=payload) as response:
-                response.raise_for_status()
-                data = await response.json()
-                text = data.get("message", {}).get("content", "")
-                duration_ms = int((time.time() - start_time) * 1000)
-                
-                return ToolResult(
-                    success=True,
-                    data=text,
-                    duration_ms=duration_ms
-                )
+            data = await self._post_json_with_retry(url, payload)
+            text = data.get("message", {}).get("content", "")
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            return ToolResult(success=True, data=text, duration_ms=duration_ms)
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
             return ToolResult(
-                success=False,
-                data=None,
-                error_message=str(e),
-                duration_ms=duration_ms
+                success=False, data=None, error_message=str(e), duration_ms=duration_ms
             )
-    
+
     async def health_check(self) -> bool:
         """Check if Ollama is available."""
         try:
@@ -181,16 +171,16 @@ class RequestTool(BaseToolWrapper):
                 return response.status == 200
         except Exception:
             return False
-    
+
     async def close(self) -> None:
         """Close session."""
         if self._session and not self._session.closed:
             await self._session.close()
-    
+
     async def __aenter__(self) -> "RequestTool":
         """Async context manager entry."""
         return self
-    
+
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit."""
         await self.close()
