@@ -417,6 +417,12 @@ class LocalAnswerConfig:
     num_predict_augmented_brief: int = 64
     num_predict_augmented_detail: int = 512
     num_predict_augmented_background: int = 128
+    local_max_tokens: int = 256
+    augmented_max_tokens: int = 512
+    evidence_max_tokens: int = 768
+    creative_max_tokens: int = 512
+    embedding_cache_size: int = 1024
+    keep_model_warm: bool = True
     max_context_chars: int = 1200
     prompt_guard_tokens: int = 700
     cache_enabled: bool = True
@@ -481,6 +487,13 @@ class LocalAnswerConfig:
             num_predict_detail=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_DETAIL", "768")),
             num_predict_long=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_LONG", "1536")),
             num_predict_clarify=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CLARIFY", "64")),
+            local_max_tokens=int(os.environ.get("LUCY_LOCAL_MAX_TOKENS", "256")),
+            augmented_max_tokens=int(os.environ.get("LUCY_AUGMENTED_MAX_TOKENS", "512")),
+            evidence_max_tokens=int(os.environ.get("LUCY_EVIDENCE_MAX_TOKENS", "768")),
+            creative_max_tokens=int(os.environ.get("LUCY_CREATIVE_MAX_TOKENS", "512")),
+            embedding_cache_size=int(os.environ.get("LUCY_EMBEDDING_CACHE_SIZE", "1024")),
+            keep_model_warm=os.environ.get("LUCY_KEEP_MODEL_WARM", "1").lower()
+            in ("1", "true", "yes", "on"),
             prompt_guard_tokens=int(os.environ.get("LUCY_LOCAL_PROMPT_GUARD_TOKENS", "700")),
             cache_enabled=os.environ.get("LUCY_LOCAL_REPEAT_CACHE", "1").lower()
             in ("1", "true", "yes", "on"),
@@ -1281,20 +1294,27 @@ class LocalAnswer:
     def _set_generation_profile(
         self, route_mode: str, output_mode: str, query: str
     ) -> Tuple[str, int, str]:
-        """Set generation profile for request."""
+        """Set generation profile and token budget for the request."""
         route = route_mode.upper()
         output = output_mode.upper()
         q = self._normalize_query(query)
+        is_creative = self._is_creative_writing_query(q)
+
+        # Phase 7: per-route token budgets from environment/config.
+        local_budget = self.config.local_max_tokens
+        augmented_budget = self.config.augmented_max_tokens
+        evidence_budget = self.config.evidence_max_tokens
+        creative_budget = self.config.creative_max_tokens
 
         # Detect explicit word-count requests (e.g., "500-word story", "1000 words")
         word_match = re.search(r"(\d+)[\s\-]*(?:word|words)", q)
         if word_match:
             requested_words = int(word_match.group(1))
-            # Token estimate: ~1.5 tokens per word for output.
-            # Some models use internal "thinking" tokens, so we use ~2.5x headroom.
-            # Cap at num_predict_long to stay within the model's context window.
+            # Token estimate: ~2.5x headroom for visible + thinking tokens.
             if route in {"AUGMENTED", "EVIDENCE"}:
-                max_tokens = self.config.num_predict_augmented_detail
+                max_tokens = evidence_budget if route == "EVIDENCE" else augmented_budget
+            elif is_creative:
+                max_tokens = creative_budget
             else:
                 max_tokens = self.config.num_predict_long
             num_predict = min(int(requested_words * 2.5), max_tokens)
@@ -1302,7 +1322,6 @@ class LocalAnswer:
 
         detail_patterns = [
             r"(in detail|detailed|deep dive|thorough|comprehensive|step by step|step-by-step|walk me through|with examples|give examples|more detail|more details|long answer|full answer|complete answer|full recipe|complete recipe|full guide|complete guide)",
-            r"\b(novel|story|poem|essay|narrative|tale|write a|compose a|craft a)\b",
         ]
         requests_detail = any(re.search(p, q) for p in detail_patterns)
 
@@ -1312,33 +1331,32 @@ class LocalAnswer:
         requests_brief = any(re.search(p, q) for p in brief_patterns)
 
         if route in {"AUGMENTED", "EVIDENCE"}:
+            max_tokens = evidence_budget if route == "EVIDENCE" else augmented_budget
             if requests_detail:
                 return (
                     "augmented_detail",
-                    self.config.num_predict_augmented_detail,
+                    min(self.config.num_predict_augmented_detail, max_tokens),
                     "- Give provisional answer from tentative background.",
                 )
             elif requests_brief:
                 return (
                     "augmented_brief",
-                    self.config.num_predict_augmented_brief,
+                    min(self.config.num_predict_augmented_brief, max_tokens),
                     "- Give short provisional answer.",
                 )
             elif self._is_background_overview_request(q):
                 return (
                     "augmented_background",
-                    self.config.num_predict_augmented_background,
+                    min(self.config.num_predict_augmented_background, max_tokens),
                     "- Give provisional answer from background.",
                 )
             else:
+                # Default route budget from the Phase 7 env values.
                 return (
                     "augmented",
-                    self.config.num_predict_augmented_default,
+                    max_tokens,
                     "- Give provisional answer from tentative background.",
                 )
-
-        if requests_detail:
-            return ("detail", self.config.num_predict_detail, "- Answer clearly, but stay focused.")
 
         if route == "CLARIFY":
             return (
@@ -1350,18 +1368,26 @@ class LocalAnswer:
         if output == "BRIEF" or requests_brief:
             return (
                 "brief",
-                self.config.num_predict_brief,
+                min(self.config.num_predict_brief, local_budget),
                 "- Prefer one short sentence if possible.",
             )
 
         if output == "CONVERSATION":
             return (
                 "conversation",
-                self.config.num_predict_conversation,
+                min(self.config.num_predict_conversation, local_budget),
                 "- Prefer two or three short sentences.",
             )
 
-        return ("chat", self.config.num_predict_chat, "- Prefer at most two short sentences.")
+        if is_creative:
+            return (
+                "chat",
+                creative_budget,
+                "- Prefer at most two short sentences.",
+            )
+
+        # Default LOCAL simple Q&A uses the Phase 7 local token budget.
+        return ("chat", local_budget, "- Prefer at most two short sentences.")
 
     def _is_background_overview_request(self, query: str) -> bool:
         """Check if query is a background/overview request."""

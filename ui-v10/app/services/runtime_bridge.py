@@ -946,6 +946,22 @@ class RuntimeBridge:
                     except Exception:
                         pass
 
+            # Phase 7: keep the most-likely-next model warm (non-blocking).
+            # Use the selector's recommendation if available; otherwise warm the
+            # model that just handled this request.
+            if os.environ.get("LUCY_KEEP_MODEL_WARM", "1").lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            ):
+                warmup_model = recommendation["recommended"] if recommendation else effective_model
+                threading.Thread(
+                    target=self._warmup_ollama_model,
+                    args=(warmup_model,),
+                    daemon=True,
+                ).start()
+
             # NOTE: We do NOT write history entries here.
             # The core ExecutionEngine's StateWriter already writes the
             # canonical entry to request_history.jsonl using the SAME

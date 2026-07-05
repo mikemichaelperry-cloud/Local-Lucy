@@ -2603,41 +2603,15 @@ class ExecutionEngine:
         else:
             chain = [primary, "wikipedia", "openai", "kimi"]
 
-        last_error = ""
-        attempted: list[str] = []
-        for provider in chain:
-            attempted.append(provider)
-            try:
-                result: dict[str, Any] | None = None
-                if provider == "trusted":
-                    result = await self._fetch_trusted_evidence(question, route)
-                elif provider == "wikipedia":
-                    result = await self._fetch_wikipedia_evidence(question)
-                elif provider == "kimi":
-                    result = await self._fetch_api_evidence(question, "kimi")
-                elif provider == "openai":
-                    result = await self._fetch_api_evidence(question, "openai")
+        # Phase 7: Fire evidence providers concurrently and return the first
+        # good result. Direct routes (NEWS/TIME/WEATHER/FINANCE) are handled
+        # above and are intentionally left sequential/single-source.
+        parallel_result = await self._fetch_evidence_parallel(question, route, chain)
+        if parallel_result.get("_parallel_success"):
+            return parallel_result["evidence"]
 
-                if result:
-                    self._logger.info(f"Evidence fetched successfully from {provider}")
-                    # Inject fallback telemetry into the evidence dict
-                    if provider != primary:
-                        result["fallback_used"] = True
-                        result["fallback_reason"] = f"primary_provider_failed:{primary}"
-                        result["primary_failed"] = primary
-                        result["fallback_to"] = provider
-                        result["attempted_chain"] = attempted
-                        result["successful_backend"] = provider
-                        result["degradation_level"] = "limited"
-                    else:
-                        result["successful_backend"] = provider
-                        result["attempted_chain"] = attempted
-                        result["degradation_level"] = "none"
-                    return result
-            except Exception as e:
-                last_error = str(e)
-                self._logger.warning(f"Evidence fetch failed for {provider}: {e}")
-
+        last_error = parallel_result.get("last_error", "")
+        attempted = parallel_result.get("attempted", [])
         self._logger.warning(f"All evidence providers failed. Last error: {last_error}")
         # Return a minimal dict with telemetry so callers know what was attempted
         return {
@@ -2648,6 +2622,83 @@ class ExecutionEngine:
             "attempted_chain": attempted,
             "successful_backend": "",
             "degradation_level": "low",
+        }
+
+    async def _fetch_evidence_parallel(
+        self,
+        question: str,
+        route: RoutingDecision,
+        chain: list[str],
+    ) -> dict[str, Any]:
+        """Fire evidence providers concurrently and return the first good result.
+
+        Returns a dict with either:
+          {"_parallel_success": True, "evidence": <evidence dict>}
+        or, when all providers fail:
+          {"_parallel_success": False, "attempted": [...], "last_error": "..."}
+        """
+        primary = chain[0] if chain else ""
+        tasks: dict[asyncio.Task, str] = {}
+        for provider in chain:
+            if provider == "trusted":
+                coro = self._fetch_trusted_evidence(question, route)
+            elif provider == "wikipedia":
+                coro = self._fetch_wikipedia_evidence(question)
+            elif provider == "kimi":
+                coro = self._fetch_api_evidence(question, "kimi")
+            elif provider == "openai":
+                coro = self._fetch_api_evidence(question, "openai")
+            else:
+                continue
+            task = asyncio.create_task(coro)
+            tasks[task] = provider
+
+        attempted: list[str] = []
+        last_error = ""
+        pending = set(tasks.keys())
+        try:
+            while pending:
+                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    provider = tasks[task]
+                    attempted.append(provider)
+                    try:
+                        result = task.result()
+                        if result:
+                            self._logger.info(f"Evidence fetched successfully from {provider}")
+                            # Cancel any still-running providers.
+                            for t in pending:
+                                t.cancel()
+                            if pending:
+                                await asyncio.wait(pending)
+                            # Inject fallback telemetry into the evidence dict.
+                            if provider != primary:
+                                result["fallback_used"] = True
+                                result["fallback_reason"] = f"primary_provider_failed:{primary}"
+                                result["primary_failed"] = primary
+                                result["fallback_to"] = provider
+                                result["attempted_chain"] = attempted
+                                result["successful_backend"] = provider
+                                result["degradation_level"] = "limited"
+                            else:
+                                result["successful_backend"] = provider
+                                result["attempted_chain"] = attempted
+                                result["degradation_level"] = "none"
+                            return {"_parallel_success": True, "evidence": result}
+                    except Exception as e:
+                        last_error = str(e)
+                        self._logger.warning(f"Evidence fetch failed for {provider}: {e}")
+        finally:
+            # Ensure nothing is left running if we exit early.
+            for t in pending:
+                t.cancel()
+            if pending:
+                await asyncio.wait(pending)
+
+        return {
+            "_parallel_success": False,
+            "attempted": attempted,
+            "last_error": last_error,
         }
 
     async def _fetch_wikipedia_evidence(self, question: str) -> dict[str, Any] | None:

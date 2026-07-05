@@ -4,7 +4,10 @@ Router policy functions - Python port of shell implementations.
 Deterministic policy decisions with no side effects.
 """
 
+import os
 import re
+import threading
+from collections import OrderedDict
 from typing import Literal
 
 
@@ -331,6 +334,40 @@ _SEMANTIC_REFS = {
 
 _SEMANTIC_EMBEDDINGS: dict[str, "numpy.ndarray | None"] = {k: None for k in _SEMANTIC_REFS}
 
+# Thread-safe LRU cache for per-query MiniLM embeddings (Phase 7).
+# Key is the normalized query string; value is the normalized embedding vector.
+_EMBEDDING_CACHE: OrderedDict[str, "numpy.ndarray"] = OrderedDict()
+_EMBEDDING_CACHE_LOCK = threading.Lock()
+
+
+def _embedding_cache_size() -> int:
+    """Return the configured LRU cache size."""
+    try:
+        return max(1, int(os.environ.get("LUCY_EMBEDDING_CACHE_SIZE", "1024")))
+    except Exception:
+        return 1024
+
+
+def _get_cached_embedding(query: str) -> "numpy.ndarray | None":
+    """Return a cached normalized embedding if present; updates LRU order."""
+    key = query.lower().strip()
+    with _EMBEDDING_CACHE_LOCK:
+        embedding = _EMBEDDING_CACHE.get(key)
+        if embedding is not None:
+            _EMBEDDING_CACHE.move_to_end(key)
+        return embedding
+
+
+def _set_cached_embedding(query: str, embedding: "numpy.ndarray") -> None:
+    """Store a normalized embedding in the LRU cache."""
+    key = query.lower().strip()
+    max_size = _embedding_cache_size()
+    with _EMBEDDING_CACHE_LOCK:
+        _EMBEDDING_CACHE[key] = embedding
+        _EMBEDDING_CACHE.move_to_end(key)
+        while len(_EMBEDDING_CACHE) > max_size:
+            _EMBEDDING_CACHE.popitem(last=False)
+
 
 def _get_semantic_model():
     """Lazy-load the MiniLM model; returns None if unavailable.
@@ -382,14 +419,20 @@ def _semantic_classify(query: str) -> str | None:
     Returns the category with the highest max-similarity score, but only
     if the top score exceeds a threshold (indicating reasonable confidence).
     Returns None if the model is unavailable or confidence is too low.
+
+    Query embeddings are cached in a thread-safe LRU cache keyed by the
+    normalized query string to avoid redundant MiniLM encode() calls.
     """
     model = _get_semantic_model()
     if model is None:
         return None
     import numpy as np
 
-    q_embed = model.encode(query.lower().strip(), convert_to_numpy=True)
-    q_embed = q_embed / (np.linalg.norm(q_embed) + 1e-9)
+    q_embed = _get_cached_embedding(query)
+    if q_embed is None:
+        q_embed = model.encode(query.lower().strip(), convert_to_numpy=True)
+        q_embed = q_embed / (np.linalg.norm(q_embed) + 1e-9)
+        _set_cached_embedding(query, q_embed)
     scores = {}
     for category in _SEMANTIC_REFS:
         ref_embeds = _get_semantic_embeddings(category)
