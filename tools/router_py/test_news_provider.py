@@ -69,6 +69,13 @@ def test_recency_filter_keeps_old_articles_for_history_query():
     assert "Stale headline" in titles
 
 
+def test_detect_region_handles_israeli_typos():
+    assert "middle_east" in RSSNewsProvider._detect_region("Whats the latest Iraeli News?")
+    assert "middle_east" in RSSNewsProvider._detect_region("latest news from Isreal")
+    assert "middle_east" in RSSNewsProvider._detect_region("what's happening in Jerusalem?")
+    assert "middle_east" not in RSSNewsProvider._detect_region("latest world news")
+
+
 def test_detect_source_disagreement_flags_conflicting_titles():
     articles = [
         {"title": "Israel confirms ceasefire with Hamas", "source": "A"},

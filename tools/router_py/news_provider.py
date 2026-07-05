@@ -17,6 +17,7 @@ v2 changes (2026-05-02):
 from __future__ import annotations
 
 import asyncio
+import difflib
 import html
 import json
 import logging
@@ -570,12 +571,29 @@ class RSSNewsProvider:
 
     @classmethod
     def _detect_region(cls, query: str) -> set[str]:
-        """Detect regions from query keywords."""
+        """Detect regions from query keywords, including common misspellings."""
         query_lower = query.lower()
         detected = set()
         for region, keywords in cls.REGION_KEYWORDS.items():
             if any(kw in query_lower for kw in keywords):
                 detected.add(region)
+                continue
+            # Fuzzy fallback for typos (e.g. "Iraeli" -> "Israeli").
+            tokens = re.findall(r"[a-zA-Z']+", query_lower)
+            for keyword in keywords:
+                if keyword in query_lower:
+                    detected.add(region)
+                    break
+                if len(keyword) >= 5:
+                    for token in tokens:
+                        if (
+                            len(token) >= 4
+                            and difflib.SequenceMatcher(None, token, keyword).ratio() >= 0.80
+                        ):
+                            detected.add(region)
+                            break
+                    if region in detected:
+                        break
         return detected
 
     @classmethod
