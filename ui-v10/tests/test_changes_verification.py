@@ -86,7 +86,7 @@ def test_fail_loud_no_env_vars():
     # so the default-derived paths are accepted.
     result = subprocess.run(
         [
-            "python3",
+            sys.executable,
             "-c",
             "from app.services import state_store; print('RUNTIME_NAMESPACE_ROOT=', state_store.RUNTIME_NAMESPACE_ROOT)",
         ],
@@ -299,7 +299,7 @@ def test_strict_contract_boundary_violation():
     }
 
     result = subprocess.run(
-        ["python3", "-c", "from app.services import state_store"],
+        [sys.executable, "-c", "from app.services import state_store"],
         cwd=str(REPO_UI_ROOT),
         capture_output=True,
         text=True,

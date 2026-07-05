@@ -15,11 +15,15 @@ Usage:
     # Full-answer mode (slower, invokes local LLM)
     LUCY_SYNTHETIC_FULL_ANSWER=1 python3 -m pytest tools/router_py/test_synthetic_adversarial.py -v
 
+    # Include v11 policy-conflict diagnostic cases
+    LUCY_SYNTHETIC_DIAGNOSTIC=1 python3 -m pytest tools/router_py/test_synthetic_adversarial.py -v
+
     # Run directly
     python3 tools/router_py/test_synthetic_adversarial.py
 
 Environment:
     LUCY_SYNTHETIC_CASES_PATH     Path to JSONL cases (default: tests/synthetic_adversarial_cases.jsonl)
+    LUCY_SYNTHETIC_DIAGNOSTIC     Set to "1" to also load diagnostic policy-conflict cases.
     LUCY_SYNTHETIC_FULL_ANSWER    Set to "1" to enable full-answer tests.
     LUCY_LOCAL_MODEL              Model name for full-answer tests (default: local-lucy-fast)
     LUCY_FORCE_LOCAL              Set to "1" to force local routing.
@@ -52,6 +56,13 @@ CASES_PATH = Path(
         PROJECT_ROOT / "tests" / "synthetic_adversarial_cases.jsonl",
     )
 )
+DIAGNOSTIC_PATH = Path(
+    os.environ.get(
+        "LUCY_SYNTHETIC_DIAGNOSTIC_PATH",
+        PROJECT_ROOT / "tests" / "adversarial_diagnostic" / "v11_policy_conflicts.jsonl",
+    )
+)
+ENABLE_DIAGNOSTIC = os.environ.get("LUCY_SYNTHETIC_DIAGNOSTIC", "") in ("1", "true", "yes")
 LOCAL_MODEL = os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-fast")
 
 # ---------------------------------------------------------------------------
@@ -80,25 +91,35 @@ def _ensure_imports():
 
 
 def _load_cases() -> List[Dict[str, Any]]:
-    """Load and validate synthetic cases from JSONL."""
+    """Load and validate synthetic cases from JSONL.
+
+    Loads the main cases file by default.  When LUCY_SYNTHETIC_DIAGNOSTIC=1,
+    also loads the optional diagnostic file containing cases that conflict
+    with v11's deliberate routing policy.
+    """
     if not CASES_PATH.exists():
         pytest.skip(f"Synthetic cases file not found: {CASES_PATH}")
 
     cases = []
     required_keys = {"id", "family", "prompt"}
-    with CASES_PATH.open("r", encoding="utf-8") as fh:
-        for line_no, raw in enumerate(fh, 1):
-            raw = raw.strip()
-            if not raw:
-                continue
-            try:
-                case = json.loads(raw)
-            except json.JSONDecodeError as exc:
-                pytest.skip(f"JSON parse error at line {line_no}: {exc}")
-            missing = required_keys - set(case.keys())
-            if missing:
-                pytest.skip(f"Case at line {line_no} missing required keys: {missing}")
-            cases.append(case)
+    files = [(CASES_PATH, "main")]
+    if ENABLE_DIAGNOSTIC and DIAGNOSTIC_PATH.exists():
+        files.append((DIAGNOSTIC_PATH, "diagnostic"))
+
+    for path, _label in files:
+        with path.open("r", encoding="utf-8") as fh:
+            for line_no, raw in enumerate(fh, 1):
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    case = json.loads(raw)
+                except json.JSONDecodeError as exc:
+                    pytest.skip(f"JSON parse error at {path}:{line_no}: {exc}")
+                missing = required_keys - set(case.keys())
+                if missing:
+                    pytest.skip(f"Case at {path}:{line_no} missing required keys: {missing}")
+                cases.append(case)
     return cases
 
 
@@ -293,6 +314,11 @@ class TestSyntheticAdversarialFullAnswer:
     These tests are **opt-in** because they invoke the local LLM and are
     therefore slower and subject to non-determinism.
     """
+
+    pytestmark = pytest.mark.skipif(
+        os.environ.get("LUCY_SYNTHETIC_FULL_ANSWER", "") not in ("1", "true", "yes"),
+        reason="Full-answer synthetic tests are opt-in (set LUCY_SYNTHETIC_FULL_ANSWER=1)",
+    )
 
     @pytest.mark.parametrize(
         "case",

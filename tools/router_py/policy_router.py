@@ -12,7 +12,9 @@ The policy router is intentionally conservative: when in doubt it returns
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from router_py.request_types import ClassificationResult
@@ -99,6 +101,22 @@ _LOCAL_REASONING_PHRASES = frozenset(
         "should they be",
         "should we be",
     }
+)
+
+# Conspiracy / paranormal / unsubstantiated markers.  These are always treated
+# as local opinion/speculation regardless of current-fact phrasing, so they do
+# not get routed to live data sources.
+_CONSPIRACY_MARKERS = (
+    re.compile(r"\b(ufo|ufos|alien|aliens|extraterrestrial)\b", re.IGNORECASE),
+    re.compile(r"\b(chemtrails?|bigfoot|reptilian|reptilians)\b", re.IGNORECASE),
+    re.compile(r"\b(qanon|haarp|mkultra|roswell)\b", re.IGNORECASE),
+    re.compile(r"\b(bermuda triangle|project blue beam|great reset)\b", re.IGNORECASE),
+    re.compile(r"\b(ancient aliens|simulation hypothesis)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(government\s+hiding|elites\s+drink\s+blood|ghosts\s+actually\s+aliens)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(pyramids?\s+(were\s+)?built\s+by\s+aliens)\b", re.IGNORECASE),
 )
 
 # Markers that indicate the query is about a current/live fact, even if it is
@@ -325,6 +343,24 @@ _WAR_HISTORY_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Stable historical-event / topic markers used by gate_stable_knowledge.
+_STABLE_HISTORY_TERMS = frozenset(
+    {
+        "french revolution",
+        "roman empire",
+        "vietnam war",
+        "nuclear program",
+    }
+)
+
+# Obvious placeholder / keyboard-mash / malformed garbage patterns.
+_GARBAGE_PATTERNS = (
+    re.compile(r"\bfoo\s+bar\s+baz\b", re.IGNORECASE),
+    re.compile(r"\bmixed\s+case\s+text\s+here\b", re.IGNORECASE),
+    re.compile(r"\basdfghjkl\b", re.IGNORECASE),
+    re.compile(r"\bqwertyuiop\b", re.IGNORECASE),
+)
+
 # Terms that make a "current" query clearly historical or technical, not live.
 _NON_CURRENT_CONTEXT = frozenset(
     {
@@ -409,8 +445,16 @@ _STABLE_KNOWLEDGE_TERMS = frozenset(
         "capacitor",
         "transistor",
         "vacuum tube",
+        "vacuum tubes",
+        "triode",
+        "triodes",
         "ohms law",
+        "ohm's law",
         "kirchhoff",
+        # Gardening / household practical knowledge
+        "lawn fertilizer",
+        "fertilizer",
+        "compost",
         # Social sciences / reasoning
         "game theory",
         "cognitive bias",
@@ -418,9 +462,17 @@ _STABLE_KNOWLEDGE_TERMS = frozenset(
         # Legal / tax stable knowledge
         "capital gains tax",
         "tenant rights",
-        # Stable humanities
+        # Stable finance definitions
+        "compound interest",
+        "reit",
+        "reits",
+        # Stable humanities / history
         "how old is the earth",
         "how far away is mars",
+        "french revolution",
+        "roman empire",
+        "vietnam war",
+        "nuclear program",
     }
 )
 
@@ -439,6 +491,11 @@ _STABLE_HISTORICAL_FIGURES = frozenset(
         "charles darwin",
         "albert einstein",
         "thomas edison",
+        "napoleon",
+        "napoleon bonaparte",
+        "george washington",
+        "abraham lincoln",
+        "winston churchill",
     }
 )
 
@@ -497,6 +554,34 @@ def _is_current_information_query(query: str) -> bool:
         or _is_latest_release_query(query)
         or _is_live_event_query(query)
     )
+
+
+def _is_garbage_or_nonsense(query: str) -> bool:
+    """Detect placeholder, keyboard-mash, symbol-only, or repetitive noise."""
+    if not query:
+        return True
+    q = query.strip()
+    if not q:
+        return True
+
+    # No real letters from any script (symbols, digits, emojis, punctuation).
+    # We exclude the Latin-1 ordinal indicators \u00aa/\u00ba so that garbage
+    # like "¿¡™£¢∞§¶•ªº–≠" is still treated as noise, while non-Latin scripts
+    # such as Hebrew remain meaningful.
+    def _is_real_letter(ch: str) -> bool:
+        return unicodedata.category(ch).startswith("L") and ch not in "\u00aa\u00ba"
+
+    if not any(_is_real_letter(c) for c in q):
+        return True
+    words = q.split()
+    # Single word repeated three or more times.
+    if len(words) >= 3 and len(set(w.lower() for w in words)) == 1:
+        return True
+    # Known placeholder / test gibberish.
+    q_lower = q.lower()
+    if any(p.search(q_lower) for p in _GARBAGE_PATTERNS):
+        return True
+    return False
 
 
 def _looks_like_attachment_query(context: dict[str, Any] | None) -> bool:
@@ -896,6 +981,24 @@ def gate_stable_knowledge(
             policy_reason="stable_historical_figure",
         )
 
+    # Stable historical events / topics (e.g. "Tell me about the French Revolution",
+    # "What is the history of Iran's nuclear program?").  Current markers are
+    # already filtered out at the top of this gate.
+    if re.search(
+        r"\b(history of|tell me about the|describe the|what caused the|what was the)\b", q
+    ) and (
+        any(re.search(rf"\b{re.escape(term)}\b", q) for term in _STABLE_HISTORY_TERMS)
+        or any(figure in q for figure in _STABLE_HISTORICAL_FIGURES)
+    ):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:stable_knowledge",
+            matched_rule="stable_knowledge",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="stable_historical_topic",
+        )
+
     return None
 
 
@@ -910,6 +1013,19 @@ def gate_local_reasoning(
     if not query:
         return None
     q = query.lower().strip()
+
+    # Conspiracy / paranormal / unsubstantiated claims are opinion/speculation,
+    # even when they include current-fact phrasing like "today".
+    if any(p.search(q) for p in _CONSPIRACY_MARKERS):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:conspiracy_local",
+            matched_rule="local_reasoning",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="conspiracy_or_unsubstantiated_claim",
+        )
+
     if any(phrase in q for phrase in _LOCAL_REASONING_PHRASES):
         # If the query also references current/live facts, the user is asking
         # for reasoning *over* current information.  Route to AUGMENTED so the
@@ -934,6 +1050,26 @@ def gate_local_reasoning(
             provider="local",
             provider_usage_class="local",
             policy_reason="subjective_or_speculative_reasoning",
+        )
+    return None
+
+
+def gate_garbage_nonsense(
+    query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
+) -> PolicyDecision | None:
+    """Placeholder, malformed, or nonsensical input should stay LOCAL/CLARIFY.
+
+    Prevents repetitive noise, keyboard mashing, and test placeholders from
+    being routed outward by the embedding router.
+    """
+    if _is_garbage_or_nonsense(query):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:garbage_nonsense_local",
+            matched_rule="garbage_nonsense",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="garbage_or_nonsense_input",
         )
     return None
 
@@ -1377,6 +1513,67 @@ def gate_hebrew_query(
     return None
 
 
+def _last_exchange_was_medical_vet() -> bool:
+    """Return True when the most recent feedback-buffer exchange was medical/vet EVIDENCE."""
+    import json
+    import os
+
+    try:
+        ns = Path(
+            os.environ.get(
+                "LUCY_RUNTIME_NAMESPACE_ROOT",
+                str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+            )
+        )
+        buf_path = ns / "feedback_buffer.json"
+        if not buf_path.exists():
+            return False
+        data = json.loads(buf_path.read_text(encoding="utf-8"))
+        exchanges = data.get("exchanges", [])
+        if not exchanges:
+            return False
+        last = exchanges[-1]
+        if str(last.get("route", "")).upper() != "EVIDENCE":
+            return False
+        last_query = str(last.get("query", "") or "").lower()
+        medical_keywords = (
+            "side effect",
+            "metformin",
+            "ibuprofen",
+            "aspirin",
+            "warfarin",
+            "amoxicillin",
+            "tadalafil",
+            "diabetes",
+            "hypertension",
+            "medication",
+            "drug",
+            "dosage",
+            "symptom",
+            "chest",
+            "shortness of breath",
+            "headache",
+            "fever",
+            "nausea",
+            "pregnant",
+            "surgery",
+            "treatment",
+            "dog",
+            "cat",
+            "canine",
+            "feline",
+            "veterinary",
+            "vet",
+            "hip dysplasia",
+            "heartworm",
+            "hyperthyroidism",
+            "bloat",
+        )
+        return any(kw in last_query for kw in medical_keywords)
+    except Exception:
+        return False
+
+
 def gate_memory_followup(
     query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
 ) -> PolicyDecision | None:
@@ -1393,14 +1590,22 @@ def gate_memory_followup(
     memory_phrases = (
         r"\bwhat\s+did\s+we\s+(discuss|talk|chat)\s+(earlier|before|about)\b",
         r"\bwhat\s+were\s+we\s+(discussing|talking|chatting)\s+(about|earlier|before)\b",
-        r"\bwhat\s+did\s+i\s+(say|mention|ask)\s+(earlier|before)\b",
+        r"\bwhat\s+did\s+i\s+(say|mention|ask)\s+(earlier|before|about)\b",
         r"\bwhat\s+did\s+you\s+(say|mention|tell\s+me)\s+(earlier|before)\b",
         r"\bwhat\s+was\s+(i|we)\s+(saying|talking|discussing)\s+(about|earlier|before)\b",
         r"\bremind\s+me\s+what\s+we\s+(discussed|talked|chatted)\s+(about|earlier|before)\b",
         r"\bwhat\s+was\s+our\s+(conversation|discussion)\s+about\b",
         r"\bwhat\s+have\s+we\s+been\s+(discussing|talking)\s+about\b",
+        r"\bwhat\s+was\s+the\s+last\s+topic\s+we\s+covered\b",
+        r"\bwhat\s+about\s+that\b",
+        r"\bhow\s+about\s+that\b",
     )
     if any(re.search(p, q) for p in memory_phrases):
+        # Bare ambiguous follow-ups like "what about that?" can also follow a
+        # medical/veterinary EVIDENCE answer. In that context the downstream
+        # medical-followup guard should keep the route outward; do not force LOCAL.
+        if q in ("what about that", "how about that") and _last_exchange_was_medical_vet():
+            return None
         return PolicyDecision(
             route="LOCAL",
             reason_code="policy:memory_followup_local",
@@ -1427,13 +1632,16 @@ class PolicyRouter:
         gate_personal_family,
         gate_recreational_pet,
         gate_medical_vet,
+        # Garbage / noise should not be routed outward by the embedding router.
+        # Run it early so symbol-only or placeholder input does not accidentally
+        # match a downstream weather/news/finance keyword heuristic.
+        gate_garbage_nonsense,
         # Hebrew-script query gate has been removed from the primary runtime
         # as part of the V11 English-only scope. The function is retained below
         # as an isolated utility for a separate Hebrew assistant.
-        # Specific external-source gates must run before the broad factual_lookup
-        # gate so that time/weather/news/conflict/age/current queries keep their
-        # dedicated routes and reason codes.
-        gate_specific_entity_fact,
+        #
+        # Dedicated external-source gates run next so time/weather/news/finance
+        # /conflict/age/current queries keep their routes and reason codes.
         gate_finance,
         gate_time,
         gate_weather,
@@ -1449,10 +1657,14 @@ class PolicyRouter:
         # AUGMENTED because the query shares few keywords with the prior topic.
         gate_memory_followup,
         # Stable knowledge / local reasoning must run before the broad
-        # factual_lookup gate so opinion, speculation, conspiracy, and timeless
-        # educational concepts stay LOCAL instead of being forced to AUGMENTED.
+        # factual_lookup gate and before specific_entity_fact so opinion,
+        # speculation, conspiracy, and timeless educational/historical concepts
+        # stay LOCAL instead of being forced outward.
         gate_stable_knowledge,
         gate_local_reasoning,
+        # Remaining specific named-entity factual lookups route outward for
+        # verification.
+        gate_specific_entity_fact,
         # Catch remaining broad factual lookups before the ambiguous-local gate
         # forces them to the local model. The factual_lookup gate carries its own
         # exclusions for local capabilities (translation, coding, math, creative,

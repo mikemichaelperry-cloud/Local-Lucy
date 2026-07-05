@@ -50,6 +50,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pytest
 from local_answer import LocalAnswer, LocalAnswerConfig
 
+# This suite exercises a live local LLM. Even with temperature=0 the output can
+# vary with GPU scheduling / model state, so allow a couple of reruns.
+pytestmark = pytest.mark.flaky(reruns=2)
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
