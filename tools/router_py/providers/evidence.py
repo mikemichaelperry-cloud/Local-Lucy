@@ -16,6 +16,7 @@ import re
 import sys
 import time
 import urllib.parse
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,7 @@ def _ensure_tools_path() -> None:
 # Optional imports
 try:
     from router_py.news_provider import NewsProvider
+
     HAS_NEWS_PROVIDER = True
 except ImportError:
     HAS_NEWS_PROVIDER = False
@@ -91,11 +93,142 @@ def _set_cached_evidence(provider: str, question: str, result: Any) -> None:
 def _prepare_subprocess_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     """Build isolated subprocess environment."""
     import os
+
     env = os.environ.copy()
     env["STATE_NAMESPACE_RAW"] = os.environ.get("LUCY_SHARED_STATE_NAMESPACE", "")
     if extra:
         env.update(extra)
     return env
+
+
+def _is_medical_vet_finance_evidence(evidence: dict[str, Any], route: Any = None) -> bool:
+    """Return True if the evidence belongs to a freshness-sensitive domain."""
+    if not isinstance(evidence, dict):
+        return False
+    text = " ".join(
+        str(evidence.get(k, "")).lower()
+        for k in ("class", "provider", "category", "source", "title")
+    )
+    if route is not None:
+        reason = str(getattr(route, "evidence_reason", "")).lower()
+        text += " " + reason
+    return any(
+        marker in text
+        for marker in (
+            "medical",
+            "veterinary",
+            "vet",
+            "finance",
+            "financial",
+            "personal_finance",
+        )
+    )
+
+
+def _parse_evidence_date(evidence: dict[str, Any]) -> datetime | None:
+    """Best-effort extraction of an evidence date."""
+    if not isinstance(evidence, dict):
+        return None
+    for key in ("date", "published", "datetime", "source_age_days", "timestamp"):
+        value = evidence.get(key)
+        if value is None:
+            continue
+        if key == "source_age_days":
+            try:
+                age_days = int(value)
+                return datetime.now(timezone.utc) - timedelta(days=age_days)
+            except Exception:
+                continue
+        parsed = _parse_date_value(str(value))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _parse_date_value(value: str) -> datetime | None:
+    """Parse a single date string; returns timezone-aware UTC datetime or None."""
+    if not value or value.lower() in ("unknown", "n/a", ""):
+        return None
+    # ISO 8601 / common RFC variants
+    for fmt in (
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+        "%a, %d %b %Y %H:%M:%S %z",
+    ):
+        try:
+            dt = datetime.strptime(value, fmt)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        except ValueError:
+            continue
+    # Fallback to dateutil if available
+    try:
+        from dateutil import parser as dateutil_parser
+
+        dt = dateutil_parser.parse(value)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def _apply_evidence_freshness(
+    evidence: dict[str, Any],
+    route: Any = None,
+    stale_days: int = 365,
+) -> dict[str, Any]:
+    """Set fresh/confidence flags on medical/vet/finance evidence.
+
+    If the evidence is older than *stale_days* days, mark it fresh=False and
+    reduce the confidence. Non-sensitive domains are left unchanged.
+    """
+    if not isinstance(evidence, dict):
+        return evidence
+    if not _is_medical_vet_finance_evidence(evidence, route=route):
+        return evidence
+
+    parsed = _parse_evidence_date(evidence)
+    age_days = None
+    if parsed is not None:
+        age_days = (datetime.now(timezone.utc) - parsed).days
+    elif "source_age_days" in evidence:
+        try:
+            age_days = int(evidence["source_age_days"])
+        except Exception:
+            pass
+
+    if age_days is not None and age_days > stale_days:
+        evidence["fresh"] = False
+        evidence["source_age_days"] = age_days
+        evidence["confidence"] = max(0.0, min(1.0, float(evidence.get("confidence", 0.8)) * 0.7))
+    else:
+        evidence["fresh"] = True
+        if age_days is not None:
+            evidence["source_age_days"] = age_days
+    return evidence
+
+
+def _local_with_caveat_fallback(
+    question: str = "",
+    reason: str = "no_live_source",
+) -> dict[str, Any]:
+    """Return a structured fallback dict for when live sources are unavailable."""
+    return {
+        "fallback": True,
+        "suggested_action": "local_with_caveat",
+        "fallback_reason": reason,
+        "context": "",
+        "content": "",
+        "formatted": "",
+        "title": "Live source unavailable",
+        "url": "",
+        "provider": "local",
+        "class": "local_fallback",
+    }
 
 
 async def fetch_wikipedia_evidence(question: str) -> dict[str, Any] | None:
@@ -110,6 +243,7 @@ async def fetch_wikipedia_evidence(question: str) -> dict[str, Any] | None:
     try:
         _ensure_tools_path()
         import unverified_context_wikipedia as wiki_provider
+
         loop = asyncio.get_event_loop()
         payload = await loop.run_in_executor(None, wiki_provider.fetch_context, question)
         if payload and payload.get("ok"):
@@ -123,6 +257,7 @@ async def fetch_wikipedia_evidence(question: str) -> dict[str, Any] | None:
     except Exception as e:
         logger.warning(f"Wikipedia evidence fetch failed: {e}")
 
+    result = _apply_evidence_freshness(result)
     _set_cached_evidence("wikipedia", question, result)
     return result
 
@@ -134,6 +269,7 @@ async def fetch_news_evidence(question: str, for_voice: bool = False) -> dict[st
         return None
 
     import time
+
     fetch_start = time.time()
     try:
         result = await NewsProvider.fetch_news(question, for_voice=for_voice)
@@ -154,6 +290,7 @@ async def fetch_news_evidence(question: str, for_voice: bool = False) -> dict[st
                 "articles": result.articles,
                 "partial": result.partial,
                 "errors": result.errors,
+                "disagreement": result.disagreement,
             }
         else:
             logger.warning(f"News fetch failed after {elapsed:.2f}s: {result.error}")
@@ -184,12 +321,50 @@ async def fetch_time_evidence(question: str) -> dict[str, Any] | None:
         match = re.search(pattern, question, re.IGNORECASE)
         if match:
             candidate = match.group(1).strip()
-            blacklist = {"a", "an", "the", "it", "that", "this", "what",
-                         "me", "my", "your", "you", "he", "him", "his",
-                         "she", "her", "they", "them", "their", "we", "us",
-                         "no", "not", "all", "same", "just", "now", "then",
-                         "here", "there", "when", "where", "why", "how",
-                         "in", "at", "on", "by", "for", "with", "to", "of"}
+            blacklist = {
+                "a",
+                "an",
+                "the",
+                "it",
+                "that",
+                "this",
+                "what",
+                "me",
+                "my",
+                "your",
+                "you",
+                "he",
+                "him",
+                "his",
+                "she",
+                "her",
+                "they",
+                "them",
+                "their",
+                "we",
+                "us",
+                "no",
+                "not",
+                "all",
+                "same",
+                "just",
+                "now",
+                "then",
+                "here",
+                "there",
+                "when",
+                "where",
+                "why",
+                "how",
+                "in",
+                "at",
+                "on",
+                "by",
+                "for",
+                "with",
+                "to",
+                "of",
+            }
             if candidate.lower() not in blacklist and len(candidate) > 1:
                 location = candidate
                 break
@@ -198,8 +373,9 @@ async def fetch_time_evidence(question: str) -> dict[str, Any] | None:
     if not location:
         try:
             import datetime as _dt
+
             tz = _dt.datetime.now().astimezone().tzinfo
-            if tz and hasattr(tz, 'key'):
+            if tz and hasattr(tz, "key"):
                 location = tz.key
             else:
                 location = "UTC"
@@ -215,7 +391,9 @@ async def fetch_time_evidence(question: str) -> dict[str, Any] | None:
             return None
 
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, str(tool_path), location,
+            sys.executable,
+            str(tool_path),
+            location,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(ROOT_DIR),
@@ -229,7 +407,7 @@ async def fetch_time_evidence(question: str) -> dict[str, Any] | None:
 
         result = None
         if proc.returncode == 0:
-            data = json.loads(stdout.decode('utf-8'))
+            data = json.loads(stdout.decode("utf-8"))
             if data.get("ok"):
                 formatted = format_time_response(data)
                 result = {
@@ -311,13 +489,9 @@ async def fetch_api_evidence(
         _ensure_tools_path()
         loop = asyncio.get_event_loop()
         if provider == "kimi":
-            return await loop.run_in_executor(
-                None, call_kimi_subprocess, question, timeout
-            )
+            return await loop.run_in_executor(None, call_kimi_subprocess, question, timeout)
         elif provider == "openai":
-            return await loop.run_in_executor(
-                None, call_openai_subprocess, question, timeout
-            )
+            return await loop.run_in_executor(None, call_openai_subprocess, question, timeout)
         return None
     except Exception as e:
         logger.warning(f"{provider} evidence fetch failed: {e}")
@@ -327,6 +501,7 @@ async def fetch_api_evidence(
 def call_kimi_subprocess(question: str, timeout: float = 130.0) -> dict[str, Any] | None:
     """Call Kimi provider via subprocess (sync version for thread pool)."""
     import subprocess
+
     tool = ROOT_DIR / "tools" / "unverified_context_kimi.py"
     if not tool.exists():
         return None
@@ -357,6 +532,7 @@ def call_kimi_subprocess(question: str, timeout: float = 130.0) -> dict[str, Any
 def call_openai_subprocess(question: str, timeout: float = 130.0) -> dict[str, Any] | None:
     """Call OpenAI provider via subprocess (sync version for thread pool)."""
     import subprocess
+
     tool = ROOT_DIR / "tools" / "unverified_context_openai.py"
     if not tool.exists():
         return None
@@ -389,7 +565,7 @@ async def fetch_trusted_evidence(
     route: Any,
 ) -> dict[str, Any] | None:
     """Fetch evidence from trusted sources (medical/veterinary domains).
-    
+
     Uses unverified_context_trusted.py with domain restrictions.
     Returns None if no evidence found, signaling strict enforcement.
     """
@@ -397,6 +573,7 @@ async def fetch_trusted_evidence(
     try:
         _ensure_tools_path()
         import unverified_context_trusted as trusted_provider
+
         loop = asyncio.get_event_loop()
         intent_family = route.intent_family if route else ""
         evidence_reason = route.evidence_reason if route else ""
@@ -414,16 +591,24 @@ async def fetch_trusted_evidence(
                 "bounded_response": payload.get("bounded_response", False),
             }
             # Pass through fallback telemetry fields from trusted provider metadata
-            for key in ("fallback_used", "fallback_reason", "primary_failed",
-                        "fallback_to", "attempted_chain", "successful_backend",
-                        "degradation_level", "answer_basis", "DEGRADED_REASON"):
+            for key in (
+                "fallback_used",
+                "fallback_reason",
+                "primary_failed",
+                "fallback_to",
+                "attempted_chain",
+                "successful_backend",
+                "degradation_level",
+                "answer_basis",
+                "DEGRADED_REASON",
+            ):
                 if key in payload:
                     evidence[key] = payload[key]
-            return evidence
-        return None
+            return _apply_evidence_freshness(evidence, route=route)
+        return _local_with_caveat_fallback(question, reason="trusted_source_unavailable")
     except Exception as e:
         logger.warning(f"Trusted evidence fetch failed: {e}")
-        return None
+        return _local_with_caveat_fallback(question, reason=f"trusted_fetch_error:{e}")
 
 
 # ---------------------------------------------------------------------------
@@ -465,14 +650,29 @@ _FINANCE_CRYPTO_IDS = {
 }
 
 _FINANCE_CURRENCY_CODES = {
-    "dollar": "USD", "usd": "USD", "$": "USD",
-    "euro": "EUR", "eur": "EUR", "€": "EUR",
-    "pound": "GBP", "gbp": "GBP", "£": "GBP",
-    "yen": "JPY", "jpy": "JPY", "¥": "JPY",
-    "shekel": "ILS", "ils": "ILS", "₪": "ILS",
-    "canadian dollar": "CAD", "cad": "CAD", "c$": "CAD",
-    "australian dollar": "AUD", "aud": "AUD", "a$": "AUD",
-    "swiss franc": "CHF", "chf": "CHF",
+    "dollar": "USD",
+    "usd": "USD",
+    "$": "USD",
+    "euro": "EUR",
+    "eur": "EUR",
+    "€": "EUR",
+    "pound": "GBP",
+    "gbp": "GBP",
+    "£": "GBP",
+    "yen": "JPY",
+    "jpy": "JPY",
+    "¥": "JPY",
+    "shekel": "ILS",
+    "ils": "ILS",
+    "₪": "ILS",
+    "canadian dollar": "CAD",
+    "cad": "CAD",
+    "c$": "CAD",
+    "australian dollar": "AUD",
+    "aud": "AUD",
+    "a$": "AUD",
+    "swiss franc": "CHF",
+    "chf": "CHF",
 }
 
 
@@ -506,7 +706,11 @@ def _extract_stock_symbol(question: str) -> str | None:
             return ticker
 
     # "X stock price" / "X share price" / "X stock"
-    for pattern in [r"([a-z]+)\s+stock\s+price", r"([a-z]+)\s+share\s+price", r"([a-z]+)\s+stock\b"]:
+    for pattern in [
+        r"([a-z]+)\s+stock\s+price",
+        r"([a-z]+)\s+share\s+price",
+        r"([a-z]+)\s+stock\b",
+    ]:
         match = re.search(pattern, q)
         if match:
             name = match.group(1)
@@ -516,8 +720,10 @@ def _extract_stock_symbol(question: str) -> str | None:
                 return name.upper()
 
     # Crypto-only patterns: "X price" / "X crypto"
-    for pattern in [r"\b(bitcoin|ethereum|solana|ripple|cardano|dogecoin|btc|eth|sol|xrp|ada|doge)\s+price\b",
-                    r"\b(bitcoin|ethereum|solana|ripple|cardano|dogecoin|btc|eth|sol|xrp|ada|doge)\s+crypto\b"]:
+    for pattern in [
+        r"\b(bitcoin|ethereum|solana|ripple|cardano|dogecoin|btc|eth|sol|xrp|ada|doge)\s+price\b",
+        r"\b(bitcoin|ethereum|solana|ripple|cardano|dogecoin|btc|eth|sol|xrp|ada|doge)\s+crypto\b",
+    ]:
         match = re.search(pattern, q)
         if match:
             return match.group(1).upper()
@@ -672,14 +878,17 @@ async def _fetch_stock_via_search(symbol: str) -> dict[str, Any] | None:
         env = os.environ.copy()
         env["PYTHONPATH"] = str(ROOT_DIR) + os.pathsep + env.get("PYTHONPATH", "")
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, str(search_script),
+            sys.executable,
+            str(search_script),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(ROOT_DIR),
             env=env,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(payload.encode("utf-8")), timeout=20.0)
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(payload.encode("utf-8")), timeout=20.0
+        )
         if proc.returncode != 0:
             logger.warning(f"Stock search failed: {stderr.decode()[:200]}")
             return None
@@ -721,14 +930,17 @@ async def _fetch_net_worth(person: str) -> dict[str, Any] | None:
         env = os.environ.copy()
         env["PYTHONPATH"] = str(ROOT_DIR) + os.pathsep + env.get("PYTHONPATH", "")
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, str(search_script),
+            sys.executable,
+            str(search_script),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(ROOT_DIR),
             env=env,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(payload.encode("utf-8")), timeout=20.0)
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(payload.encode("utf-8")), timeout=20.0
+        )
         if proc.returncode != 0:
             logger.warning(f"Net-worth search failed: {stderr.decode()[:200]}")
             return None
@@ -778,7 +990,7 @@ async def fetch_finance_evidence(question: str) -> dict[str, Any] | None:
     if fx:
         result = _fetch_exchange_rate(fx["base"], fx["target"])
         if result:
-            return result
+            return _apply_evidence_freshness(result)
 
     # 2. Stock / index / crypto quote
     symbol = _extract_stock_symbol(question)
@@ -786,22 +998,22 @@ async def fetch_finance_evidence(question: str) -> dict[str, Any] | None:
         # Try CoinGecko first for known crypto
         result = _fetch_coingecko(symbol)
         if result:
-            return result
+            return _apply_evidence_freshness(result)
         # Then Yahoo Finance for stocks/indices
         result = _fetch_yahoo_finance(symbol)
         if result:
-            return result
+            return _apply_evidence_freshness(result)
         # Fallback to web search if Yahoo rate-limits
         result = await _fetch_stock_via_search(symbol)
         if result:
-            return result
+            return _apply_evidence_freshness(result)
 
     # 3. Net worth / billionaire query
     person = _extract_net_worth_person(question)
     if person:
         result = await _fetch_net_worth(person)
         if result:
-            return result
+            return _apply_evidence_freshness(result)
 
     logger.info(f"No finance fetcher matched question: {question[:50]}")
-    return None
+    return _local_with_caveat_fallback(question, reason="no_finance_fetcher_matched")

@@ -76,6 +76,7 @@ class NewsResult:
     partial: bool = False
     errors: list[str] | None = None
     html_text: str = ""
+    disagreement: bool = False
 
 
 def _clean_html(text: str) -> str:
@@ -126,6 +127,40 @@ def _parse_rfc822_date(date_str: str) -> datetime | None:
     return None
 
 
+def _query_asks_for_history(query: str) -> bool:
+    """Return True if the query explicitly asks for historical news."""
+    if not query:
+        return False
+    history_markers = {
+        "history",
+        "in 20",
+        "during",
+        "past",
+        "old",
+        "archived",
+        "historical",
+        "years ago",
+        "decade",
+        "century",
+    }
+    query_lower = query.lower()
+    return any(marker in query_lower for marker in history_markers)
+
+
+def _article_is_stale(pub_date: str, days: int = 7) -> bool:
+    """Return True if the article is older than *days* days."""
+    dt = _parse_rfc822_date(pub_date)
+    if dt is None:
+        return False
+    from datetime import timezone
+
+    now = datetime.now(timezone.utc)
+    try:
+        return (now - dt) > timedelta(days=days)
+    except Exception:
+        return False
+
+
 def _format_time_ago(published: str) -> str:
     """Format publish time as 'X minutes/hours ago'."""
     try:
@@ -174,6 +209,137 @@ def _format_time_ago(published: str) -> str:
             return f"{days} day{'s' if days != 1 else ''} ago"
     except Exception:
         return "recently"
+
+
+def _detect_source_disagreement(articles: list[dict[str, Any]]) -> bool:
+    """Detect whether sources report conflicting claims.
+
+    Uses a lightweight keyword heuristic: if two different sources share a
+    significant content word but one title uses a word and the other uses a
+    known antonym/negation (e.g. "denies" vs "confirms"), flag disagreement.
+    """
+    if len(articles) < 2:
+        return False
+
+    # Pairs of contradictory stems/words commonly found in news headlines.
+    antonym_pairs = [
+        {"denies", "confirms"},
+        {"rejects", "accepts", "approves"},
+        {"falls", "drops", "rises", "gains", "soars"},
+        {"attacks", "strike", "ceasefire", "truce"},
+        {"war", "peace"},
+        {"false", "true"},
+        {"no", "yes"},
+        {"guilty", "innocent"},
+        {"accuses", "defends"},
+    ]
+
+    stopwords = {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "dare",
+        "ought",
+        "used",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "among",
+        "and",
+        "but",
+        "or",
+        "yet",
+        "so",
+        "if",
+        "because",
+        "although",
+        "though",
+        "while",
+        "where",
+        "when",
+        "that",
+        "which",
+        "who",
+        "whom",
+        "whose",
+        "what",
+        "this",
+        "these",
+        "those",
+        "i",
+        "you",
+        "he",
+        "she",
+        "it",
+        "we",
+        "they",
+    }
+
+    # Build per-source title tokens, keeping only meaningful words.
+    source_titles: list[tuple[str, set[str], set[str]]] = []
+    for article in articles:
+        title = str(article.get("title", "")).lower()
+        if not title:
+            continue
+        tokens = set(re.findall(r"[a-z][a-z']*", title))
+        content_words = tokens - stopwords
+        if not content_words:
+            continue
+        source_titles.append((article.get("source", ""), content_words, tokens))
+
+    for i in range(len(source_titles)):
+        for j in range(i + 1, len(source_titles)):
+            src_i, words_i, raw_i = source_titles[i]
+            src_j, words_j, raw_j = source_titles[j]
+            if src_i == src_j:
+                continue
+            shared = words_i & words_j
+            if len(shared) < 1:
+                continue
+            for pair in antonym_pairs:
+                has_i = bool(raw_i & pair)
+                has_j = bool(raw_j & pair)
+                if has_i and has_j and not (raw_i & pair == raw_j & pair):
+                    return True
+    return False
 
 
 class RSSNewsProvider:
@@ -388,6 +554,19 @@ class RSSNewsProvider:
             "qantas",
         ],
     }
+
+    @classmethod
+    def _filter_by_recency(
+        cls, articles: list[dict[str, Any]], query: str, days: int = 7
+    ) -> list[dict[str, Any]]:
+        """Drop articles older than *days* days unless the query asks for history."""
+        if _query_asks_for_history(query):
+            return articles
+        return [
+            article
+            for article in articles
+            if not _article_is_stale(article.get("published", ""), days=days)
+        ]
 
     @classmethod
     def _detect_region(cls, query: str) -> set[str]:
@@ -655,6 +834,11 @@ class RSSNewsProvider:
                 deduped.append(article)
         all_articles = deduped
 
+        # Recency scoring: drop articles older than 7 days unless the query
+        # explicitly asks for historical news. This prevents stale headlines
+        # from ranking highly for "latest news" queries.
+        all_articles = cls._filter_by_recency(all_articles, query)
+
         # Sort by parsed datetime (most recent first).  Feeds without parseable
         # timestamps sort to the end so they don't push fresher content down.
         all_articles.sort(
@@ -675,6 +859,10 @@ class RSSNewsProvider:
                 break
         all_articles = capped
 
+        # Source cross-check: when multiple feeds are available, detect
+        # conflicting claims among the top items from different sources.
+        disagreement = _detect_source_disagreement(all_articles[: cls.MAX_TOTAL_ARTICLES])
+
         # Format response
         formatted = cls._format_news_response(all_articles, query, for_voice=for_voice)
         html_formatted = cls._format_news_response(
@@ -689,6 +877,7 @@ class RSSNewsProvider:
             partial=bool(errors),
             errors=errors if errors else None,
             html_text=html_formatted,
+            disagreement=disagreement,
         )
 
     @classmethod

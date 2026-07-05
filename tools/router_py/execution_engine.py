@@ -2180,24 +2180,32 @@ class ExecutionEngine:
                 "medical_safety",
                 "veterinary_context",
             ):
-                return ExecutionResult(
-                    status="completed",
-                    outcome_code="clarification_requested",
-                    route=route.route,
-                    provider=route.provider,
-                    provider_usage_class=route.provider_usage_class,
-                    response_text=(
-                        "I could not find trusted evidence for this question. "
-                        "For medical, veterinary, or legal topics, please consult a "
-                        "qualified professional or rephrase your question with more details."
-                    ),
-                    error_message="trusted_evidence_unavailable",
-                    metadata={
-                        "route_type": "evidence_failure",
-                        "fallback": "safe_clarification",
-                        "real_route_preserved": True,
-                    },
-                )
+                # Phase 8: when live sources explicitly signal a caveat fallback,
+                # answer from local knowledge with a clear prefix instead of refusing.
+                if evidence and evidence.get("suggested_action") == "local_with_caveat":
+                    context["_local_with_caveat"] = True
+                    route = dataclasses.replace(
+                        route, provider="local", provider_usage_class="local"
+                    )
+                else:
+                    return ExecutionResult(
+                        status="completed",
+                        outcome_code="clarification_requested",
+                        route=route.route,
+                        provider=route.provider,
+                        provider_usage_class=route.provider_usage_class,
+                        response_text=(
+                            "I could not find trusted evidence for this question. "
+                            "For medical, veterinary, or legal topics, please consult a "
+                            "qualified professional or rephrase your question with more details."
+                        ),
+                        error_message="trusted_evidence_unavailable",
+                        metadata={
+                            "route_type": "evidence_failure",
+                            "fallback": "safe_clarification",
+                            "real_route_preserved": True,
+                        },
+                    )
             if route.route == "AUGMENTED":
                 # Stable ordinary fact: allow a local, explicitly unverified answer.
                 context["_augmented_evidence_failed_stable_fact"] = True
@@ -2529,12 +2537,23 @@ class ExecutionEngine:
             result = dataclasses.replace(
                 result,
                 response_text=(
-                    "I could not verify this externally; here is what I know: "
-                    + result.response_text
+                    "Live sources are unavailable; here is what I know: " + result.response_text
                 ),
                 metadata={
                     **result.metadata,
                     "evidence_unverified_local_answer": True,
+                },
+            )
+
+        if context.get("_local_with_caveat") and result.response_text:
+            result = dataclasses.replace(
+                result,
+                response_text=(
+                    "Live sources are unavailable; here is what I know: " + result.response_text
+                ),
+                metadata={
+                    **result.metadata,
+                    "live_source_unavailable_local_answer": True,
                 },
             )
 

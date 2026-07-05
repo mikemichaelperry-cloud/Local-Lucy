@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🤖 Local Lucy V10
+# 🤖 Local Lucy V11
 
 **A Self-Learning, Privacy-First Desktop AI Assistant**
 
@@ -17,7 +17,7 @@
 
 ## Overview
 
-Local Lucy V10 is a **privacy-first, self-learning desktop AI assistant** built with PySide6. It runs entirely on your local machine with optional cloud augmentation, giving you full control over your data while providing intelligent conversation, voice interaction, and real-time information retrieval.
+Local Lucy V11 is a **privacy-first, self-learning desktop AI assistant** built with PySide6. The v11 runtime is English-only; Hebrew / Racheli support lives in a separate isolation layer. It runs entirely on your local machine with optional cloud augmentation, giving you full control over your data while providing intelligent conversation, voice interaction, and real-time information retrieval.
 
 Unlike cloud-only assistants, Lucy learns from your explicit corrections in natural language — tell her "that should have been LOCAL" and, after a safety gate, she updates her routing model. Auto-detected signals and router logs are telemetry only; they never mutate the model unsupervised.
 
@@ -55,7 +55,8 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 - **WEATHER** — Real-time weather lookups
 
 ### 🖥️ Desktop HMI
-- PySide6-based GUI with conversation history and detail view
+- PySide6-based GUI with a **simplified default view** (conversation, input, memory/voice toggles, Auto model selector)
+- Optional **Engineering panel** for route diagnostics, provider selectors, augmentation policy, learner controls, and structured logs
 - Real-time status panel and event logs
 - Configurable voice, provider, and model settings
 - Cross-platform (Linux primary, extensible)
@@ -114,7 +115,7 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 └─────────────────────────────────────────────────────────────┘
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete technical specification.
+See [Architecture.md](Architecture.md) for the complete v11 technical specification.
 
 ## Installation
 
@@ -163,6 +164,8 @@ ollama create local-lucy-mistral -f config/Modelfile.local-lucy-mistral
 # (Optional) Copy and configure API keys for cloud providers
 cp .env.example .env
 # Edit .env and add your keys
+
+# (Optional) Tune latency, caching, and GPU knobs in config/latency_optimizations.env
 
 # Launch the desktop application
 ./START_LUCY.sh

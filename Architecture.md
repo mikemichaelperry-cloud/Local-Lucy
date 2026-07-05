@@ -1,35 +1,25 @@
-# Local Lucy V10 — Architecture
+# Local Lucy V11 — Architecture
 
 **Date:** 2026-07-04
-**Version:** v10
-**Branch:** main / v10-dev
-**Hardware target:** RTX 3060 12 GB (current), RTX 3090/5090 (planned upgrades)
+**Version:** v11
+**Branch:** v11-dev
+**Scope:** English-only primary runtime
 
----
-
-## ⚠️ V11 Migration Notice
-
-This document describes the **current V10 implementation**. It is **descriptive, not normative for V11**. Several components documented here are scheduled for correction or isolation in Phase 0 of the V11 roadmap (`docs/superpowers/plans/2026-07-05-local-lucy-v11-roadmap.md`):
-
-- **Hebrew / Racheli persona support** is being separated from the primary Local Lucy runtime.
-- **Evidence versus synthesis** handling will change: Wikipedia, official APIs, and trusted domains remain evidence sources; OpenAI and Kimi are synthesis providers, not evidence sources themselves.
-- **Local-first routing** will be strengthened: stable basic facts, recipes, coding, opinion, and creative writing should stay LOCAL unless the user requests verification or live data.
-- **Prompt policy** will be revised to remove contradictions ("say I don't know" vs "never hedge" vs "facts only").
-- **Context validation** will be added before any source is injected into the LLM prompt.
-
-When implementing V11, follow the revised V11 roadmap, not this document as a specification. During Phase 0, this document will be frozen as `Architecture_V10_Current_State.md` and `Architecture.md` will become the evolving normative V11 architecture.
+> This document describes **v11 as implemented**. Hebrew / Racheli support has been separated from the primary runtime and is maintained in its own isolation layer.
 
 ---
 
 ## 1. Overview
 
-Local Lucy V10 is a privacy-first, locally-hosted AI assistant. It runs entirely on the user's machine, keeps conversation history and persistent facts in a local SQLite database, and only reaches out to the internet when the router explicitly decides an answer needs live or external evidence.
+Local Lucy V11 is a privacy-first, locally-hosted AI assistant. The primary runtime is English-only. It keeps conversation history and persistent facts in a local SQLite database, and only reaches out to the internet when the router explicitly decides an answer needs live or externally sourced evidence.
 
 **Core design goals**
 
-- **Local by default:** General knowledge, reasoning, creative writing, coding, and personal/family questions are answered by an Ollama-hosted local LLM.
-- **Evidence when it matters:** Medical, veterinary, financial-market, news, weather, time, travel, and current-event queries are routed to sourced external providers.
-- **No evasion:** The system prompt and routing policy are tuned to answer directly, avoid unnecessary disclaimers, and not refuse personal/family questions.
+- **Local-first:** Stable knowledge, reasoning, creative writing, coding, recipes, and personal/family questions are answered by an Ollama-hosted local LLM unless the user asks for verification or live data.
+- **When in doubt, route out:** Medical, veterinary, financial-market, news, weather, time, travel, and current-event queries are routed to sourced external providers.
+- **Evidence vs synthesis:** Wikipedia, trusted medical/vet/finance domains, official APIs, and RSS feeds are treated as evidence. OpenAI and Kimi are synthesis providers, not evidence sources themselves.
+- **No evasion:** The system prompt and routing policy answer directly, avoid unnecessary disclaimers, and do not refuse personal/family questions.
+- **Context guard:** Every piece of retrieved evidence and session-memory turn is checked for provenance, temporal relevance, entity collision, and answerability before it is injected into the LLM prompt.
 - **User-controlled learning:** Only explicit feedback (`thumbs_up/down`, corrections) is ingested into the learning pipeline; there is no implicit continuous retraining.
 - **Unified entry point:** Every surface (HMI, voice, web, CLI) funnels through `tools/router_py/main.py::run(...)`.
 
@@ -39,7 +29,7 @@ Local Lucy V10 is a privacy-first, locally-hosted AI assistant. It runs entirely
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              Local Lucy V10                               │
+│                              Local Lucy V11                               │
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌───────────┐ │
 │  │   HMI        │   │   Voice      │   │    Web      │   │    CLI    │ │
 │  │  (PySide6)   │   │  PTT/STT/TTS │   │   adapter   │   │           │ │
@@ -58,7 +48,7 @@ Local Lucy V10 is a privacy-first, locally-hosted AI assistant. It runs entirely
 │         │               │                                               │
 │         ▼               ▼                                               │
 │  ┌─────────────┐  ┌─────────────┐                                       │
-│  │  Ollama     │  │  External   │  (Wikipedia, OpenAI, Kimi, news,     │   │
+│  │  Ollama     │  │  External   │  (Wikipedia, official APIs, news,    │   │
 │  │  (local)    │  │  providers  │   weather, finance, time APIs)       │   │
 │  └─────────────┘  └─────────────┘                                       │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -77,11 +67,10 @@ lucy-v10/
 │   ├── Modelfile.local-lucy-fast
 │   ├── Modelfile.local-lucy-stable
 │   ├── Modelfile.local-lucy-mem
-│   ├── Modelfile.local-lucy-michael
-│   ├── Modelfile.local-lucy-racheli
 │   ├── evidence_policy.yaml
 │   ├── trusted_domains.yaml
-│   └── url_map.yaml
+│   ├── url_map.yaml
+│   └── latency_optimizations.env
 ├── models/router/             # Fine-tuned MiniLM router, examples, learner
 │   ├── hybrid_router_v2.py
 │   ├── comprehensive_examples.json
@@ -95,6 +84,7 @@ lucy-v10/
 │   ├── execution_engine.py
 │   ├── local_answer.py
 │   ├── model_selector.py
+│   ├── context_guard.py
 │   ├── feedback_buffer.py
 │   └── providers/
 ├── tools/router/core/         # Semantic interpreter / intent classifier
@@ -106,8 +96,7 @@ lucy-v10/
 │   ├── tts_adapter.py
 │   └── voices/
 ├── ui-v10/                    # PySide6 desktop HMI
-│   ├── app/panels/control_panel.py
-│   ├── app/panels/status_panel.py
+│   ├── app/panels/
 │   └── app/services/runtime_bridge.py
 ├── web_adapter/               # Optional stateless HTTP API
 │   └── server.py
@@ -121,12 +110,13 @@ lucy-v10/
 ## 4. Request Pipeline
 
 1. **Ingest** — `main.run(query, attachments, session_id, overrides)`
-2. **Feedback detection** — Corrections and thumbs-up/down are short-circuited to the feedback buffer / background learner.
+2. **Feedback detection** — Corrections and thumbs-up/down short-circuit to the feedback buffer / background learner.
 3. **Classify & route** — `classify.classify_intent()` + `select_route()` produce a `RoutingDecision`.
 4. **Resolve provider** — `provider_resolver` maps the route to a concrete provider plan.
 5. **Execute** — `execution_engine` runs the plan in a sandboxed Python namespace.
-6. **Generate answer** — `local_answer` streams the final response from Ollama (or formats external provider output).
-7. **Persist** — Turn is written to SQLite; feedback/state files are updated.
+6. **Guard context** — `context_guard` filters evidence and memory for relevance.
+7. **Generate answer** — `local_answer` streams the final response from Ollama (or formats external provider output).
+8. **Persist** — Turn is written to SQLite; feedback/state files are updated.
 
 ---
 
@@ -136,7 +126,7 @@ Routing is **deterministic-first, semantic-second**.
 
 ### 5.1 Policy Router (`tools/router_py/policy_router.py`)
 
-A ordered set of regex/heuristic gates runs before the embedding model. Current gates include:
+An ordered set of regex/heuristic gates runs before the embedding model. Key gates include:
 
 | Gate | Example trigger | Route |
 |------|-----------------|-------|
@@ -169,42 +159,53 @@ After the policy router / embedding router, `classify.py` applies additional saf
 
 - **Continuation follow-up inheritance** — "Tell me more", "more details", "elaborate" inherit the route of the prior exchange if it was an evidence/external route.
 - **Medical/veterinary follow-up guard** — Short ambiguous follow-ups ("why?", "is it safe?") after an `EVIDENCE` medical/vet answer stay on `EVIDENCE`/`AUGMENTED`.
-- **Memory follow-up guard** — Explicit memory-recall phrases ("what did we discuss earlier?") override live-data routes back to `LOCAL` when session memory is enabled.
+- **Memory follow-up guard** — Explicit memory-recall phrases override live-data routes back to `LOCAL` when session memory is enabled.
 - **Short-query guard** — Utterances like "thanks", "ok", "wrong" stay `LOCAL`.
 - **Hostile override** — Adversarial probes are forced `LOCAL`.
 
 ### 5.4 Route Labels
 
-`LOCAL`, `AUGMENTED`, `EVIDENCE`, `NEWS`, `WEATHER`, `TIME`, `FINANCE`, `CLARIFY`, `MEMORY_FOLLOWUP`, `TRAVEL_TOURISM`, `HEBREW_QUERY`, `LOCAL_REASONING`, `EPHEMERAL`.
+`LOCAL`, `AUGMENTED`, `EVIDENCE`, `NEWS`, `WEATHER`, `TIME`, `FINANCE`, `CLARIFY`, `MEMORY_FOLLOWUP`, `TRAVEL_TOURISM`, `LOCAL_REASONING`, `EPHEMERAL`.
 
 ---
 
 ## 6. Provider & Evidence Layer
 
-Providers are Python modules loaded and executed inside `execution_engine.py`. There is no shell-script dispatch.
+Providers are Python modules loaded and executed inside `execution_engine.py`.
 
 | Route | Primary provider | Notes |
 |-------|------------------|-------|
 | `LOCAL` | Ollama local model | Injects session memory + persistent facts |
-| `AUGMENTED` | Wikipedia → OpenAI → Kimi | Sourced external answer |
-| `EVIDENCE` | Trusted evidence (Wikipedia + allowlisted domains) | Medical/vet/finance/legal safety route |
-| `NEWS` | News provider | Current headlines / synthesis |
+| `AUGMENTED` | Wikipedia / OpenAI / Kimi chain | Sourced external answer; Wikipedia is evidence, OpenAI/Kimi synthesise |
+| `EVIDENCE` | Trusted evidence (Wikipedia + allowlisted domains) | Medical/vet/finance safety route |
+| `NEWS` | RSS news provider | Current headlines with recency scoring and source cross-check |
 | `WEATHER` | Weather provider | Live forecast |
 | `TIME` | Time API | Current time by location |
-| `FINANCE` | Finance provider | Live market data with citations |
+| `FINANCE` | Finance provider | Live market data with citations and freshness checks |
 
-Evidence source quality is constrained by `config/trusted_domains.yaml` and `config/url_map.yaml`. Medical and veterinary queries always require trusted evidence; they cannot be overridden to a generative provider.
+Evidence source quality is constrained by `config/trusted_domains.yaml` and `config/url_map.yaml`. Medical and veterinary queries require trusted evidence; they cannot be overridden to a generative provider.
+
+### 6.1 News Provider Improvements
+
+- **Recency scoring:** RSS `pubDate` is parsed; articles older than 7 days are dropped unless the query contains history markers (`history`, `in 20xx`, `during`, `past`, `old`).
+- **Source cross-check:** When more than one feed is available for a region/topic, top items from 2–3 sources are included. If titles/snippets disagree, the result carries `disagreement=True`.
+
+### 6.2 Evidence Freshness & Fallback
+
+- Medical/veterinary/finance evidence is checked for freshness. If the source date/`source_age_days` is older than 365 days, `fresh=False` is set and confidence is reduced.
+- If a live evidence fetch fails or returns no usable result, the provider returns a structured fallback dict with `fallback=True` and `suggested_action="local_with_caveat"`. The execution engine answers from local knowledge with the prefix: "Live sources are unavailable; here is what I know:".
 
 ---
 
 ## 7. Execution Engine
 
-`tools/router_py/execution_engine.py` (~3,700 lines) is the central dispatch layer:
+`tools/router_py/execution_engine.py` is the central dispatch layer:
 
 - Builds a Python execution plan from the resolved route.
 - Runs in an isolated namespace.
 - Loads relevant memory context.
 - Calls the appropriate provider function.
+- Filters evidence and memory through `context_guard`.
 - Formats the response and writes structured state updates via `StateWriter`.
 - On failure, escalates to clarification or local reasoning rather than crashing.
 
@@ -220,17 +221,7 @@ Evidence source quality is constrained by `config/trusted_domains.yaml` and `con
 
 ### 8.2 Model Selector (`tools/router_py/model_selector.py`)
 
-The UI exposes five selector entries:
-
-| UI entry | Base model | Notes |
-|----------|------------|-------|
-| `auto` | Router-dependent | Chooses by query bucket |
-| `local-lucy-llama31` | `llama3.1:8b` | Default; 8192 context; fast; literal system-prompt following |
-| `qwen3` | `qwen3:14b` | Stronger reasoning; privacy guardrails on personal queries |
-| `fast` | `qwen3:14b` | Same base as qwen3, optimized for low latency |
-| `mistral` | `mistral-nemo` | Less constrained, drier/encyclopedic style |
-
-Additional persona Modelfiles exist for `michael`, `racheli`, `stable`, and `mem` but are not in the main selector.
+The UI exposes an **Auto** default. In shadow mode, the selector automatically chooses the most appropriate local model by query bucket. Manual overrides remain available for power users.
 
 ### 8.3 Default Modelfile (`config/Modelfile.local-lucy-llama31`)
 
@@ -254,27 +245,40 @@ Rules:
 
 ---
 
-## 9. Memory, Feedback & Learning
+## 9. Context Guard (`tools/router_py/context_guard.py`)
 
-### 9.1 Session Memory (`tools/memory/memory_service.py`)
+Every retrieved evidence item and memory turn is scored before being injected into the prompt:
+
+- **Provenance:** Wikipedia, medical, finance, weather, and news sources score higher; generated text and memory are damped.
+- **Temporal:** Current-fact queries penalise evidence older than 30 days (weather and time sources are exempt).
+- **Entity collision:** A named entity in the query that does not appear in the evidence reduces the score.
+- **Answerability:** Evidence with no content-word overlap with the question is heavily discounted.
+
+If relevance is below threshold, the evidence/turn is dropped.
+
+---
+
+## 10. Memory, Feedback & Learning
+
+### 10.1 Session Memory (`tools/memory/memory_service.py`)
 
 - SQLite tables: `conversation_turns`, `session_summaries`, `summary_embeddings`, `archived_turns`, `session_metadata`.
 - Last few turns are prepended to the prompt.
 - Session summaries are embedded with MiniLM for long-context retrieval.
 - Personal/family queries suppress noisy session memory when explicit persistent facts are available.
 
-### 9.2 Persistent Memory
+### 10.2 Persistent Memory
 
 - SQLite table: `persistent_facts`.
 - Stores approved facts (family members, pets, preferences, addresses).
 - MiniLM embeddings pre-computed at storage time; semantic retrieval threshold ~0.35.
 
-### 9.3 Feedback Buffer (`tools/router_py/feedback_buffer.py`)
+### 10.3 Feedback Buffer (`tools/router_py/feedback_buffer.py`)
 
 - Ring buffer of recent exchanges.
 - Used for fast correction replay and continuation-follow-up inheritance.
 
-### 9.4 Background Learner (`models/router/background_learner.py`)
+### 10.4 Background Learner (`models/router/background_learner.py`)
 
 - Ingests **explicit user feedback only**.
 - Safety gate prevents auto-learning of medical/vet/evidence routes without human review.
@@ -282,31 +286,22 @@ Rules:
 
 ---
 
-## 10. Voice Subsystem
-
-```
-PTT press → record audio → whisper_worker.py (whisper.cpp) → transcript
-   → router → execution engine → local_answer → tts_adapter.py (Kokoro/Piper/Edge) → audio out
-```
-
-- STT: whisper.cpp server, GPU if available.
-- TTS: Kokoro by default; Piper and Edge TTS are fallback options. GPU is avoided for TTS to prevent OOM (`LUCY_VOICE_KOKORO_DEVICE=cpu`).
-- Integration points: `tools/router_py/streaming_voice.py`, `tools/runtime_voice.py`.
-
----
-
 ## 11. UI / HMI & Web Adapter
 
 ### 11.1 Desktop UI (`ui-v10/`)
 
-- `app/services/runtime_bridge.py` calls Python functions directly (`main.run(...)`, `execute_plan_python(...)`); no shell indirection.
-- `app/panels/control_panel.py`: model selector, toggles (web, voice, evidence, memory), persona selector.
-- `app/panels/status_panel.py`: runtime diagnostics and request status.
+The HMI has been simplified to two views:
+
+- **Default view:** Conversation history, input, memory/voice toggles, and the Auto model selector.
+- **Engineering panel:** Exposes route diagnostics, provider selectors, augmentation policy, learner controls, and structured logs.
+
+`app/services/runtime_bridge.py` calls Python functions directly (`main.run(...)`, `execute_plan_python(...)`); no shell indirection.
 
 ### 11.2 Runtime Control
 
 - `START_LUCY.sh` — desktop shortcut entry point.
 - `tools/runtime_control.py` / `tools/runtime_request.py` — process lifecycle and local API access.
+- `config/latency_optimizations.env` — caching, timeout, and GPU knobs.
 
 ### 11.3 Web Adapter (`web_adapter/server.py`)
 
@@ -340,7 +335,7 @@ PTT press → record audio → whisper_worker.py (whisper.cpp) → transcript
 | Location | Coverage |
 |----------|----------|
 | `tests/` | Golden responses, regression cases, specific entity fact gate |
-| `tools/router_py/test_*.py` | Routing, policy, classification, finance, medical, news, edge cases |
+| `tools/router_py/test_*.py` | Routing, policy, classification, finance, medical, news, edge cases, evidence provider |
 | `tools/tests/` | Memory service, end-to-end comprehensive tests |
 | `tools/voice/tests/` | TTS fallback, voice utilities |
 | `ui-v10/tests/` | Off-screen HMI tests |
@@ -350,23 +345,24 @@ Run the routing/policy suite:
 
 ```bash
 cd /home/mike/lucy-v10/tools/router_py
-python3 -m pytest test_policy_router.py test_classify.py test_routing_edge_cases.py test_policy.py test_finance_routing.py test_medical_evidence_routing.py test_news_synthesis_routing.py test_augmented_auto_routing.py -v
+python3 -m pytest test_policy_router.py test_classify.py test_routing_edge_cases.py test_policy.py test_finance_routing.py test_medical_evidence_routing.py test_news_synthesis_routing.py test_augmented_auto_routing.py test_news_provider.py test_evidence_provider.py -v
 ```
 
 ---
 
-## 14. What Changed Since the 2026-06-08 Architecture Doc
+## 14. What Changed for V11
 
-| Old claim | Current reality |
-|-----------|-----------------|
-| Routing was "MiniLM k=3 nearest-neighbor" | Fine-tuned MiniLM + classifier head with confidence thresholds |
-| Default `local-lucy-llama31` context was 4096 | **8192** |
-| 4-model selector | **5-model selector** (`auto`, `llama31`, `qwen3`, `fast`, `mistral`) |
-| Shell-based provider / UI-bridge execution | **Python-native** execution engine and runtime bridge |
-| Background learner ingested general user feedback | **Explicit feedback only**, safety-gated and versioned |
-| Route list omitted newer buckets | Added `FINANCE`, `EVIDENCE`, `TRAVEL_TOURISM`, `HEBREW_QUERY`, `MEMORY_FOLLOWUP`, `CLARIFY`, `EPHEMERAL`, `LOCAL_REASONING` |
-| No web adapter documented | `web_adapter/server.py` is a first-class optional surface |
-| No persona Modelfiles mentioned | `michael`, `racheli`, `stable`, `mem` variants exist |
+| V10 claim | V11 reality |
+|-----------|-------------|
+| Hebrew / Racheli persona in primary runtime | **Separated** into an isolated layer; primary runtime is English-only |
+| Five-model manual selector | **Auto default** with automatic model selection in shadow mode |
+| Evidence could include OpenAI/Kimi as sources | **Wikipedia/official APIs are evidence**; OpenAI/Kimi are synthesis only |
+| Local-first with broad local fallback | **Local-first strengthened**; "when in doubt, route out" for high-stakes/current facts |
+| Context validation absent | **Context guard** added: provenance, temporal, entity, answerability checks |
+| Full-featured default HMI | **Simplified default view** + optional Engineering panel |
+| News fetched from all feeds equally | **Recency scoring** and **source cross-check** with disagreement flag |
+| Evidence freshness not checked | **Freshness check** for medical/vet/finance evidence |
+| Live evidence failures returned clarification | **Graceful fallback** to local knowledge with `local_with_caveat` |
 
 ---
 
