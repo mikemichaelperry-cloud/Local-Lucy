@@ -659,12 +659,27 @@ class RuntimeBridge:
     def _unload_ollama_model(self, model: str) -> None:
         """Unload a model from Ollama to free VRAM before loading another.
 
-        Sends a generate request with keep_alive=0 so Ollama evicts the model
-        from GPU/CPU memory. Failures are ignored — the model may already be
-        unloaded or Ollama may not be running.
+        Tries the Ollama CLI first (most reliable), then falls back to the
+        generate API with keep_alive=0. Failures are ignored — the model may
+        already be unloaded or Ollama may not be running.
         """
         if not model or model.lower() == "auto":
             return
+
+        # Primary: ollama stop is the official way to evict a loaded model.
+        try:
+            subprocess.run(
+                ["ollama", "stop", model],
+                capture_output=True,
+                text=True,
+                timeout=30.0,
+                check=False,
+            )
+            return
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            pass
+
+        # Fallback: generate request with keep_alive=0.
         api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate")
         body = {
             "model": model,
@@ -684,6 +699,25 @@ class RuntimeBridge:
                 response.read()
         except (urllib.error.URLError, TimeoutError, OSError):
             pass
+
+    def _unload_other_ollama_models(self, keep_model: str) -> None:
+        """Query Ollama for loaded models and unload any that are not *keep_model*."""
+        if not keep_model or keep_model.lower() == "auto":
+            return
+        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434")
+        try:
+            with urllib.request.urlopen(f"{api_url}/api/ps", timeout=5.0) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except Exception:
+            return
+        for entry in data.get("models", []):
+            name = entry.get("name", "") or entry.get("model", "")
+            if not name:
+                continue
+            # Ollama names include ':latest'; compare base tag too.
+            if name == keep_model or name.startswith(keep_model + ":"):
+                continue
+            self._unload_ollama_model(name)
 
     def _background_warmup_router(self) -> None:
         """Eagerly load the embedding router (ModernBERT) so first query isn't penalized.
@@ -914,16 +948,11 @@ class RuntimeBridge:
             except Exception:
                 recommendation = None
 
-        # Phase 7: manual model switch — unload the previously loaded model
-        # before loading the newly selected one. Skip in Auto mode because the
-        # selector may pick a different model per query.
-        if (
-            is_auto_model is not None
-            and not is_auto_model(manual_model)
-            and self._last_used_model
-            and self._last_used_model != effective_model
-        ):
-            self._unload_ollama_model(self._last_used_model)
+        # Phase 7: manual model switch — ask Ollama to evict every loaded
+        # model that is not the one we are about to use. Skip in Auto mode
+        # because the selector may pick a different model per query.
+        if is_auto_model is not None and not is_auto_model(manual_model):
+            self._unload_other_ollama_models(effective_model)
 
         # Get augmentation policy from environment
         policy = normalize_augmentation_policy(
