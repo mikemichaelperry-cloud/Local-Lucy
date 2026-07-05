@@ -1,9 +1,9 @@
 # Local Lucy V11 — Session Handoff
 
-**Date:** 2026-07-05
+**Date:** 2026-07-05 (final update)
 **Branch:** `v10-dev` on GitHub (`origin v10-dev` pushed)
 **Version:** `11.0.0-dev`
-**Status:** All v11 roadmap phases completed and pushed.
+**Status:** All v11 roadmap phases completed, plus two live-fixes applied and pushed.
 
 ---
 
@@ -19,6 +19,8 @@
 | 6 | Synthetic adversarial cleanup: full-answer tests opt-in, v11 policy-conflict cases moved to diagnostic directory, fixed routing defects (conspiracy→LOCAL, stable history/finance→LOCAL, garbage→LOCAL). | `3d4e05f` |
 | 7 | Latency optimization: MiniLM embedding LRU cache, parallel AUGMENTED evidence fetching, per-route token budgets, model warmup thread. | `d4a7334` |
 | 8 | Version bump to `11.0.0-dev`, updated Architecture.md/README.md, news recency scoring + source cross-check, evidence freshness check + graceful fallback. | `cb04727` |
+| Live fix 1 | Fuzzy region detection for Israeli news typos (`Iraeli`, `Isreal`, etc.). | `11389c8` |
+| Live fix 2 | Unload previous Ollama model on manual model switch in Engineering panel. | `e3027ee` |
 
 ---
 
@@ -31,7 +33,7 @@
 | Adversarial route tests | timed out / 81 failures | **879 passed** |
 | HMI comprehensive inspection | 138/138 | **138/138** |
 
-*Latency:* routing steady-state mean after warmup is **~3.0 ms** (first-load dominated by MiniLM import remains ~4.5 s).
+*Latency:* routing steady-state mean after warmup is **~3.0 ms** (first-load MiniLM import remains ~4.5 s).
 
 ---
 
@@ -42,7 +44,9 @@
 - **Context guard.** Every injected source is scored before reaching the LLM prompt; stale/irrelevant evidence and memory turns are dropped.
 - **Automatic model selection.** HMI defaults to Auto; manual override remains in Engineering panel. Shadow logs are written to the metrics sink.
 - **Simplified HMI.** Default view shows only Memory toggle, Voice toggle, route/model status, trust/source summary.
-- **Latency.** Embedding cache + parallel evidence + token budgets should make v11 feel faster.
+- **Latency.** Embedding cache + parallel evidence + token budgets + model warmup.
+- **News typos.** Fuzzy region matching catches misspellings like `Iraeli` / `Isreal` and routes to Middle East feeds.
+- **Model switching.** Manually switching models in Engineering now unloads the previously loaded Ollama model before loading the new one. Auto mode intentionally skips this because the selector may pick per-query models.
 
 ---
 
