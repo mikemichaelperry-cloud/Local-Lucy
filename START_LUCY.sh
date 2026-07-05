@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local Lucy v10 - Desktop Launcher
+# Local Lucy v11 - Desktop Launcher
 # One path: ui-v10/app/ contains all backend code
 
 set -euo pipefail
