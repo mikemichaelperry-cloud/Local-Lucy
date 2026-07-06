@@ -867,8 +867,37 @@ def _fetch_coingecko(symbol: str) -> dict[str, Any] | None:
     return None
 
 
+def _extract_price_from_snippets(results: list[dict]) -> tuple[str | None, str | None, str | None]:
+    """Try to find a price-like number and currency in search snippets.
+
+    Returns (price, source_name, url) or (None, None, None).
+    """
+    for result in results:
+        snippet = (result.get("snippet", "") or "").strip()
+        title = (result.get("title", "") or "").strip()
+        url = (result.get("url", "") or "").strip()
+        if not snippet:
+            continue
+        # Look for patterns like "$123.45", "123.45 USD", "Price 123.45"
+        match = re.search(
+            r"(?:price|closing|open)\s*:?\s*[$\u20ac\u00a3\u00a5]?\s*(\d{1,6}(?:,\d{3})*\.\d{2})\b",
+            snippet,
+            re.IGNORECASE,
+        )
+        if not match:
+            match = re.search(r"[$\u20ac\u00a3\u00a5]\s*(\d{1,6}(?:,\d{3})*\.\d{2})\b", snippet)
+        if match:
+            return match.group(1), title, url
+    return None, None, None
+
+
 async def _fetch_stock_via_search(symbol: str) -> dict[str, Any] | None:
-    """Fallback stock quote via web search when Yahoo Finance rate-limits."""
+    """Fallback stock quote via web search when Yahoo Finance rate-limits.
+
+    Search snippets rarely contain real-time prices. If a numeric price is
+    found we return it with a freshness caveat; otherwise we return an honest
+    unavailable message instead of a useless generic snippet.
+    """
     search_script = ROOT_DIR / "tools" / "internet" / "search_web.py"
     if not search_script.exists():
         return None
@@ -896,23 +925,40 @@ async def _fetch_stock_via_search(symbol: str) -> dict[str, Any] | None:
         results = data.get("results", [])
         if not results:
             return None
-        top = results[0]
-        snippet = top.get("snippet", "").strip()
-        title = top.get("title", "")
-        url = top.get("url", "")
-        if not snippet:
-            return None
-        formatted = f"{symbol} stock (from search): {snippet}\n\nSource: {title}\n{url}"
+
+        price, title, url = _extract_price_from_snippets(results)
+        if price:
+            formatted = (
+                f"{symbol}: ~{price} USD (extracted from web search; "
+                f"may be delayed or stale).\n\nSource: {title}\n{url}"
+            )
+            return {
+                "ok": True,
+                "context": formatted,
+                "formatted": formatted,
+                "title": f"{symbol} Quote",
+                "url": url,
+                "provider": "finance",
+                "source": "web search (delayed)",
+                "symbol": symbol,
+                "class": "finance_quote",
+            }
+
+        # No price found: return an honest unavailable message.
+        formatted = (
+            f"Yahoo Finance is temporarily rate-limited and the web search fallback "
+            f"did not return a current {symbol} price. Please try again in a minute."
+        )
         return {
             "ok": True,
             "context": formatted,
             "formatted": formatted,
-            "title": f"{symbol} Quote",
-            "url": url,
+            "title": f"{symbol} Quote Unavailable",
+            "url": "",
             "provider": "finance",
-            "source": "web search",
+            "source": "yahoo finance rate-limited",
             "symbol": symbol,
-            "class": "finance_quote",
+            "class": "finance_quote_unavailable",
         }
     except Exception as e:
         logger.warning(f"Stock search fallback failed for {symbol}: {e}")

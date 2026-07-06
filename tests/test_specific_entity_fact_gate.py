@@ -16,8 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from router_py.policy_router import PolicyRouter
-from router_py.request_types import ClassificationResult
+from router_py.policy_router import PolicyRouter  # noqa: E402
 
 
 class MinimalClassification:
@@ -43,15 +42,18 @@ GATE_CASES = [
     ),
     ("Where is the Eiffel Tower?", "AUGMENTED", "policy:specific_entity_fact"),
     ("When was IBM founded?", "AUGMENTED", "policy:specific_entity_fact"),
-    ("Who is Ada Lovelace?", "AUGMENTED", "policy:specific_entity_fact"),
-    ("History of the Roman Empire", "AUGMENTED", "policy:specific_entity_fact"),
+    # Stable historical/scientific facts now stay LOCAL under the v11
+    # stable-knowledge gate. Named entities that are not stable textbook facts
+    # still route to AUGMENTED for verification.
+    ("Who is Ada Lovelace?", "LOCAL", "policy:stable_knowledge"),
+    ("History of the Roman Empire", "LOCAL", "policy:stable_knowledge"),
     # Broad factual lookups -> AUGMENTED (unless they are stable science or
     # historical war/conflict queries, which the embedding router handles locally).
     ("What is the capital of France?", "AUGMENTED", "policy:factual_lookup"),
     ("Why is the sky blue?", "AUGMENTED", "policy:factual_lookup"),
     ("How tall is Mount Everest?", "AUGMENTED", "policy:factual_lookup"),
     ("When did World War II end?", None, ""),
-    ("What is photosynthesis?", None, ""),
+    ("What is photosynthesis?", "LOCAL", "policy:stable_knowledge"),
     # Local capabilities / exclusions
     ("Can you translate hello to French?", None, ""),
     ("How do I install Python?", None, ""),
@@ -81,9 +83,7 @@ def test_truth_first_gates() -> None:
     if failures:
         print("FAILURES:")
         for query, exp_route, exp_reason, act_route, act_reason in failures:
-            print(
-                f"  {query!r}: expected {exp_route}/{exp_reason}, got {act_route}/{act_reason}"
-            )
+            print(f"  {query!r}: expected {exp_route}/{exp_reason}, got {act_route}/{act_reason}")
         raise AssertionError(f"{len(failures)} policy-gate case(s) failed")
 
     total = len(GATE_CASES)

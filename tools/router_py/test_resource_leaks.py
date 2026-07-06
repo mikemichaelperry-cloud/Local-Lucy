@@ -217,12 +217,17 @@ def test_database_connection_cleanup():
 
 
 def test_zombie_processes():
-    """Check for zombie processes after execution."""
+    """Check that StateManager workers do not leak an excessive number of threads."""
     print("\n--- Test: Zombie Process Check ---")
 
     import threading
 
     namespace = f"zombie_test_{int(time.time() * 1000)}"
+
+    # Capture baseline after other tests may have left helper threads running.
+    current_process = psutil.Process()
+    baseline_threads = current_process.num_threads()
+    print(f"  Baseline thread count: {baseline_threads}")
 
     # Create threads that use StateManager
     threads = []
@@ -243,20 +248,19 @@ def test_zombie_processes():
     time.sleep(0.5)
 
     # Count threads
-    current_process = psutil.Process()
     thread_count = current_process.num_threads()
+    growth = thread_count - baseline_threads
+    print(f"  Current thread count: {thread_count} (growth: {growth})")
 
-    print(f"  Current thread count: {thread_count}")
-
-    # We expect some threads but not excessive
-    passed = thread_count < 50
+    # We expect StateManager itself to add only a handful of threads
+    passed = growth < 20
 
     if passed:
         print("✅ Thread count normal")
     else:
-        print(f"⚠️  WARNING: High thread count ({thread_count})")
+        print(f"⚠️  WARNING: High thread count growth ({growth})")
 
-    assert passed, f"Thread count too high: {thread_count}"
+    assert passed, f"Thread count growth too high: {growth} (baseline {baseline_threads}, current {thread_count})"
 
 
 def test_repeated_execution():

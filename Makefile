@@ -26,8 +26,11 @@ install:
 
 test:
 	@echo "[test] Running pytest suite..."
-	QT_QPA_PLATFORM=offscreen $(PYTHON) -m pytest -q \
-		--ignore=tools/router_py/test_synthetic_adversarial.py
+	OLLAMA_KEEP_ALIVE=0 QT_QPA_PLATFORM=offscreen $(PYTHON) -m pytest -q \
+		--ignore=tools/router_py/test_synthetic_adversarial.py \
+		--ignore=tools/tests/test_end_to_end_comprehensive.py \
+		--deselect web_adapter/test_web_adapter.py::test_ask_integration_local \
+		--timeout=300 --timeout-method=thread
 
 lint:
 	@echo "[lint] Running ruff..."

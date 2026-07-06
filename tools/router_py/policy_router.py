@@ -1055,14 +1055,21 @@ def gate_local_reasoning(
 
 
 def gate_garbage_nonsense(
-    query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
+    query: str, classification: ClassificationResult, _context: dict[str, Any] | None
 ) -> PolicyDecision | None:
     """Placeholder, malformed, or nonsensical input should stay LOCAL/CLARIFY.
 
     Prevents repetitive noise, keyboard mashing, and test placeholders from
     being routed outward by the embedding router.
+
+    If the classifier has already flagged the request as requiring evidence
+    (medical/vet/conflict/source-verification/etc.), do not silence it as
+    garbage; the evidence path takes precedence.
     """
     if _is_garbage_or_nonsense(query):
+        # Classifier-flagged evidence requests take precedence over the garbage gate.
+        if classification.evidence_mode == "required":
+            return None
         return PolicyDecision(
             route="LOCAL",
             reason_code="policy:garbage_nonsense_local",

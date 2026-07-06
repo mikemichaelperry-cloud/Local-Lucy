@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -76,6 +77,18 @@ def _make_route(
     )
 
 
+def _fake_local_worker(
+    question: str, env: dict | None = None, stdout: str = "The answer is 42."
+) -> subprocess.CompletedProcess[str]:
+    """Return a mock local-worker result without loading Ollama."""
+    return subprocess.CompletedProcess(
+        args=["local_answer", question],
+        returncode=0,
+        stdout=stdout,
+        stderr="",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -103,6 +116,9 @@ def engine(tmp_state_dir, monkeypatch):
     eng.state_writer._state_dir = tmp_state_dir
     eng.state_manager = MagicMock()
     eng.state_writer.state_manager = eng.state_manager
+    # Bypass Ollama/local model loading — these tests validate state persistence,
+    # not the LLM itself.
+    monkeypatch.setattr(eng, "_call_local_worker", _fake_local_worker)
     return eng
 
 
@@ -449,7 +465,7 @@ class TestFullVoiceTurn:
         engine.state_manager = MagicMock()
         engine.state_writer.state_manager = engine.state_manager
 
-        with patch.object(engine, "_call_single_provider", return_value="42"):
+        with patch.object(engine, "_call_local_worker", _fake_local_worker):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
             result = engine.execute(
@@ -490,10 +506,17 @@ class TestFullVoiceTurn:
         engine.state_manager = MagicMock()
         engine.state_writer.state_manager = engine.state_manager
 
-        with patch.object(
-            engine,
-            "_fetch_evidence",
-            return_value={"ok": True, "formatted": "Sunny, 22°C in Paris"},
+        with (
+            patch.object(
+                engine,
+                "_fetch_evidence",
+                return_value={"ok": True, "formatted": "Sunny, 22°C in Paris"},
+            ),
+            patch.object(
+                engine,
+                "_call_local_worker",
+                lambda q, env=None: _fake_local_worker(q, env, stdout="Sunny, 22°C in Paris"),
+            ),
         ):
             intent = _make_classification("weather", confidence=0.97)
             route = _make_route("WEATHER", "weather", "free", confidence=0.97)
