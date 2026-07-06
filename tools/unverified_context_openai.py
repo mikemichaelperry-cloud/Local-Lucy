@@ -60,6 +60,15 @@ def main() -> int:
             "missing_openai_configuration: set OPENAI_BASE_URL/OPENAI_MODEL in lucy-v10/.env or environment"
         )
 
+    # Network latency to OpenAI can spike; use a generous default timeout and
+    # allow override via environment. The previous 5s default caused frequent
+    # transient timeouts that opened the api_provider circuit breaker.
+    try:
+        request_timeout = float(os.environ.get("OPENAI_TIMEOUT", "30.0").strip())
+    except ValueError:
+        request_timeout = 30.0
+    request_timeout = max(request_timeout, 5.0)
+
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     system_text = (
         "You are a factual research assistant. The user has been routed here because "
@@ -93,7 +102,7 @@ def main() -> int:
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=5.0) as response:
+        with urllib.request.urlopen(request, timeout=request_timeout) as response:
             raw = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         return _fail(f"openai_http_error_{e.code}")

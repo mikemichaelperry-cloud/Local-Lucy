@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -550,6 +551,14 @@ class RuntimeBridge:
             payload=self._extract_payload(completed.stdout),
         )
         if action == "model_selection" and status == "ok":
+            # Evict every other loaded model immediately so the user does not
+            # see stale Ollama state. Warm up the selected model afterwards.
+            if requested_value and requested_value.lower() != "auto":
+                threading.Thread(
+                    target=self._unload_other_ollama_models,
+                    args=(requested_value,),
+                    daemon=True,
+                ).start()
             threading.Thread(
                 target=self._warmup_ollama_model,
                 args=(requested_value,),
@@ -659,12 +668,14 @@ class RuntimeBridge:
     def _unload_ollama_model(self, model: str) -> None:
         """Unload a model from Ollama to free VRAM before loading another.
 
-        Tries the Ollama CLI first (most reliable), then falls back to the
-        generate API with keep_alive=0. Failures are ignored — the model may
-        already be unloaded or Ollama may not be running.
+        Uses both the CLI and the generate API, then polls /api/ps briefly to
+        confirm the model is gone. Failures are ignored — the model may already
+        be unloaded or Ollama may not be running.
         """
         if not model or model.lower() == "auto":
             return
+
+        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434")
 
         # Primary: ollama stop is the official way to evict a loaded model.
         try:
@@ -675,12 +686,11 @@ class RuntimeBridge:
                 timeout=30.0,
                 check=False,
             )
-            return
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
             pass
 
-        # Fallback: generate request with keep_alive=0.
-        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate")
+        # Secondary: generate request with keep_alive=0. Some Ollama versions
+        # unload more reliably via the API, especially while a model is busy.
         body = {
             "model": model,
             "prompt": "",
@@ -690,7 +700,7 @@ class RuntimeBridge:
         }
         try:
             request = urllib.request.Request(
-                api_url,
+                f"{api_url}/api/generate",
                 data=json.dumps(body).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
                 method="POST",
@@ -699,6 +709,39 @@ class RuntimeBridge:
                 response.read()
         except (urllib.error.URLError, TimeoutError, OSError):
             pass
+
+        # Verify: poll /api/ps for a few seconds until the model disappears.
+        # This prevents the HMI from reporting stale loaded state.
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            try:
+                with urllib.request.urlopen(f"{api_url}/api/ps", timeout=5.0) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+                still_loaded = any(
+                    self._is_same_ollama_model(
+                        model, entry.get("name", "") or entry.get("model", "")
+                    )
+                    for entry in data.get("models", [])
+                )
+                if not still_loaded:
+                    return
+            except Exception:
+                return
+            time.sleep(0.5)
+
+    @staticmethod
+    def _is_same_ollama_model(a: str, b: str) -> bool:
+        """Compare two Ollama model names tolerating ':latest' and similar tags."""
+        if not a or not b:
+            return False
+        a_norm = a.strip().lower()
+        b_norm = b.strip().lower()
+        if a_norm == b_norm:
+            return True
+        # Strip ':latest' and compare base names.
+        a_base = a_norm.split(":")[0]
+        b_base = b_norm.split(":")[0]
+        return a_base == b_base or b_norm.startswith(a_norm + ":")
 
     def _unload_other_ollama_models(self, keep_model: str) -> None:
         """Query Ollama for loaded models and unload any that are not *keep_model*."""
@@ -714,8 +757,7 @@ class RuntimeBridge:
             name = entry.get("name", "") or entry.get("model", "")
             if not name:
                 continue
-            # Ollama names include ':latest'; compare base tag too.
-            if name == keep_model or name.startswith(keep_model + ":"):
+            if self._is_same_ollama_model(keep_model, name):
                 continue
             self._unload_ollama_model(name)
 

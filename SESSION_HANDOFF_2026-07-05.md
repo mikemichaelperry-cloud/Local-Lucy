@@ -21,6 +21,7 @@
 | 8 | Version bump to `11.0.0-dev`, updated Architecture.md/README.md, news recency scoring + source cross-check, evidence freshness check + graceful fallback. | `cb04727` |
 | Live fix 1 | Fuzzy region detection for Israeli news typos (`Iraeli`, `Isreal`, etc.). | `11389c8` |
 | Live fix 2 | Unload previous Ollama model on manual model switch in Engineering panel. | `e3027ee` |
+| Live fix 3 | Increased OpenAI/Kimi/Wikipedia HTTP timeouts and hardened Ollama model unload verification. | `tbd` |
 
 ---
 
@@ -32,6 +33,7 @@
 | Router unit tests | 719 passed | **767 passed, 29 skipped** |
 | Adversarial route tests | timed out / 81 failures | **879 passed** |
 | HMI comprehensive inspection | 138/138 | **138/138** |
+| Live API provider tests (OpenAI/Kimi) | 14/15, Kimi timeout | **15/15 PASS** |
 
 *Latency:* routing steady-state mean after warmup is **~3.0 ms** (first-load MiniLM import remains ~4.5 s).
 
@@ -46,7 +48,8 @@
 - **Simplified HMI.** Default view shows only Memory toggle, Voice toggle, route/model status, trust/source summary.
 - **Latency.** Embedding cache + parallel evidence + token budgets + model warmup.
 - **News typos.** Fuzzy region matching catches misspellings like `Iraeli` / `Isreal` and routes to Middle East feeds.
-- **Model switching.** Manually switching models in Engineering now unloads the previously loaded Ollama model before loading the new one. Auto mode intentionally skips this because the selector may pick per-query models.
+- **Model switching.** Manually switching models in Engineering now unloads the previously loaded Ollama model immediately, and the unload is verified by polling `/api/ps`. Auto mode intentionally skips this because the selector may pick per-query models.
+- **External provider timeouts.** OpenAI/Kimi internal HTTP timeout raised from 5 s / 10 s to 30 s (configurable via `OPENAI_TIMEOUT` / `KIMI_TIMEOUT`). Wikipedia internal HTTP timeout raised from 2.5 s to 10 s (configurable via `LUCY_UNVERIFIED_CONTEXT_WIKIPEDIA_TIMEOUT`). These short defaults were causing transient timeouts that opened the `api_provider` circuit breaker and made AUGMENTED/EVIDENCE answers fail.
 
 ---
 
@@ -67,3 +70,11 @@
 3. After ~50 real queries, review A/B preference data and decide whether to hide the manual model selector completely.
 4. Run `LUCY_SYNTHETIC_FULL_ANSWER=1 python3 -m pytest tools/router_py/test_synthetic_adversarial.py` when you have time to validate response-level invariants.
 5. The user also asked for a "barrage of common, wide-ranging test questions" compared to your own answers and retraining Lucy to match — this remains a future task.
+
+---
+
+## Known issues / notes
+
+- One semantic regression case (`personality_logic_over_ideology`) is currently below the embedding threshold. This appears unrelated to the provider-timeout / model-unload fixes and is likely sensitive to which local model is loaded and the current system prompt. Re-run `python3 -m pytest tools/router_py/test_semantic_regression.py -v` after settling on a final default model/prompt.
+- The `run_response_regression_all_models.py` full-model regression suite is still slow; run it only when you have several minutes.
+- If external providers still fail after these timeout increases, check the circuit-breaker state in the logs for `circuit_breaker_state_change` and consider raising `OPENAI_TIMEOUT` / `KIMI_TIMEOUT` further in `.env`.

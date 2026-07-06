@@ -22,7 +22,18 @@ def _fail() -> int:
     return _emit({"ok": False}, rc=1)
 
 
-def _http_json(url: str, timeout: float = 2.5) -> dict:
+def _http_json(url: str, timeout: float | None = None) -> dict:
+    # The previous 2.5s default was too aggressive for Wikipedia's API,
+    # especially when several sequential calls are made. Allow override via
+    # environment and default to a more tolerant value.
+    if timeout is None:
+        try:
+            timeout = float(
+                os.environ.get("LUCY_UNVERIFIED_CONTEXT_WIKIPEDIA_TIMEOUT", "10.0").strip()
+            )
+        except ValueError:
+            timeout = 10.0
+        timeout = max(timeout, 2.5)
     request = urllib.request.Request(url, headers={"User-Agent": "LocalLucy/1.0"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         raw = response.read().decode("utf-8", errors="replace")
