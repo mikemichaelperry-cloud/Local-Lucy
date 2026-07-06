@@ -990,10 +990,12 @@ class RuntimeBridge:
             except Exception:
                 recommendation = None
 
-        # Phase 7: manual model switch — ask Ollama to evict every loaded
-        # model that is not the one we are about to use. Skip in Auto mode
-        # because the selector may pick a different model per query.
-        if is_auto_model is not None and not is_auto_model(manual_model):
+        # Phase 7: ensure only the model we are about to use stays loaded.
+        # With only 12 GB VRAM there is no room for two models. Evict every
+        # other loaded model whether the user selected manually or the Auto
+        # selector chose a model. Skip only if we genuinely do not know which
+        # model will be used.
+        if effective_model and effective_model.lower() != "auto":
             self._unload_other_ollama_models(effective_model)
 
         # Get augmentation policy from environment

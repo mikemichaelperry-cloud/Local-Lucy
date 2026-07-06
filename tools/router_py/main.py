@@ -52,6 +52,7 @@ from router_py.logging_config import setup_logging
 from router_py.request_types import RouterOutcome
 from router_py.security_guard import validate_input
 from router_py.shutdown_handler import install as install_shutdown_handler
+from router_py.shutdown_handler import register_closeable
 from router_py.structured_logging import get_structured_logger
 from router_py.utils import sha256_text
 
@@ -595,6 +596,14 @@ def main() -> int:
 
 # Install graceful shutdown handlers once at module load
 install_shutdown_handler()
+
+# Register Ollama model cleanup so VRAM is released when Local Lucy exits.
+try:
+    from router_py.ollama_cleanup import shutdown_cleanup
+
+    register_closeable(shutdown_cleanup)
+except Exception:
+    pass
 
 # Start recurring Ollama warmup ping to eliminate cold-start latency.
 # This is a no-op if LUCY_WARMUP_ENABLED is not "1" or if Ollama is unreachable.
