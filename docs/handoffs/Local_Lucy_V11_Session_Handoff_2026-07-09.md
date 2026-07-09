@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-09
 **Branch:** `v10-dev`
-**Latest commit:** `25375af` — refactor(router): remove dead shell fallback paths from execution_engine
+**Latest commit:** `538bc35` — refactor(runtime): replace critical shell/subprocess calls with Python
 **Written for:** Next Kimi / Codex / Grok session
 **Primary runtime:** English-only
 
@@ -13,7 +13,7 @@
 We are continuing the V11 consolidation/release. The big cleanup of the day is complete and committed: the execution engine is now Python-native only.
 
 - **Repository is clean** on `v10-dev`.
-- **Tests pass:** `make test` → 1,063 passed, 34 skipped, 1 deselected.
+- **Tests pass:** `make test` → 1,062 passed, 34 skipped, 1 deselected (1 unrelated flaky whisper CLI test; passes in isolation).
 - **Barrage stable:** 56 queries, 44 passed, 12 failed — same as before the cleanup.
 - **HMI/backend sync verified:** the UI calls the same canonical `ExecutionEngine` as the router tests.
 
@@ -25,6 +25,14 @@ We are continuing the V11 consolidation/release. The big cleanup of the day is c
 - Removed the `use_python_path` toggle; Python-native execution is now the only path.
 - Deleted `tools/router_py/test_escalation_trigger.py` (shell-only test).
 - Updated callers/tests that passed `use_python_path=True`.
+- Replaced critical runtime shell/subprocess calls with Python:
+  - `timedatectl` → Python timezone detection.
+  - `nvidia-smi` / `curl` → `nvidia-ml-py` / `urllib`.
+  - `ollama list` / `ollama stop` → Ollama HTTP API.
+  - Provider subprocess hops (`current_time_tool`, `unverified_context_kimi/openai`, `search_web`) → direct imports.
+  - `runtime_request.py` shell fallbacks → direct `router_py.main.run()` calls.
+  - HMI `runtime_bridge.py` Python-on-Python subprocess hops → direct function calls.
+  - `run_fetch_with_gate.sh` → new `tools/internet/fetch_gate.py` (shell kept as thin wrapper).
 - Reverted an accidental background-learning mutation in `models/router/comprehensive_examples.json`.
 - Archived stale V11 handoffs/reports on the desktop.
 
