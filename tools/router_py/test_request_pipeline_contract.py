@@ -269,9 +269,7 @@ class TestProviderFailureIsNotRouteCorrection:
             policy_reason="test",
             ephemeral=True,
         )
-        result = engine.execute(
-            classification, decision, {"question": "What's the weather?"}, use_python_path=True
-        )
+        result = engine.execute(classification, decision, {"question": "What's the weather?"})
         assert result.route == "WEATHER", f"Expected WEATHER, got {result.route}"
 
     def test_news_provider_failure_preserves_route(self, monkeypatch):
@@ -308,9 +306,7 @@ class TestProviderFailureIsNotRouteCorrection:
             policy_reason="test",
             ephemeral=True,
         )
-        result = engine.execute(
-            classification, decision, {"question": "Latest news?"}, use_python_path=True
-        )
+        result = engine.execute(classification, decision, {"question": "Latest news?"})
         assert result.route == "NEWS", f"Expected NEWS, got {result.route}"
 
     def test_augmented_provider_failure_preserves_route(self, monkeypatch):
@@ -344,9 +340,7 @@ class TestProviderFailureIsNotRouteCorrection:
             requires_evidence=True,
             policy_reason="test",
         )
-        result = engine.execute(
-            classification, decision, {"question": "Explain quantum physics"}, use_python_path=True
-        )
+        result = engine.execute(classification, decision, {"question": "Explain quantum physics"})
         assert result.route == "AUGMENTED", f"Expected AUGMENTED, got {result.route}"
 
 

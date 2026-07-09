@@ -102,6 +102,7 @@ def process(
     parity comparisons use the exact same routing decision for both paths.
     """
     import time as _time
+
     _profiling = os.environ.get("LUCY_LATENCY_PROFILE", "").lower() in {"1", "true", "yes"}
     _profile: dict[str, int] = {}
     start_time = _time.time()
@@ -140,8 +141,12 @@ def process(
         _t1 = _time.time()
         try:
             normalized_policy = normalize_augmentation_policy(policy)
-            session_id = (context or {}).get("session_id", os.environ.get("LUCY_SESSION_ID", "default")) or "default"
-            decision = select_route(classification, policy=normalized_policy, query=question, session_id=session_id)
+            session_id = (context or {}).get(
+                "session_id", os.environ.get("LUCY_SESSION_ID", "default")
+            ) or "default"
+            decision = select_route(
+                classification, policy=normalized_policy, query=question, session_id=session_id
+            )
             if _profiling:
                 _profile["route_ms"] = int((_time.time() - _t1) * 1000)
         except Exception as exc:
@@ -234,11 +239,13 @@ def process(
     # ------------------------------------------------------------------
     _t4 = _time.time()
     try:
-        engine = ExecutionEngine(config={
-            "timeout": timeout,
-            "model": model or os.environ.get("LUCY_MODEL", "local-lucy-llama31"),
-            "use_sqlite_state": True,
-        })
+        engine = ExecutionEngine(
+            config={
+                "timeout": timeout,
+                "model": model or os.environ.get("LUCY_MODEL", "local-lucy-llama31"),
+                "use_sqlite_state": True,
+            }
+        )
 
         exec_context = pipeline_ctx.to_dict()
 
@@ -246,7 +253,6 @@ def process(
             classification,
             decision,
             exec_context,
-            use_python_path=True,
         )
 
     except Exception as exc:

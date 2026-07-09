@@ -3,7 +3,7 @@
 Execution Engine — Python-native plan execution.
 
 Receives RoutingDecision from the pipeline and executes it:
-- WEATHER / TIME / NEWS: fetch evidence, return formatted result
+- WEATHER / TIME / NEWS / FINANCE: fetch evidence, return formatted result
 - LOCAL: call local model worker
 - AUGMENTED / FULL / EVIDENCE: fetch evidence, build prompt, call provider
 - CLARIFY: return clarification request
@@ -14,7 +14,7 @@ The engine trusts `route.provider` as the single source of truth.
 Response formatting and validation live in `response_formatter.py`.
 Memory persistence lives in `main._persist_memory_turn()`.
 
-This module no longer contains shell delegation paths (removed in Stage 9).
+Shell delegation paths have been removed; this module is Python-native only.
 """
 
 from __future__ import annotations
@@ -23,11 +23,9 @@ import asyncio
 import json
 import logging
 import os
-import random
 import re
 import shutil
 import socket
-import subprocess
 import sys
 import time
 import uuid
@@ -207,11 +205,6 @@ except ImportError:
     HAS_NEWS_PROVIDER = False
 
 
-# Tool paths (legacy shell scripts, retained for fallback only)
-SHELL_EXECUTE_PLAN = ROOT_DIR / "tools" / "router" / "execute_plan.sh"
-LOCAL_ANSWER_SCRIPT = ROOT_DIR / "tools" / "local_answer.sh"
-LOCAL_ANSWER_PY_SCRIPT = ROOT_DIR / "tools" / "router_py" / "local_answer.py"
-
 # Import provider modules (extracted to keep ExecutionEngine focused on dispatch)
 try:
     from router_py.providers import (
@@ -225,21 +218,13 @@ try:
         format_time_response,
         format_wikipedia_response,
         call_openai_for_response,
-        call_openai_subprocess,
         call_kimi_for_response,
-        call_kimi_subprocess,
         call_local_model_async,
     )
 
     HAS_PROVIDER_MODULES = True
 except ImportError:
     HAS_PROVIDER_MODULES = False
-
-# Feature flag: Use Python local_answer instead of shell version
-# Default is "1" (Python) - shell path available via LUCY_LOCAL_ANSWER_PY=0 if needed
-USE_LOCAL_ANSWER_PY = os.environ.get("LUCY_LOCAL_ANSWER_PY", "1") == "1"
-UNVERIFIED_CONTEXT_DISPATCH = ROOT_DIR / "tools" / "unverified_context_provider_dispatch.py"
-CONVERSATION_SHIM = ROOT_DIR / "tools" / "conversation" / "conversation_cadence_shim.py"
 
 DEFAULT_TIMEOUT = 130
 DEFAULT_POLICY_CONFIDENCE_THRESHOLD = 0.60
@@ -361,18 +346,18 @@ def _load_session_memory_context(
 
 class ExecutionEngine:
     """
-        Engine for executing routing decisions.
+    Engine for executing routing decisions.
 
-        The ExecutionEngine takes routing decisions from the Router and executes
-    them according to the route type (bypass, provisional, or full). It handles:
+    The ExecutionEngine takes routing decisions from the Router and executes
+    them using the Python-native path. It handles:
 
         1. Route-specific execution paths
-        2. Tool dispatch via governed shell paths
+        2. Provider dispatch via Python APIs
         3. Response formatting and enhancement
         4. State persistence for telemetry
 
-        Design Philosophy:
-        - Delegate to governed paths: Use existing shell tools for provider calls
+    Design Philosophy:
+        - Python-native: No shell subprocess delegation
         - Preserve authority: Maintain truth metadata through execution chain
         - Fail gracefully: Fall back to local responses on provider errors
         - Transparent: Record execution path for debugging and audit
@@ -389,16 +374,6 @@ class ExecutionEngine:
     CLASSIFIER_SCRIPT: Path = ROOT_DIR / "tools" / "router" / "classify_intent.py"
     PLAN_MAPPER_SCRIPT: Path = ROOT_DIR / "tools" / "router" / "plan_to_pipeline.py"
     EXTRACTOR_SCRIPT: Path = ROOT_DIR / "tools" / "router" / "extract_validated.py"
-    LUCY_CHAT_SCRIPT: Path = ROOT_DIR / "lucy_chat.sh"
-    LOCAL_ANSWER_SCRIPT: Path = ROOT_DIR / "tools" / "local_answer.sh"
-    LOCAL_ANSWER_PY_SCRIPT: Path = ROOT_DIR / "tools" / "router_py" / "local_answer.py"
-    LOCAL_WORKER_SCRIPT: Path = ROOT_DIR / "tools" / "local_worker.py"
-    LOCAL_WORKER_CLIENT_LIB: Path = ROOT_DIR / "tools" / "local_worker_client.sh"
-    CONV_SHIM_SCRIPT: Path = ROOT_DIR / "tools" / "conversation" / "conversation_cadence_shim.py"
-    UNVERIFIED_CONTEXT_PROVIDER_DISPATCH_TOOL: Path = (
-        ROOT_DIR / "tools" / "unverified_context_provider_dispatch.py"
-    )
-    LATPROF_LIB: Path = ROOT_DIR / "tools" / "router" / "latency_profile.sh"
 
     # =========================================================================
     # FILE PATHS - Configuration files
@@ -658,20 +633,17 @@ class ExecutionEngine:
         # NAMESPACE ISOLATION SETUP
         # =========================================================================
         # Generate a truly unique namespace for this execution instance.
-        # This prevents "shared-state overlap" errors when shell scripts
-        # check for STATE_NAMESPACE_RAW and skip their own locking.
         #
         # NAMESPACE ISOLATION STRATEGY:
         # - Each ExecutionEngine instance gets a unique namespace
-        # - Format: {hostname}_{pid}_{timestamp}_{random}
+        # - Format: {hostname}_{pid}_{timestamp}_{uuid_suffix}
         # - Example: "mike_12345_1712948423_a7f3e2"
         # - This ensures no collision even with rapid sequential queries
         #
         # The namespace is used to:
         # 1. Create an isolated state directory (ROOT/state/namespaces/{namespace}/)
-        # 2. Set STATE_NAMESPACE_RAW to tell shell scripts to skip their own locking
-        # 3. Set LUCY_SHARED_STATE_NAMESPACE for state file isolation
-        # 4. Set LUCY_STATE_DIR for subprocess state file location
+        # 2. Set LUCY_SHARED_STATE_NAMESPACE for state file isolation
+        # 3. Set LUCY_STATE_DIR for state file location
         hostname = socket.gethostname().split(".")[0]  # Get short hostname
         pid = os.getpid()
         timestamp = int(time.time() * 1000)  # Millisecond precision
@@ -719,7 +691,6 @@ class ExecutionEngine:
         - Each ExecutionEngine instance has a unique _execution_namespace
         - State directory format: ROOT/state/namespaces/{namespace}/
         - This provides complete isolation between concurrent executions
-        - Shell scripts check STATE_NAMESPACE_RAW and skip their own locking
 
         Returns:
             Path to the namespaced state directory
@@ -762,100 +733,34 @@ class ExecutionEngine:
         except Exception:
             self._logger.debug("Failed to record request metrics", exc_info=True)
 
-    def _prepare_subprocess_env(self, base_env: dict[str, str] | None = None) -> dict[str, str]:
-        """
-        Prepare environment variables for subprocess calls.
-
-        NAMESPACE ISOLATION FOR SUBPROCESSES:
-        This helper ensures ALL subprocess calls (lucy_chat.sh, local_answer.sh,
-        local_worker.py, unverified_context_provider_dispatch.py, etc.) receive
-        the proper namespace isolation environment variables.
-
-        Critical Environment Variables:
-        - STATE_NAMESPACE_RAW: Tells shell scripts to skip their own locking
-        - LUCY_SHARED_STATE_NAMESPACE: Used for state file isolation
-        - LUCY_STATE_DIR: Points to the namespaced state directory
-
-        When STATE_NAMESPACE_RAW is set, execute_plan.sh skips acquire_shared_execution_lock(),
-        preventing "shared-state overlap" errors during concurrent executions.
-
-        Args:
-            base_env: Optional base environment to extend (defaults to os.environ)
-
-        Returns:
-            Dictionary of environment variables for subprocess execution
-        """
-        env = (base_env or os.environ).copy()
-        env.update(
-            {
-                # Critical: Tells shell scripts (execute_plan.sh) to skip their own locking
-                # This prevents "shared-state overlap detected" errors
-                "STATE_NAMESPACE_RAW": self._execution_namespace,
-                # Used by state file operations for namespace isolation
-                "LUCY_SHARED_STATE_NAMESPACE": self._execution_namespace,
-                # Points subprocesses to the correct state directory
-                "LUCY_STATE_DIR": str(self._state_dir),
-            }
-        )
-        # Propagate the selected model so local_answer uses the right LLM.
-        # HMI model selector updates current_state.json; runtime_bridge passes
-        # it via config["model"]. Without this, START_LUCY.sh's hardcoded
-        # LUCY_LOCAL_MODEL=local-lucy always wins.
-        configured_model = self.config.get("model")
-        if configured_model and str(configured_model).lower() not in ("auto", ""):
-            env["LUCY_LOCAL_MODEL"] = str(configured_model)
-            self._logger.info(f"[MODEL] Subprocess env set to: {configured_model}")
-        return env
-
     def execute(
         self,
         intent: ClassificationResult,
         route: RoutingDecision,
         context: dict[str, Any] | None = None,
-        use_python_path: bool = False,
     ) -> ExecutionResult:
         """
-        Execute a routing decision.
+        Execute a routing decision using the Python-native path.
 
-        This is the main entry point for execution. It dispatches to the
-        appropriate execution path based on the route type.
+        This is the main synchronous entry point. It dispatches to
+        `execute_async` and runs it in an event loop suitable for the
+        current context. All execution is Python-native; no shell fallback
+        is used.
 
         NAMESPACE ISOLATION:
         Each execution runs in its own isolated namespace to prevent
         "shared-state overlap" errors during concurrent executions.
         The namespace directory is cleaned up after execution completes.
 
-        MEDICAL QUERY DETECTION:
-        Medical queries are detected and forced to LOCAL route for safety.
-        This matches shell behavior where medical queries get route_reason_override="medical_evidence_only".
-
         Args:
             intent: The classified intent result
             route: The routing decision to execute
             context: Optional execution context (conversation history, etc.)
-            use_python_path: If True, use the new Python-native execution path
-                instead of calling lucy_chat.sh. This preserves the real route
-                (AUGMENTED stays AUGMENTED) and eliminates shell overhead.
 
         Returns:
             ExecutionResult with status, response, and metadata
-
-        Execution Flow:
-        1. Capture pre-execution state
-        2. Check for medical context and force LOCAL route if needed
-        3. Log execution start
-        4. Handle CLARIFY routes early
-        5. Determine execution path (bypass, provisional, full, or python_native)
-        6. Dispatch to appropriate execution handler
-        7. Format and enhance response
-        8. Persist execution metadata
-        9. Clean up namespace directory
-        10. Return structured result
         """
-        start_time = time.time()
         context = context or {}
-        question = context.get("question", "")
-        session_id = context.get("session_id", "default") or "default"
 
         # Use structured logger from context if provided
         logger: ContextualLogger = context.get("_logger")
@@ -863,257 +768,23 @@ class ExecutionEngine:
             logger = get_structured_logger("router_py.execution_engine")
         self._logger = logger
 
-        # Reject empty or whitespace-only queries at the engine boundary
-        if not question or not question.strip():
-            execution_time = int((time.time() - start_time) * 1000)
-            result = ExecutionResult(
-                status="failed",
-                outcome_code="empty_query",
-                route="LOCAL",
-                provider="local",
-                provider_usage_class="local",
-                response_text="",
-                error_message="Query is empty or contains only whitespace.",
-                execution_time_ms=execution_time,
-                metadata={"reason": "empty_query_rejected"},
-                evidence_reason=route.evidence_reason if route else "",
-                policy_reason=route.policy_reason if route else "",
-            )
-            self._write_state_files(route, result, context)
-            self._write_json_state_files(route, result, context)
-            self._record_request_metrics(context, route, result, execution_time)
-            return result
-
-        # Use Python-native path when requested. The runtime pipeline passes
-        # use_python_path=True, so this is the active execution path for normal
-        # requests. The shell-based path remains available as a fallback.
-        if use_python_path and route.route in (
-            "FULL",
-            "EVIDENCE",
-            "NEWS",
-            "AUGMENTED",
-            "LOCAL",
-            "TIME",
-            "WEATHER",
-            "FINANCE",
-        ):
-            self._logger.info("Using Python-native execution path (shell-free)")
-            # Run the async version in a new event loop
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # We're already in an async context, create a new loop
-                    import concurrent.futures
-
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(self._run_async_execute, intent, route, context)
-                        return future.result()
-                else:
-                    return loop.run_until_complete(self.execute_async(intent, route, context))
-            except RuntimeError:
-                # No event loop, create one
-                return asyncio.run(self.execute_async(intent, route, context))
-
-        # Check for medical context and configure safety constraints
-        requires_evidence, evidence_reason = requires_evidence_mode(question, context)
-
-        # For medical queries: set domain restrictions but don't force LOCAL
-        # This allows LLM to provide informative answers while constraining any web search
-        if evidence_reason == "medical_context":
-            self._logger.info("Medical query detected - setting domain restrictions")
-            # Update context with medical routing signal
-            context["route_reason_override"] = "medical_evidence_only"
-            context["is_medical_query"] = True
-            # Set medical domain allowlist for trusted source restriction
-            medical_domains_file = (
-                ROOT_DIR / "config" / "trust" / "generated" / "medical_runtime.txt"
-            )
-            context["allow_domains_file"] = str(medical_domains_file)
-            # Note: We don't force LOCAL route - let normal routing proceed
-            # The domain restrictions above ensure any web search uses trusted sources
-
-        # Log execution start
-        self._logger.info(
-            f"Execution start: route={route.route}, provider={route.provider}, "
-            f"intent={intent.intent}, question={question[:100]}..."
-        )
-
-        # Response cache short-circuit: skip LLM for repeated LOCAL queries
-        if HAS_RESPONSE_CACHE and route.route == "LOCAL" and question:
-            cached = get_cached(question)
-            if cached:
-                execution_time = int((time.time() - start_time) * 1000)
-                self._logger.info(f"Cache hit: returning cached response ({execution_time}ms)")
-                cache_result = ExecutionResult(
-                    status="completed",
-                    outcome_code="local_answer",
-                    route="LOCAL",
-                    provider="local",
-                    provider_usage_class="local",
-                    response_text=cached,
-                    execution_time_ms=execution_time,
-                    metadata={"cache_hit": True, "execution_time_ms": execution_time},
-                )
-                self._record_request_metrics(context, route, cache_result, execution_time)
-                return cache_result
+        self._logger.info("Using Python-native execution path (shell-free)")
 
         try:
-            # Handle CLARIFY route early
-            if route.route == "CLARIFY":
-                clarify_result = self._handle_clarify_route(intent, route, context, start_time)
-                self._record_request_metrics(
-                    context, route, clarify_result, clarify_result.execution_time_ms
-                )
-                return clarify_result
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're already in an async context, run in a separate thread
+                # with its own event loop to avoid "loop already running" errors.
+                import concurrent.futures
 
-            # Determine execution path based on route type
-            route_type = self._determine_route_type(route, intent, context)
-            self._logger.info(f"Route type determined: {route_type}")
-
-            # Dispatch to appropriate execution handler
-            if route_type == "bypass":
-                result = self._execute_bypass_route(intent, route, context)
-            elif route_type == "provisional":
-                result = self._execute_provisional_route(intent, route, context)
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(self._run_async_execute, intent, route, context)
+                    return future.result()
             else:
-                result = self._execute_full_route(intent, route, context)
-
-            # Calculate execution time
-            execution_time = int((time.time() - start_time) * 1000)
-
-            # Create final result with execution time
-            final_result = ExecutionResult(
-                status=result.status,
-                outcome_code=result.outcome_code,
-                route=result.route,
-                provider=result.provider,
-                provider_usage_class=result.provider_usage_class,
-                response_text=result.response_text,
-                error_message=result.error_message,
-                execution_time_ms=execution_time,
-                metadata={
-                    **result.metadata,
-                    "execution_time_ms": execution_time,
-                    "route_type": route_type,
-                },
-                evidence_reason=route.evidence_reason,
-                policy_reason=route.policy_reason,
-            )
-
-            # Persist execution state
-            self._write_state_files(route, final_result, context)
-            self._write_json_state_files(route, final_result, context)
-
-            # Auto-feedback: detect obvious misroutes from answer quality
-            if HAS_AUTO_FEEDBACK and question:
-                try:
-                    suggestion = analyze_answer_quality(
-                        query=question,
-                        route=route.route,
-                        response_text=final_result.response_text or "",
-                        error_message=final_result.error_message or "",
-                    )
-                    if suggestion:
-                        log_auto_feedback(suggestion)
-                        self._logger.info(
-                            f"Auto-feedback: detected {suggestion['reason']} "
-                            f"(suggest {suggestion['suggested_route']}, "
-                            f"confidence={suggestion['confidence']})"
-                        )
-                        # Trigger background learning if enough feedback accumulated
-                        try:
-                            from background_learner import maybe_auto_learn
-
-                            triggered = maybe_auto_learn(min_entries=5)
-                            if triggered:
-                                self._logger.info("Background learning triggered (auto)")
-                        except Exception:
-                            pass
-                except Exception:
-                    pass  # Auto-feedback must never break execution
-
-            # Cache LOCAL responses for repeated queries
-            if (
-                HAS_RESPONSE_CACHE
-                and route.route == "LOCAL"
-                and question
-                and final_result.response_text
-            ):
-                try:
-                    set_cached(question, final_result.response_text, route="LOCAL")
-                except Exception:
-                    pass  # Cache must never break execution
-
-            self._logger.info(
-                f"Execution complete: status={final_result.status}, "
-                f"outcome={final_result.outcome_code}, time={execution_time}ms"
-            )
-
-            self._record_request_metrics(context, route, final_result, execution_time)
-            return final_result
-
-        except Exception as e:
-            execution_time = int((time.time() - start_time) * 1000)
-            self._logger.error(f"Execution failed: {e}")
-
-            error_result = ExecutionResult(
-                status="failed",
-                outcome_code="execution_error",
-                route=route.route,
-                provider=route.provider,
-                provider_usage_class=route.provider_usage_class,
-                error_message=str(e),
-                execution_time_ms=execution_time,
-                metadata={"exception_type": type(e).__name__},
-                evidence_reason=route.evidence_reason,
-                policy_reason=route.policy_reason,
-            )
-
-            # Still try to write state files for error cases
-            try:
-                self._write_state_files(route, error_result, context)
-                self._write_json_state_files(route, error_result, context)
-            except Exception:
-                pass
-
-            # Auto-feedback on error cases too
-            if HAS_AUTO_FEEDBACK and question:
-                try:
-                    suggestion = analyze_answer_quality(
-                        query=question,
-                        route=route.route,
-                        response_text="",
-                        error_message=str(e),
-                    )
-                    if suggestion:
-                        log_auto_feedback(suggestion)
-                except Exception:
-                    pass
-
-            self._record_request_metrics(context, route, error_result, execution_time)
-            return error_result
-
-        finally:
-            # =========================================================================
-            # NAMESPACE CLEANUP
-            # =========================================================================
-            # Clean up the namespace directory to prevent accumulation of stale
-            # namespaces. This runs even if execution failed (try/finally).
-            #
-            # SAFETY CHECK: Only remove directories that are:
-            # 1. Inside the namespaces/ directory (verified by checking path components)
-            # 2. Associated with this execution's namespace
-            try:
-                if (
-                    self._state_dir.exists()
-                    and "namespaces" in str(self._state_dir)
-                    and self._execution_namespace in str(self._state_dir)
-                ):
-                    shutil.rmtree(self._state_dir, ignore_errors=True)
-                    self._logger.debug(f"Cleaned up namespace directory: {self._state_dir}")
-            except Exception as e:
-                # Log but don't fail if cleanup fails
-                self._logger.warning(f"Failed to cleanup namespace directory: {e}")
+                return loop.run_until_complete(self.execute_async(intent, route, context))
+        except RuntimeError:
+            # No event loop, create one
+            return asyncio.run(self.execute_async(intent, route, context))
 
     def _handle_clarify_route(
         self,
@@ -1148,57 +819,6 @@ class ExecutionEngine:
         self._write_state_files(route, result, context)
         self._write_json_state_files(route, result, context)
         return result
-
-    def _handle_medical_insufficient(
-        self,
-        question: str,
-        local_result: ExecutionResult,
-        context: dict[str, Any],
-    ) -> ExecutionResult:
-        """
-        Handle insufficient local response for medical queries.
-
-        Medical queries are NOT eligible for augmented fallback (line 1365 in shell).
-        When local response is insufficient, return a medical-specific message
-        that informs the user without attempting augmentation.
-
-        This matches shell behavior (lines 3232-3235) where medical queries
-        get special "insufficient" handling that skips validated_insufficient_recovery.
-
-        Args:
-            question: The original user question
-            local_result: The result from local execution attempt
-            context: Execution context
-
-        Returns:
-            ExecutionResult with medical-specific insufficient response
-        """
-        self._logger.info("Returning medical-specific insufficient response")
-
-        # Medical-specific insufficient response
-        # This is a safety measure - medical queries require authoritative sources
-        medical_response = (
-            "I cannot provide medical advice. For health-related questions, "
-            "please consult a qualified healthcare professional."
-        )
-
-        return ExecutionResult(
-            status="completed",
-            outcome_code="medical_insufficient",
-            route="LOCAL",
-            provider="local",
-            provider_usage_class="local",
-            response_text=medical_response,
-            error_message="",
-            metadata={
-                "route_type": "medical_safety",
-                "fallback_used": False,
-                "fallback_reason": "medical_query_no_augmentation",
-                "is_medical_query": True,
-                "local_response_attempted": True,
-                "local_response": local_result.response_text,
-            },
-        )
 
     def _append_medical_sources(
         self,
@@ -1294,619 +914,6 @@ class ExecutionEngine:
                 return True
         return False
 
-    def _determine_route_type(
-        self,
-        route: RoutingDecision,
-        intent: ClassificationResult,
-        context: dict[str, Any],
-    ) -> str:
-        """
-        Determine the execution route type.
-
-        Args:
-            route: The routing decision
-            intent: The classified intent
-            context: Execution context
-
-        Returns:
-            Route type: "bypass", "provisional", or "full"
-
-        Logic ported from execute_plan.sh:
-        - BYPASS: Local-only, no augmentation attempted (augmentation_policy=disabled)
-        - PROVISIONAL: Local first, with fallback to augmentation (augmentation_policy=fallback_only)
-        - FULL: Full governed execution with all checks (augmentation_policy=direct_allowed or other)
-        """
-        # Get augmentation policy from context or default
-        augmentation_policy = context.get("augmentation_policy", self.DEFAULT_AUGMENTATION_POLICY)
-        normalized_policy = self._normalize_augmentation_policy(augmentation_policy)
-
-        # Check for forced modes
-        forced_mode = context.get("forced_mode", "AUTO")
-        if forced_mode == "FORCED_OFFLINE":
-            return "bypass"
-        if forced_mode == "FORCED_ONLINE":
-            return "full"
-
-        # Determine by policy first. When fallback is enabled we want the
-        # local-first provisional path so an admission of ignorance can
-        # automatically escalate to AUGMENTED/EVIDENCE. The fast bypass path
-        # skips that safety net.
-        if normalized_policy == "disabled":
-            # Check if local direct path is eligible
-            if self._local_direct_eligible(route, intent, context):
-                return "bypass"
-            return "bypass"
-        elif normalized_policy == "fallback_only":
-            # TIME route goes directly to full (no local attempt)
-            if route.route == "TIME":
-                return "full"
-            return "provisional"
-        else:  # direct_allowed
-            return "full"
-
-    def _local_direct_eligible(
-        self,
-        route: RoutingDecision,
-        intent: ClassificationResult,
-        context: dict[str, Any],
-    ) -> bool:
-        """
-        Check if query qualifies for local direct (fast) path.
-
-        Ported from execute_plan.sh local_direct_eligible() function (lines 874-894).
-
-        Criteria for local direct path:
-        - LUCY_EXECUTE_PLAN_LOCAL_FASTPATH enabled (default: 1)
-        - LUCY_LOCAL_DIRECT_ENABLED enabled (default: 1)
-        - Governor route is LOCAL
-        - Governor does NOT require sources
-        - Governor does NOT require clarification
-        - Force mode is LOCAL (not AUGMENTED or CLARIFY)
-        - Route mode is not CLARIFY
-        - needs_web is false
-        - output_mode is CHAT
-        - local_answer.sh is executable
-        - offline_action is allow
-        - No clarifying question pending
-        - No chat memory context (unless contextual_local_followup is 1)
-
-        Args:
-            route: The routing decision
-            intent: The classified intent
-            context: Execution context
-
-        Returns:
-            True if eligible for local direct path
-        """
-        # Check environment-based feature flags
-        local_fastpath = self._is_truthy(os.environ.get("LUCY_EXECUTE_PLAN_LOCAL_FASTPATH", "1"))
-        if not local_fastpath:
-            return False
-
-        local_direct_enabled = self._is_truthy(os.environ.get("LUCY_LOCAL_DIRECT_ENABLED", "1"))
-        if not local_direct_enabled:
-            return False
-
-        # Check governor route (from route or context)
-        governor_route = context.get("governor_route", route.route)
-        if governor_route != "LOCAL":
-            return False
-
-        # Check governor requirements
-        governor_requires_sources = context.get("governor_requires_sources", False)
-        if governor_requires_sources:
-            return False
-
-        governor_requires_clarification = context.get("governor_requires_clarification", False)
-        if governor_requires_clarification:
-            return False
-
-        # Check force mode
-        force_mode = context.get("force_mode", "LOCAL")
-        if force_mode != "LOCAL":
-            return False
-
-        # Check if needs web
-        # Trust the router's final decision. Guards (e.g. social_greeting_override)
-        # may have overridden an intent that incorrectly flagged needs_web.
-        if intent.needs_web and route.route != "LOCAL":
-            return False
-
-        # Check output mode
-        output_mode = context.get("output_mode", "CHAT")
-        if output_mode != "CHAT":
-            return False
-
-        # Check if local_answer.sh or local_answer.py exists
-        if not (self.LOCAL_ANSWER_SCRIPT.exists() or self.LOCAL_ANSWER_PY_SCRIPT.exists()):
-            return False
-
-        # Check offline action
-        offline_action = context.get("offline_action", "allow")
-        if offline_action != "allow":
-            return False
-
-        # Check for pending clarifying question
-        clarifying_question = context.get("clarifying_question", "")
-        if clarifying_question:
-            return False
-
-        return True
-
-    def _execute_bypass_route(
-        self,
-        intent: ClassificationResult,
-        route: RoutingDecision,
-        context: dict[str, Any],
-    ) -> ExecutionResult:
-        """
-        Execute a bypass route (local-only, no augmentation).
-
-        Bypass routes skip all augmentation logic and go directly to local
-        response generation. This is used when:
-        - Augmentation is disabled
-        - Confidence is below threshold
-        - Operator has forced local mode
-        - Query qualifies for local direct path
-
-        NAMESPACE ISOLATION:
-        Uses _prepare_subprocess_env() to ensure local_answer.sh runs in an
-        isolated namespace, preventing "shared-state overlap" errors.
-
-        Args:
-            intent: The classified intent
-            route: The routing decision
-            context: Execution context
-
-        Returns:
-            ExecutionResult from local execution
-
-        Ported from execute_plan.sh (lines 2883-2969):
-        - Call local_answer.sh directly
-        - On failure, try local_worker.py fallback
-        - Apply guards for generation failure
-        - Format and return result
-        """
-        self._logger.info("Executing bypass route (local-only)")
-        question = context.get("question", "")
-        session_id = context.get("session_id", "default") or "default"
-
-        # Prepare environment with namespace isolation
-        # _prepare_subprocess_env() ensures local_answer.sh gets the proper
-        # namespace variables to avoid shared-state conflicts.
-        env = self._prepare_subprocess_env()
-        env.update(
-            {
-                "LUCY_IDENTITY_TRACE_FILE": str(
-                    self._state_dir / f"identity_trace.{os.getpid()}.env"
-                ),
-                "LUCY_LOCAL_POLICY_RESPONSE_ID": context.get("governor_local_response_id", ""),
-                "LUCY_LOCAL_GEN_ROUTE_MODE": "LOCAL",
-                "LUCY_LOCAL_GEN_OUTPUT_MODE": context.get("output_mode", "CHAT"),
-            }
-        )
-
-        # Add session memory context if enabled
-        session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(
-            question, session_id=session_id
-        )
-        if session_memory:
-            env["LUCY_SESSION_MEMORY_CONTEXT"] = session_memory
-            self._logger.debug(f"Added session memory context ({len(session_memory)} chars)")
-
-        # Automatic local-model selection when no model is pinned.
-        current_model = env.get("LUCY_LOCAL_MODEL", "")
-        if not current_model or str(current_model).lower() == "auto":
-            selector_context = {
-                "persona": context.get("persona") if context else None,
-                "active_persona": context.get("active_persona") if context else None,
-                "intent_family": getattr(intent, "intent_family", ""),
-            }
-            chosen_model = select_local_model(question, route, selector_context)
-            env["LUCY_LOCAL_MODEL"] = chosen_model
-            self._logger.info(f"[MODEL] Auto-selected local model: {chosen_model}")
-
-        local_direct_used = True
-        local_direct_fallback = False
-        local_direct_path = "local_answer"
-
-        # Try local_answer.sh first
-        result = self._call_local_worker(question, env)
-
-        # If local_answer fails, try local_worker fallback
-        if result.returncode != 0:
-            self._logger.info("Local answer failed, trying worker fallback")
-            if self.LOCAL_WORKER_SCRIPT.exists():
-                local_direct_fallback = True
-                local_direct_path = "worker"
-                result = self._call_local_worker_fallback(question, env)
-
-        # Process the result
-        raw_output = result.stdout
-        rc = result.returncode
-
-        # Check for local generation failure patterns
-        if rc == 0 and response_formatter.is_local_generation_failure_output(raw_output):
-            guard_trigger = "local_generation_failure_phrase"
-            fallback_kind = "deterministic_local_prompt_fallback"
-            outcome_code = "local_guard_fallback"
-            local_force_plain_fallback = True
-            response_text = self._runtime_local_prompt_fallback_text(question, "0")
-        else:
-            # Render the response
-            response_text = response_formatter.render_chat_fast_from_raw(raw_output)
-            response_text = self._local_fast_non_empty_guard(question, response_text, "CHAT")
-            response_text = self._local_fast_repetition_guard(question, response_text, "CHAT")
-
-            # Check for evidence style text (shouldn't happen in bypass)
-            if response_formatter.is_evidence_style_text(response_text):
-                outcome_code = "local_lexeme_blocked"
-                guard_trigger = "local_evidence_lexeme_detected"
-                fallback_kind = "lexeme_blocked_replacement"
-                response_text = self._runtime_local_prompt_fallback_text(question, "1")
-            else:
-                outcome_code = "answered"
-                guard_trigger = "none"
-                fallback_kind = "none"
-                local_force_plain_fallback = False
-
-        # Build metadata — normalize ad-hoc bypass fields into standard schema
-        bypass_telemetry = _ft(
-            fallback_used=local_direct_fallback,
-            fallback_reason="local_worker_failed" if local_direct_fallback else "",
-            primary_failed="local_answer.sh" if local_direct_fallback else "",
-            fallback_to=local_direct_path if local_direct_fallback else "",
-            degradation_level="limited" if local_direct_fallback else "none",
-        )
-        metadata = {
-            "route_type": "bypass",
-            "local_direct_used": local_direct_used,
-            "local_direct_fallback": local_direct_fallback,
-            "local_direct_path": local_direct_path,
-            "guard_trigger": guard_trigger,
-            "fallback_kind": fallback_kind,
-            "trust_class": "local",
-            **memory_telemetry,
-        }
-        metadata = _ft_merge(metadata, bypass_telemetry)
-
-        return ExecutionResult(
-            status="completed" if rc == 0 or local_force_plain_fallback else "failed",
-            outcome_code=outcome_code,
-            route="LOCAL",
-            provider="local",
-            provider_usage_class="local",
-            response_text=response_text,
-            error_message=result.stderr if rc != 0 and not local_force_plain_fallback else "",
-            metadata=metadata,
-        )
-
-    def _execute_provisional_route(
-        self,
-        intent: ClassificationResult,
-        route: RoutingDecision,
-        context: dict[str, Any],
-    ) -> ExecutionResult:
-        """
-        Execute a provisional route (local first, conditional augmentation).
-
-        Provisional routes attempt local response first, then fall back to
-        augmentation if the local response is insufficient. This balances
-        speed (local is faster) with quality (augmented is better).
-
-        MEDICAL/VETERINARY QUERIES:
-        These escalate to the EVIDENCE route (strict trusted sources) when the
-        local model admits ignorance, rather than falling back to the general
-        AUGMENTED provider chain.
-
-        Args:
-            intent: The classified intent
-            route: The routing decision
-            context: Execution context
-
-        Returns:
-            ExecutionResult from local or escalated execution
-        """
-        self._logger.info("Executing provisional route (local-first with fallback)")
-        question = context.get("question", "")
-
-        # Step 1: Try local execution first
-        local_result = self._execute_bypass_route(intent, route, context)
-
-        # Step 2: Check if local result is sufficient
-        if local_result.status == "completed" and local_result.outcome_code == "answered":
-            if not self._is_local_response_sufficient(local_result.response_text):
-                return self._try_escalation_fallback(
-                    question, intent, route, context, local_result, "local_insufficient"
-                )
-            return local_result
-
-        # Local execution failed, try escalation
-        return self._try_escalation_fallback(
-            question, intent, route, context, local_result, "local_failed"
-        )
-
-    def _try_escalation_fallback(
-        self,
-        question: str,
-        intent: ClassificationResult,
-        route: RoutingDecision,
-        context: dict[str, Any],
-        local_result: ExecutionResult,
-        fallback_reason: str,
-    ) -> ExecutionResult:
-        """Escalate a failed or insufficient LOCAL result to AUGMENTED or EVIDENCE."""
-        requires_evidence, evidence_reason = requires_evidence_mode(question, context)
-        is_medical_or_vet = evidence_reason in (
-            "medical_context",
-            "medical_body_symptom",
-            "veterinary_context",
-        )
-        is_strict_evidence = requires_evidence and is_medical_or_vet
-
-        if is_strict_evidence:
-            self._logger.info(
-                f"Local result unsuitable for {evidence_reason} query - escalating to EVIDENCE"
-            )
-            evidence_route = RoutingDecision(
-                route="EVIDENCE",
-                mode=route.mode,
-                intent_family=route.intent_family,
-                confidence=route.confidence,
-                provider="trusted",
-                provider_usage_class="trusted",
-                evidence_mode="required",
-                evidence_reason=evidence_reason,
-                requires_evidence=True,
-                policy_reason="automatic_escalation_to_evidence",
-                ephemeral=route.ephemeral,
-            )
-
-            if evidence_reason in ("medical_context", "medical_body_symptom"):
-                medical_domains_file = (
-                    ROOT_DIR / "config" / "trust" / "generated" / "medical_runtime.txt"
-                )
-                context["allow_domains_file"] = str(medical_domains_file)
-                context["is_medical_query"] = True
-
-            aug_result = self._call_augmented_provider(question, intent, evidence_route, context)
-            target_route = "EVIDENCE"
-        else:
-            if is_medical_or_vet:
-                self._logger.info(
-                    "Medical query with insufficient local response - attempting augmentation with restrictions"
-                )
-            else:
-                self._logger.info("Local response insufficient, attempting augmentation fallback")
-            aug_result = self._call_augmented_provider(question, intent, route, context)
-            target_route = "AUGMENTED"
-
-        if aug_result.status == "completed" and aug_result.response_text:
-            if is_medical_or_vet:
-                aug_result = self._append_medical_sources(aug_result, context)
-
-        if aug_result.status == "completed":
-            return ExecutionResult(
-                status="completed",
-                outcome_code=f"{target_route.lower()}_fallback",
-                route=target_route,
-                provider=aug_result.metadata.get("provider", "wikipedia")
-                if target_route == "AUGMENTED"
-                else "trusted",
-                provider_usage_class=aug_result.metadata.get("provider_usage_class", "free")
-                if target_route == "AUGMENTED"
-                else "trusted",
-                response_text=aug_result.response_text,
-                metadata={
-                    "route_type": "provisional",
-                    "fallback_used": True,
-                    "fallback_reason": fallback_reason,
-                    "local_response": local_result.response_text,
-                    **aug_result.metadata,
-                },
-            )
-
-        # Escalation failed, return local result
-        self._logger.warning(f"Escalation fallback failed: {aug_result.error_message}")
-        return ExecutionResult(
-            status="completed",
-            outcome_code="local_fallback",
-            route="LOCAL",
-            provider="local",
-            provider_usage_class="local",
-            response_text=local_result.response_text,
-            metadata={
-                "route_type": "provisional",
-                "fallback_used": False,
-                "fallback_reason": "escalation_failed",
-                "augmentation_error": aug_result.error_message,
-            },
-        )
-
-    def _execute_full_route(
-        self,
-        intent: ClassificationResult,
-        route: RoutingDecision,
-        context: dict[str, Any],
-    ) -> ExecutionResult:
-        """
-        Execute a full route (governed execution via shell tools).
-
-        Full routes use the complete governed execution path through
-        lucy_chat.sh. This preserves all authority semantics and truth metadata.
-
-        NAMESPACE ISOLATION:
-        Uses _prepare_subprocess_env() to ensure lucy_chat.sh runs in an
-        isolated namespace, preventing "shared-state overlap" errors.
-
-        Args:
-            intent: The classified intent
-            route: The routing decision
-            context: Execution context
-
-        Returns:
-            ExecutionResult from governed execution
-
-        Ported from execute_plan.sh main execution path (lines 2912-2916):
-        - Call lucy_chat.sh with proper environment variables
-        - Parse response and state files
-        - Handle evidence fetching indicators
-        - Return structured result
-        """
-        self._logger.info("Executing full route (governed execution)")
-        question = context.get("question", "")
-        is_medical_query = self._context_indicates_medical_query(context) or (
-            route and route.evidence_reason in ("medical_safety", "medical_context")
-        )
-
-        # Prepare environment for lucy_chat.sh with namespace isolation
-        # _prepare_subprocess_env() sets STATE_NAMESPACE_RAW, LUCY_SHARED_STATE_NAMESPACE,
-        # and LUCY_STATE_DIR to ensure proper isolation from other executions.
-        env = self._prepare_subprocess_env()
-        env.update(
-            {
-                "LUCY_ROUTER_BYPASS": "1",
-                "LUCY_CHAT_FORCE_MODE": self._map_route_to_chat_mode(route.route),
-                "LUCY_CHAT_ROUTE_REASON_OVERRIDE": context.get(
-                    "route_reason_override", "router_classifier_mapper"
-                ),
-                "LUCY_NEWS_REGION_FILTER": context.get("region_filter", ""),
-                "LUCY_FETCH_ALLOWLIST_FILTER_FILE": context.get("allow_domains_file", ""),
-                "LUCY_SEARCH_ALLOWLIST_FILTER_FILE": context.get("allow_domains_file", ""),
-                "LUCY_CONVERSATION_MODE_ACTIVE": "1"
-                if context.get("conversation_mode_active", False)
-                else "0",
-                "LUCY_IDENTITY_TRACE_FILE": str(
-                    self._state_dir / f"identity_trace.{os.getpid()}.env"
-                ),
-                "LUCY_LOCAL_POLICY_RESPONSE_ID": context.get("governor_local_response_id", ""),
-                "LUCY_SEMANTIC_INTERPRETER_FIRED": "true"
-                if context.get("semantic_interpreter_fired", False)
-                else "false",
-                "LUCY_SEMANTIC_INTERPRETER_CONFIDENCE": str(
-                    context.get("semantic_interpreter_confidence", 0.0)
-                ),
-                "LUCY_SEMANTIC_INTERPRETER_FORWARD_CANDIDATES": "true"
-                if context.get("semantic_interpreter_forward_candidates", False)
-                else "false",
-                "LUCY_SEMANTIC_INTERPRETER_ORIGINAL_QUERY": context.get(
-                    "semantic_interpreter_original_query", ""
-                ),
-                "LUCY_SEMANTIC_INTERPRETER_SELECTED_NORMALIZED_QUERY": context.get(
-                    "semantic_interpreter_selected_normalized_query", ""
-                ),
-                "LUCY_SEMANTIC_INTERPRETER_SELECTED_RETRIEVAL_QUERY": context.get(
-                    "semantic_interpreter_selected_retrieval_query", ""
-                ),
-                "LUCY_SEMANTIC_INTERPRETER_NORMALIZED_CANDIDATES_JSON": context.get(
-                    "semantic_interpreter_normalized_candidates_json", "[]"
-                ),
-                "LUCY_SEMANTIC_INTERPRETER_RETRIEVAL_CANDIDATES_JSON": context.get(
-                    "semantic_interpreter_retrieval_candidates_json", "[]"
-                ),
-            }
-        )
-
-        try:
-            # Call lucy_chat.sh
-            result = subprocess.run(
-                [str(self.LUCY_CHAT_SCRIPT), question],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=env,
-                cwd=str(ROOT_DIR),
-            )
-
-            # Parse result
-            raw_output = result.stdout
-            rc = result.returncode
-
-            # Get dynamic state file paths (respects namespace isolation)
-            route_file, outcome_file = self._get_state_file_paths()
-
-            # Try to read outcome from state files
-            outcome_code = self._read_state_field(outcome_file, "OUTCOME_CODE") or "answered"
-
-            final_mode = self._read_state_field(route_file, "FINAL_MODE") or route.route
-
-            # Determine provider from outcome
-            provider = (
-                self._read_state_field(outcome_file, "AUGMENTED_PROVIDER_USED") or route.provider
-            )
-
-            provider_usage_class = self._provider_usage_class_for(provider)
-
-            # Format response
-            if rc == 0:
-                response_text = response_formatter.render_chat_fast_from_raw(raw_output)
-                if is_medical_query and final_mode == "AUGMENTED" and response_text:
-                    medical_result = self._append_medical_sources(
-                        ExecutionResult(
-                            status="completed",
-                            outcome_code=outcome_code,
-                            route=final_mode,
-                            provider=provider,
-                            provider_usage_class=provider_usage_class,
-                            response_text=response_text,
-                            metadata={},
-                        ),
-                        context,
-                    )
-                    response_text = medical_result.response_text
-                status = "completed"
-                error_message = ""
-            else:
-                response_text = raw_output
-                status = "failed"
-                error_message = result.stderr
-
-            # Build metadata from state files
-            metadata = {
-                "route_type": "full",
-                "final_mode": final_mode,
-                "outcome_code": outcome_code,
-                "return_code": rc,
-            }
-
-            # Add child trace fields if available
-            for field in self.CHILD_TRACE_FIELDS.split():
-                value = self._read_state_field(outcome_file, field)
-                if value:
-                    metadata[field.lower()] = value
-
-            return ExecutionResult(
-                status=status,
-                outcome_code=outcome_code,
-                route=final_mode,
-                provider=provider,
-                provider_usage_class=provider_usage_class,
-                response_text=response_text,
-                error_message=error_message,
-                metadata=metadata,
-            )
-
-        except subprocess.TimeoutExpired:
-            return ExecutionResult(
-                status="timeout",
-                outcome_code="timeout",
-                route=route.route,
-                provider=route.provider,
-                provider_usage_class=route.provider_usage_class,
-                error_message=f"Request timed out after {self.timeout}s",
-                metadata={"route_type": "full"},
-            )
-        except Exception as e:
-            return ExecutionResult(
-                status="failed",
-                outcome_code="execution_error",
-                route=route.route,
-                provider=route.provider,
-                provider_usage_class=route.provider_usage_class,
-                error_message=str(e),
-                metadata={"route_type": "full", "exception_type": type(e).__name__},
-            )
-
     # ======================================================================
     # FULL PYTHON EXECUTION PATH (Phase 2 - No Shell Dependency)
     # ======================================================================
@@ -1939,8 +946,7 @@ class ExecutionEngine:
         """
         Async execution entry point.
 
-        This method provides async execution capability, using the full Python
-        execution path for routes that need evidence fetching or augmentation.
+        All routes are executed via the Python-native full route path.
 
         Args:
             intent: The classified intent result
@@ -1974,7 +980,7 @@ class ExecutionEngine:
             return empty_result
 
         # Check for medical context and configure safety constraints
-        requires_evidence, evidence_reason = requires_evidence_mode(question, context)
+        _, evidence_reason = requires_evidence_mode(question, context)
 
         # For medical queries: set domain restrictions but don't force LOCAL
         if evidence_reason == "medical_context":
@@ -2001,35 +1007,8 @@ class ExecutionEngine:
                 )
                 return clarify_result
 
-            # Determine route type for proper handling
-            route_type = self._determine_route_type(route, intent, context)
-
-            # Use Python-native execution based on route type
-            if route.route in (
-                "FULL",
-                "EVIDENCE",
-                "NEWS",
-                "AUGMENTED",
-                "TIME",
-                "WEATHER",
-                "FINANCE",
-            ):
-                result = await self._execute_full_route_python(intent, route, context)
-            elif route_type == "provisional":
-                # Provisional: local first with fallback to augmentation
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    None, self._execute_provisional_route, intent, route, context
-                )
-            elif route.route == "LOCAL":
-                # Use sync bypass route but run in thread pool to not block
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    None, self._execute_bypass_route, intent, route, context
-                )
-            else:
-                # Default to bypass for unknown routes
-                result = self._execute_bypass_route(intent, route, context)
+            # All routes use the Python-native full execution path
+            result = await self._execute_full_route_python(intent, route, context)
 
             # Calculate execution time
             execution_time = int((time.time() - start_time) * 1000)
@@ -2113,7 +1092,6 @@ class ExecutionEngine:
         """
         Full governed execution entirely in Python.
 
-        Replaces: Calling lucy_chat.sh
         Benefits: Keeps real route (AUGMENTED stays AUGMENTED), no shell overhead,
                   async execution for better concurrency.
 
@@ -2569,8 +1547,7 @@ class ExecutionEngine:
         """
         Fetch evidence from appropriate sources based on route.
 
-        Uses existing provider modules but calls them via Python API
-        instead of subprocess for better performance and async support.
+        Uses existing provider modules called via Python API.
 
         Args:
             question: The user question
@@ -2617,7 +1594,7 @@ class ExecutionEngine:
         if primary == "none" or not primary:
             primary = "wikipedia"
 
-        # Build fallback chain matching _call_augmented_provider logic
+        # Build fallback chain for evidence providers
         if primary == "wikipedia":
             chain = ["wikipedia", "openai", "kimi"]
         elif primary == "openai":
@@ -2888,18 +1865,6 @@ class ExecutionEngine:
             self._logger.warning(f"API evidence fetch failed: {e}")
             return None
 
-    def _call_kimi_subprocess(self, question: str) -> dict[str, Any] | None:
-        """Call Kimi provider via subprocess (delegated to provider module)."""
-        if HAS_PROVIDER_MODULES:
-            return call_kimi_subprocess(question, timeout=self.timeout)
-        return None
-
-    def _call_openai_subprocess(self, question: str) -> dict[str, Any] | None:
-        """Call OpenAI provider via subprocess (delegated to provider module)."""
-        if HAS_PROVIDER_MODULES:
-            return call_openai_subprocess(question, timeout=self.timeout)
-        return None
-
     async def _call_local_model_async(
         self,
         prompt: str,
@@ -2971,18 +1936,6 @@ class ExecutionEngine:
             self._logger.error(f"API provider call failed: {e}")
             raise
 
-    def _call_openai_for_response(self, prompt: str) -> str:
-        """Call OpenAI for direct response (delegated to provider module)."""
-        if HAS_PROVIDER_MODULES:
-            return call_openai_for_response(prompt, timeout=self.timeout)
-        return "Error: OpenAI tool not found"
-
-    def _call_kimi_for_response(self, prompt: str) -> str:
-        """Call Kimi for direct response (delegated to provider module)."""
-        if HAS_PROVIDER_MODULES:
-            return call_kimi_for_response(prompt, timeout=self.timeout)
-        return "Error: Kimi tool not found"
-
     async def _call_wikipedia_provider_async(
         self,
         prompt: str,
@@ -2994,659 +1947,6 @@ class ExecutionEngine:
         if HAS_PROVIDER_MODULES:
             return format_wikipedia_response(prompt, evidence, context)
         return "No Wikipedia information available for this query."
-
-    def _call_local_worker_py(
-        self,
-        question: str,
-        env: dict[str, str],
-    ) -> subprocess.CompletedProcess[str]:
-        """
-        Call Python local_answer directly (async).
-
-        This is the Python-native replacement for local_answer.sh.
-        Uses asyncio to call the async LocalAnswer class.
-
-        Args:
-            question: The user question
-            env: Environment variables (applied to config)
-
-        Returns:
-            CompletedProcess with stdout, stderr, and returncode
-        """
-        import asyncio
-
-        self._logger.debug(f"Calling Python local_answer with question: {question[:50]}...")
-
-        try:
-            # Create config from environment
-            config = LocalAnswerConfig.from_env()
-
-            # Override with passed env vars
-            if env.get("LUCY_LOCAL_MODEL"):
-                config.model = env["LUCY_LOCAL_MODEL"]
-            if env.get("LUCY_SESSION_MEMORY_CONTEXT"):
-                session_memory = env["LUCY_SESSION_MEMORY_CONTEXT"]
-            else:
-                session_memory = ""
-
-            # Run async local_answer
-            async def run_local():
-                async with LocalAnswer(config) as answer_gen:
-                    result = await answer_gen.generate_answer(
-                        query=question,
-                        session_memory=session_memory,
-                        route_mode=env.get("LUCY_LOCAL_GEN_ROUTE_MODE", "LOCAL"),
-                        output_mode=env.get("LUCY_LOCAL_GEN_OUTPUT_MODE", "CHAT"),
-                        augmented_user_question=env.get("LUCY_LOCAL_AUGMENTED_USER_QUESTION", ""),
-                        augmented_background_context=env.get(
-                            "LUCY_LOCAL_AUGMENTED_BACKGROUND_CONTEXT", ""
-                        ),
-                    )
-                    return result
-
-            result = asyncio.run(run_local())
-
-            return subprocess.CompletedProcess(
-                args=["local_answer.py", question],
-                returncode=0 if not result.error else 1,
-                stdout=result.text,
-                stderr=result.error or "",
-            )
-        except Exception as e:
-            self._logger.error(f"Python local_answer failed: {e}")
-            return subprocess.CompletedProcess(
-                args=["local_answer.py", question],
-                returncode=1,
-                stdout="",
-                stderr=str(e),
-            )
-
-    def _call_local_worker(
-        self,
-        question: str,
-        env: dict[str, str],
-    ) -> subprocess.CompletedProcess[str]:
-        """
-        Call local_answer.sh to generate a local response.
-
-        Args:
-            question: The user question
-            env: Environment variables for the subprocess
-
-        Returns:
-            CompletedProcess with stdout, stderr, and returncode
-        """
-        # Check if we should use Python local_answer (experimental)
-        if USE_LOCAL_ANSWER_PY and HAS_LOCAL_ANSWER_PY:
-            self._logger.info(f"[MODE] Using Python local_answer.py for: {question[:50]}...")
-            return self._call_local_worker_py(question, env)
-
-        self._logger.info(f"[MODE] Using shell local_answer.sh for: {question[:50]}...")
-
-        # Ensure namespace isolation for subprocess
-        env = self._prepare_subprocess_env(env)
-
-        try:
-            result = subprocess.run(
-                [str(self.LOCAL_ANSWER_SCRIPT), question],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=env,
-                cwd=str(ROOT_DIR),
-            )
-            return result
-        except subprocess.TimeoutExpired:
-            return subprocess.CompletedProcess(
-                args=[str(self.LOCAL_ANSWER_SCRIPT), question],
-                returncode=1,
-                stdout="",
-                stderr=f"Timeout after {self.timeout}s",
-            )
-        except Exception as e:
-            return subprocess.CompletedProcess(
-                args=[str(self.LOCAL_ANSWER_SCRIPT), question],
-                returncode=1,
-                stdout="",
-                stderr=str(e),
-            )
-
-    def _call_local_worker_fallback(
-        self,
-        question: str,
-        env: dict[str, str],
-    ) -> subprocess.CompletedProcess[str]:
-        """
-        Call local_worker.py as a fallback when local_answer.sh fails.
-
-        NAMESPACE ISOLATION:
-        Uses _prepare_subprocess_env() to ensure local_worker.py runs in an
-        isolated namespace, preventing "shared-state overlap" errors.
-
-        Args:
-            question: The user question
-            env: Environment variables for the subprocess
-
-        Returns:
-            CompletedProcess with stdout, stderr, and returncode
-        """
-        self._logger.debug(f"Calling local_worker.py fallback: {question[:50]}...")
-
-        # Ensure namespace isolation for subprocess
-        # _prepare_subprocess_env() sets STATE_NAMESPACE_RAW to tell shell scripts
-        # (execute_plan.sh) to skip their own locking, preventing conflicts.
-        env = self._prepare_subprocess_env(env)
-
-        try:
-            result = subprocess.run(
-                [sys.executable, str(self.LOCAL_WORKER_SCRIPT), question],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=env,
-                cwd=str(ROOT_DIR),
-            )
-            return result
-        except subprocess.TimeoutExpired:
-            return subprocess.CompletedProcess(
-                args=[sys.executable, str(self.LOCAL_WORKER_SCRIPT), question],
-                returncode=1,
-                stdout="",
-                stderr=f"Timeout after {self.timeout}s",
-            )
-        except Exception as e:
-            return subprocess.CompletedProcess(
-                args=[sys.executable, str(self.LOCAL_WORKER_SCRIPT), question],
-                returncode=1,
-                stdout="",
-                stderr=str(e),
-            )
-
-    def _call_augmented_provider(
-        self,
-        question: str,
-        intent: ClassificationResult,
-        route: RoutingDecision,
-        context: dict[str, Any],
-    ) -> ExecutionResult:
-        """
-        Call unverified context provider for augmentation with fallback chain.
-
-        Provider chain: trusted -> wikipedia -> openai -> kimi
-        If one fails, automatically tries the next.
-
-        For news/medical/finance queries, tries trusted sources first.
-
-        NAMESPACE ISOLATION:
-        Uses _prepare_subprocess_env() to ensure the provider dispatch runs in an
-        isolated namespace, preventing "shared-state overlap" errors.
-
-        Args:
-            question: The user question
-            intent: The classified intent
-            route: The routing decision
-            context: Execution context
-
-        Returns:
-            ExecutionResult from augmented provider
-        """
-        self._logger.info(f"Calling augmented provider for: {question[:50]}...")
-
-        # EVIDENCE route = strict trusted sources only (medical, veterinary)
-        if route and route.route == "EVIDENCE":
-            self._logger.info("EVIDENCE route: using strict trusted sources only")
-            result = self._call_single_provider("trusted", question, intent, route, context)
-            if result.status == "completed":
-                return result
-            # Trusted provider failed or not applicable — return evidence-not-found
-            # Do NOT fall back to Wikipedia/OpenAI for EVIDENCE routes
-            return ExecutionResult(
-                status="completed",
-                outcome_code="evidence_not_found",
-                route="EVIDENCE",
-                provider="trusted",
-                provider_usage_class="local",
-                response_text=(
-                    "I couldn't find evidence from the designated trusted sources for this query.\n\n"
-                    "For medical decisions, please consult a healthcare professional and verify "
-                    "with authoritative sources such as:\n"
-                    "- cochranelibrary.com\n"
-                    "- dailymed.nlm.nih.gov\n"
-                    "- jamanetwork.com\n"
-                    "- medlineplus.gov\n"
-                    "- nejm.org\n"
-                    "- pubmed.ncbi.nlm.nih.gov"
-                ),
-                error_message="No evidence found in trusted sources",
-                metadata={
-                    "providers_attempted": ["trusted"],
-                    "strict_evidence": True,
-                    "trust_class": "trusted",
-                    **_trusted_evidence_metadata(
-                        None,
-                        answer_basis="error_fallback",
-                        live_fetch_status="failed",
-                        confidence="low",
-                        degraded_reason="no_trusted_evidence_found",
-                    ),
-                },
-            )
-
-        # Determine provider chain. In autonomous mode the route already carries
-        # the provider chosen by the router (e.g. wikipedia for entity facts,
-        # openai for evidence requests). Otherwise fall back to the HMI/default.
-        primary_provider = context.get("augmented_provider", "wikipedia")
-        if primary_provider in ("auto", ""):
-            primary_provider = getattr(route, "provider", "") or "wikipedia"
-        if primary_provider == "none" or not primary_provider:
-            primary_provider = "wikipedia"
-
-        # Check if this is a category-specific query that should try trusted first
-        intent_family = intent.intent_family if intent else ""
-        is_category_query = self._is_category_specific_query(question, intent_family)
-
-        # Check if this is a medical query (detected via context or evidence_reason)
-        is_medical_query = self._context_indicates_medical_query(context) or (
-            route and route.evidence_reason in ("medical_safety", "medical_context")
-        )
-
-        # Build fallback chain: free providers first, then paid
-        if is_category_query:
-            # Try trusted sources first for news/medical/finance
-            provider_chain = ["trusted", "wikipedia", "kimi", "openai"]
-            self._logger.info("Category-specific query detected, trying trusted sources first")
-        elif primary_provider == "wikipedia":
-            provider_chain = ["wikipedia", "openai", "kimi"]
-        elif primary_provider == "openai":
-            provider_chain = ["openai", "kimi", "wikipedia"]
-        elif primary_provider == "kimi":
-            provider_chain = ["kimi", "openai", "wikipedia"]
-        else:
-            provider_chain = [primary_provider, "wikipedia", "kimi", "openai"]
-
-        # Try each provider in chain
-        last_error = ""
-        for provider in provider_chain:
-            result = self._call_single_provider(provider, question, intent, route, context)
-            if result.status == "completed":
-                # For medical queries, append trusted sources to informative answer
-                if is_medical_query and result.response_text:
-                    result = self._append_medical_sources(result, context)
-                return result
-            # "not_applicable" means this provider doesn't handle this query type
-            # This is not a failure, so don't log it as an error
-            if result.error_message and "not_applicable" in result.error_message.lower():
-                self._logger.info(
-                    f"Provider {provider} not applicable for this query, trying fallback..."
-                )
-            else:
-                last_error = result.error_message or f"{provider} failed"
-                self._logger.warning(f"Provider {provider} failed, trying fallback...")
-
-        # All providers failed
-        return ExecutionResult(
-            status="failed",
-            outcome_code="augmentation_failed",
-            route="AUGMENTED",
-            provider="none",
-            provider_usage_class="local",
-            error_message=f"All providers failed. Last error: {last_error}",
-            metadata={"providers_attempted": provider_chain},
-        )
-
-    def _call_single_provider(
-        self,
-        provider: str,
-        question: str,
-        intent: ClassificationResult,
-        route: RoutingDecision,
-        context: dict[str, Any],
-    ) -> ExecutionResult:
-        """
-        Call a single augmented provider.
-
-        Args:
-            provider: Provider name (wikipedia, openai, kimi)
-            question: The user question
-            intent: The classified intent
-            route: The routing decision
-            context: Execution context
-
-        Returns:
-            ExecutionResult from the provider
-        """
-        session_id = context.get("session_id", "default") or "default"
-        self._logger.info(f"Trying provider: {provider}")
-
-        # Circuit breaker for augmented provider subprocess
-        breaker_name = f"augmented_provider_{provider}"
-        breaker = get_breaker(breaker_name)
-        try:
-            breaker._before_call()
-        except CircuitBreakerOpen:
-            self._logger.warning(f"Circuit breaker open for provider {provider}")
-            return ExecutionResult(
-                status="failed",
-                outcome_code="circuit_open",
-                route="AUGMENTED",
-                provider=provider,
-                provider_usage_class=self._provider_usage_class_for(provider),
-                error_message=f"Circuit breaker open for provider {provider}",
-                metadata={"provider": provider, "circuit_breaker": breaker_name},
-            )
-
-        # Prepare environment for subprocess with namespace isolation
-        # _prepare_subprocess_env() sets STATE_NAMESPACE_RAW to tell shell scripts
-        # (execute_plan.sh) to skip their own locking, preventing conflicts.
-        env = self._prepare_subprocess_env()
-
-        # Pass intent family to provider for category detection
-        if intent and intent.intent_family:
-            env["LUCY_INTENT_FAMILY"] = intent.intent_family
-
-        # Pass domain allowlist for medical/category queries (restricts web search to trusted domains)
-        allow_domains_file = context.get("allow_domains_file", "")
-        if allow_domains_file:
-            env["LUCY_FETCH_ALLOWLIST_FILTER_FILE"] = allow_domains_file
-            env["LUCY_SEARCH_ALLOWLIST_FILTER_FILE"] = allow_domains_file
-
-        # Initialize memory telemetry defaults (updated later if memory is loaded)
-        memory_telemetry: dict[str, str] = {
-            "memory_context_used": "false",
-            "memory_mode_used": "none",
-            "memory_depth_used": "none",
-            "memory_top_score": "none",
-            "memory_session_injected": "none",
-            "memory_top_gap": "none",
-        }
-
-        try:
-            # Call unverified_context_provider_dispatch.py
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(self.UNVERIFIED_CONTEXT_PROVIDER_DISPATCH_TOOL),
-                    provider,
-                    question,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
-                env=env,
-                cwd=str(ROOT_DIR),
-            )
-
-            if result.returncode != 0:
-                breaker._on_failure(Exception("provider_dispatch_failed"))
-                # Dispatch tool writes structured errors to stdout; try to extract reason
-                dispatch_error = result.stderr or ""
-                if not dispatch_error and result.stdout:
-                    try:
-                        parsed = json.loads(result.stdout)
-                        if isinstance(parsed, dict) and not parsed.get("ok"):
-                            dispatch_error = parsed.get("reason", "Provider dispatch failed")
-                    except (json.JSONDecodeError, ValueError):
-                        pass
-                if not dispatch_error:
-                    dispatch_error = "Provider dispatch failed"
-                return ExecutionResult(
-                    status="failed",
-                    outcome_code="augmentation_failed",
-                    route="AUGMENTED",
-                    provider=provider,
-                    provider_usage_class=self._provider_usage_class_for(provider),
-                    error_message=dispatch_error,
-                    metadata={
-                        "provider": provider,
-                        "raw_output": result.stdout,
-                        **memory_telemetry,
-                    },
-                )
-
-            # Parse JSON response
-            try:
-                payload = json.loads(result.stdout)
-            except json.JSONDecodeError:
-                breaker._on_failure(Exception("JSONDecodeError"))
-                return ExecutionResult(
-                    status="failed",
-                    outcome_code="augmentation_parse_error",
-                    route="AUGMENTED",
-                    provider=provider,
-                    provider_usage_class=self._provider_usage_class_for(provider),
-                    error_message="Failed to parse provider response",
-                    metadata={"provider": provider, "raw_output": result.stdout},
-                )
-
-            if not payload.get("ok"):
-                breaker._on_failure(Exception("provider_error"))
-                return ExecutionResult(
-                    status="failed",
-                    outcome_code="augmentation_provider_error",
-                    route="AUGMENTED",
-                    provider=provider,
-                    provider_usage_class=self._provider_usage_class_for(provider),
-                    error_message=payload.get("reason", "Unknown provider error"),
-                    metadata={"provider": provider, "payload": payload, **memory_telemetry},
-                )
-
-            # Extract context from payload
-            context_text = payload.get("context", "")
-            context_title = payload.get("title", "")
-            context_url = payload.get("url", "")
-
-            # Check if this is a bounded response from trusted provider
-            # (returns formatted answer directly without calling local model)
-            if payload.get("bounded_response") and payload.get("content"):
-                response_text = payload.get("content", "")
-                sources = payload.get("sources", [])
-                category = payload.get("category", "trusted")
-                trusted_meta = _trusted_evidence_metadata(payload)
-
-                # Use content as-is - trusted provider already formatted it with sources
-
-                return ExecutionResult(
-                    status="completed",
-                    outcome_code="augmented_answer_bounded",
-                    route="AUGMENTED",
-                    provider=provider,
-                    provider_usage_class="local",  # No paid API used
-                    response_text=response_text.strip(),
-                    metadata={
-                        "provider": provider,
-                        "category": category,
-                        "sources": sources,
-                        "trust_class": "trusted",
-                        **trusted_meta,
-                        **memory_telemetry,
-                    },
-                )
-
-            # Now call local worker with augmented context
-            # Use _prepare_subprocess_env() for namespace isolation
-            env = self._prepare_subprocess_env()
-            env.update(
-                {
-                    "LUCY_LOCAL_GEN_ROUTE_MODE": "AUGMENTED",
-                    "LUCY_LOCAL_GEN_OUTPUT_MODE": "CHAT",
-                    "LUCY_LOCAL_AUGMENTED_USER_QUESTION": question,
-                    "LUCY_LOCAL_AUGMENTED_BACKGROUND_CONTEXT": context_text,
-                    "LUCY_LOCAL_AUGMENTED_CONTEXT_CLASS": provider,
-                    "LUCY_LOCAL_AUGMENTED_CONTEXT_TITLE": context_title,
-                    "LUCY_LOCAL_AUGMENTED_CONTEXT_URL": context_url,
-                }
-            )
-
-            # Add session memory context if enabled
-            # Augmented mode gets deep context since the model handles mixed sources well
-            session_memory, memory_telemetry = _load_session_memory_context_with_telemetry(
-                question, depth="deep", mode="augmented", session_id=session_id
-            )
-            if session_memory:
-                env["LUCY_SESSION_MEMORY_CONTEXT"] = session_memory
-                self._logger.debug(f"Added session memory context ({len(session_memory)} chars)")
-
-            local_result = self._call_local_worker(question, env)
-
-            if local_result.returncode != 0:
-                breaker._on_failure(Exception("local_worker_failed"))
-                return ExecutionResult(
-                    status="failed",
-                    outcome_code="augmentation_generation_failed",
-                    route="AUGMENTED",
-                    provider=provider,
-                    provider_usage_class=self._provider_usage_class_for(provider),
-                    error_message=local_result.stderr,
-                    metadata={"provider": provider, **memory_telemetry},
-                )
-
-            # Success - format and return
-            response_text = response_formatter.render_chat_fast_from_raw(local_result.stdout)
-
-            breaker._on_success()
-            return ExecutionResult(
-                status="completed",
-                outcome_code="augmented_answer",
-                route="AUGMENTED",
-                provider=provider,
-                provider_usage_class=self._provider_usage_class_for(provider),
-                response_text=response_text,
-                metadata={
-                    "provider": provider,
-                    "context_title": context_title,
-                    "context_url": context_url,
-                    "trust_class": "unverified",
-                    **memory_telemetry,
-                },
-            )
-
-        except subprocess.TimeoutExpired:
-            breaker._on_failure(Exception("timeout"))
-            return ExecutionResult(
-                status="timeout",
-                outcome_code="augmentation_timeout",
-                route="AUGMENTED",
-                provider=provider,
-                provider_usage_class=self._provider_usage_class_for(provider),
-                error_message=f"Augmentation timeout after {self.timeout}s",
-                metadata={**memory_telemetry},
-            )
-        except Exception as e:
-            breaker._on_failure(e)
-            return ExecutionResult(
-                status="failed",
-                outcome_code="augmentation_error",
-                route="AUGMENTED",
-                provider=provider,
-                provider_usage_class=self._provider_usage_class_for(provider),
-                error_message=str(e),
-                metadata={"exception_type": type(e).__name__, **memory_telemetry},
-            )
-
-    def _is_local_response_sufficient(self, response_text: str) -> bool:
-        """
-        Check if a local response is sufficient or needs augmentation fallback.
-
-        Args:
-            response_text: The local response text
-
-        Returns:
-            True if response is sufficient, False if augmentation needed
-        """
-        if not response_text:
-            return False
-
-        # Check for fallback phrases that indicate insufficient response
-        normalized = response_formatter.guard_normalize(response_text)
-        insufficient_patterns = [
-            "i could not generate a reply locally",
-            "i don't have enough information",
-            "i don't have the specific",
-            "i don't have information",
-            "i do not have information",
-            "i don't know",
-            "i do not know",
-            "i have no idea",
-            "i'm not sure",
-            "i am not sure",
-            "i cannot provide",
-            "i can't provide",
-            "i cannot say",
-            "i can't say",
-            "i don't have any information",
-            "i do not have any information",
-            "i don't have access",
-            "i do not have access",
-            "i don't have real-time",
-            "i do not have real-time",
-            "i don't have up-to-date",
-            "i do not have up-to-date",
-            "i don't have current",
-            "i do not have current",
-            "unable to verify",
-            "cannot verify",
-            "can't verify",
-            "i can only speculate",
-            "i would need to",
-            "i'd need to",
-            "i would have to",
-            "i'd have to",
-            "without access to",
-            "no facts about",
-            "no information about",
-            "not mentioned",
-            "not provided",
-            "not in the facts",
-            "not in my facts",
-            "persistent fact",
-            "provided persistent fact",
-            "outside my knowledge",
-            "beyond my knowledge",
-            "outside my training",
-            "this requires evidence mode",
-            "insufficient evidence",
-            "you may need to consult",
-            "simulation tools",
-            "error",
-        ]
-
-        for pattern in insufficient_patterns:
-            if pattern in normalized:
-                return False
-
-        return True
-
-    def _call_tool(
-        self,
-        tool_name: str,
-        params: dict[str, Any],
-    ) -> dict[str, Any]:
-        """
-        Call a tool via the governed execution path.
-
-        This method dispatches tool calls through the appropriate
-        governed path, ensuring authority semantics are preserved.
-
-        Args:
-            tool_name: Name of the tool to call
-            params: Parameters for the tool call
-
-        Returns:
-            Tool response as dictionary
-
-        Supported Tools:
-        - local: Local response generation
-        - wikipedia: Wikipedia search and fetch
-        - openai: OpenAI API calls
-        - kimi: Kimi API calls
-        """
-        # TODO: Implement tool dispatch from execute_plan.sh
-        # - Map tool_name to tool path
-        # - Prepare parameters
-        # - Execute tool
-        # - Parse and return response
-
-        raise NotImplementedError(f"Tool call not yet implemented: {tool_name}")
 
     def _format_response(
         self,
@@ -3727,42 +2027,8 @@ class ExecutionEngine:
         """Read a field value from a state file."""
         return self.state_writer._read_state_field(state_file, field)
 
-    def _map_route_to_chat_mode(self, route: str) -> str:
-        """
-        Map internal route to valid lucy_chat.sh mode.
-
-        DEPRECATED: To be removed after Phase 2 completion - no longer needed.
-        This method was used when calling lucy_chat.sh which only accepts
-        LOCAL/EVIDENCE/NEWS modes. The new Python-native execution path
-        (_execute_full_route_python) keeps real routes (AUGMENTED, etc.)
-        without mapping.
-
-        Valid modes in lucy_chat.sh: LOCAL, EVIDENCE, NEWS
-
-        Internal routes like AUGMENTED, CLARIFY, SELF_REVIEW are mapped
-        to appropriate chat modes. Unknown routes default to LOCAL for safety.
-
-        Args:
-            route: Internal route name (e.g., "LOCAL", "AUGMENTED", "CLARIFY")
-
-        Returns:
-            Valid lucy_chat.sh mode (LOCAL, EVIDENCE, or NEWS)
-        """
-        mapping = {
-            "LOCAL": "LOCAL",
-            "BYPASS": "LOCAL",
-            "PROVISIONAL": "LOCAL",
-            "FULL": "EVIDENCE",
-            "EVIDENCE": "EVIDENCE",
-            "NEWS": "NEWS",
-            "AUGMENTED": "LOCAL",  # Augmented is handled differently
-            "CLARIFY": "LOCAL",  # Clarification is local
-            "SELF_REVIEW": "LOCAL",
-        }
-        return mapping.get(route, "LOCAL")  # Default to LOCAL for safety
-
     # ======================================================================
-    # Helper Methods (ported from execute_plan.sh)
+    # Helper Methods
     # ======================================================================
 
     def _local_fast_non_empty_guard(
@@ -3862,11 +2128,7 @@ class ExecutionEngine:
         return bank[idx]
 
     def _render_conversation_fallback(self, question: str) -> str:
-        """
-        Render conversation mode fallback.
-
-        Ported from render_conversation_fallback (referenced in execute_plan.sh).
-        """
+        """Render conversation mode fallback."""
         return self._runtime_local_prompt_fallback_text(question, "0")
 
     # ======================================================================

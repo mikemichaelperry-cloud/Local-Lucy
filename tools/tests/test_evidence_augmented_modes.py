@@ -446,139 +446,6 @@ async def test_full_execution_paths():
 # ---------------------------------------------------------------------------
 
 
-async def test_provider_fallback_chains():
-    section("4. Provider Fallback Chains")
-
-    engine = ExecutionEngine(config={"timeout": 60})
-
-    # 4a. _call_augmented_provider with forced provider chain
-    print("\n  4a. Augmented provider chain: wikipedia → kimi → openai...")
-    try:
-        intent = ClassificationResult(
-            intent="background_overview",
-            intent_family="background_overview",
-            category="science",
-            confidence=0.85,
-            needs_web=True,
-            evidence_mode=None,
-            evidence_reason=None,
-            force_local=False,
-        )
-        route = RoutingDecision(
-            route="AUGMENTED",
-            provider="wikipedia",
-            provider_usage_class="free",
-            mode="AUTO",
-            intent_family="background_overview",
-            confidence=0.85,
-            evidence_mode=None,
-            evidence_reason=None,
-            requires_evidence=False,
-            policy_reason="test",
-        )
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            engine._call_augmented_provider,
-            "What is general relativity?",
-            intent,
-            route,
-            {"augmented_provider": "wikipedia"},
-        )
-        check("Fallback chain completed", result.status == "completed", f"status={result.status}")
-        check("Fallback chain has response", len(result.response_text) > 20)
-        print(f"     Provider used: {result.provider}")
-        print(f"     Response: {result.response_text[:120]}...")
-    except Exception as e:
-        check("Fallback chain execution", False, str(e))
-
-    # 4b. _call_augmented_provider with kimi first
-    print("\n  4b. Augmented provider chain: kimi → openai → wikipedia...")
-    try:
-        intent = ClassificationResult(
-            intent="background_overview",
-            intent_family="background_overview",
-            category="science",
-            confidence=0.85,
-            needs_web=True,
-            evidence_mode=None,
-            evidence_reason=None,
-            force_local=False,
-        )
-        route = RoutingDecision(
-            route="AUGMENTED",
-            provider="kimi",
-            provider_usage_class="paid",
-            mode="AUTO",
-            intent_family="background_overview",
-            confidence=0.85,
-            evidence_mode=None,
-            evidence_reason=None,
-            requires_evidence=False,
-            policy_reason="test",
-        )
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            engine._call_augmented_provider,
-            "What is dark matter?",
-            intent,
-            route,
-            {"augmented_provider": "kimi"},
-        )
-        check("Kimi-first chain completed", result.status == "completed", f"status={result.status}")
-        check("Kimi-first chain has response", len(result.response_text) > 20)
-        check("Kimi-first provider is kimi", result.provider == "kimi")
-        print(f"     Provider used: {result.provider}")
-        print(f"     Response: {result.response_text[:120]}...")
-    except Exception as e:
-        check("Kimi-first chain execution", False, str(e))
-
-    # 4c. _call_augmented_provider with openai first
-    print("\n  4c. Augmented provider chain: openai → kimi → wikipedia...")
-    try:
-        intent = ClassificationResult(
-            intent="background_overview",
-            intent_family="background_overview",
-            category="science",
-            confidence=0.85,
-            needs_web=True,
-            evidence_mode=None,
-            evidence_reason=None,
-            force_local=False,
-        )
-        route = RoutingDecision(
-            route="AUGMENTED",
-            provider="openai",
-            provider_usage_class="paid",
-            mode="AUTO",
-            intent_family="background_overview",
-            confidence=0.85,
-            evidence_mode=None,
-            evidence_reason=None,
-            requires_evidence=False,
-            policy_reason="test",
-        )
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            engine._call_augmented_provider,
-            "What is dark energy?",
-            intent,
-            route,
-            {"augmented_provider": "openai"},
-        )
-        check(
-            "OpenAI-first chain completed", result.status == "completed", f"status={result.status}"
-        )
-        check("OpenAI-first chain has response", len(result.response_text) > 20)
-        check("OpenAI-first provider is openai", result.provider == "openai")
-        print(f"     Provider used: {result.provider}")
-        print(f"     Response: {result.response_text[:120]}...")
-    except Exception as e:
-        check("OpenAI-first chain execution", False, str(e))
-
-
 # ---------------------------------------------------------------------------
 # Section 5: Memory injection in augmented modes
 # ---------------------------------------------------------------------------
@@ -661,11 +528,11 @@ async def test_memory_injection():
 
 
 async def test_provisional_route():
-    section("6. Provisional Route (local first + augmentation fallback)")
+    section("6. Local Route via Python-Native Path")
 
     engine = ExecutionEngine(config={"timeout": 60})
 
-    print("\n  6a. Provisional with simple factual query...")
+    print("\n  6a. Local route with simple factual query...")
     try:
         intent = ClassificationResult(
             intent="local_answer",
@@ -690,13 +557,13 @@ async def test_provisional_route():
             policy_reason="local_sufficient",
         )
         result = await engine.execute_async(intent, route, {"question": "What is 2+2?"})
-        check("Provisional local completed", result.status == "completed")
-        check("Provisional local has response", len(result.response_text) > 0)
+        check("Local route completed", result.status == "completed")
+        check("Local route has response", len(result.response_text) > 0)
         print(f"     Response: {result.response_text[:80]}...")
     except Exception as e:
-        check("Provisional local", False, str(e))
+        check("Local route simple", False, str(e))
 
-    print("\n  6b. Provisional with web query (should attempt augmentation fallback)...")
+    print("\n  6b. Local route with web-marked query (stays local in Python-native path)...")
     try:
         intent = ClassificationResult(
             intent="background_overview",
@@ -720,7 +587,6 @@ async def test_provisional_route():
             requires_evidence=False,
             policy_reason="local_first_fallback_allowed",
         )
-        # Set policy to fallback_only to trigger provisional behavior
         result = await engine.execute_async(
             intent,
             route,
@@ -729,12 +595,12 @@ async def test_provisional_route():
                 "augmentation_policy": "fallback_only",
             },
         )
-        check("Provisional fallback completed", result.status == "completed")
-        check("Provisional fallback has response", len(result.response_text) > 20)
+        check("Local route completed", result.status == "completed")
+        check("Local route has response", len(result.response_text) > 0)
         print(f"     Route: {result.route}, Provider: {result.provider}")
         print(f"     Response: {result.response_text[:120]}...")
     except Exception as e:
-        check("Provisional fallback", False, str(e))
+        check("Local route web query", False, str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -752,7 +618,6 @@ async def main():
     await test_evidence_fetching()
     test_augmented_prompt()
     await test_full_execution_paths()
-    await test_provider_fallback_chains()
     await test_memory_injection()
     await test_provisional_route()
 

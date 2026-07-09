@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -77,16 +76,14 @@ def _make_route(
     )
 
 
-def _fake_local_worker(
-    question: str, env: dict | None = None, stdout: str = "The answer is 42."
-) -> subprocess.CompletedProcess[str]:
-    """Return a mock local-worker result without loading Ollama."""
-    return subprocess.CompletedProcess(
-        args=["local_answer", question],
-        returncode=0,
-        stdout=stdout,
-        stderr="",
-    )
+async def _fake_local_model_async(
+    prompt: str,
+    context: dict | None = None,
+    session_memory: str = "",
+    route_mode: str = "LOCAL",
+) -> str:
+    """Return a mock local-model response without loading Ollama."""
+    return "The answer is 42."
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +115,7 @@ def engine(tmp_state_dir, monkeypatch):
     eng.state_writer.state_manager = eng.state_manager
     # Bypass Ollama/local model loading — these tests validate state persistence,
     # not the LLM itself.
-    monkeypatch.setattr(eng, "_call_local_worker", _fake_local_worker)
+    monkeypatch.setattr(eng, "_call_local_model_async", _fake_local_model_async)
     return eng
 
 
@@ -130,11 +127,11 @@ def engine(tmp_state_dir, monkeypatch):
 class TestVoiceLocalRoute:
     def test_voice_local_json_state_files_written(self, engine, tmp_state_dir):
         """Voice submit to LOCAL should write JSON state files (env deprecated in Stream 3)."""
-        with patch.object(engine, "_call_single_provider", return_value="The answer is 42."):
+        with patch.object(engine, "_call_api_provider_async", return_value="The answer is 42."):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
             ctx = {"question": "What is 2+2?", "surface": "voice"}
-            result = engine.execute(intent, route, context=ctx, use_python_path=True)
+            result = engine.execute(intent, route, context=ctx)
 
         assert result.status == "completed"
         assert result.route == "LOCAL"
@@ -155,11 +152,11 @@ class TestVoiceLocalRoute:
 
     def test_voice_local_sqlite_written(self, engine):
         """Voice submit to LOCAL should also write to SQLite via StateManager."""
-        with patch.object(engine, "_call_single_provider", return_value="42"):
+        with patch.object(engine, "_call_api_provider_async", return_value="42"):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
             ctx = {"question": "What is 2+2?", "surface": "voice"}
-            engine.execute(intent, route, context=ctx, use_python_path=True)
+            engine.execute(intent, route, context=ctx)
 
         assert engine.state_manager.write_batch.called
         route_args, outcome_args = engine.state_manager.write_batch.call_args[0]
@@ -167,14 +164,13 @@ class TestVoiceLocalRoute:
 
     def test_voice_surface_propagated_to_metadata(self, engine, tmp_state_dir):
         """Voice surface should be available in execution context."""
-        with patch.object(engine, "_call_single_provider", return_value="Voice answer."):
+        with patch.object(engine, "_call_api_provider_async", return_value="Voice answer."):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
             result = engine.execute(
                 intent,
                 route,
                 context={"question": "Hello", "surface": "voice"},
-                use_python_path=True,
             )
         assert result.status == "completed"
         # JSON state files should be written (env deprecated in Stream 3)
@@ -196,7 +192,7 @@ class TestHmiTimeRoute:
             intent = _make_classification("time", confidence=0.99)
             route = _make_route("TIME", "time", "free", confidence=0.99)
             ctx = {"question": "What time is it?", "surface": "hmi"}
-            result = engine.execute(intent, route, context=ctx, use_python_path=True)
+            result = engine.execute(intent, route, context=ctx)
 
         assert result.status == "completed"
         assert result.route == "TIME"
@@ -217,7 +213,6 @@ class TestHmiTimeRoute:
                 intent,
                 route,
                 context={"question": "What time is it?", "surface": "hmi"},
-                use_python_path=True,
             )
 
         route_args, outcome_args = engine.state_manager.write_batch.call_args[0]
@@ -235,14 +230,14 @@ class TestHmiTimeRoute:
 class TestVoiceAugmentedTelemetry:
     def test_augmented_memory_telemetry_in_files(self, engine, tmp_state_dir):
         """AUGMENTED route with memory telemetry should persist all fields."""
-        with patch.object(engine, "_call_single_provider", return_value="Detailed answer."):
+        with patch.object(engine, "_call_api_provider_async", return_value="Detailed answer."):
             intent = _make_classification("factual", confidence=0.88)
             route = _make_route("AUGMENTED", "openai", "paid", confidence=0.88)
             ctx = {
                 "question": "Explain quantum computing.",
                 "surface": "voice",
             }
-            result = engine.execute(intent, route, context=ctx, use_python_path=True)
+            result = engine.execute(intent, route, context=ctx)
 
         assert result.status == "completed"
 
@@ -327,7 +322,7 @@ class TestTerminalOutcome:
         )
         route = _make_route("CLARIFY", "local", "local", confidence=0.80)
         ctx = {"question": "What?", "surface": "voice"}
-        result = engine.execute(intent, route, context=ctx, use_python_path=True)
+        result = engine.execute(intent, route, context=ctx)
 
         assert result.status == "completed"
         assert result.route == "CLARIFY"
@@ -360,24 +355,20 @@ class TestTerminalOutcome:
 class TestStateConsistency:
     def test_consistency_passes_when_both_match(self, engine, tmp_state_dir):
         """When SQLite and files agree, verify_state_consistency should return True."""
-        with patch.object(engine, "_call_single_provider", return_value="Answer."):
+        with patch.object(engine, "_call_api_provider_async", return_value="Answer."):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
-            engine.execute(
-                intent, route, context={"question": "Hello", "surface": "hmi"}, use_python_path=True
-            )
+            engine.execute(intent, route, context={"question": "Hello", "surface": "hmi"})
 
         engine.state_manager.read_last_route.return_value = {"strategy": "LOCAL"}
         assert engine.verify_state_consistency() is True
 
     def test_consistency_fails_on_mismatch(self, engine, tmp_state_dir):
         """When SQLite and files disagree, verify_state_consistency should return False."""
-        with patch.object(engine, "_call_single_provider", return_value="Answer."):
+        with patch.object(engine, "_call_api_provider_async", return_value="Answer."):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
-            engine.execute(
-                intent, route, context={"question": "Hello", "surface": "hmi"}, use_python_path=True
-            )
+            engine.execute(intent, route, context={"question": "Hello", "surface": "hmi"})
 
         engine.state_manager.read_last_route.return_value = {"strategy": "AUGMENTED"}
         assert engine.verify_state_consistency() is False
@@ -465,14 +456,13 @@ class TestFullVoiceTurn:
         engine.state_manager = MagicMock()
         engine.state_writer.state_manager = engine.state_manager
 
-        with patch.object(engine, "_call_local_worker", _fake_local_worker):
+        with patch.object(engine, "_call_local_model_async", _fake_local_model_async):
             intent = _make_classification("local_answer")
             route = _make_route("LOCAL", "local", "local")
             result = engine.execute(
                 intent,
                 route,
                 context={"question": "What is 2+2?", "surface": "voice"},
-                use_python_path=True,
             )
 
         assert result.status == "completed"
@@ -506,17 +496,10 @@ class TestFullVoiceTurn:
         engine.state_manager = MagicMock()
         engine.state_writer.state_manager = engine.state_manager
 
-        with (
-            patch.object(
-                engine,
-                "_fetch_evidence",
-                return_value={"ok": True, "formatted": "Sunny, 22°C in Paris"},
-            ),
-            patch.object(
-                engine,
-                "_call_local_worker",
-                lambda q, env=None: _fake_local_worker(q, env, stdout="Sunny, 22°C in Paris"),
-            ),
+        with patch.object(
+            engine,
+            "_fetch_evidence",
+            return_value={"ok": True, "formatted": "Sunny, 22°C in Paris"},
         ):
             intent = _make_classification("weather", confidence=0.97)
             route = _make_route("WEATHER", "weather", "free", confidence=0.97)
@@ -524,7 +507,6 @@ class TestFullVoiceTurn:
                 intent,
                 route,
                 context={"question": "Weather in Paris?", "surface": "voice"},
-                use_python_path=True,
             )
 
         assert result.status == "completed"
