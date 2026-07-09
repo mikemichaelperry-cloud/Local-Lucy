@@ -24,11 +24,18 @@ class TestSingleAuthoritativePath:
     def test_main_run_exists_as_unified_entry(self):
         """main.run() must exist as a callable unified entry point."""
         from router_py.main import run
+
         assert callable(run)
 
     def test_hmi_bridge_uses_main_run_not_direct_engine(self):
         """HMI bridge must call main.run(), not instantiate ExecutionEngine directly."""
-        source = Path(__file__).resolve().parent.parent.parent / "ui-v10" / "app" / "services" / "runtime_bridge.py"
+        source = (
+            Path(__file__).resolve().parent.parent.parent
+            / "ui-v10"
+            / "app"
+            / "services"
+            / "runtime_bridge.py"
+        )
         source_text = source.read_text()
         assert "main.run(" in source_text or "from router_py.main import run" in source_text
         assert "ExecutionEngine(" not in source_text
@@ -37,8 +44,11 @@ class TestSingleAuthoritativePath:
         """streaming_voice.py must use main.run(), not instantiate ExecutionEngine directly."""
         import inspect
         from router_py import streaming_voice
+
         source = inspect.getsource(streaming_voice.StreamingVoicePipeline._get_full_response)
-        assert "ExecutionEngine(" not in source, "Voice streaming should not instantiate ExecutionEngine"
+        assert (
+            "ExecutionEngine(" not in source
+        ), "Voice streaming should not instantiate ExecutionEngine"
         assert (
             "main.run(" in source
             or "from router_py.main import run" in source
@@ -50,6 +60,7 @@ class TestSingleAuthoritativePath:
         """voice_tool.py must use main.run(), not instantiate ExecutionEngine directly."""
         import inspect
         from router_py import voice_tool
+
         source = inspect.getsource(voice_tool.VoicePipeline.process_query)
         assert "ExecutionEngine(" not in source, "Voice tool should not instantiate ExecutionEngine"
         assert (
@@ -69,6 +80,7 @@ class TestMemoryTogglePropagation:
         """When memory enabled, prefetch should be attempted."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
         from router_py.classify import _memory_routing_gate
+
         # A follow-up query should trigger the gate when memory is on
         result = _memory_routing_gate("What did I say about him?", "WEATHER")
         assert result == "LOCAL", "Memory gate should override when memory enabled"
@@ -77,13 +89,17 @@ class TestMemoryTogglePropagation:
         """Explicit recall queries route LOCAL even when memory disabled."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "0")
         from router_py.classify import _memory_routing_gate
+
         result = _memory_routing_gate("What did I say about him?", "WEATHER")
-        assert result == "LOCAL", "Explicit recall should route LOCAL so model can explain memory is disabled"
+        assert (
+            result == "LOCAL"
+        ), "Explicit recall should route LOCAL so model can explain memory is disabled"
 
     def test_memory_disabled_no_injection(self, monkeypatch):
         """When memory disabled, no memory should be injected into prompts."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "0")
         from router_py.execution_engine import _load_session_memory_context_with_telemetry
+
         context, telemetry = _load_session_memory_context_with_telemetry("hello")
         assert context == ""
         assert telemetry["memory_context_used"] == "false"
@@ -104,6 +120,7 @@ class TestMemoryRecallQuery:
 
         # Mock SQLite assembly to return empty so we test file-based fallback
         import memory.memory_service as mem_svc
+
         monkeypatch.setattr(
             mem_svc,
             "assemble_context_with_telemetry",
@@ -111,7 +128,10 @@ class TestMemoryRecallQuery:
         )
 
         from router_py.execution_engine import _load_session_memory_context_with_telemetry
-        context, telemetry = _load_session_memory_context_with_telemetry("What is my favorite color?")
+
+        context, telemetry = _load_session_memory_context_with_telemetry(
+            "What is my favorite color?"
+        )
         assert "blue" in context.lower()
         assert telemetry["memory_context_used"] == "true"
 
@@ -123,6 +143,7 @@ class TestMemoryRecallQuery:
         monkeypatch.setenv("LUCY_CHAT_MEMORY_FILE", str(mem_file))
 
         from router_py.classify import classify_intent, select_route
+
         cl = classify_intent("What is my favorite color?", surface="cli")
         decision = select_route(cl, policy="fallback_only", query="What is my favorite color?")
         assert decision.route in ("LOCAL", "AUGMENTED", "MEMORY_RECALL")
@@ -137,6 +158,7 @@ class TestMemoryMustNotOverrideLiveData:
         """Weather query should stay WEATHER even with stale memory."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
         from router_py.classify import _memory_routing_gate
+
         # "weather" keyword should prevent override
         result = _memory_routing_gate("What's the weather?", "WEATHER")
         assert result is None, "Weather keyword must preserve WEATHER route"
@@ -145,6 +167,7 @@ class TestMemoryMustNotOverrideLiveData:
         """News query should stay NEWS even with stale memory."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
         from router_py.classify import _memory_routing_gate
+
         result = _memory_routing_gate("Today's headlines?", "NEWS")
         assert result is None, "News keyword must preserve NEWS route"
 
@@ -152,6 +175,7 @@ class TestMemoryMustNotOverrideLiveData:
         """Time query should stay TIME even with stale memory."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
         from router_py.classify import _memory_routing_gate
+
         result = _memory_routing_gate("What time is it?", "TIME")
         assert result is None, "Time keyword must preserve TIME route"
 
@@ -167,8 +191,11 @@ class TestProviderPreferencePropagation:
         monkeypatch.setenv("LUCY_AUGMENTED_PROVIDER", provider)
         from router_py.provider_resolver import resolve_provider
         from router_py.request_types import ClassificationResult
+
         classification = ClassificationResult(
-            intent="test", intent_family="test", confidence=0.5,
+            intent="test",
+            intent_family="test",
+            confidence=0.5,
         )
         result = resolve_provider(classification)
         assert result == provider
@@ -178,8 +205,11 @@ class TestProviderPreferencePropagation:
         monkeypatch.setenv("LUCY_AUGMENTED_PROVIDER", "openai")
         from router_py.provider_resolver import resolve_provider
         from router_py.request_types import ClassificationResult
+
         classification = ClassificationResult(
-            intent="test", intent_family="test", confidence=0.5,
+            intent="test",
+            intent_family="test",
+            confidence=0.5,
             evidence_reason="medical_context",
         )
         result = resolve_provider(classification)
@@ -190,8 +220,11 @@ class TestProviderPreferencePropagation:
         monkeypatch.delenv("LUCY_AUGMENTED_PROVIDER", raising=False)
         from router_py.provider_resolver import resolve_provider
         from router_py.request_types import ClassificationResult
+
         classification = ClassificationResult(
-            intent="test", intent_family="background_overview", confidence=0.5,
+            intent="test",
+            intent_family="background_overview",
+            confidence=0.5,
         )
         result = resolve_provider(classification)
         assert result == "wikipedia"
@@ -209,23 +242,36 @@ class TestProviderFailureIsNotRouteCorrection:
         from router_py.classify import ClassificationResult, RoutingDecision
 
         engine = ExecutionEngine(config={"timeout": 30})
+
         # Force weather provider to return no evidence (simulating failure)
         async def _noop(*a, **k):
             return None
+
         engine._fetch_weather_evidence = _noop
 
         classification = ClassificationResult(
-            intent="weather", intent_family="current_evidence", confidence=0.9,
-            surface="cli", needs_web=True,
+            intent="weather",
+            intent_family="current_evidence",
+            confidence=0.9,
+            surface="cli",
+            needs_web=True,
         )
         decision = RoutingDecision(
-            route="WEATHER", mode="AUTO", intent_family="current_evidence",
-            confidence=0.9, provider="weather", provider_usage_class="free",
-            evidence_mode="required", evidence_reason="weather_query",
-            requires_evidence=True, policy_reason="test",
+            route="WEATHER",
+            mode="AUTO",
+            intent_family="current_evidence",
+            confidence=0.9,
+            provider="weather",
+            provider_usage_class="free",
+            evidence_mode="required",
+            evidence_reason="weather_query",
+            requires_evidence=True,
+            policy_reason="test",
             ephemeral=True,
         )
-        result = engine.execute(classification, decision, {"question": "What's the weather?"}, use_python_path=True)
+        result = engine.execute(
+            classification, decision, {"question": "What's the weather?"}, use_python_path=True
+        )
         assert result.route == "WEATHER", f"Expected WEATHER, got {result.route}"
 
     def test_news_provider_failure_preserves_route(self, monkeypatch):
@@ -235,23 +281,36 @@ class TestProviderFailureIsNotRouteCorrection:
         from router_py.classify import ClassificationResult, RoutingDecision
 
         engine = ExecutionEngine(config={"timeout": 30})
+
         # Force news provider to return no evidence (simulating failure)
         async def _noop(*a, **k):
             return None
+
         engine._fetch_news_evidence = _noop
 
         classification = ClassificationResult(
-            intent="news", intent_family="current_evidence", confidence=0.9,
-            surface="cli", needs_web=True,
+            intent="news",
+            intent_family="current_evidence",
+            confidence=0.9,
+            surface="cli",
+            needs_web=True,
         )
         decision = RoutingDecision(
-            route="NEWS", mode="AUTO", intent_family="current_evidence",
-            confidence=0.9, provider="news", provider_usage_class="free",
-            evidence_mode="required", evidence_reason="news_query",
-            requires_evidence=True, policy_reason="test",
+            route="NEWS",
+            mode="AUTO",
+            intent_family="current_evidence",
+            confidence=0.9,
+            provider="news",
+            provider_usage_class="free",
+            evidence_mode="required",
+            evidence_reason="news_query",
+            requires_evidence=True,
+            policy_reason="test",
             ephemeral=True,
         )
-        result = engine.execute(classification, decision, {"question": "Latest news?"}, use_python_path=True)
+        result = engine.execute(
+            classification, decision, {"question": "Latest news?"}, use_python_path=True
+        )
         assert result.route == "NEWS", f"Expected NEWS, got {result.route}"
 
     def test_augmented_provider_failure_preserves_route(self, monkeypatch):
@@ -262,19 +321,32 @@ class TestProviderFailureIsNotRouteCorrection:
 
         engine = ExecutionEngine(config={"timeout": 30})
         # Force augmented provider to raise an exception
-        engine._call_api_provider_async = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("Provider down"))
+        engine._call_api_provider_async = lambda *a, **k: (_ for _ in ()).throw(
+            RuntimeError("Provider down")
+        )
 
         classification = ClassificationResult(
-            intent="factual", intent_family="background_overview", confidence=0.9,
-            surface="cli", needs_web=True,
+            intent="factual",
+            intent_family="background_overview",
+            confidence=0.9,
+            surface="cli",
+            needs_web=True,
         )
         decision = RoutingDecision(
-            route="AUGMENTED", mode="AUTO", intent_family="background_overview",
-            confidence=0.9, provider="openai", provider_usage_class="paid",
-            evidence_mode="required", evidence_reason="factual_query",
-            requires_evidence=True, policy_reason="test",
+            route="AUGMENTED",
+            mode="AUTO",
+            intent_family="background_overview",
+            confidence=0.9,
+            provider="openai",
+            provider_usage_class="paid",
+            evidence_mode="required",
+            evidence_reason="factual_query",
+            requires_evidence=True,
+            policy_reason="test",
         )
-        result = engine.execute(classification, decision, {"question": "Explain quantum physics"}, use_python_path=True)
+        result = engine.execute(
+            classification, decision, {"question": "Explain quantum physics"}, use_python_path=True
+        )
         assert result.route == "AUGMENTED", f"Expected AUGMENTED, got {result.route}"
 
 
@@ -289,7 +361,15 @@ class TestExplicitUserCorrection:
         feedback_file = tmp_path / "user_feedback.jsonl"
         monkeypatch.setenv("LUCY_USER_FEEDBACK_FILE", str(feedback_file))
 
+        # Seed the feedback buffer so the correction has a prior exchange to
+        # attribute to. This keeps the test independent of disk/global state.
+        from router_py.feedback_buffer import get_buffer
+
+        buf = get_buffer()
+        buf.append("What is the weather in London?", "WEATHER", "weather_query", "Sunny, 22C", 0.95)
+
         from router_py.main import run
+
         result = run("That should have been WEATHER", surface="cli")
         assert result.outcome_code == "feedback_acknowledged"
         # After running, check that feedback was logged
@@ -301,6 +381,7 @@ class TestExplicitUserCorrection:
         """'That was wrong' should log negative feedback."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "0")
         from router_py.main import run
+
         result = run("That was wrong", surface="cli")
         assert result.outcome_code == "feedback_acknowledged"
 
@@ -315,6 +396,7 @@ class TestNoStaleStateFileFallback:
         # The unified path returns RouterOutcome directly.
         # It should not read last_outcome.env or last_route.env as authoritative.
         from router_py.main import run
+
         result = run("What is 2+2?", surface="cli", timeout=30)
         # Result must have been produced by the current execution
         assert result.request_id != ""

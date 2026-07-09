@@ -254,7 +254,7 @@ _CURRENT_FACT_MARKERS = {"current", "latest", "now", "today", "price"}
 def _is_current_fact_query(question: str) -> bool:
     """Return True when the query asks for current/latest/real-time information."""
     norm = re.sub(r"\s+", " ", (question or "").lower().strip())
-    return any(marker in norm for marker in _CURRENT_FACT_MARKERS)
+    return any(re.search(rf"\b{re.escape(marker)}\b", norm) for marker in _CURRENT_FACT_MARKERS)
 
 
 def _evidence_has_content(evidence: dict[str, Any] | None) -> bool:
@@ -884,8 +884,9 @@ class ExecutionEngine:
             self._record_request_metrics(context, route, result, execution_time)
             return result
 
-        # Use Python-native path by default for all routes (shell-free)
-        # Following burn-in certification (2,221+ queries, 100% success)
+        # Use Python-native path when requested. The runtime pipeline passes
+        # use_python_path=True, so this is the active execution path for normal
+        # requests. The shell-based path remains available as a fallback.
         if use_python_path and route.route in (
             "FULL",
             "EVIDENCE",
@@ -2448,7 +2449,7 @@ class ExecutionEngine:
                 response = await self._call_local_model_async(
                     prompt, context, session_memory, route_mode=route.route
                 )
-            if route.provider in ("openai", "kimi"):
+            elif route.provider in ("openai", "kimi"):
                 # Prepend session memory to the prompt so API providers also see it
                 api_prompt = prompt
                 if session_memory.strip():
@@ -2605,6 +2606,12 @@ class ExecutionEngine:
             news_ev = await self._fetch_news_evidence(question, for_voice=for_voice)
             if news_ev:
                 return news_ev
+
+        # EVIDENCE route (medical, veterinary, legal high-stakes): strict trusted
+        # sources only. Do NOT race Wikipedia/OpenAI/Kimi for these queries.
+        if route.route == "EVIDENCE":
+            self._logger.info("EVIDENCE route: using strict trusted sources only")
+            return await self._fetch_trusted_evidence(question, route)
 
         primary = route.provider
         if primary == "none" or not primary:
@@ -2863,11 +2870,11 @@ class ExecutionEngine:
         provider: str,
     ) -> dict[str, Any] | None:
         """Fetch evidence from API provider (Kimi or OpenAI) (delegated to provider module)."""
-        breaker = get_breaker("api_provider")
+        breaker = get_breaker(f"api_provider_{provider}")
         try:
             breaker._before_call()
         except CircuitBreakerOpen:
-            self._logger.warning("Circuit breaker open for api_provider")
+            self._logger.warning(f"Circuit breaker open for api_provider_{provider}")
             return None
         try:
             if HAS_PROVIDER_MODULES:
@@ -2936,12 +2943,12 @@ class ExecutionEngine:
         context: dict[str, Any],
     ) -> str:
         """Call API provider asynchronously (OpenAI or Kimi) (delegated to provider module)."""
-        breaker = get_breaker("api_provider")
+        breaker = get_breaker(f"api_provider_{provider}")
         try:
             breaker._before_call()
         except CircuitBreakerOpen:
-            self._logger.warning("Circuit breaker open for api_provider")
-            return "Error: API provider circuit breaker is OPEN."
+            self._logger.warning(f"Circuit breaker open for api_provider_{provider}")
+            return f"Error: API provider circuit breaker is OPEN for {provider}."
         self._logger.debug(f"Calling {provider} API async with prompt: {prompt[:50]}...")
         if not HAS_PROVIDER_MODULES:
             return "Error: Provider modules not available"
@@ -3312,7 +3319,8 @@ class ExecutionEngine:
         self._logger.info(f"Trying provider: {provider}")
 
         # Circuit breaker for augmented provider subprocess
-        breaker = get_breaker("augmented_provider")
+        breaker_name = f"augmented_provider_{provider}"
+        breaker = get_breaker(breaker_name)
         try:
             breaker._before_call()
         except CircuitBreakerOpen:
@@ -3324,7 +3332,7 @@ class ExecutionEngine:
                 provider=provider,
                 provider_usage_class=self._provider_usage_class_for(provider),
                 error_message=f"Circuit breaker open for provider {provider}",
-                metadata={"provider": provider, "circuit_breaker": "augmented_provider"},
+                metadata={"provider": provider, "circuit_breaker": breaker_name},
             )
 
         # Prepare environment for subprocess with namespace isolation
