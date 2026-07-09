@@ -9,6 +9,7 @@ Usage:
     from web_extract import extract_webpage
     text = extract_webpage("https://medlineplus.gov/appendicitis.html", max_chars=2500)
 """
+
 from __future__ import annotations
 
 import os
@@ -19,10 +20,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Allow importing extract_text as fallback
+# Allow importing extract_text and fetch_gate from this directory
 _FALLBACK_DIR = Path(__file__).resolve().parent
 if str(_FALLBACK_DIR) not in sys.path:
     sys.path.insert(0, str(_FALLBACK_DIR))
+
+import fetch_gate  # noqa: E402
 
 
 def _find_webclaw() -> Path | None:
@@ -69,7 +72,9 @@ def _strip_toc_nav(text: str) -> str:
     return text.strip()
 
 
-def _is_substantive_content(text: str, min_sentences: int = 3, max_bullet_ratio: float = 0.55) -> bool:
+def _is_substantive_content(
+    text: str, min_sentences: int = 3, max_bullet_ratio: float = 0.55
+) -> bool:
     """Return True if text appears to be substantive article content, not just TOC/nav.
 
     Detects landing pages and navigation indexes that masquerade as long content
@@ -80,7 +85,7 @@ def _is_substantive_content(text: str, min_sentences: int = 3, max_bullet_ratio:
     if not text or len(text) < 200:
         return False
 
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
     if not lines:
         return False
 
@@ -100,7 +105,7 @@ def _is_substantive_content(text: str, min_sentences: int = 3, max_bullet_ratio:
     bullet_ratio = bullet_like / total_lines if total_lines else 0
 
     # Count paragraph-like lines: long lines with periods
-    paragraph_like = sum(1 for l in lines if len(l) > 60 and "." in l)
+    paragraph_like = sum(1 for line in lines if len(line) > 60 and "." in line)
 
     # Repeated TOC pattern (e.g. "For More Information" appearing many times)
     toc_ref_count = text.lower().count("for more information")
@@ -247,7 +252,15 @@ def _extract_with_webclaw(url: str, timeout: int = 20) -> str | None:
         return None
     try:
         result = subprocess.run(
-            [str(binary), url, "--format", "text", "--only-main-content", "--timeout", str(timeout)],
+            [
+                str(binary),
+                url,
+                "--format",
+                "text",
+                "--only-main-content",
+                "--timeout",
+                str(timeout),
+            ],
             capture_output=True,
             text=True,
             timeout=timeout + 5,
@@ -263,32 +276,23 @@ def _extract_with_webclaw(url: str, timeout: int = 20) -> str | None:
 
 
 def _extract_with_fallback(url: str, timeout: int = 20) -> str | None:
-    """Fallback: fetch via gate + legacy html_to_text."""
-    root = Path(__file__).resolve().parents[2]
-    gate = root / "tools" / "internet" / "run_fetch_with_gate.sh"
-    if not gate.exists():
-        return None
+    """Fallback: fetch via pure-Python gate + legacy html_to_text."""
     try:
-        result = subprocess.run(
-            [str(gate), url],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if result.returncode != 0:
+        reason, html = fetch_gate.fetch_url_text(url, timeout=timeout)
+        if reason != fetch_gate.OK or not html:
             return None
-        html = result.stdout
-        if not html or len(html) < 200:
+        if len(html) < 200:
             return None
         # Use legacy extractor
         try:
             from extract_text import html_to_text
+
             text = html_to_text(html)
             if text and len(text) > 100:
                 return text
         except Exception:
             return None
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    except Exception:
         pass
     return None
 

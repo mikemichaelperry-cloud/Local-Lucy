@@ -16,6 +16,16 @@ import urllib.parse
 import urllib.request
 from typing import Dict, List, Tuple
 
+_INTERNET_DIR = os.path.join(os.path.dirname(__file__), "..", "internet")
+if os.path.isdir(_INTERNET_DIR) and _INTERNET_DIR not in sys.path:
+    sys.path.insert(0, _INTERNET_DIR)
+try:
+    import fetch_gate
+
+    HAS_FETCH_GATE = True
+except Exception:
+    HAS_FETCH_GATE = False
+
 OK = "OK"
 FAIL_DNS = "FAIL_DNS"
 FAIL_CONNECT = "FAIL_CONNECT"
@@ -55,13 +65,10 @@ def detect_root() -> str:
             fail(f"LUCY_ROOT failed marker check: {root}")
         return root
     script_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    if (
-        os.path.isdir(script_root)
-        and (
-            os.path.isfile(os.path.join(script_root, "lucy_chat.sh"))
-            or os.path.isdir(os.path.join(script_root, "tools"))
-            or os.path.isdir(os.path.join(script_root, "snapshots"))
-        )
+    if os.path.isdir(script_root) and (
+        os.path.isfile(os.path.join(script_root, "lucy_chat.sh"))
+        or os.path.isdir(os.path.join(script_root, "tools"))
+        or os.path.isdir(os.path.join(script_root, "snapshots"))
     ):
         return script_root
     home = os.path.expanduser("~")
@@ -355,54 +362,67 @@ def http_probe(domain: str, probe_paths: List[str]) -> Dict[str, str]:
 def gate_probe(root: str, domain: str, probe_paths: List[str]) -> Dict[str, str]:
     path = probe_paths[0] if probe_paths else "/"
     url = f"https://{domain}{path}"
-    cmd = [os.path.join(root, "tools", "internet", "run_fetch_with_gate.sh"), url]
     timeout_seen = False
     for _ in range(2):
         try:
-            proc = subprocess.run(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=25,
-            )
-            stderr = (proc.stderr or "").strip()
-            meta = {
-                "reason": "",
-                "http_status": "none",
-                "final_url": "",
-                "final_domain": "",
-                "attempts": "",
-                "proto": "",
-                "allowlisted_final": "",
-            }
-            for line in stderr.splitlines():
-                if line.startswith("FETCH_META "):
-                    parts = line.split()
-                    for part in parts[1:]:
-                        if "=" not in part:
-                            continue
-                        k, v = part.split("=", 1)
-                        if k in meta:
-                            meta[k] = v
-            if proc.returncode == 40:
+            if HAS_FETCH_GATE:
+                reason, _body, meta = fetch_gate.fetch_with_meta(url, timeout=25, _emit=False)
+                rc_map = {
+                    fetch_gate.OK: 0,
+                    fetch_gate.FAIL_NOT_ALLOWLISTED: 40,
+                    fetch_gate.FAIL_REDIRECT_BLOCKED: 40,
+                    fetch_gate.FAIL_POLICY: 41,
+                }
+                rc = rc_map.get(reason, 42)
+            else:
+                # Fallback to the legacy shell gate if Python gate is unavailable.
+                cmd = [os.path.join(root, "tools", "internet", "run_fetch_with_gate.sh"), url]
+                proc = subprocess.run(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=25,
+                )
+                rc = proc.returncode  # type: ignore[has-type]
+                meta: Dict[str, str] = {
+                    "reason": "",
+                    "http_status": "none",
+                    "final_url": "",
+                    "final_domain": "",
+                    "attempts": "",
+                    "proto": "",
+                    "allowlisted_final": "",
+                }
+                stderr = (proc.stderr or "").strip()
+                for line in stderr.splitlines():
+                    if line.startswith("FETCH_META "):
+                        parts = line.split()
+                        for part in parts[1:]:
+                            if "=" not in part:
+                                continue
+                            k, v = part.split("=", 1)
+                            if k in meta:
+                                meta[k] = v
+
+            if rc == 40:
                 status = "blocked_allowlist"
-            elif proc.returncode in (0, 22, 42):
+            elif rc in (0, 22, 42):
                 status = "allowed_by_gate"
             else:
                 status = "other_error"
             return {
-                "rc": str(proc.returncode),
+                "rc": str(rc),
                 "status": status,
-                "stderr": stderr[:500],
+                "stderr": "",
                 "probe_path": path,
-                "reason_bucket": meta["reason"] or FAIL_UNKNOWN,
-                "meta_http_status": meta["http_status"] or "none",
-                "meta_final_url": meta["final_url"],
-                "meta_final_domain": meta["final_domain"],
-                "meta_attempts": meta["attempts"],
-                "meta_proto": meta["proto"],
-                "meta_allowlisted_final": meta["allowlisted_final"],
+                "reason_bucket": str(meta.get("reason") or FAIL_UNKNOWN),
+                "meta_http_status": str(meta.get("http_status") or "none"),
+                "meta_final_url": str(meta.get("final_url") or ""),
+                "meta_final_domain": str(meta.get("final_domain") or ""),
+                "meta_attempts": str(meta.get("attempts") or ""),
+                "meta_proto": str(meta.get("proto") or ""),
+                "meta_allowlisted_final": str(meta.get("allowlisted_final") or ""),
             }
         except subprocess.TimeoutExpired:
             timeout_seen = True
@@ -557,7 +577,9 @@ def probe_one(
     gate_ok = gate["status"] == expected_gate
     gate_failure_class = classify_gate_failure(gate, expected_gate)
 
-    exp_pass, exp_via, exp_reason = evaluate_expectation(mode, dns_ok, tcp_ok, http, tcp_reason, gate)
+    exp_pass, exp_via, exp_reason = evaluate_expectation(
+        mode, dns_ok, tcp_ok, http, tcp_reason, gate
+    )
 
     final_status_code = http["status"] if http["status"] else "none"
     if final_status_code == "none" and gate.get("meta_http_status"):
@@ -642,7 +664,9 @@ def write_csv(path: str, rows: List[Dict[str, str]]) -> None:
             f.write(",".join(vals) + "\n")
 
 
-def write_markdown(path: str, rows: List[Dict[str, str]], root: str, policy_tiers: List[int]) -> None:
+def write_markdown(
+    path: str, rows: List[Dict[str, str]], root: str, policy_tiers: List[int]
+) -> None:
     total = len(rows)
     gate_fail = [r for r in rows if r["gate_ok"] != "true"]
     probe_fail = [r for r in rows if r["probe_pass"] != "true"]
@@ -714,7 +738,9 @@ def write_markdown(path: str, rows: List[Dict[str, str]], root: str, policy_tier
                 f.write(f"- `{r['domain']}` -> `{r['final_host']}`\n")
 
         f.write("\n## Domain Results\n")
-        f.write("| domain | tier | expectation | probe_host | probe_pass | result_type | failure_bucket | final_status_code | dns | tcp | http | final_host | gate |\n")
+        f.write(
+            "| domain | tier | expectation | probe_host | probe_pass | result_type | failure_bucket | final_status_code | dns | tcp | http | final_host | gate |\n"
+        )
         f.write("|---|---:|---|---|---|---|---|---|---|---|---|---|---|\n")
         for r in rows:
             http = "ok" if r["http_ok"] == "true" else f"fail:{r['http_reason_bucket']}"

@@ -4,10 +4,12 @@ from __future__ import annotations
 # This HMI bridge intentionally lives in the shared UI tree outside any single
 # snapshot. Runtime authority remains pinned to snapshot-local backend tools.
 
+import contextlib
 import fcntl
+import importlib
+import io
 import json
 import os
-import subprocess
 import sys
 import threading
 import time
@@ -15,7 +17,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
@@ -190,32 +192,24 @@ class RuntimeBridge:
         if explicit:
             return explicit
 
-        adapter_tool = self.snapshot_root / "tools" / "voice" / "tts_adapter.py"
         candidates = [
             self._workspace_root() / "ui-v10" / ".venv" / "bin" / "python3",
         ]
-        for candidate in candidates:
-            if not candidate.exists() or not candidate.is_file():
-                continue
-            if adapter_tool.exists():
-                try:
-                    completed = subprocess.run(
-                        [str(candidate), str(adapter_tool), "probe", "--engine", "kokoro"],
-                        check=False,
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                        shell=False,
-                    )
-                    payload = self._extract_payload(completed.stdout)
-                    if (
-                        isinstance(payload, dict)
-                        and payload.get("ok")
-                        and payload.get("engine") == "kokoro"
-                    ):
+        # Direct Python probe (avoids subprocess hop); failure is non-fatal.
+        try:
+            with self._runtime_env():
+                tts_adapter = self._import_tool("voice.tts_adapter")
+                payload = tts_adapter.probe_backend(requested_engine="kokoro")
+            if (
+                isinstance(payload, dict)
+                and payload.get("ok")
+                and payload.get("engine") == "kokoro"
+            ):
+                for candidate in candidates:
+                    if candidate.exists() and candidate.is_file():
                         return str(candidate)
-                except (OSError, subprocess.TimeoutExpired):
-                    continue
+        except Exception:
+            pass
         for candidate in candidates:
             if candidate.exists() and candidate.is_file():
                 return str(candidate)
@@ -275,6 +269,30 @@ class RuntimeBridge:
             "LUCY_ROUTER_LOG_DIR", os.environ.get("LUCY_ROUTER_LOG_DIR", default_log_dir)
         )
         return env
+
+    def _import_tool(self, module_name: str) -> Any:
+        """Lazily import a module from the snapshot tools directory.
+
+        Imports happen inside methods so that modules which set global state or
+        run side effects at import time do not affect HMI startup.
+        """
+        tools_path = str(self.snapshot_root / "tools")
+        if tools_path not in sys.path:
+            sys.path.insert(0, tools_path)
+        return importlib.import_module(module_name)
+
+    @contextlib.contextmanager
+    def _runtime_env(self, *, include_voice_python: bool = False) -> Iterator[None]:
+        """Apply the same environment defaults used for subprocess calls.
+
+        Only adds missing keys so the current process env is not overwritten.
+        Keys are left in place after the call to avoid thread races and because
+        they represent global runtime defaults that direct calls should see.
+        """
+        env = self._command_env(include_voice_python=include_voice_python)
+        for key, value in env.items():
+            os.environ.setdefault(key, value)
+        yield
 
     def _resolve_snapshot_root(self) -> Path:
         override = (os.environ.get(self.authority_root_env) or "").strip()
@@ -505,52 +523,53 @@ class RuntimeBridge:
                 payload=None,
             )
 
-        command = self._build_command(action, requested_value)
-        if command is None:
+        return self._run_control_action_direct(action, requested_value)
+
+    _CONTROL_ACTION_MAP: dict[str, tuple[str, str]] = {
+        "mode_selection": ("set-mode", "mode"),
+        "conversation_toggle": ("set-conversation", "conversation"),
+        "memory_toggle": ("set-memory", "memory"),
+        "evidence_toggle": ("set-evidence", "evidence"),
+        "voice_toggle": ("set-voice", "voice"),
+        "augmentation_policy": ("set-augmentation", "augmentation_policy"),
+        "augmented_provider": ("set-augmented-provider", "augmented_provider"),
+        "model_selection": ("set-model", "model"),
+        "learner_toggle": ("set-learner", "learner"),
+    }
+
+    def _run_control_action_direct(self, action: str, requested_value: str) -> CommandResult:
+        command_name, field = self._CONTROL_ACTION_MAP[action]
+        try:
+            with self._runtime_env():
+                runtime_control = self._import_tool("runtime_control")
+                state_file = runtime_control.resolve_runtime_paths(None).state_file
+                if action == "learner_toggle":
+                    result = runtime_control.update_learner_state(state_file, requested_value)
+                else:
+                    result = runtime_control.update_state_field(state_file, field, requested_value)
+                payload: dict[str, Any] = {
+                    "ok": True,
+                    "action": command_name,
+                    "field": result.field,
+                    "value": result.value,
+                    "changed": result.changed,
+                    "state_file": str(state_file),
+                    "state": result.state,
+                }
+                stdout = json.dumps(payload, sort_keys=True)
+        except Exception as exc:
             return CommandResult(
                 action=action,
                 requested_value=requested_value,
-                status="unavailable",
-                returncode=None,
+                status="failed",
+                returncode=1,
                 stdout="",
-                stderr=f"no command mapping for {action}",
+                stderr=str(exc),
                 timed_out=False,
                 payload=None,
             )
 
-        try:
-            completed = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=self.control_timeout_seconds,
-                shell=False,
-            )
-        except subprocess.TimeoutExpired as exc:
-            return CommandResult(
-                action=action,
-                requested_value=requested_value,
-                status="timeout",
-                returncode=None,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
-                timed_out=True,
-                payload=None,
-            )
-
-        status = "ok" if completed.returncode == 0 else "failed"
-        result = CommandResult(
-            action=action,
-            requested_value=requested_value,
-            status=status,
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
-            timed_out=False,
-            payload=self._extract_payload(completed.stdout),
-        )
-        if action == "model_selection" and status == "ok":
+        if action == "model_selection":
             # Evict every other loaded model immediately so the user does not
             # see stale Ollama state. Warm up the selected model afterwards.
             if requested_value and requested_value.lower() != "auto":
@@ -564,7 +583,17 @@ class RuntimeBridge:
                 args=(requested_value,),
                 daemon=True,
             ).start()
-        return result
+
+        return CommandResult(
+            action=action,
+            requested_value=requested_value,
+            status="ok",
+            returncode=0,
+            stdout=stdout,
+            stderr="",
+            timed_out=False,
+            payload=payload,
+        )
 
     def _run_profile_action(self, action: str) -> CommandResult:
         if not self.profile_capability.available:
@@ -579,38 +608,33 @@ class RuntimeBridge:
                 payload=None,
             )
 
-        command = ["python3", str(self.profile_tool_path), "reload"]
         try:
-            completed = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=self.profile_timeout_seconds,
-                shell=False,
-            )
-        except subprocess.TimeoutExpired as exc:
+            with self._runtime_env():
+                runtime_profile = self._import_tool("runtime_profile")
+                state_file = runtime_profile.resolve_state_file(None)
+                payload = runtime_profile.reload_profile_state(state_file)
+                stdout = json.dumps(payload, sort_keys=True)
+        except Exception as exc:
             return CommandResult(
                 action=action,
                 requested_value="",
-                status="timeout",
-                returncode=None,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
-                timed_out=True,
+                status="failed",
+                returncode=1,
+                stdout="",
+                stderr=str(exc),
+                timed_out=False,
                 payload=None,
             )
 
-        status = "ok" if completed.returncode == 0 else "failed"
         return CommandResult(
             action=action,
             requested_value="",
-            status=status,
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
+            status="ok",
+            returncode=0,
+            stdout=stdout,
+            stderr="",
             timed_out=False,
-            payload=self._extract_payload(completed.stdout),
+            payload=payload,
         )
 
     def _prime_voice_state(self) -> None:
@@ -618,16 +642,15 @@ class RuntimeBridge:
             return
         try:
             # Check voice status (fast, keep synchronous)
-            subprocess.run(
-                ["python3", str(self.voice_tool_path), "status"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=self.voice_status_timeout_seconds,
-                shell=False,
-                env=self._command_env(include_voice_python=True),
-            )
-        except (OSError, subprocess.TimeoutExpired):
+            with self._runtime_env(include_voice_python=True):
+                runtime_voice = self._import_tool("runtime_voice")
+                runtime_file = runtime_voice.resolve_voice_runtime_file(None)
+                state_file = runtime_voice.resolve_state_file(None)
+                if runtime_voice.use_python_voice():
+                    runtime_voice.handle_status_python()
+                else:
+                    runtime_voice.sync_voice_runtime(runtime_file, state_file)
+        except Exception:
             return
         # Background prewarm voice workers so UI startup isn't blocked
         threading.Thread(target=self._background_prewarm_voice, daemon=True).start()
@@ -668,7 +691,7 @@ class RuntimeBridge:
     def _unload_ollama_model(self, model: str) -> None:
         """Unload a model from Ollama to free VRAM before loading another.
 
-        Uses both the CLI and the generate API, then polls /api/ps briefly to
+        Uses the Ollama HTTP API (keep_alive=0), then polls /api/ps briefly to
         confirm the model is gone. Failures are ignored — the model may already
         be unloaded or Ollama may not be running.
         """
@@ -677,19 +700,7 @@ class RuntimeBridge:
 
         api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434")
 
-        # Primary: ollama stop is the official way to evict a loaded model.
-        try:
-            subprocess.run(
-                ["ollama", "stop", model],
-                capture_output=True,
-                text=True,
-                timeout=30.0,
-                check=False,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-            pass
-
-        # Secondary: generate request with keep_alive=0. Some Ollama versions
+        # Primary: generate request with keep_alive=0. Some Ollama versions
         # unload more reliably via the API, especially while a model is busy.
         body = {
             "model": model,
@@ -780,101 +791,49 @@ class RuntimeBridge:
 
     def _background_prewarm_voice(self) -> None:
         """Prewarm TTS and STT workers in the background to eliminate cold-start latency."""
-        env = self._command_env(include_voice_python=True)
-        # Prewarm Kokoro TTS worker (~2s on cold start)
         try:
-            subprocess.run(
-                ["python3", str(self.voice_tool_path), "internal-prewarm-tts"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                shell=False,
-                env=env,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            pass
-        # Prewarm Whisper STT server (~3-5s on cold start for CPU mode)
-        try:
-            subprocess.run(
-                ["python3", str(self.voice_tool_path), "internal-prewarm-stt"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                shell=False,
-                env=env,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            pass
+            with self._runtime_env(include_voice_python=True):
+                runtime_voice = self._import_tool("runtime_voice")
+                runtime_file = runtime_voice.resolve_voice_runtime_file(None)
+                state_file = runtime_voice.resolve_state_file(None)
 
-    def _build_command(self, action: str, requested_value: str) -> list[str] | None:
-        command_map = {
-            "mode_selection": [
-                "python3",
-                str(self.control_tool_path),
-                "set-mode",
-                "--value",
-                requested_value,
-            ],
-            "conversation_toggle": [
-                "python3",
-                str(self.control_tool_path),
-                "set-conversation",
-                "--value",
-                requested_value,
-            ],
-            "memory_toggle": [
-                "python3",
-                str(self.control_tool_path),
-                "set-memory",
-                "--value",
-                requested_value,
-            ],
-            "evidence_toggle": [
-                "python3",
-                str(self.control_tool_path),
-                "set-evidence",
-                "--value",
-                requested_value,
-            ],
-            "voice_toggle": [
-                "python3",
-                str(self.control_tool_path),
-                "set-voice",
-                "--value",
-                requested_value,
-            ],
-            "augmentation_policy": [
-                "python3",
-                str(self.control_tool_path),
-                "set-augmentation",
-                "--value",
-                requested_value,
-            ],
-            "augmented_provider": [
-                "python3",
-                str(self.control_tool_path),
-                "set-augmented-provider",
-                "--value",
-                requested_value,
-            ],
-            "model_selection": [
-                "python3",
-                str(self.control_tool_path),
-                "set-model",
-                "--value",
-                requested_value,
-            ],
-            "learner_toggle": [
-                "python3",
-                str(self.control_tool_path),
-                "set-learner",
-                "--value",
-                requested_value,
-            ],
-        }
-        return command_map.get(action)
+                # Prewarm Kokoro TTS worker (~2s on cold start)
+                try:
+                    backend = runtime_voice.detect_backend()
+                    if backend.tts_engine == "kokoro":
+                        runtime_voice.prewarm_kokoro_worker()
+                        # Update voice runtime state so UI reflects the detected TTS backend
+                        if backend.tts_engine != "none":
+                            try:
+                                with runtime_voice.locked_state_file(runtime_file):
+                                    runtime_state = runtime_voice.load_voice_runtime_locked(
+                                        runtime_file
+                                    )
+                                    runtime_state["tts"] = backend.tts_engine
+                                    runtime_state["tts_device"] = backend.tts_device
+                                    runtime_state["audio_player"] = backend.audio_player
+                                    runtime_state["last_updated"] = runtime_voice.iso_now()
+                                    runtime_voice.write_voice_runtime(runtime_file, runtime_state)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+                # Prewarm Whisper STT server (~3-5s on cold start for CPU mode)
+                try:
+                    backend = runtime_voice.detect_backend(include_tts=False)
+                    ensure_whisper_worker = getattr(runtime_voice, "ensure_whisper_worker", None)
+                    if (
+                        ensure_whisper_worker is not None
+                        and backend.stt_engine == "whisper"
+                        and backend.available
+                    ):
+                        model_path = runtime_voice.resolve_whisper_model_path()
+                        ensure_whisper_worker(model_path)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def _run_submit_request(
         self,
@@ -1290,38 +1249,42 @@ class RuntimeBridge:
                 payload=None,
             )
 
-        command = ["python3", str(self.lifecycle_tool_path), expected_value]
         try:
-            completed = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=self.lifecycle_timeout_seconds,
-                shell=False,
-            )
-        except subprocess.TimeoutExpired as exc:
+            with self._runtime_env():
+                runtime_lifecycle = self._import_tool("runtime_lifecycle")
+                lifecycle_file = runtime_lifecycle.resolve_lifecycle_file(None)
+                if expected_value == "start":
+                    payload = runtime_lifecycle.start_runtime(
+                        lifecycle_file=lifecycle_file,
+                        launcher_path=runtime_lifecycle.resolve_launcher_path(None),
+                        log_file=runtime_lifecycle.resolve_log_file(None),
+                    )
+                else:
+                    payload = runtime_lifecycle.stop_runtime(lifecycle_file)
+                stdout = json.dumps(payload, sort_keys=True)
+                returncode = 0 if payload.get("status") in {"running", "stopped"} else 1
+        except Exception as exc:
             return CommandResult(
                 action=action,
                 requested_value=requested_value,
-                status="timeout",
-                returncode=None,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
-                timed_out=True,
-                payload=self._extract_payload(exc.stdout),
+                status="failed",
+                returncode=1,
+                stdout="",
+                stderr=str(exc),
+                timed_out=False,
+                payload=None,
             )
 
-        status = "ok" if completed.returncode == 0 else "failed"
+        status = "ok" if returncode == 0 else "failed"
         return CommandResult(
             action=action,
             requested_value=requested_value,
             status=status,
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
+            returncode=returncode,
+            stdout=stdout,
+            stderr="",
             timed_out=False,
-            payload=self._extract_payload(completed.stdout),
+            payload=payload,
         )
 
     def _run_voice_action(self, action: str, requested_value: str) -> CommandResult:
@@ -1354,83 +1317,110 @@ class RuntimeBridge:
                 payload=None,
             )
 
-        timeout_seconds = self.voice_status_timeout_seconds
-        if action == "voice_ptt_start":
-            timeout_seconds = self.voice_start_timeout_seconds
-        elif action == "voice_ptt_stop":
-            timeout_seconds = self.voice_stop_timeout_seconds
-
         try:
-            completed = subprocess.run(
-                ["python3", str(self.voice_tool_path), command_name],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-                shell=False,
-                env=self._command_env(include_voice_python=True),
-            )
-        except subprocess.TimeoutExpired as exc:
+            with self._runtime_env(include_voice_python=True):
+                runtime_voice = self._import_tool("runtime_voice")
+                RuntimeVoiceExit = runtime_voice.RuntimeVoiceExit
+                runtime_file = runtime_voice.resolve_voice_runtime_file(None)
+                state_file = runtime_voice.resolve_state_file(None)
+                capture_dir = runtime_voice.resolve_capture_directory(None)
+
+                if action == "voice_status":
+                    if runtime_voice.use_python_voice():
+                        payload = runtime_voice.handle_status_python()
+                    else:
+                        payload = runtime_voice.sync_voice_runtime(runtime_file, state_file)
+                elif action == "voice_ptt_start":
+                    if runtime_voice.use_python_voice():
+                        payload = runtime_voice.handle_ptt_start_python(
+                            runtime_file, state_file, capture_dir
+                        )
+                    else:
+                        payload = runtime_voice.handle_ptt_start(
+                            runtime_file, state_file, capture_dir
+                        )
+                elif action == "voice_ptt_stop":
+                    if runtime_voice.use_python_voice():
+                        payload = runtime_voice.handle_ptt_stop_python(
+                            runtime_file, state_file, capture_dir
+                        )
+                    else:
+                        payload = runtime_voice.handle_ptt_stop(
+                            runtime_file, state_file, capture_dir
+                        )
+                else:
+                    payload = {}
+
+                stdout = json.dumps(payload, sort_keys=True)
+                stderr = ""
+                returncode = 0
+        except RuntimeVoiceExit as exc:
             return CommandResult(
                 action=action,
                 requested_value=requested_value,
-                status="timeout",
-                returncode=None,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
-                timed_out=True,
-                payload=self._extract_payload(exc.stdout),
+                status="failed",
+                returncode=exc.exit_code,
+                stdout="",
+                stderr=exc.message,
+                timed_out=False,
+                payload=None,
+            )
+        except Exception as exc:
+            return CommandResult(
+                action=action,
+                requested_value=requested_value,
+                status="failed",
+                returncode=1,
+                stdout="",
+                stderr=str(exc),
+                timed_out=False,
+                payload=None,
             )
 
-        status = "ok" if completed.returncode == 0 else "failed"
         return CommandResult(
             action=action,
             requested_value=requested_value,
-            status=status,
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
+            status="ok",
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
             timed_out=False,
-            payload=self._extract_payload(completed.stdout),
+            payload=payload,
         )
 
     def _run_clear_persona_action(self) -> CommandResult:
-        """Clear the active user identity/persona via the memory service CLI."""
+        """Clear the active user identity/persona via the memory service."""
         try:
-            completed = subprocess.run(
-                [sys.executable, str(self.memory_tool_path), "--clear-identity"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=self.control_timeout_seconds,
-                shell=False,
-                env=self._command_env(),
-            )
-        except subprocess.TimeoutExpired as exc:
+            with self._runtime_env():
+                memory_service = self._import_tool("memory.memory_service")
+                memory_service.clear_current_user_identity()
+                stdout = "Current user identity cleared.\n"
+                stderr = ""
+                returncode = 0
+        except Exception as exc:
             return CommandResult(
                 action="persona_clear",
                 requested_value=None,
-                status="timeout",
-                returncode=None,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
-                timed_out=True,
+                status="failed",
+                returncode=1,
+                stdout="",
+                stderr=str(exc),
+                timed_out=False,
                 payload=None,
             )
-        status = "ok" if completed.returncode == 0 else "failed"
         return CommandResult(
             action="persona_clear",
             requested_value=None,
-            status=status,
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
+            status="ok",
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
             timed_out=False,
             payload=None,
         )
 
     def _run_set_persona_action(self, requested_value: str) -> CommandResult:
-        """Set the active user identity/persona via the memory service CLI."""
+        """Set the active user identity/persona via the memory service."""
         canonical = requested_value.strip().lower()
         if canonical not in {"michael"}:
             return CommandResult(
@@ -1444,39 +1434,41 @@ class RuntimeBridge:
                 payload=None,
             )
         try:
-            completed = subprocess.run(
-                [
-                    sys.executable,
-                    str(self.memory_tool_path),
-                    "--set-identity",
-                    canonical.capitalize(),
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=self.control_timeout_seconds,
-                shell=False,
-                env=self._command_env(),
-            )
-        except subprocess.TimeoutExpired as exc:
+            with self._runtime_env():
+                memory_service = self._import_tool("memory.memory_service")
+                row_id = memory_service.set_current_user_identity(canonical.capitalize())
+                stdout = f"Current user identity set to: {canonical.capitalize()} (row {row_id})\n"
+                stderr = ""
+                returncode = 0
+        except ValueError as exc:
             return CommandResult(
                 action="persona_set",
                 requested_value=requested_value,
-                status="timeout",
-                returncode=None,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
-                timed_out=True,
+                status="failed",
+                returncode=1,
+                stdout="",
+                stderr=str(exc),
+                timed_out=False,
                 payload=None,
             )
-        status = "ok" if completed.returncode == 0 else "failed"
+        except Exception as exc:
+            return CommandResult(
+                action="persona_set",
+                requested_value=requested_value,
+                status="failed",
+                returncode=1,
+                stdout="",
+                stderr=str(exc),
+                timed_out=False,
+                payload=None,
+            )
         return CommandResult(
             action="persona_set",
             requested_value=requested_value,
-            status=status,
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
+            status="ok",
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
             timed_out=False,
             payload=None,
         )
@@ -1495,39 +1487,35 @@ class RuntimeBridge:
                 payload=None,
             )
         try:
-            # Long voice text (e.g., NEWS with 10 articles) can exceed 60s of audio +
-            # synthesis time. Compute a generous timeout from text length (~8 chars/sec
-            # spoken rate + 30s synthesis headroom), capped at 5 minutes.
-            speak_timeout = max(60, len(text) // 8 + 30)
-            speak_timeout = min(speak_timeout, 300)
-            completed = subprocess.run(
-                ["python3", str(self.voice_tool_path), "speak", "--text", text],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=speak_timeout,
-                shell=False,
-                env=self._command_env(include_voice_python=True),
-            )
-        except subprocess.TimeoutExpired as exc:
+            with self._runtime_env(include_voice_python=True):
+                runtime_voice = self._import_tool("runtime_voice")
+                backend = runtime_voice.detect_backend()
+                stderr_capture = io.StringIO()
+                with contextlib.redirect_stderr(stderr_capture):
+                    tts_status = runtime_voice.speak_response(backend, text)
+                ok = tts_status == "completed"
+                payload = {"ok": ok, "tts_status": tts_status}
+                stdout = json.dumps(payload, sort_keys=True)
+                stderr = stderr_capture.getvalue()
+                returncode = 0 if ok else 1
+        except Exception as exc:
             return CommandResult(
                 action="speak",
                 requested_value=text,
-                status="timeout",
-                returncode=None,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
-                timed_out=True,
-                payload=self._extract_payload(exc.stdout),
+                status="failed",
+                returncode=1,
+                stdout="",
+                stderr=str(exc),
+                timed_out=False,
+                payload=None,
             )
-        status = "ok" if completed.returncode == 0 else "failed"
         return CommandResult(
             action="speak",
             requested_value=text,
-            status=status,
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
+            status="ok" if returncode == 0 else "failed",
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
             timed_out=False,
-            payload=self._extract_payload(completed.stdout),
+            payload=payload,
         )

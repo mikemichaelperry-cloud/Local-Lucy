@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
 import urllib.error
 import urllib.request
 from typing import Any
@@ -57,21 +56,7 @@ def unload_model(name: str) -> bool:
     if not name:
         return False
 
-    # CLI first (most reliable).
-    try:
-        result = subprocess.run(
-            ["ollama", "stop", name],
-            capture_output=True,
-            text=True,
-            timeout=30.0,
-            check=False,
-        )
-        if result.returncode == 0:
-            return True
-    except Exception as e:
-        logger.debug(f"ollama stop {name} failed: {e}")
-
-    # Fallback: API keep_alive=0.
+    # Use the Ollama HTTP API to unload the model immediately.
     body = json.dumps(
         {
             "model": name,

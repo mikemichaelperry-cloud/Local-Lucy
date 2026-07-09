@@ -44,9 +44,9 @@ case "$TOOL" in
   fetch_url|fetch_url_v0)
     if [[ "$is_json" == "1" ]]; then
       url="$(json_get url "$ARGS_JSON")"
-      exec "$LUCY_ROOT/tools/internet/run_fetch_with_gate.sh" "$url"
+      exec python3 "$LUCY_ROOT/tools/internet/fetch_gate.py" "$url"
     else
-      exec "$LUCY_ROOT/tools/internet/run_fetch_with_gate.sh" "$@"
+      exec python3 "$LUCY_ROOT/tools/internet/fetch_gate.py" "$@"
     fi
     ;;
 

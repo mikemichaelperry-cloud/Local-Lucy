@@ -8,9 +8,11 @@ model to the task.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
-import subprocess
+import urllib.error
+import urllib.request
 from functools import lru_cache
 from typing import Any
 
@@ -163,21 +165,13 @@ def _resolve_persona_model(base_model: str, persona: str, available: set[str]) -
 def _ollama_installed_models() -> frozenset[str]:
     """Return installed Ollama model tags, or an empty set if ollama is unreachable."""
     try:
-        result = subprocess.run(
-            ["ollama", "list"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-        if result.returncode != 0:
-            logger.warning("ollama list failed: %s", result.stderr.strip())
-            return frozenset()
+        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=15.0) as response:
+            data = json.loads(response.read().decode("utf-8"))
         tags: set[str] = set()
-        for line in result.stdout.splitlines()[1:]:
-            parts = line.split()
-            if parts:
-                tags.add(parts[0])
+        for entry in data.get("models", []) or []:
+            name = entry.get("name", "")
+            if name:
+                tags.add(name)
         return frozenset(tags)
     except Exception as exc:  # pragma: no cover - ollama may not be installed in CI
         logger.warning("Could not list Ollama models: %s", exc)

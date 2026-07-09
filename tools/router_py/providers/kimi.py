@@ -2,7 +2,6 @@
 
 import json
 import logging
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,75 +10,46 @@ logger = logging.getLogger(__name__)
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 
-def _prepare_subprocess_env(extra: dict[str, str] | None = None) -> dict[str, str]:
-    """Build isolated subprocess environment."""
-    import os
-    env = os.environ.copy()
-    env["STATE_NAMESPACE_RAW"] = os.environ.get("LUCY_SHARED_STATE_NAMESPACE", "")
-    if extra:
-        env.update(extra)
-    return env
+def _ensure_tools_path() -> None:
+    tools_path = str(ROOT_DIR / "tools")
+    if tools_path not in sys.path:
+        sys.path.insert(0, tools_path)
 
 
 def call_kimi_for_response(prompt: str, timeout: float = 130.0) -> str:
     """Call Kimi for direct response (sync version)."""
-    tool = ROOT_DIR / "tools" / "unverified_context_kimi.py"
-    if not tool.exists():
-        return "Error: Kimi tool not found"
     try:
-        result = subprocess.run(
-            [sys.executable, str(tool), prompt],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=_prepare_subprocess_env(),
-            cwd=str(ROOT_DIR),
-        )
-        if result.returncode == 0:
-            payload = json.loads(result.stdout)
-            if payload.get("ok"):
-                return payload.get("text", payload.get("context", "No response"))
-        # Subprocess failed — try to extract reason from stdout JSON first,
-        # then fall back to stderr, then generic message.
+        _ensure_tools_path()
+        import unverified_context_kimi as kimi_provider
+
+        payload = kimi_provider.answer_question(prompt)
+        if payload.get("ok"):
+            return payload.get("text", payload.get("context", "No response"))
         error_detail = ""
-        if result.stdout.strip():
-            try:
-                payload = json.loads(result.stdout)
-                if isinstance(payload, dict) and not payload.get("ok"):
-                    error_detail = payload.get("reason", "")
-            except json.JSONDecodeError:
-                pass
+        if isinstance(payload, dict) and not payload.get("ok"):
+            error_detail = payload.get("reason", "")
         if not error_detail:
-            error_detail = result.stderr.strip() or "Kimi provider failed"
+            error_detail = "Kimi provider failed"
         return f"Error: {error_detail}"
     except Exception as e:
         return f"Error calling Kimi: {e}"
 
 
 def call_kimi_subprocess(question: str, timeout: float = 130.0) -> dict[str, Any] | None:
-    """Call Kimi provider via subprocess for evidence fetching."""
-    tool = ROOT_DIR / "tools" / "unverified_context_kimi.py"
-    if not tool.exists():
-        return None
+    """Call Kimi provider directly for evidence fetching."""
     try:
-        result = subprocess.run(
-            [sys.executable, str(tool), question],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=_prepare_subprocess_env(),
-            cwd=str(ROOT_DIR),
-        )
-        if result.returncode == 0:
-            payload = json.loads(result.stdout)
-            if payload.get("ok"):
-                return {
-                    "context": payload.get("text", payload.get("context", "")),
-                    "title": payload.get("title", ""),
-                    "url": payload.get("url", ""),
-                    "provider": "kimi",
-                    "class": payload.get("class", "kimi_general"),
-                }
+        _ensure_tools_path()
+        import unverified_context_kimi as kimi_provider
+
+        payload = kimi_provider.answer_question(question)
+        if payload.get("ok"):
+            return {
+                "context": payload.get("text", payload.get("context", "")),
+                "title": payload.get("title", ""),
+                "url": payload.get("url", ""),
+                "provider": "kimi",
+                "class": payload.get("class", "kimi_general"),
+            }
     except Exception as e:
-        logger.debug(f"Kimi subprocess failed: {e}")
+        logger.debug(f"Kimi direct call failed: {e}")
     return None

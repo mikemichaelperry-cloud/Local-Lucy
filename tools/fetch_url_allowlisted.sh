@@ -9,7 +9,7 @@ ALLOW_DOMAINS_PRIMARY="$ROOT/config/trust/generated/allowlist_all_tier12.txt"
 ALLOW_DOMAINS_FALLBACK="$ROOT/config/trust/generated/allowlist_fetch.txt"
 ALLOW_DOMAINS=""
 ALLOW_DOMAINS_FILTER="${LUCY_FETCH_ALLOWLIST_FILTER_FILE:-}"
-GATE_FETCH="$ROOT/tools/internet/run_fetch_with_gate.sh"
+GATE_FETCH="$ROOT/tools/internet/fetch_gate.py"
 
 # Hard caps (prevent huge downloads / terminal floods).
 MAX_BYTES="${LUCY_FETCH_MAX_BYTES:-1048576}"
@@ -61,7 +61,7 @@ require_allowlist() {
 }
 
 require_gate() {
-  if [ ! -x "$GATE_FETCH" ]; then
+  if [ ! -f "$GATE_FETCH" ]; then
     echo "ERROR: missing fetch gate: $GATE_FETCH" >&2
     exit 2
   fi
@@ -74,7 +74,7 @@ fetch_html() {
   tmp_err="$(mktemp /tmp/lucy-fetch-err.XXXXXX)"
 
   set +e
-  "$GATE_FETCH" "$url" >"$tmp_html" 2>"$tmp_err"
+  python3 "$GATE_FETCH" "$url" >"$tmp_html" 2>"$tmp_err"
   rc=$?
   set -e
 

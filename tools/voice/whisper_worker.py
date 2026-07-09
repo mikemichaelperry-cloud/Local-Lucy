@@ -38,18 +38,26 @@ def _gpu_available() -> bool:
         return True
     if env_gpu in ("0", "false", "no", "off"):
         return False
-    # Auto-detect via nvidia-smi
+    # Auto-detect via pynvml when available
     try:
-        result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-        if result.returncode == 0 and result.stdout.strip():
+        import pynvml
+
+        pynvml.nvmlInit()
+        try:
+            pynvml.nvmlDeviceGetHandleByIndex(0)
             return True
-    except (OSError, subprocess.TimeoutExpired):
+        finally:
+            pynvml.nvmlShutdown()
+    except Exception:
+        pass
+
+    # Fallback: parse /proc/driver/nvidia/gpus/*/information for a model name
+    try:
+        for info_path in Path("/proc/driver/nvidia/gpus").glob("*/information"):
+            text = info_path.read_text(encoding="utf-8", errors="replace")
+            if "model:" in text.lower():
+                return True
+    except Exception:
         pass
     return False
 

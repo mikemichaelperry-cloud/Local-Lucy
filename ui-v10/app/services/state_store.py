@@ -94,33 +94,28 @@ def _detect_gpu_status() -> dict[str, Any]:
         "model_loaded": False,
     }
 
-    # Check for NVIDIA GPU
+    # Check for NVIDIA GPU via pynvml when available
     try:
-        nvidia_smi = subprocess.run(
-            [
-                "nvidia-smi",
-                "--query-gpu=name,memory.used,memory.total",
-                "--format=csv,noheader,nounits",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=2,
-            check=False,
-        )
-        if nvidia_smi.returncode == 0 and nvidia_smi.stdout.strip():
-            lines = nvidia_smi.stdout.strip().split("\n")
-            if lines:
-                parts = lines[0].split(", ")
-                if len(parts) >= 3:
-                    result["type"] = "nvidia"
-                    result["model"] = parts[0].strip()
-                    result["vram_used_mb"] = int(float(parts[1].strip()))
-                    result["vram_total_mb"] = int(float(parts[2].strip()))
-                    result["available"] = True
-    except (OSError, subprocess.TimeoutExpired, ValueError):
+        import pynvml
+
+        pynvml.nvmlInit()
+        try:
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            name = pynvml.nvmlDeviceGetName(handle)
+            if isinstance(name, bytes):
+                name = name.decode("utf-8", errors="replace")
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            result["type"] = "nvidia"
+            result["model"] = name.strip()
+            result["vram_used_mb"] = int(mem_info.used // (1024 * 1024))
+            result["vram_total_mb"] = int(mem_info.total // (1024 * 1024))
+            result["available"] = True
+        finally:
+            pynvml.nvmlShutdown()
+    except Exception:
         pass
 
-    # Check for AMD GPU
+    # Check for AMD GPU (no pure-Python library known; keep subprocess fallback)
     if not result["available"]:
         try:
             rocm_smi = subprocess.run(
@@ -138,29 +133,22 @@ def _detect_gpu_status() -> dict[str, Any]:
                     if "GPU" in line and ":" in line:
                         result["model"] = line.split(":")[-1].strip()
                         break
-        except (OSError, subprocess.TimeoutExpired):
+        except Exception:
             pass
 
     # Check if Ollama is using GPU
     try:
-        ollama_ps = subprocess.run(
-            ["curl", "-s", "http://localhost:11434/api/ps"],
-            capture_output=True,
-            text=True,
-            timeout=2,
-            check=False,
-        )
-        if ollama_ps.returncode == 0 and ollama_ps.stdout.strip():
-            data = json.loads(ollama_ps.stdout)
-            if isinstance(data, dict) and "models" in data:
-                models = data["models"]
-                if models:
-                    result["model_loaded"] = True
-                    for model in models:
-                        if isinstance(model, dict) and model.get("size_vram", 0) > 0:
-                            result["ollama_on_gpu"] = True
-                            break
-    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        with urllib.request.urlopen("http://localhost:11434/api/ps", timeout=2) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        if isinstance(data, dict) and "models" in data:
+            models = data["models"]
+            if models:
+                result["model_loaded"] = True
+                for model in models:
+                    if isinstance(model, dict) and model.get("size_vram", 0) > 0:
+                        result["ollama_on_gpu"] = True
+                        break
+    except Exception:
         pass
 
     return result

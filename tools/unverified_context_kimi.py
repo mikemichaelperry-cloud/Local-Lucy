@@ -24,43 +24,43 @@ def _emit(payload: dict[str, Any], *, rc: int) -> int:
     return rc
 
 
+def _fail_payload(reason: str) -> dict[str, Any]:
+    return {"ok": False, "provider": "kimi", "reason": reason}
+
+
 def _fail(reason: str) -> int:
-    return _emit({"ok": False, "provider": "kimi", "reason": reason}, rc=1)
+    return _emit(_fail_payload(reason), rc=1)
 
 
-def main() -> int:
-    import sys
-
-    question = " ".join(sys.argv[1:]).strip()
+def answer_question(question: str) -> dict[str, Any]:
+    """Return a Kimi answer payload for *question* without side effects."""
+    question = question.strip()
     if not question:
-        return _fail("missing_question")
+        return _fail_payload("missing_question")
 
     mock_text = os.environ.get("LUCY_KIMI_MOCK_TEXT", "").strip()
     mock_url = os.environ.get("LUCY_KIMI_MOCK_URL", "").strip()
     if mock_text:
-        return _emit(
-            {
-                "ok": True,
-                "provider": "kimi",
-                "class": "kimi_general",
-                "url": mock_url,
-                "text": re.sub(r"\s+", " ", mock_text).strip(),
-            },
-            rc=0,
-        )
+        return {
+            "ok": True,
+            "provider": "kimi",
+            "class": "kimi_general",
+            "url": mock_url,
+            "text": re.sub(r"\s+", " ", mock_text).strip(),
+        }
 
     api_key = (
         os.environ.get("KIMI_API_KEY", "").strip() or os.environ.get("MOONSHOT_API_KEY", "").strip()
     )
     if not api_key:
-        return _fail(
+        return _fail_payload(
             "missing_kimi_configuration: set KIMI_API_KEY or MOONSHOT_API_KEY in lucy-v10/.env or environment"
         )
 
     api_base = os.environ.get("KIMI_API_BASE_URL", "https://api.moonshot.ai/v1").strip().rstrip("/")
     model = os.environ.get("KIMI_MODEL", "moonshot-v1-8k").strip()
     if not api_base or not model:
-        return _fail(
+        return _fail_payload(
             "missing_kimi_configuration: set KIMI_API_BASE_URL/KIMI_MODEL in lucy-v10/.env or environment"
         )
 
@@ -108,16 +108,16 @@ def main() -> int:
         with urllib.request.urlopen(request, timeout=request_timeout) as response:
             raw = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
-        return _fail(f"kimi_http_error_{e.code}")
+        return _fail_payload(f"kimi_http_error_{e.code}")
     except urllib.error.URLError as e:
-        return _fail(f"kimi_network_error: {e.reason}")
+        return _fail_payload(f"kimi_network_error: {e.reason}")
     except Exception as e:
-        return _fail(f"kimi_request_failed: {e}")
+        return _fail_payload(f"kimi_request_failed: {e}")
 
     try:
         parsed = json.loads(raw)
     except Exception:
-        return _fail("kimi_bad_payload")
+        return _fail_payload("kimi_bad_payload")
 
     text = ""
     if isinstance(parsed, dict):
@@ -131,18 +131,24 @@ def main() -> int:
 
     text = re.sub(r"\s+", " ", text).strip()
     if not text:
-        return _fail("kimi_no_text")
+        return _fail_payload("kimi_no_text")
 
-    return _emit(
-        {
-            "ok": True,
-            "provider": "kimi",
-            "class": "kimi_general",
-            "url": "",
-            "text": text,
-        },
-        rc=0,
-    )
+    return {
+        "ok": True,
+        "provider": "kimi",
+        "class": "kimi_general",
+        "url": "",
+        "text": text,
+    }
+
+
+def main() -> int:
+    import sys
+
+    question = " ".join(sys.argv[1:]).strip()
+    payload = answer_question(question)
+    rc = 0 if payload.get("ok") else 1
+    return _emit(payload, rc=rc)
 
 
 if __name__ == "__main__":

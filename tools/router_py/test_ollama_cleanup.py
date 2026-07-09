@@ -43,21 +43,23 @@ def test_list_loaded_models_returns_empty_on_error() -> None:
         assert oc.list_loaded_models() == []
 
 
-def test_unload_model_uses_cli_first() -> None:
-    with patch("subprocess.run", return_value=MagicMock(returncode=0)) as mock_run:
+def test_unload_model_uses_api() -> None:
+    mock_response = MagicMock()
+    mock_response.__enter__ = MagicMock(return_value=mock_response)
+    mock_response.__exit__ = MagicMock(return_value=False)
+    with patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
         assert oc.unload_model("local-lucy-fast:latest")
-    mock_run.assert_called_once()
-    args = mock_run.call_args[0][0]
-    assert args[:2] == ["ollama", "stop"]
+    mock_urlopen.assert_called_once()
+    request = mock_urlopen.call_args[0][0]
+    assert request.method == "POST"
+    assert request.full_url.endswith("/api/generate")
 
 
-def test_unload_model_falls_back_to_api() -> None:
-    with patch("subprocess.run", side_effect=FileNotFoundError("ollama")):
-        mock_response = MagicMock()
-        mock_response.__enter__ = MagicMock(return_value=mock_response)
-        mock_response.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
-            assert oc.unload_model("local-lucy-fast:latest")
+def test_unload_model_returns_false_on_api_error() -> None:
+    with patch(
+        "urllib.request.urlopen", side_effect=urllib.error.URLError("connection refused")
+    ) as mock_urlopen:
+        assert not oc.unload_model("local-lucy-fast:latest")
     mock_urlopen.assert_called_once()
 
 

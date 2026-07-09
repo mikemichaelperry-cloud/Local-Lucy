@@ -31,13 +31,8 @@ d=json.loads(sys.argv[1])
 print(d.get("url",""))
 PY
 )
-    b=$(python3 - <<'PY' "$PAYLOAD_JSON"
-import json,sys
-d=json.loads(sys.argv[1])
-print(int(d.get("max_bytes",400000)))
-PY
-)
-    exec "$LUCY_ROOT/tools/internet/run_fetch_with_gate.sh" "$u" "$b"
+    # max_bytes is ignored by the new gate; size limit comes from LUCY_GATE_MAX_BYTES
+    exec python3 "$LUCY_ROOT/tools/internet/fetch_gate.py" "$u"
     ;;
 
   *)

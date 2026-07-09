@@ -350,6 +350,40 @@ _TZ_TO_LOCATION: Dict[str, str] = {
 }
 
 
+def _get_local_timezone_name() -> str:
+    """Return the system IANA timezone name using only standard library.
+
+    Falls back to an empty string if the timezone cannot be determined.
+    """
+    # 1. Explicit TZ environment variable
+    tz = os.environ.get("TZ", "").strip()
+    if tz:
+        return tz
+
+    # 2. Debian/Ubuntu /etc/timezone file
+    try:
+        tz_path = Path("/etc/timezone")
+        if tz_path.exists():
+            return tz_path.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+
+    # 3. /etc/localtime symlink pointing into /usr/share/zoneinfo
+    try:
+        localtime = Path("/etc/localtime")
+        if localtime.is_symlink():
+            target = localtime.resolve()
+            zoneinfo_root = Path("/usr/share/zoneinfo")
+            try:
+                return str(target.relative_to(zoneinfo_root))
+            except ValueError:
+                pass
+    except Exception:
+        pass
+
+    return ""
+
+
 def _get_current_context() -> str:
     """Return current date, time, timezone and approximate location.
 
@@ -362,18 +396,11 @@ def _get_current_context() -> str:
     try:
         now = datetime.now().astimezone()
         tz_name = str(now.tzinfo).lower()
-        # Try to get a cleaner timezone name
+        # Try to get a cleaner IANA timezone name without shelling out
         try:
-            import subprocess
-
-            result = subprocess.run(
-                ["timedatectl", "show", "--property=Timezone", "--value"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                tz_name = result.stdout.strip().lower()
+            detected = _get_local_timezone_name()
+            if detected:
+                tz_name = detected.lower()
         except Exception:
             pass
 

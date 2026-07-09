@@ -7,7 +7,6 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -16,27 +15,18 @@ from pathlib import Path
 from typing import Any
 
 from runtime_control import (
-    MODE_TO_ROUTE_CONTROL,
     RuntimeControlError,
     enforce_authority_contract,
     iso_now,
     load_or_create_state,
     locked_state_file,
     resolve_state_file,
-    toggle_to_flag,
 )
 
-# Import StateManager for SQLite-backed state (Phase 3: Primary state source)
 # Add router_py to path for imports
 ROUTER_PY_PATH = Path(__file__).parent / "router_py"
 if str(ROUTER_PY_PATH) not in sys.path:
     sys.path.insert(0, str(ROUTER_PY_PATH))
-
-try:
-    from state_manager import get_state_manager
-    HAS_STATE_MANAGER = True
-except ImportError:
-    HAS_STATE_MANAGER = False
 
 try:
     from payload_builders import (
@@ -49,7 +39,9 @@ except ImportError:
     def build_route_snapshot_payload(payload: dict[str, Any]) -> dict[str, Any]:  # type: ignore[misc]
         raise NotImplementedError("payload_builders not available")
 
-    def determine_route_source_type(*, current_route: str, provider_used: str, trust_class: str) -> str:  # type: ignore[misc]
+    def determine_route_source_type(
+        *, current_route: str, provider_used: str, trust_class: str
+    ) -> str:  # type: ignore[misc]
         raise NotImplementedError("payload_builders not available")
 
     def build_history_entry(payload: dict[str, Any]) -> dict[str, Any]:  # type: ignore[misc]
@@ -106,7 +98,13 @@ SELF_REVIEW_TOPIC_BASENAMES = (
     ),
     (
         {"route", "router", "routing", "manifest", "governor", "provider", "augmented", "evidence"},
-        ("execute_plan.sh", "policy_engine.py", "route_manifest.py", "runtime_governor.py", "runtime_request.py"),
+        (
+            "execute_plan.sh",
+            "policy_engine.py",
+            "route_manifest.py",
+            "runtime_governor.py",
+            "runtime_request.py",
+        ),
     ),
     (
         {"runtime", "request", "submit", "metadata", "bridge"},
@@ -122,8 +120,6 @@ class RuntimeRequestError(RuntimeError):
 @dataclass(frozen=True)
 class RequestPaths:
     root: Path
-    chat_bin: Path
-    local_answer_bin: Path
     last_route_file: Path
     last_outcome_file: Path
     result_file: Path
@@ -163,7 +159,9 @@ def main() -> int:
             error=str(exc),
             status="failed",
             accepted=False,
-            augmented_direct_request="1" if bool(getattr(args, "augmented_direct_once", False)) else "0",
+            augmented_direct_request="1"
+            if bool(getattr(args, "augmented_direct_once", False))
+            else "0",
         )
         persist_payload(resolve_result_file(), payload)
         print(json.dumps(payload, sort_keys=True))
@@ -171,7 +169,9 @@ def main() -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Authoritative Local Lucy non-interactive request endpoint.")
+    parser = argparse.ArgumentParser(
+        description="Authoritative Local Lucy non-interactive request endpoint."
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     submit_parser = subparsers.add_parser("submit")
@@ -182,7 +182,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Set one-shot direct augmented request override for this submit only.",
     )
     submit_review_parser = subparsers.add_parser("submit-review")
-    submit_review_parser.add_argument("--text", required=True, help="Read-only self-review request text.")
+    submit_review_parser.add_argument(
+        "--text", required=True, help="Read-only self-review request text."
+    )
     return parser
 
 
@@ -227,7 +229,9 @@ def legacy_runtime_namespace_status(
     runtime_namespace_root: Path | None = None,
     legacy_root: Path | None = None,
 ) -> str:
-    resolved_runtime_root = (runtime_namespace_root or default_runtime_namespace_root()).expanduser().resolve()
+    resolved_runtime_root = (
+        (runtime_namespace_root or default_runtime_namespace_root()).expanduser().resolve()
+    )
     resolved_legacy_root = (legacy_root or legacy_runtime_namespace_root()).expanduser().resolve()
     if resolved_runtime_root == resolved_legacy_root:
         return "same"
@@ -238,7 +242,9 @@ def legacy_runtime_namespace_status(
 
 DEFAULT_RESULT_FILE = str(default_runtime_namespace_root() / "state" / "last_request_result.json")
 DEFAULT_HISTORY_FILE = str(default_runtime_namespace_root() / "state" / "request_history.jsonl")
-DEFAULT_CHAT_MEMORY_FILE = str(default_runtime_namespace_root() / "state" / "chat_session_memory.txt")
+DEFAULT_CHAT_MEMORY_FILE = str(
+    default_runtime_namespace_root() / "state" / "chat_session_memory.txt"
+)
 
 
 def resolve_ui_state_dir() -> Path:
@@ -255,26 +261,34 @@ def resolve_chat_memory_file() -> Path:
     return Path(DEFAULT_CHAT_MEMORY_FILE)
 
 
-def should_use_chat_memory(root: Path, state: dict[str, Any], request_text: str) -> bool:
+# Memory-safety gate: a query is memory-unsafe only if it matches a small
+# hard-coded hostile/authority-bypass pattern.  This replaces the missing
+# tools/query_policy.sh subprocess dependency.
+_HOSTILE_MEMORY_PATTERNS = re.compile(
+    r"\b("
+    r"jailbreak|"
+    r"ignore previous instructions|ignore your instructions|ignore prior instructions|"
+    r"system prompt|"
+    r"DAN( mode)?|do anything now|"
+    r"ignore all previous"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def should_use_chat_memory(state: dict[str, Any], request_text: str) -> bool:
     if state.get("memory") != "on":
         return False
-    tool = root / "tools" / "query_policy.sh"
-    if not tool.exists():
-        return True
-    completed = subprocess.run(
-        [str(tool), "is-memory-unsafe", request_text],
-        check=False,
-        capture_output=True,
-        text=True,
-        shell=False,
-    )
-    return completed.returncode != 0
+    return not _HOSTILE_MEMORY_PATTERNS.search(request_text or "")
 
 
-def append_chat_memory_turn(memory_file: Path, request_text: str, response_text: str, *, max_turns: int = 6) -> None:
+def append_chat_memory_turn(
+    memory_file: Path, request_text: str, response_text: str, *, max_turns: int = 6
+) -> None:
     # Dual-write: persist to SQLite first (best effort)
     try:
-        from memory.memory_service import store_turn, maybe_summarize_session
+        from memory.memory_service import maybe_summarize_session, store_turn
+
         store_turn("user", request_text)
         store_turn("assistant", response_text)
         maybe_summarize_session()
@@ -317,9 +331,13 @@ def resolve_history_max_entries() -> int:
     try:
         value = int(raw)
     except ValueError as exc:
-        raise RuntimeRequestError(f"invalid LUCY_RUNTIME_REQUEST_HISTORY_MAX_ENTRIES: {raw}") from exc
+        raise RuntimeRequestError(
+            f"invalid LUCY_RUNTIME_REQUEST_HISTORY_MAX_ENTRIES: {raw}"
+        ) from exc
     if value <= 0:
-        raise RuntimeRequestError("LUCY_RUNTIME_REQUEST_HISTORY_MAX_ENTRIES must be greater than zero")
+        raise RuntimeRequestError(
+            "LUCY_RUNTIME_REQUEST_HISTORY_MAX_ENTRIES must be greater than zero"
+        )
     return value
 
 
@@ -345,7 +363,9 @@ def handle_self_review_submit(request_text: str) -> dict[str, Any]:
     if not targets:
         targets = infer_self_review_targets(request_text, review_roots)
     if not targets:
-        raise RuntimeRequestError("read-only self-review could not resolve any allowed Local Lucy v6 review targets")
+        raise RuntimeRequestError(
+            "read-only self-review could not resolve any allowed Local Lucy v6 review targets"
+        )
 
     search_terms = extract_self_review_search_terms(request_text)
     execution_text = build_self_review_execution_text(request_text, targets, search_terms)
@@ -355,8 +375,8 @@ def handle_self_review_submit(request_text: str) -> dict[str, Any]:
         targets=targets,
     )
     try:
-        response_text = run_self_review_generation(paths, state, execution_text)
-    except subprocess.TimeoutExpired as exc:
+        response_text = run_self_review_generation(state, execution_text)
+    except TimeoutError:
         return build_failed_payload(
             request_text=request_text,
             error="self-review request timed out",
@@ -364,7 +384,7 @@ def handle_self_review_submit(request_text: str) -> dict[str, Any]:
             accepted=True,
             request_id=request_id,
             control_state=state,
-            response_text=strip_validated_text(exc.stdout or ""),
+            response_text="",
             route_meta=route_meta,
             outcome_meta=outcome_meta,
         )
@@ -420,278 +440,111 @@ def _run_backend_submit_python(
     execution_text: str,
     augmented_direct_once: bool,
     extra_env: dict[str, str] | None,
-    paths: RequestPaths,
 ) -> dict[str, Any]:
-    """
-    Python-native backend submit using router_py.
-    
-    This bypasses lucy_chat.sh and uses the Python ExecutionEngine directly.
-    """
-    import subprocess
-    import sys
-    
-    root = paths.root
+    """Python-native backend submit using router_py.main.run()."""
+    from router_py.main import run as router_run
+
     request_id = make_request_id()
-    
-    # Build router_py command
-    cmd = [
-        sys.executable,
-        str(root / "tools" / "router_py" / "main.py"),
-        "--json",
-        execution_text,
-    ]
-    
-    env = os.environ.copy()
-    env["LUCY_EXEC_PY"] = "1"  # Use Python execution engine
-    env["LUCY_AUGMENTATION_POLICY"] = "fallback_only"
-    if augmented_direct_once:
-        env["LUCY_AUGMENTATION_POLICY"] = "direct_allowed"
-    if extra_env:
-        env.update(extra_env)
-    
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=DEFAULT_TIMEOUT_SECONDS,
-            env=env,
-            cwd=str(root),
-        )
-        
-        if result.returncode != 0:
-            error_text = result.stderr or "Python router failed"
-            return build_failed_payload(
-                request_text=request_text,
-                error=error_text,
-                status="failed",
-                accepted=True,
-                request_id=request_id,
-            )
-        
-        # Parse router result
-        router_result = json.loads(result.stdout)
-        
-        # Load state for control_state
-        state = load_or_create_state(resolve_state_file(None), refresh_timestamp=False)
-        
-        # Build route_meta and outcome_meta from router result
-        route_meta = {
-            "INTENT_FAMILY": router_result.get("intent_family", "unknown"),
-            "FINAL_MODE": router_result.get("route", "LOCAL"),
-            "CONFIDENCE": str(router_result.get("confidence", 0.0)),
-        }
-        
-        outcome_meta = {
-            "OUTCOME_CODE": router_result.get("outcome_code", "unknown"),
-            "AUGMENTED_PROVIDER_USED": router_result.get("provider", "local"),
-        }
-        
-        response_text = router_result.get("response_text", "")
-        
-        # Persist to history
-        payload = {
-            "accepted": True,
-            "authority": build_authority_payload(),
-            "completed_at": iso_now(),
-            "control_state": {
-                "mode": state.get("mode", "auto"),
-                "conversation": state.get("conversation", "off"),
-                "memory": state.get("memory", "off"),
-                "evidence": state.get("evidence", "off"),
-                "voice": state.get("voice", "off"),
-                "augmentation_policy": state.get("augmentation_policy", "disabled"),
-                "augmented_provider": state.get("augmented_provider", "wikipedia"),
-                "model": state.get("model", "local-lucy"),
-                "profile": state.get("profile", "lucy-v10"),
-            },
-            "error": "",
-            "outcome": build_outcome_payload(
-                outcome_meta,
-                response_text=response_text,
-                request_text=request_text,
-                history_file=resolve_history_file(),
-            ),
-            "request_id": request_id,
-            "request_text": request_text,
-            "response_text": response_text,
-            "route": build_route_payload(route_meta, outcome_meta, request_text=request_text),
-            "status": router_result.get("status", "completed"),
-        }
-        
-        # Persist to history file
-        append_history_entry(resolve_history_file(), payload)
-        
-        return payload
-        
-    except subprocess.TimeoutExpired:
-        return build_failed_payload(
-            request_text=request_text,
-            error="Python router timeout",
-            status="timeout",
-            accepted=True,
-            request_id=request_id,
-        )
-    except Exception as e:
-        return build_failed_payload(
-            request_text=request_text,
-            error=f"Python router error: {e}",
-            status="failed",
-            accepted=True,
-            request_id=request_id,
-        )
-
-
-def run_backend_submit(
-    *,
-    request_text: str,
-    execution_text: str,
-    augmented_direct_once: bool,
-    extra_env: dict[str, str] | None,
-) -> dict[str, Any]:
-    paths = resolve_paths()
-    
-    # Check if we should use Python-native execution (lucy_chat.sh archived)
-    use_python_path = (
-        os.environ.get("LUCY_ROUTER_PY", "") == "1" or
-        not paths.chat_bin.exists() or
-        os.environ.get("LUCY_DIRECT_EXECUTION", "") == "1"
-    )
-    
-    if use_python_path:
-        return _run_backend_submit_python(
-            request_text=request_text,
-            execution_text=execution_text,
-            augmented_direct_once=augmented_direct_once,
-            extra_env=extra_env,
-            paths=paths,
-        )
-    
-    # Shell path (legacy)
     state = load_or_create_state(resolve_state_file(None), refresh_timestamp=False)
-    request_id = make_request_id()
-    chat_memory_file = resolve_chat_memory_file() if should_use_chat_memory(paths.root, state, request_text) else None
-    env = build_request_env(
-        paths.root,
-        state,
-        augmented_direct_once=augmented_direct_once,
-        chat_memory_file=chat_memory_file,
-    )
+    policy = "direct_allowed" if augmented_direct_once else "fallback_only"
+
+    # router_py reads augmentation policy and memory from os.environ, so apply
+    # the caller's overrides temporarily while keeping the rest of the process
+    # environment intact.
+    env_overrides = {
+        "LUCY_AUGMENTATION_POLICY": policy,
+    }
+    if augmented_direct_once:
+        env_overrides["LUCY_AUGMENTED_DIRECT_REQUEST"] = "1"
+    if not should_use_chat_memory(state, request_text):
+        env_overrides["LUCY_SESSION_MEMORY"] = "0"
     if extra_env:
-        env.update(extra_env)
-    route_signature_before = file_signature(paths.last_route_file)
-    outcome_signature_before = file_signature(paths.last_outcome_file)
+        env_overrides.update(extra_env)
 
+    original_environ = dict(os.environ)
     try:
-        completed = subprocess.run(
-            [str(paths.chat_bin), execution_text],
-            check=False,
-            capture_output=True,
-            text=True,
+        os.environ.update(env_overrides)
+        outcome = router_run(
+            execution_text,
+            policy=policy,
             timeout=DEFAULT_TIMEOUT_SECONDS,
-            shell=False,
-            env=env,
-        )
-    except subprocess.TimeoutExpired as exc:
-        return build_failed_payload(
-            request_text=request_text,
-            error="request timed out",
-            status="timeout",
-            accepted=True,
-            request_id=request_id,
-            control_state=state,
-            response_text=strip_validated_text(exc.stdout or ""),
-            augmented_direct_request="1" if augmented_direct_once else "0",
-        )
-
-    # Phase 3: Try StateManager (SQLite) first, fall back to env files
-    route_meta = load_route_from_state_manager(execution_text)
-    if not route_meta:
-        # Fall back to file-based state for backwards compatibility
-        route_meta = load_fresh_env_file(paths.last_route_file, route_signature_before, execution_text)
-    
-    outcome_meta = load_outcome_from_state_manager(execution_text)
-    if not outcome_meta:
-        # Fall back to file-based state for backwards compatibility
-        outcome_meta = load_valid_outcome_env_file(paths.last_outcome_file, outcome_signature_before, execution_text)
-    response_text = strip_validated_text(completed.stdout)
-
-    if not outcome_meta:
-        if completed.returncode != 0:
-            error_text = choose_failure_error(
-                stderr_text=completed.stderr or "",
-                stdout_text=completed.stdout or "",
-                fallback="backend request failed",
-            )
-        else:
-            error_text = "backend did not publish valid outcome state"
-        outcome_meta = synthesize_failure_outcome_meta(
-            request_text=execution_text,
-            route_meta=route_meta,
-            control_state=state,
-            returncode=completed.returncode,
-            error_text=error_text,
+            surface="cli",
             augmented_direct_once=augmented_direct_once,
         )
-        write_outcome_env_file(paths.last_outcome_file, outcome_meta)
-
-    if completed.returncode != 0:
-        error_text = choose_failure_error(
-            outcome_meta=outcome_meta,
-            stderr_text=completed.stderr or "",
-            stdout_text=completed.stdout or "",
-            fallback="backend request failed",
-        )
+    except Exception as exc:
         return build_failed_payload(
             request_text=request_text,
-            error=error_text,
+            error=f"Python router error: {exc}",
             status="failed",
             accepted=True,
             request_id=request_id,
             control_state=state,
-            response_text=response_text,
-            route_meta=route_meta,
-            outcome_meta=outcome_meta,
-            returncode=completed.returncode,
-            augmented_direct_request="1" if augmented_direct_once else "0",
         )
+    finally:
+        os.environ.clear()
+        os.environ.update(original_environ)
 
-    if outcome_meta.get("OUTCOME_CODE") == "execution_error":
+    if outcome.status != "completed":
         return build_failed_payload(
             request_text=request_text,
-            error=choose_failure_error(
-                outcome_meta=outcome_meta,
-                stdout_text=response_text,
-                fallback="backend did not publish valid outcome state",
-            ),
-            status="failed",
+            error=outcome.error_message or "Python router failed",
+            status=outcome.status,
             accepted=True,
             request_id=request_id,
             control_state=state,
-            response_text=response_text,
-            route_meta=route_meta,
-            outcome_meta=outcome_meta,
-            returncode=completed.returncode,
-            augmented_direct_request="1" if augmented_direct_once else "0",
+            response_text=outcome.response_text,
         )
 
-    if chat_memory_file is not None:
-        append_chat_memory_turn(chat_memory_file, request_text, response_text)
+    response_text = outcome.response_text or ""
+    route_meta = {
+        "UTC": iso_now(),
+        "MODE": outcome.route or "LOCAL",
+        "INTENT_FAMILY": outcome.intent_family or "unknown",
+        "FINAL_MODE": outcome.route or "LOCAL",
+        "CONFIDENCE": str(outcome.confidence),
+        "QUERY": execution_text,
+        "ROUTE_REASON": outcome.policy_reason or "route_selected",
+        "SESSION_ID": outcome.request_id or request_id,
+    }
+    outcome_meta = {
+        "UTC": iso_now(),
+        "MODE": outcome.route or "LOCAL",
+        "OUTCOME_CODE": outcome.outcome_code,
+        "REQUESTED_MODE": outcome.route or "LOCAL",
+        "FINAL_MODE": outcome.route or "LOCAL",
+        "TRUST_CLASS": outcome.provider_usage_class or "local",
+        "INTENT_FAMILY": outcome.intent_family or "unknown",
+        "MANIFEST_INTENT_FAMILY": outcome.intent_family or "unknown",
+        "CONFIDENCE": str(outcome.confidence),
+        "AUGMENTED_PROVIDER": outcome.provider or "local",
+        "AUGMENTED_PROVIDER_USED": outcome.provider or "local",
+        "AUGMENTED_PROVIDER_USAGE_CLASS": outcome.provider_usage_class or "local",
+        "AUGMENTATION_POLICY": policy,
+        "AUGMENTED_DIRECT_REQUEST": "1" if augmented_direct_once else "0",
+        "EVIDENCE_CREATED": "true" if outcome.route == "EVIDENCE" else "false",
+        "ERROR_MESSAGE": outcome.error_message or "",
+        "STATUS": outcome.status,
+    }
+    if outcome.metadata:
+        for key, value in outcome.metadata.items():
+            str_key = str(key).upper()
+            if str_key not in outcome_meta:
+                outcome_meta[str_key] = str(value)
 
-    return {
+    payload = {
         "accepted": True,
         "authority": build_authority_payload(),
         "completed_at": iso_now(),
         "control_state": {
-            "mode": state["mode"],
+            "mode": state.get("mode", "auto"),
             "conversation": state.get("conversation", "off"),
-            "memory": state["memory"],
-            "evidence": state["evidence"],
-            "voice": state["voice"],
+            "memory": state.get("memory", "off"),
+            "evidence": state.get("evidence", "off"),
+            "voice": state.get("voice", "off"),
             "augmentation_policy": state.get("augmentation_policy", "disabled"),
             "augmented_provider": state.get("augmented_provider", "wikipedia"),
-            "model": state["model"],
-            "profile": state["profile"],
+            "model": state.get("model", "local-lucy"),
+            "profile": state.get("profile", "lucy-v10"),
         },
         "error": "",
         "outcome": build_outcome_payload(
@@ -704,8 +557,26 @@ def run_backend_submit(
         "request_text": request_text,
         "response_text": response_text,
         "route": build_route_payload(route_meta, outcome_meta, request_text=request_text),
-        "status": "completed",
+        "status": outcome.status,
     }
+    append_history_entry(resolve_history_file(), payload)
+    return payload
+
+
+def run_backend_submit(
+    *,
+    request_text: str,
+    execution_text: str,
+    augmented_direct_once: bool,
+    extra_env: dict[str, str] | None,
+) -> dict[str, Any]:
+    """Run the Python-native backend submit path unconditionally."""
+    return _run_backend_submit_python(
+        request_text=request_text,
+        execution_text=execution_text,
+        augmented_direct_once=augmented_direct_once,
+        extra_env=extra_env,
+    )
 
 
 def resolve_paths() -> RequestPaths:
@@ -713,8 +584,6 @@ def resolve_paths() -> RequestPaths:
     state_dir = resolve_state_dir(root)
     return RequestPaths(
         root=root,
-        chat_bin=root / "lucy_chat.sh",
-        local_answer_bin=root / "tools" / "local_answer.sh",
         last_route_file=state_dir / "last_route.env",
         last_outcome_file=state_dir / "last_outcome.env",
         result_file=resolve_result_file(),
@@ -734,7 +603,12 @@ def resolve_state_dir(root: Path) -> Path:
 
 
 def ensure_self_review_allowed() -> None:
-    if str(os.environ.get("LUCY_SELF_REVIEW_ALLOWED", "")).strip().lower() not in {"1", "true", "yes", "on"}:
+    if str(os.environ.get("LUCY_SELF_REVIEW_ALLOWED", "")).strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
         raise RuntimeRequestError("self-review unavailable without explicit HMI authorization")
 
 
@@ -806,7 +680,11 @@ def resolve_self_review_target(token: str, roots: list[Path]) -> Path | None:
 
     candidate_path = Path(cleaned).expanduser()
     if candidate_path.is_absolute():
-        return candidate_path.resolve() if is_allowed_self_review_file(candidate_path.resolve(), roots) else None
+        return (
+            candidate_path.resolve()
+            if is_allowed_self_review_file(candidate_path.resolve(), roots)
+            else None
+        )
 
     direct_matches: list[Path] = []
     for root in roots:
@@ -992,11 +870,17 @@ def format_self_review_output(raw_text: str, targets: list[Path]) -> str:
         append_unique_item(sections[classified_section], item)
 
     if not sections["Findings"]:
-        sections["Findings"].append("No concrete findings were extracted from this bounded self-review pass.")
+        sections["Findings"].append(
+            "No concrete findings were extracted from this bounded self-review pass."
+        )
     if not sections["Risks"]:
-        sections["Risks"].append("No additional risks were isolated beyond the bounded findings above.")
+        sections["Risks"].append(
+            "No additional risks were isolated beyond the bounded findings above."
+        )
     if not sections["Suggestions"]:
-        sections["Suggestions"].append("No additional suggestions were extracted beyond the bounded findings above.")
+        sections["Suggestions"].append(
+            "No additional suggestions were extracted beyond the bounded findings above."
+        )
 
     rendered_sections: list[str] = []
     for section_name in ("Findings", "Risks", "Suggestions", "Files reviewed"):
@@ -1058,11 +942,35 @@ def normalize_self_review_item(line: str) -> str:
 
 def classify_self_review_item(item: str) -> str:
     lowered = item.lower()
-    if any(token in lowered for token in ("risk", "fragile", "drift", "regress", "leak", "ambiguous", "confus", "brittle")):
+    if any(
+        token in lowered
+        for token in (
+            "risk",
+            "fragile",
+            "drift",
+            "regress",
+            "leak",
+            "ambiguous",
+            "confus",
+            "brittle",
+        )
+    ):
         return "Risks"
     if any(
         token in lowered
-        for token in ("suggest", "recommend", "consider", "should ", "could ", "prefer", "keep ", "avoid ", "tighten", "normalize", "consolidate")
+        for token in (
+            "suggest",
+            "recommend",
+            "consider",
+            "should ",
+            "could ",
+            "prefer",
+            "keep ",
+            "avoid ",
+            "tighten",
+            "normalize",
+            "consolidate",
+        )
     ):
         return "Suggestions"
     return "Findings"
@@ -1134,67 +1042,35 @@ def build_self_review_meta(
     return route_meta, outcome_meta
 
 
-def run_self_review_generation(paths: RequestPaths, state: dict[str, Any], execution_text: str) -> str:
-    if not paths.local_answer_bin.exists():
-        raise RuntimeRequestError(f"missing self-review local generator: {paths.local_answer_bin}")
+def run_self_review_generation(state: dict[str, Any], execution_text: str) -> str:
+    """Generate a read-only self-review response using router_py.local_answer."""
+    import asyncio
 
-    env = build_request_env(paths.root, state, augmented_direct_once=False)
-    env["LUCY_SELF_REVIEW_ACTIVE"] = "1"
-    env["LUCY_LOCAL_GEN_ROUTE_MODE"] = "SELF_REVIEW"
-    env["LUCY_LOCAL_GEN_OUTPUT_MODE"] = "CHAT"
-    completed = subprocess.run(
-        [str(paths.local_answer_bin), execution_text],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=DEFAULT_TIMEOUT_SECONDS,
-        shell=False,
-        env=env,
-    )
-    response_text = strip_validated_text(completed.stdout)
-    if completed.returncode != 0:
-        raise RuntimeRequestError(
-            choose_failure_error(
-                stderr_text=completed.stderr or "",
-                stdout_text=completed.stdout or "",
-                fallback="self-review local generation failed",
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig.from_env()
+    model = state.get("model")
+    if model:
+        config.model = model
+
+    async def _generate() -> str:
+        async with LocalAnswer(config) as generator:
+            result = await generator.generate_answer(
+                execution_text,
+                route_mode="SELF_REVIEW",
+                output_mode="CHAT",
             )
-        )
+            return result.text
+
+    try:
+        response_text = asyncio.run(_generate())
+    except Exception as exc:
+        raise RuntimeRequestError(f"self-review generation failed: {exc}") from exc
+
+    response_text = strip_validated_text(response_text)
     if not response_text:
         raise RuntimeRequestError("self-review local generation returned no text")
     return response_text
-
-
-def build_request_env(
-    root: Path,
-    state: dict[str, Any],
-    *,
-    augmented_direct_once: bool = False,
-    chat_memory_file: Path | None = None,
-) -> dict[str, str]:
-    env = os.environ.copy()
-    env["LUCY_ROOT"] = str(root)
-    env[AUTHORITY_ROOT_ENV] = str(root)
-    env["LUCY_ROUTE_CONTROL_MODE"] = MODE_TO_ROUTE_CONTROL[state["mode"]]
-    env["LUCY_CONVERSATION_MODE_FORCE"] = toggle_to_flag(str(state.get("conversation", "off")))
-    env["LUCY_SESSION_MEMORY"] = toggle_to_flag(state["memory"])
-    if chat_memory_file is not None:
-        env["LUCY_CHAT_MEMORY_FILE"] = str(chat_memory_file)
-    env["LUCY_EVIDENCE_ENABLED"] = toggle_to_flag(state["evidence"])
-    env["LUCY_ENABLE_INTERNET"] = toggle_to_flag(state["evidence"])
-    env["LUCY_VOICE_ENABLED"] = toggle_to_flag(state["voice"])
-    env["LUCY_AUGMENTATION_POLICY"] = str(state.get("augmentation_policy", "disabled"))
-    env["LUCY_AUGMENTED_PROVIDER"] = str(state.get("augmented_provider", "wikipedia"))
-    if augmented_direct_once:
-        env["LUCY_AUGMENTED_DIRECT_REQUEST"] = "1"
-    env["LUCY_LOCAL_MODEL"] = state["model"]
-    env["LUCY_RUNTIME_PROFILE"] = state["profile"]
-    # Propagate Python router/execution engine flags for voice path compatibility
-    if os.environ.get("LUCY_ROUTER_PY"):
-        env["LUCY_ROUTER_PY"] = os.environ["LUCY_ROUTER_PY"]
-    if os.environ.get("LUCY_EXEC_PY"):
-        env["LUCY_EXEC_PY"] = os.environ["LUCY_EXEC_PY"]
-    return env
 
 
 def make_request_id() -> str:
@@ -1205,202 +1081,6 @@ def query_sha256(text: str) -> str:
     return hashlib.sha256((text or "").encode("utf-8", errors="ignore")).hexdigest()
 
 
-def load_env_file(path: Path) -> dict[str, str]:
-    if not path.exists():
-        return {}
-    values: dict[str, str] = {}
-    try:
-        for raw_line in path.read_text(encoding="utf-8").splitlines():
-            if "=" not in raw_line:
-                continue
-            key, value = raw_line.split("=", 1)
-            values[key.strip()] = value.strip()
-    except OSError:
-        return {}
-    return values
-
-
-def file_signature(path: Path) -> tuple[int, int, int] | None:
-    try:
-        stat_result = path.stat()
-    except OSError:
-        return None
-    return (stat_result.st_mtime_ns, stat_result.st_size, stat_result.st_ino)
-
-
-def load_fresh_env_file(path: Path, previous_signature: tuple[int, int, int] | None, expected_query: str) -> dict[str, str]:
-    current_signature = file_signature(path)
-    if current_signature is None or current_signature == previous_signature:
-        return {}
-    values = load_env_file(path)
-    expected_query_hash = query_sha256(expected_query)
-    actual_query_hash = values.get("QUERY_SHA256", "").strip().lower()
-    query_matches = actual_query_hash == expected_query_hash if actual_query_hash else values.get("QUERY", "") == expected_query
-    if not query_matches:
-        return {}
-    values["QUERY"] = expected_query
-    values["QUERY_SHA256"] = expected_query_hash
-    return values
-
-
-def load_valid_outcome_env_file(path: Path, previous_signature: tuple[int, int, int] | None, expected_query: str) -> dict[str, str]:
-    values = load_fresh_env_file(path, previous_signature, expected_query)
-    if not values.get("OUTCOME_CODE", ""):
-        return {}
-    return values
-
-
-# ============================================================================
-# StateManager (SQLite) State Functions - Phase 3: Primary State Source
-# ============================================================================
-
-def load_route_from_state_manager(expected_query: str) -> dict[str, str] | None:
-    """
-    Load route from StateManager (SQLite) - PRIMARY source.
-    
-    Phase 3 migration: StateManager is now the authoritative source for state.
-    Falls back to None if StateManager unavailable or no matching record.
-    
-    Args:
-        expected_query: The query text to match
-        
-    Returns:
-        Route metadata dict or None if not found
-    """
-    if not HAS_STATE_MANAGER:
-        return None
-    
-    try:
-        sm = get_state_manager()
-        route_data = sm.read_last_route()
-        
-        if not route_data:
-            return None
-            
-        # Verify query matches
-        route_query = route_data.get("metadata", {}).get("question", "")
-        if route_query != expected_query:
-            return None
-            
-        # Convert StateManager format to env-style format
-        return {
-            "MODE": route_data.get("strategy", "LOCAL"),
-            "INTENT": route_data.get("intent", ""),
-            "CONFIDENCE": str(route_data.get("confidence", 0.0)),
-            "ROUTE_REASON": route_data.get("metadata", {}).get("final_mode", "route_selected"),
-            "QUERY": expected_query,
-            "QUERY_SHA256": query_sha256(expected_query),
-            "PROVIDER": route_data.get("metadata", {}).get("provider", "local"),
-            "IS_MEDICAL_QUERY": str(route_data.get("metadata", {}).get("is_medical_query", False)).lower(),
-        }
-    except Exception as e:
-        # Silently fall back to file-based state
-        return None
-
-
-def load_outcome_from_state_manager(expected_query: str) -> dict[str, str] | None:
-    """
-    Load outcome from StateManager (SQLite) - PRIMARY source.
-    
-    Phase 3 migration: StateManager is now the authoritative source for state.
-    Falls back to None if StateManager unavailable or no matching record.
-    
-    Args:
-        expected_query: The query text to match
-        
-    Returns:
-        Outcome metadata dict or None if not found
-    """
-    if not HAS_STATE_MANAGER:
-        return None
-    
-    try:
-        sm = get_state_manager()
-        outcome_data = sm.read_last_outcome()
-        
-        if not outcome_data:
-            return None
-            
-        # Verify query matches via outcome result
-        # Note: StateManager stores query in metadata, we need to match carefully
-        result = outcome_data.get("result", {})
-        
-        # Convert StateManager format to env-style format
-        success = outcome_data.get("success", False)
-        outcome_code = "completed" if success else outcome_data.get("result", {}).get("outcome_code", "unknown")
-        
-        return {
-            "UTC": outcome_data.get("timestamp", iso_now()),
-            "MODE": result.get("route", "LOCAL"),
-            "OUTCOME_CODE": outcome_code,
-            "TRUST_CLASS": result.get("trust_class", "local"),
-            "FINAL_MODE": result.get("route", "LOCAL"),
-            "QUERY": expected_query,
-            "QUERY_SHA256": query_sha256(expected_query),
-            "ERROR_MESSAGE": outcome_data.get("error_message", ""),
-        }
-    except Exception as e:
-        # Silently fall back to file-based state
-        return None
-
-
-def synthesize_failure_outcome_meta(
-    *,
-    request_text: str,
-    route_meta: dict[str, str],
-    control_state: dict[str, Any],
-    returncode: int,
-    error_text: str,
-    augmented_direct_once: bool,
-) -> dict[str, str]:
-    requested_mode = route_meta.get("MODE", "") or "unknown"
-    route_reason = route_meta.get("ROUTE_REASON", "") or "backend_failure_no_outcome"
-    return {
-        "UTC": iso_now(),
-        "MODE": "ERROR",
-        "ROUTE_REASON": route_reason,
-        "SESSION_ID": "",
-        "EVIDENCE_CREATED": "false",
-        "OUTCOME_CODE": "execution_error",
-        "ACTION_HINT": "check backend logs",
-        "RC": str(returncode),
-        "QUERY": request_text,
-        "QUERY_SHA256": query_sha256(request_text),
-        "REQUESTED_MODE": requested_mode,
-        "FINAL_MODE": "ERROR",
-        "FALLBACK_USED": "false",
-        "FALLBACK_REASON": "none",
-        "TRUST_CLASS": "unknown",
-        "AUGMENTED_PROVIDER": "none",
-        "AUGMENTED_ALLOWED": "false",
-        "AUGMENTED_PROVIDER_SELECTED": str(control_state.get("augmented_provider", "none")),
-        "AUGMENTED_PROVIDER_USED": "none",
-        "AUGMENTED_PROVIDER_USAGE_CLASS": "none",
-        "AUGMENTED_PROVIDER_CALL_REASON": "error",
-        "AUGMENTED_PROVIDER_COST_NOTICE": "false",
-        "AUGMENTED_PAID_PROVIDER_INVOKED": "false",
-        "AUGMENTATION_POLICY": str(control_state.get("augmentation_policy", "disabled")),
-        "AUGMENTED_DIRECT_REQUEST": "1" if augmented_direct_once else "0",
-        "ERROR_MESSAGE": error_text,
-    }
-
-
-def write_outcome_env_file(path: Path, outcome_meta: dict[str, str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        dir=path.parent,
-        delete=False,
-        prefix=".last_outcome.",
-        suffix=".tmp",
-    ) as handle:
-        for key, value in outcome_meta.items():
-            handle.write(f"{key}={value}\n")
-        tmp_path = Path(handle.name)
-    os.replace(tmp_path, path)
-
-
 def strip_validated_text(raw_text: str) -> str:
     lines = []
     for line in (raw_text or "").replace("\r", "").splitlines():
@@ -1409,29 +1089,6 @@ def strip_validated_text(raw_text: str) -> str:
             continue
         lines.append(line)
     return "\n".join(lines).strip()
-
-
-def first_nonempty_line(text: str) -> str:
-    for line in (text or "").splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    return ""
-
-
-def choose_failure_error(
-    *,
-    outcome_meta: dict[str, str] | None = None,
-    stderr_text: str = "",
-    stdout_text: str = "",
-    fallback: str = "backend request failed",
-) -> str:
-    meta = outcome_meta or {}
-    for key in ("ERROR_MESSAGE", "ACTION_HINT"):
-        value = str(meta.get(key, "")).strip()
-        if value:
-            return value
-    return first_nonempty_line(stderr_text) or first_nonempty_line(stdout_text) or fallback
 
 
 def parse_int(raw: str | None) -> int | None:
@@ -1450,7 +1107,11 @@ def evidence_mode_selection_label(evidence_mode: str, evidence_reason: str) -> s
         return "default-light"
     if evidence_reason.startswith("explicit_") or evidence_reason == "source_request":
         return "explicit-user-triggered"
-    if evidence_reason.startswith("policy_") or evidence_reason in {"medical_context", "geopolitics", "conflict_live"}:
+    if evidence_reason.startswith("policy_") or evidence_reason in {
+        "medical_context",
+        "geopolitics",
+        "conflict_live",
+    }:
         return "policy-triggered"
     return "manifest-selected"
 
@@ -1504,9 +1165,11 @@ def determine_answer_class(outcome_meta: dict[str, str]) -> str:
 def determine_provider_authorization(outcome_meta: dict[str, str], answer_class: str) -> str:
     if answer_class not in {"augmented_unverified_fallback", "augmented_unverified_answer"}:
         return "not_applicable"
-    if _truthy_text(outcome_meta.get("AUGMENTED_DIRECT_REQUEST")) or str(
-        outcome_meta.get("AUGMENTED_PROVIDER_SELECTION_REASON", "")
-    ).strip().lower() == "explicit provider selection":
+    if (
+        _truthy_text(outcome_meta.get("AUGMENTED_DIRECT_REQUEST"))
+        or str(outcome_meta.get("AUGMENTED_PROVIDER_SELECTION_REASON", "")).strip().lower()
+        == "explicit provider selection"
+    ):
         return "explicit_provider_selection"
     if str(outcome_meta.get("AUGMENTATION_POLICY", "")).strip().lower() == "disabled":
         return "not_authorized"
@@ -1553,12 +1216,16 @@ def _operator_answer_text(raw_text: str) -> str:
 def _source_basis_for_answer_contract(outcome_meta: dict[str, str], answer_class: str) -> list[str]:
     basis: list[str] = []
     provider_status = str(outcome_meta.get("AUGMENTED_PROVIDER_STATUS", "")).strip().lower()
-    provider = str(
-        outcome_meta.get("AUGMENTED_PROVIDER_USED")
-        or outcome_meta.get("AUGMENTED_PROVIDER")
-        or outcome_meta.get("AUGMENTED_PROVIDER_SELECTED")
-        or ""
-    ).strip().lower()
+    provider = (
+        str(
+            outcome_meta.get("AUGMENTED_PROVIDER_USED")
+            or outcome_meta.get("AUGMENTED_PROVIDER")
+            or outcome_meta.get("AUGMENTED_PROVIDER_SELECTED")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
     context_used = _truthy_text(outcome_meta.get("UNVERIFIED_CONTEXT_USED"))
 
     if answer_class in {"augmented_unverified_fallback", "augmented_unverified_answer"}:
@@ -1610,15 +1277,23 @@ def _is_structured_or_well_known_question(outcome_meta: dict[str, str]) -> bool:
         query,
     ):
         return True
-    provider_selection_reason = normalize_single_line(str(outcome_meta.get("AUGMENTED_PROVIDER_SELECTION_REASON", "")).lower())
-    provider_selection_rule = normalize_single_line(str(outcome_meta.get("AUGMENTED_PROVIDER_SELECTION_RULE", "")).lower())
+    provider_selection_reason = normalize_single_line(
+        str(outcome_meta.get("AUGMENTED_PROVIDER_SELECTION_REASON", "")).lower()
+    )
+    provider_selection_rule = normalize_single_line(
+        str(outcome_meta.get("AUGMENTED_PROVIDER_SELECTION_RULE", "")).lower()
+    )
     if provider_selection_rule == "background_overview":
         return True
     return "stable factual overview" in provider_selection_reason
 
 
-def _multiple_consistent_signals_modifier(outcome_meta: dict[str, str], source_basis: list[str]) -> int:
-    provider_status = normalize_single_line(str(outcome_meta.get("AUGMENTED_PROVIDER_STATUS", "")).lower())
+def _multiple_consistent_signals_modifier(
+    outcome_meta: dict[str, str], source_basis: list[str]
+) -> int:
+    provider_status = normalize_single_line(
+        str(outcome_meta.get("AUGMENTED_PROVIDER_STATUS", "")).lower()
+    )
     provider_present = any(item.startswith("augmented_provider_") for item in source_basis)
     context_used = _truthy_text(outcome_meta.get("UNVERIFIED_CONTEXT_USED")) or bool(
         str(outcome_meta.get("UNVERIFIED_CONTEXT_TITLE", "")).strip()
@@ -1640,7 +1315,9 @@ def _multiple_consistent_signals_modifier(outcome_meta: dict[str, str], source_b
     return 0
 
 
-def _confidence_base_for_answer_contract(answer_class: str, source_basis: list[str], verification_status: str) -> int:
+def _confidence_base_for_answer_contract(
+    answer_class: str, source_basis: list[str], verification_status: str
+) -> int:
     if verification_status == "verified":
         return 85
     if answer_class == "best_effort_recovery_answer":
@@ -1678,7 +1355,9 @@ def _read_history_entries(history_file: Path | None, *, limit: int = 240) -> lis
     return entries
 
 
-def _history_provider_stability_modifier(outcome_meta: dict[str, str], history_file: Path | None) -> int:
+def _history_provider_stability_modifier(
+    outcome_meta: dict[str, str], history_file: Path | None
+) -> int:
     provider = normalize_single_line(
         str(
             outcome_meta.get("AUGMENTED_PROVIDER_USED")
@@ -1689,7 +1368,13 @@ def _history_provider_stability_modifier(outcome_meta: dict[str, str], history_f
     )
     if not provider or provider == "none":
         return 0
-    unstable_statuses = {"external_unavailable", "misconfigured", "provider_error", "unavailable", "unstable"}
+    unstable_statuses = {
+        "external_unavailable",
+        "misconfigured",
+        "provider_error",
+        "unavailable",
+        "unstable",
+    }
     unstable_count = 0
     observed_count = 0
     for entry in reversed(_read_history_entries(history_file)):
@@ -1706,7 +1391,9 @@ def _history_provider_stability_modifier(outcome_meta: dict[str, str], history_f
         )
         if historical_provider != provider:
             continue
-        provider_status = normalize_single_line(str(outcome.get("augmented_provider_status", "")).lower())
+        provider_status = normalize_single_line(
+            str(outcome.get("augmented_provider_status", "")).lower()
+        )
         if not provider_status or provider_status in {"none", "not_used"}:
             continue
         observed_count += 1
@@ -1778,7 +1465,9 @@ def _estimated_confidence_for_answer_contract(
 ) -> tuple[int, str]:
     provider_status = str(outcome_meta.get("AUGMENTED_PROVIDER_STATUS", "")).strip().lower()
     clarification_required = _truthy_text(outcome_meta.get("AUGMENTED_CLARIFICATION_REQUIRED"))
-    confidence = _confidence_base_for_answer_contract(answer_class, source_basis, verification_status)
+    confidence = _confidence_base_for_answer_contract(
+        answer_class, source_basis, verification_status
+    )
     confidence += _multiple_consistent_signals_modifier(outcome_meta, source_basis)
     if clarification_required:
         confidence -= 8
@@ -1789,7 +1478,9 @@ def _estimated_confidence_for_answer_contract(
         confidence -= 3
     if _is_structured_or_well_known_question(outcome_meta):
         confidence += 4
-    repeat_modifier, repeat_signal = _repeat_consistency_modifier(request_text, response_text, history_file)
+    repeat_modifier, repeat_signal = _repeat_consistency_modifier(
+        request_text, response_text, history_file
+    )
     confidence += repeat_modifier
     return max(20, min(90, int(confidence))), repeat_signal
 
@@ -1819,8 +1510,14 @@ def _answer_contract_notes(
     if answer_class == "best_effort_recovery_answer":
         return "No allowlisted evidence confirmed this directly."
     provider_status = str(outcome_meta.get("AUGMENTED_PROVIDER_STATUS", "")).strip().lower()
-    if provider_status in {"external_unavailable", "misconfigured", "provider_error"} and source_basis == ["local_model_background"]:
-        return "Provider background was unavailable, so this answer uses only local model background."
+    if provider_status in {
+        "external_unavailable",
+        "misconfigured",
+        "provider_error",
+    } and source_basis == ["local_model_background"]:
+        return (
+            "Provider background was unavailable, so this answer uses only local model background."
+        )
     return "No allowlisted evidence confirmed this directly."
 
 
@@ -1832,7 +1529,11 @@ def build_augmented_answer_contract(
     request_text: str = "",
     history_file: Path | None = None,
 ) -> dict[str, Any]:
-    if answer_class not in {"augmented_unverified_fallback", "augmented_unverified_answer", "best_effort_recovery_answer"}:
+    if answer_class not in {
+        "augmented_unverified_fallback",
+        "augmented_unverified_answer",
+        "best_effort_recovery_answer",
+    }:
         return {}
 
     answer_text = _operator_answer_text(response_text)
@@ -1840,7 +1541,9 @@ def build_augmented_answer_contract(
         return {}
 
     source_basis = _source_basis_for_answer_contract(outcome_meta, answer_class)
-    verification_status = _verification_status_for_answer_contract(outcome_meta, answer_class, source_basis)
+    verification_status = _verification_status_for_answer_contract(
+        outcome_meta, answer_class, source_basis
+    )
     estimated_confidence_pct, consistency_signal = _estimated_confidence_for_answer_contract(
         outcome_meta,
         answer_class,
@@ -1856,7 +1559,9 @@ def build_augmented_answer_contract(
         "verification_status": verification_status,
         "estimated_confidence_pct": estimated_confidence_pct,
         "estimated_confidence_band": estimated_confidence_band,
-        "estimated_confidence_label": _confidence_label_for_pct(estimated_confidence_pct, estimated_confidence_band),
+        "estimated_confidence_label": _confidence_label_for_pct(
+            estimated_confidence_pct, estimated_confidence_band
+        ),
         "source_basis": source_basis,
         "notes": _answer_contract_notes(
             outcome_meta,
@@ -1868,7 +1573,10 @@ def build_augmented_answer_contract(
     if consistency_signal != "not_checked":
         contract["consistency_signal"] = consistency_signal
     provider_status = str(outcome_meta.get("AUGMENTED_PROVIDER_STATUS", "")).strip()
-    if answer_class in {"augmented_unverified_fallback", "augmented_unverified_answer"} and provider_status:
+    if (
+        answer_class in {"augmented_unverified_fallback", "augmented_unverified_answer"}
+        and provider_status
+    ):
         contract["provider_status"] = provider_status
     return contract
 
@@ -1938,9 +1646,15 @@ def operator_answer_path(outcome_meta: dict[str, str], answer_class: str) -> str
 def operator_note(outcome_meta: dict[str, str], answer_class: str) -> str:
     fallback_reason = str(outcome_meta.get("FALLBACK_REASON", "")).strip()
     action_hint = str(outcome_meta.get("ACTION_HINT", "")).strip()
-    if answer_class == "augmented_unverified_fallback" and fallback_reason == "local_generation_degraded":
+    if (
+        answer_class == "augmented_unverified_fallback"
+        and fallback_reason == "local_generation_degraded"
+    ):
         return "Escalated because the local answer degraded."
-    if answer_class == "augmented_unverified_fallback" and fallback_reason == "validated_insufficient":
+    if (
+        answer_class == "augmented_unverified_fallback"
+        and fallback_reason == "validated_insufficient"
+    ):
         return "Escalated because the evidence path was insufficient."
     if answer_class == "operator_blocked":
         return "Evidence is disabled by operator control."
@@ -2005,10 +1719,13 @@ def build_outcome_payload(
         "fallback_used": outcome_meta.get("FALLBACK_USED", ""),
         "fallback_reason": outcome_meta.get("FALLBACK_REASON", ""),
         "trust_class": outcome_meta.get("TRUST_CLASS", ""),
-        "intent_family": outcome_meta.get("MANIFEST_INTENT_FAMILY", "") or outcome_meta.get("INTENT_FAMILY", ""),
+        "intent_family": outcome_meta.get("MANIFEST_INTENT_FAMILY", "")
+        or outcome_meta.get("INTENT_FAMILY", ""),
         "evidence_mode": evidence_mode,
         "evidence_mode_reason": evidence_mode_reason,
-        "evidence_mode_selection": evidence_mode_selection_label(evidence_mode, evidence_mode_reason),
+        "evidence_mode_selection": evidence_mode_selection_label(
+            evidence_mode, evidence_mode_reason
+        ),
         "augmented_allowed": outcome_meta.get("AUGMENTED_ALLOWED", ""),
         "augmented_provider": outcome_meta.get("AUGMENTED_PROVIDER", ""),
         "augmented_provider_selected": outcome_meta.get("AUGMENTED_PROVIDER_SELECTED", ""),
@@ -2017,13 +1734,20 @@ def build_outcome_payload(
         "augmented_provider_call_reason": outcome_meta.get("AUGMENTED_PROVIDER_CALL_REASON", ""),
         "augmented_provider_status": outcome_meta.get("AUGMENTED_PROVIDER_STATUS", ""),
         "augmented_provider_error_reason": outcome_meta.get("AUGMENTED_PROVIDER_ERROR_REASON", ""),
-        "augmented_provider_selection_reason": outcome_meta.get("AUGMENTED_PROVIDER_SELECTION_REASON", ""),
-        "augmented_provider_selection_query": outcome_meta.get("AUGMENTED_PROVIDER_SELECTION_QUERY", ""),
-        "augmented_provider_selection_rule": outcome_meta.get("AUGMENTED_PROVIDER_SELECTION_RULE", ""),
+        "augmented_provider_selection_reason": outcome_meta.get(
+            "AUGMENTED_PROVIDER_SELECTION_REASON", ""
+        ),
+        "augmented_provider_selection_query": outcome_meta.get(
+            "AUGMENTED_PROVIDER_SELECTION_QUERY", ""
+        ),
+        "augmented_provider_selection_rule": outcome_meta.get(
+            "AUGMENTED_PROVIDER_SELECTION_RULE", ""
+        ),
         "augmented_provider_cost_notice": outcome_meta.get("AUGMENTED_PROVIDER_COST_NOTICE", ""),
         "augmented_paid_provider_invoked": outcome_meta.get("AUGMENTED_PAID_PROVIDER_INVOKED", ""),
         "augmentation_policy": outcome_meta.get("AUGMENTATION_POLICY", ""),
-        "augmented_direct_request": outcome_meta.get("AUGMENTED_DIRECT_REQUEST", "") or augmented_direct_request,
+        "augmented_direct_request": outcome_meta.get("AUGMENTED_DIRECT_REQUEST", "")
+        or augmented_direct_request,
         "unverified_context_used": outcome_meta.get("UNVERIFIED_CONTEXT_USED", ""),
         "unverified_context_class": outcome_meta.get("UNVERIFIED_CONTEXT_CLASS", ""),
         "unverified_context_title": outcome_meta.get("UNVERIFIED_CONTEXT_TITLE", ""),
@@ -2035,7 +1759,9 @@ def build_outcome_payload(
         "recovery_eligible": outcome_meta.get("RECOVERY_ELIGIBLE", ""),
         "recovery_lane": outcome_meta.get("RECOVERY_LANE", ""),
         "augmented_behavior_shape": outcome_meta.get("AUGMENTED_BEHAVIOR_SHAPE", ""),
-        "augmented_clarification_required": outcome_meta.get("AUGMENTED_CLARIFICATION_REQUIRED", ""),
+        "augmented_clarification_required": outcome_meta.get(
+            "AUGMENTED_CLARIFICATION_REQUIRED", ""
+        ),
         "augmented_answer_contract": build_augmented_answer_contract(
             outcome_meta,
             answer_class,
@@ -2074,11 +1800,15 @@ def build_route_payload(
         "selected_route": selected_route,
         "requested_mode": outcome_meta.get("REQUESTED_MODE", ""),
         "final_mode": outcome_meta.get("FINAL_MODE", ""),
-        "intent_class": outcome_meta.get("GOVERNOR_INTENT", "") or outcome_meta.get("CLASSIFIER_INTENT", ""),
-        "intent_family": outcome_meta.get("MANIFEST_INTENT_FAMILY", "") or outcome_meta.get("INTENT_FAMILY", ""),
+        "intent_class": outcome_meta.get("GOVERNOR_INTENT", "")
+        or outcome_meta.get("CLASSIFIER_INTENT", ""),
+        "intent_family": outcome_meta.get("MANIFEST_INTENT_FAMILY", "")
+        or outcome_meta.get("INTENT_FAMILY", ""),
         "evidence_mode": evidence_mode,
         "evidence_mode_reason": evidence_mode_reason,
-        "evidence_mode_selection": evidence_mode_selection_label(evidence_mode, evidence_mode_reason),
+        "evidence_mode_selection": evidence_mode_selection_label(
+            evidence_mode, evidence_mode_reason
+        ),
         "authority_basis": outcome_meta.get("MANIFEST_AUTHORITY_BASIS", ""),
         "winning_signal": outcome_meta.get("WINNING_SIGNAL", ""),
         "query": route_meta.get("QUERY", "") or outcome_meta.get("QUERY", "") or request_text,
@@ -2166,7 +1896,9 @@ def persist_route_snapshot(payload: dict[str, Any]) -> None:
     route = payload.get("route")
     if not isinstance(route, dict):
         return
-    selected_route = _stringify(route.get("selected_route") or route.get("mode") or route.get("final_mode"))
+    selected_route = _stringify(
+        route.get("selected_route") or route.get("mode") or route.get("final_mode")
+    )
     if not selected_route:
         return
 
@@ -2215,7 +1947,10 @@ def _history_contains_request_id(history_file: Path, request_id: str) -> bool:
                     parsed = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if isinstance(parsed, dict) and str(parsed.get("request_id", "")).strip() == request_id:
+                if (
+                    isinstance(parsed, dict)
+                    and str(parsed.get("request_id", "")).strip() == request_id
+                ):
                     return True
         except OSError:
             continue
@@ -2239,7 +1974,9 @@ def _read_history_lines(history_file: Path) -> list[str]:
     if not history_file.exists():
         return []
     try:
-        return [line for line in history_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+        return [
+            line for line in history_file.read_text(encoding="utf-8").splitlines() if line.strip()
+        ]
     except OSError as exc:
         raise RuntimeRequestError(f"unable to read history file {history_file}: {exc}") from exc
 

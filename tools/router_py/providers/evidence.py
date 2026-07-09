@@ -91,8 +91,7 @@ def _set_cached_evidence(provider: str, question: str, result: Any) -> None:
 
 
 def _prepare_subprocess_env(extra: dict[str, str] | None = None) -> dict[str, str]:
-    """Build isolated subprocess environment."""
-    import os
+    """Build isolated subprocess environment (retained for API compatibility)."""
 
     env = os.environ.copy()
     env["STATE_NAMESPACE_RAW"] = os.environ.get("LUCY_SHARED_STATE_NAMESPACE", "")
@@ -385,42 +384,22 @@ async def fetch_time_evidence(question: str) -> dict[str, Any] | None:
     logger.info(f"Fetching time for location: {location}")
 
     try:
-        tool_path = ROOT_DIR / "tools" / "current_time_tool.py"
-        if not tool_path.exists():
-            logger.warning("Time tool not found")
-            return None
+        _ensure_tools_path()
+        import current_time_tool
 
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable,
-            str(tool_path),
-            location,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(ROOT_DIR),
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10.0)
-        except asyncio.TimeoutError:
-            proc.kill()
-            logger.warning("Time tool timed out")
-            return None
-
+        data = current_time_tool.get_current_time(location)
         result = None
-        if proc.returncode == 0:
-            data = json.loads(stdout.decode("utf-8"))
-            if data.get("ok"):
-                formatted = format_time_response(data)
-                result = {
-                    "ok": True,
-                    "timezone": data.get("timezone"),
-                    "datetime": data.get("datetime"),
-                    "dst": data.get("dst"),
-                    "formatted": formatted,
-                }
-            else:
-                logger.warning(f"Time API error: {data.get('error')}")
+        if data.get("ok"):
+            formatted = format_time_response(data)
+            result = {
+                "ok": True,
+                "timezone": data.get("timezone"),
+                "datetime": data.get("datetime"),
+                "dst": data.get("dst"),
+                "formatted": formatted,
+            }
         else:
-            logger.warning(f"Time tool failed: {stderr.decode()}")
+            logger.warning(f"Time API error: {data.get('error')}")
         _set_cached_evidence("time", question, result)
         return result
     except Exception as e:
@@ -499,64 +478,42 @@ async def fetch_api_evidence(
 
 
 def call_kimi_subprocess(question: str, timeout: float = 130.0) -> dict[str, Any] | None:
-    """Call Kimi provider via subprocess (sync version for thread pool)."""
-    import subprocess
-
-    tool = ROOT_DIR / "tools" / "unverified_context_kimi.py"
-    if not tool.exists():
-        return None
+    """Call Kimi provider directly (sync version for thread pool)."""
     try:
-        result = subprocess.run(
-            [sys.executable, str(tool), question],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=_prepare_subprocess_env(),
-            cwd=str(ROOT_DIR),
-        )
-        if result.returncode == 0:
-            payload = json.loads(result.stdout)
-            if payload.get("ok"):
-                return {
-                    "context": payload.get("text", payload.get("context", "")),
-                    "title": payload.get("title", ""),
-                    "url": payload.get("url", ""),
-                    "provider": "kimi",
-                    "class": payload.get("class", "kimi_general"),
-                }
+        _ensure_tools_path()
+        import unverified_context_kimi as kimi_provider
+
+        payload = kimi_provider.answer_question(question)
+        if payload.get("ok"):
+            return {
+                "context": payload.get("text", payload.get("context", "")),
+                "title": payload.get("title", ""),
+                "url": payload.get("url", ""),
+                "provider": "kimi",
+                "class": payload.get("class", "kimi_general"),
+            }
     except Exception as e:
-        logger.debug(f"Kimi subprocess failed: {e}")
+        logger.debug(f"Kimi direct call failed: {e}")
     return None
 
 
 def call_openai_subprocess(question: str, timeout: float = 130.0) -> dict[str, Any] | None:
-    """Call OpenAI provider via subprocess (sync version for thread pool)."""
-    import subprocess
-
-    tool = ROOT_DIR / "tools" / "unverified_context_openai.py"
-    if not tool.exists():
-        return None
+    """Call OpenAI provider directly (sync version for thread pool)."""
     try:
-        result = subprocess.run(
-            [sys.executable, str(tool), question],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=_prepare_subprocess_env(),
-            cwd=str(ROOT_DIR),
-        )
-        if result.returncode == 0:
-            payload = json.loads(result.stdout)
-            if payload.get("ok"):
-                return {
-                    "context": payload.get("text", payload.get("context", "")),
-                    "title": payload.get("title", ""),
-                    "url": payload.get("url", ""),
-                    "provider": "openai",
-                    "class": payload.get("class", "openai_general"),
-                }
+        _ensure_tools_path()
+        import unverified_context_openai as openai_provider
+
+        payload = openai_provider.answer_question(question)
+        if payload.get("ok"):
+            return {
+                "context": payload.get("text", payload.get("context", "")),
+                "title": payload.get("title", ""),
+                "url": payload.get("url", ""),
+                "provider": "openai",
+                "class": payload.get("class", "openai_general"),
+            }
     except Exception as e:
-        logger.debug(f"OpenAI subprocess failed: {e}")
+        logger.debug(f"OpenAI direct call failed: {e}")
     return None
 
 
@@ -891,6 +848,24 @@ def _extract_price_from_snippets(results: list[dict]) -> tuple[str | None, str |
     return None, None, None
 
 
+async def _search_web(query: str, max_results: int = 5) -> list[dict[str, Any]]:
+    """Run a web search via direct import, preserving the 20s timeout."""
+    try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
+        from tools.internet.search_web import multi_backend_search
+
+        loop = asyncio.get_event_loop()
+        backend, results = await asyncio.wait_for(
+            loop.run_in_executor(None, multi_backend_search, query, max_results),
+            timeout=20.0,
+        )
+        return results[:max_results]
+    except Exception as e:
+        logger.debug(f"Web search failed: {e}")
+        return []
+
+
 async def _fetch_stock_via_search(symbol: str) -> dict[str, Any] | None:
     """Fallback stock quote via web search when Yahoo Finance rate-limits.
 
@@ -898,31 +873,9 @@ async def _fetch_stock_via_search(symbol: str) -> dict[str, Any] | None:
     found we return it with a freshness caveat; otherwise we return an honest
     unavailable message instead of a useless generic snippet.
     """
-    search_script = ROOT_DIR / "tools" / "internet" / "search_web.py"
-    if not search_script.exists():
-        return None
     query = f"{symbol} stock price"
     try:
-        payload = json.dumps({"query": query, "max_results": 5})
-        env = os.environ.copy()
-        env["PYTHONPATH"] = str(ROOT_DIR) + os.pathsep + env.get("PYTHONPATH", "")
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable,
-            str(search_script),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(ROOT_DIR),
-            env=env,
-        )
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(payload.encode("utf-8")), timeout=20.0
-        )
-        if proc.returncode != 0:
-            logger.warning(f"Stock search failed: {stderr.decode()[:200]}")
-            return None
-        data = json.loads(stdout.decode("utf-8"))
-        results = data.get("results", [])
+        results = await _search_web(query, max_results=5)
         if not results:
             return None
 
@@ -967,31 +920,9 @@ async def _fetch_stock_via_search(symbol: str) -> dict[str, Any] | None:
 
 async def _fetch_net_worth(person: str) -> dict[str, Any] | None:
     """Fetch net-worth estimate via web search restricted to trusted finance sources."""
-    search_script = ROOT_DIR / "tools" / "internet" / "search_web.py"
-    if not search_script.exists():
-        return None
     query = f"{person} net worth"
     try:
-        payload = json.dumps({"query": query, "max_results": 5})
-        env = os.environ.copy()
-        env["PYTHONPATH"] = str(ROOT_DIR) + os.pathsep + env.get("PYTHONPATH", "")
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable,
-            str(search_script),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(ROOT_DIR),
-            env=env,
-        )
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(payload.encode("utf-8")), timeout=20.0
-        )
-        if proc.returncode != 0:
-            logger.warning(f"Net-worth search failed: {stderr.decode()[:200]}")
-            return None
-        data = json.loads(stdout.decode("utf-8"))
-        results = data.get("results", [])
+        results = await _search_web(query, max_results=5)
         if not results:
             return None
         # Use the first result's snippet as evidence; include source URL
