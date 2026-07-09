@@ -1,8 +1,8 @@
 # Local Lucy V11 — Architecture
 
-**Date:** 2026-07-04
+**Date:** 2026-07-09
 **Version:** v11
-**Branch:** v11-dev
+**Branch:** v10-dev
 **Scope:** English-only primary runtime
 
 > This document describes **v11 as implemented**. Hebrew / Racheli support has been separated from the primary runtime and is maintained in its own isolation layer.
@@ -201,6 +201,7 @@ Evidence source quality is constrained by `config/trusted_domains.yaml` and `con
 
 `tools/router_py/execution_engine.py` is the central dispatch layer:
 
+- **Python-native only** as of 2026-07-09: the legacy shell fallback path and the `use_python_path` toggle were removed. Callers (`ui-v10/app/services/runtime_bridge.py`, `tools/router_py/request_pipeline.py`) invoke Python directly.
 - Builds a Python execution plan from the resolved route.
 - Runs in an isolated namespace.
 - Loads relevant memory context.
@@ -208,6 +209,8 @@ Evidence source quality is constrained by `config/trusted_domains.yaml` and `con
 - Filters evidence and memory through `context_guard`.
 - Formats the response and writes structured state updates via `StateWriter`.
 - On failure, escalates to clarification or local reasoning rather than crashing.
+
+The file shrank from ~3,900 lines to ~2,216 lines after the shell removal, reducing surface area for dual-path bugs.
 
 ---
 
