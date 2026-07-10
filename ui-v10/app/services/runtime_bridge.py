@@ -10,6 +10,7 @@ import importlib
 import io
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -1317,75 +1318,44 @@ class RuntimeBridge:
                 payload=None,
             )
 
+        timeout_seconds = self.voice_status_timeout_seconds
+        if action == "voice_ptt_start":
+            timeout_seconds = self.voice_start_timeout_seconds
+        elif action == "voice_ptt_stop":
+            timeout_seconds = self.voice_stop_timeout_seconds
+
         try:
-            with self._runtime_env(include_voice_python=True):
-                runtime_voice = self._import_tool("runtime_voice")
-                RuntimeVoiceExit = runtime_voice.RuntimeVoiceExit
-                runtime_file = runtime_voice.resolve_voice_runtime_file(None)
-                state_file = runtime_voice.resolve_state_file(None)
-                capture_dir = runtime_voice.resolve_capture_directory(None)
-
-                if action == "voice_status":
-                    if runtime_voice.use_python_voice():
-                        payload = runtime_voice.handle_status_python()
-                    else:
-                        payload = runtime_voice.sync_voice_runtime(runtime_file, state_file)
-                elif action == "voice_ptt_start":
-                    if runtime_voice.use_python_voice():
-                        payload = runtime_voice.handle_ptt_start_python(
-                            runtime_file, state_file, capture_dir
-                        )
-                    else:
-                        payload = runtime_voice.handle_ptt_start(
-                            runtime_file, state_file, capture_dir
-                        )
-                elif action == "voice_ptt_stop":
-                    if runtime_voice.use_python_voice():
-                        payload = runtime_voice.handle_ptt_stop_python(
-                            runtime_file, state_file, capture_dir
-                        )
-                    else:
-                        payload = runtime_voice.handle_ptt_stop(
-                            runtime_file, state_file, capture_dir
-                        )
-                else:
-                    payload = {}
-
-                stdout = json.dumps(payload, sort_keys=True)
-                stderr = ""
-                returncode = 0
-        except RuntimeVoiceExit as exc:
+            completed = subprocess.run(
+                ["python3", str(self.voice_tool_path), command_name],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                shell=False,
+                env=self._command_env(include_voice_python=True),
+            )
+        except subprocess.TimeoutExpired as exc:
             return CommandResult(
                 action=action,
                 requested_value=requested_value,
-                status="failed",
-                returncode=exc.exit_code,
-                stdout="",
-                stderr=exc.message,
-                timed_out=False,
-                payload=None,
-            )
-        except Exception as exc:
-            return CommandResult(
-                action=action,
-                requested_value=requested_value,
-                status="failed",
-                returncode=1,
-                stdout="",
-                stderr=str(exc),
-                timed_out=False,
-                payload=None,
+                status="timeout",
+                returncode=None,
+                stdout=exc.stdout or "",
+                stderr=exc.stderr or "",
+                timed_out=True,
+                payload=self._extract_payload(exc.stdout),
             )
 
+        status = "ok" if completed.returncode == 0 else "failed"
         return CommandResult(
             action=action,
             requested_value=requested_value,
-            status="ok",
-            returncode=returncode,
-            stdout=stdout,
-            stderr=stderr,
+            status=status,
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
             timed_out=False,
-            payload=payload,
+            payload=self._extract_payload(completed.stdout),
         )
 
     def _run_clear_persona_action(self) -> CommandResult:
