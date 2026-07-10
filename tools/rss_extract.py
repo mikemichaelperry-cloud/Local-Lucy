@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-import sys
-import re
 import html
+import re
+import sys
 import xml.etree.ElementTree as ET
 
 TAG_RE = re.compile(r"<[^>]+>")
 WS_RE = re.compile(r"\s+")
+
 
 def clean_text(s: str) -> str:
     if not s:
@@ -17,6 +18,7 @@ def clean_text(s: str) -> str:
     s = re.sub(r"\s*Continue reading\.\.\.\s*$", "", s)
     return s
 
+
 def first_text(elem, paths):
     for p in paths:
         x = elem.find(p)
@@ -25,6 +27,7 @@ def first_text(elem, paths):
             if t:
                 return t
     return ""
+
 
 def main() -> int:
     data = sys.stdin.read()
@@ -71,6 +74,7 @@ def main() -> int:
         return 0
 
     return 0
+
 
 if __name__ == "__main__":
     try:

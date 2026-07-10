@@ -4,6 +4,7 @@ Local Lucy V10 — Fast Thrash Test (Routing Layer Only)
 Hammers classification, routing, provider selection, and memory gate.
 No LLM inference — sub-second per query.
 """
+
 from __future__ import annotations
 
 import concurrent.futures
@@ -21,20 +22,25 @@ os.environ["LUCY_SESSION_MEMORY"] = "1"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 from router_py.classify import (
-    classify_intent, select_route, _memory_routing_gate,
-    _resolve_provider_preference, RoutingDecision
+    RoutingDecision,
+    _memory_routing_gate,
+    _resolve_provider_preference,
+    classify_intent,
+    select_route,
 )
-from router_py.execution_engine import ExecutionEngine, HAS_PROVIDER_MODULES
-from router_py.main import ensure_control_env, execute_plan_python
+from router_py.execution_engine import HAS_PROVIDER_MODULES, ExecutionEngine
+from router_py.main import ensure_control_env
 
 results = []
 start_time = time.time()
+
 
 def log(stage: str, name: str, ok: bool, detail: str = ""):
     status = "PASS" if ok else "FAIL"
     elapsed = time.time() - start_time
     results.append((elapsed, stage, status, name, detail))
     print(f"  [{status:4s}] {stage:18s} | {name:38s} {detail}")
+
 
 # Warm up the router once
 print("Warming up ModernBERT router...")
@@ -90,7 +96,7 @@ for query in basic_queries[-5:]:
     except Exception:
         pass
 
-log("Basic", "100 queries total", True, f"completed")
+log("Basic", "100 queries total", True, "completed")
 
 # ============================================================================
 # STAGE 2: PROVIDER PREFERENCE (60 rapid switches)
@@ -119,12 +125,30 @@ print("STAGE 3: Garbage & Malformed Inputs (50 queries)")
 print("=" * 70)
 
 garbage = [
-    "", "   ", "!@#$%^&*()", "a", "x" * 5000,
-    "\x00\x01\x02", "\n\r\t", "日本語テスト", "العربية",
-    "local:", "augmented:   ", "news:", "evidence:",
-    "DROP TABLE users;", "<script>alert(1)</script>",
-    "1+1", "---", "???", "!!!", "...",
-] + [''.join(random.choices(string.ascii_letters + string.digits, k=random.randint(5, 200))) for _ in range(30)]
+    "",
+    "   ",
+    "!@#$%^&*()",
+    "a",
+    "x" * 5000,
+    "\x00\x01\x02",
+    "\n\r\t",
+    "日本語テスト",
+    "العربية",
+    "local:",
+    "augmented:   ",
+    "news:",
+    "evidence:",
+    "DROP TABLE users;",
+    "<script>alert(1)</script>",
+    "1+1",
+    "---",
+    "???",
+    "!!!",
+    "...",
+] + [
+    "".join(random.choices(string.ascii_letters + string.digits, k=random.randint(5, 200)))
+    for _ in range(30)
+]
 
 crash_count = 0
 for i, g in enumerate(garbage):
@@ -146,13 +170,19 @@ print("STAGE 4: Concurrent Routing (16 threads × 8 queries = 128)")
 print("=" * 70)
 
 concurrent_queries = [
-    "What time is it?", "Weather in Berlin", "Explain entropy",
-    "Who wrote Hamlet?", "What is the speed of light?", "Tell me a riddle",
-    "breaking news headlines", "Explain quantum mechanics",
+    "What time is it?",
+    "Weather in Berlin",
+    "Explain entropy",
+    "Who wrote Hamlet?",
+    "What is the speed of light?",
+    "Tell me a riddle",
+    "breaking news headlines",
+    "Explain quantum mechanics",
 ] * 16
 
 success_c = 0
 fail_c = 0
+
 
 def classify_one(q):
     global success_c, fail_c
@@ -162,6 +192,7 @@ def classify_one(q):
         success_c += 1
     except Exception:
         fail_c += 1
+
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
     list(ex.map(classify_one, concurrent_queries))
@@ -176,6 +207,7 @@ print("STAGE 5: Memory Gate Stress (50 patterns)")
 print("=" * 70)
 
 from memory.memory_service import clear_session, store_turn
+
 try:
     clear_session()
     store_turn("user", "My dog is named Max.")
@@ -233,12 +265,22 @@ print("=" * 70)
 
 log("ProviderMod", "HAS_PROVIDER_MODULES", HAS_PROVIDER_MODULES, "")
 
-from router_py.providers import (
-    fetch_wikipedia_evidence, fetch_api_evidence, fetch_time_evidence,
-    fetch_weather_evidence, fetch_news_evidence, format_time_response,
-    format_wikipedia_response, call_openai_for_response, call_openai_subprocess,
-    call_kimi_for_response, call_kimi_subprocess, call_local_model_async,
+# Intentional smoke-test: verify provider symbols are importable.
+from router_py.providers import (  # noqa: F401
+    call_kimi_for_response,
+    call_kimi_subprocess,
+    call_local_model_async,
+    call_openai_for_response,
+    call_openai_subprocess,
+    fetch_api_evidence,
+    fetch_news_evidence,
+    fetch_time_evidence,
+    fetch_weather_evidence,
+    fetch_wikipedia_evidence,
+    format_time_response,
+    format_wikipedia_response,
 )
+
 log("ProviderMod", "All imports OK", True, "13 symbols")
 
 # ============================================================================
@@ -249,11 +291,18 @@ print("STAGE 8: Frozen Dataclass Mutation (1000 replacements)")
 print("=" * 70)
 
 import dataclasses
+
 rd = RoutingDecision(
-    route="AUGMENTED", mode="AUTO", intent_family="background_overview",
-    confidence=0.9, provider="wikipedia", provider_usage_class="free",
-    evidence_mode="required", evidence_reason="source_request",
-    requires_evidence=True, policy_reason="test"
+    route="AUGMENTED",
+    mode="AUTO",
+    intent_family="background_overview",
+    confidence=0.9,
+    provider="wikipedia",
+    provider_usage_class="free",
+    evidence_mode="required",
+    evidence_reason="source_request",
+    requires_evidence=True,
+    policy_reason="test",
 )
 for _ in range(1000):
     rd2 = dataclasses.replace(rd, provider=random.choice(["wikipedia", "openai", "kimi"]))
@@ -271,7 +320,12 @@ print("=" * 70)
 
 ensure_control_env()
 state_file = Path("/home/mike/lucy-v10/state/state/current_state.json")
-log("StateFile", "current_state.json", state_file.exists(), f"size={state_file.stat().st_size if state_file.exists() else 0}")
+log(
+    "StateFile",
+    "current_state.json",
+    state_file.exists(),
+    f"size={state_file.stat().st_size if state_file.exists() else 0}",
+)
 
 # ============================================================================
 # STAGE 10: EXECUTION ENGINE INSTANTIATION
@@ -307,8 +361,12 @@ print(f"\nTotal checks:    {total}")
 print(f"Passed:          {passed}")
 print(f"Failed:          {failed}")
 print(f"Total time:      {total_time:.1f}s")
-print(f"Queries routed:  {len(basic_queries) + len(concurrent_queries) + len(garbage) + len(prefix_tests)}")
-print(f"Avg per query:   {total_time / (len(basic_queries) + len(concurrent_queries) + len(garbage) + len(prefix_tests)) * 1000:.1f}ms")
+print(
+    f"Queries routed:  {len(basic_queries) + len(concurrent_queries) + len(garbage) + len(prefix_tests)}"
+)
+print(
+    f"Avg per query:   {total_time / (len(basic_queries) + len(concurrent_queries) + len(garbage) + len(prefix_tests)) * 1000:.1f}ms"
+)
 
 if failed > 0:
     print("\nFAILED DETAILS:")

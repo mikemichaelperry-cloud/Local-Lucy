@@ -10,7 +10,6 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ADAPTER = REPO_ROOT / "tools" / "voice" / "tts_adapter.py"
 
@@ -43,7 +42,10 @@ def main() -> int:
 
         probe = run_adapter(env, "probe", "--engine", "auto")
         assert_ok(probe["ok"] is True, f"probe failed: {probe}")
-        assert_ok(probe["engine"] == "kokoro", f"auto selection should prefer kokoro when available: {probe}")
+        assert_ok(
+            probe["engine"] == "kokoro",
+            f"auto selection should prefer kokoro when available: {probe}",
+        )
 
         auto_payload = run_adapter(
             env,
@@ -55,9 +57,18 @@ def main() -> int:
             "--text",
             "selection test",
         )
-        assert_ok(auto_payload["requested_engine"] == "auto", f"auto payload missing requested_engine: {auto_payload}")
-        assert_ok(auto_payload["engine"] == "kokoro", f"auto synth should prefer kokoro when available: {auto_payload}")
-        assert_ok(auto_payload["fallback_used"] is False, f"auto primary selection should not mark fallback: {auto_payload}")
+        assert_ok(
+            auto_payload["requested_engine"] == "auto",
+            f"auto payload missing requested_engine: {auto_payload}",
+        )
+        assert_ok(
+            auto_payload["engine"] == "kokoro",
+            f"auto synth should prefer kokoro when available: {auto_payload}",
+        )
+        assert_ok(
+            auto_payload["fallback_used"] is False,
+            f"auto primary selection should not mark fallback: {auto_payload}",
+        )
 
         env_no_piper = env.copy()
         env_no_piper["LUCY_VOICE_PIPER_BIN"] = str(root / "missing-piper")
@@ -66,7 +77,10 @@ def main() -> int:
 
         fallback_probe = run_adapter(env_no_piper, "probe", "--engine", "auto")
         assert_ok(fallback_probe["ok"] is True, f"fallback probe failed: {fallback_probe}")
-        assert_ok(fallback_probe["engine"] == "kokoro", f"auto selection should still prefer kokoro when piper is unavailable: {fallback_probe}")
+        assert_ok(
+            fallback_probe["engine"] == "kokoro",
+            f"auto selection should still prefer kokoro when piper is unavailable: {fallback_probe}",
+        )
 
         degraded_payload = run_adapter(
             env_no_piper,
@@ -80,10 +94,22 @@ def main() -> int:
             "--text",
             "degraded direct selection",
         )
-        assert_ok(degraded_payload["ok"] is True, f"degraded selection should still synthesize: {degraded_payload}")
-        assert_ok(degraded_payload["requested_engine"] == "piper", f"requested_engine should preserve requested backend: {degraded_payload}")
-        assert_ok(degraded_payload["engine"] == "kokoro", f"degraded selection should truthfully report actual engine: {degraded_payload}")
-        assert_ok(degraded_payload["fallback_used"] is False, f"direct degraded selection must not mark fallback_used: {degraded_payload}")
+        assert_ok(
+            degraded_payload["ok"] is True,
+            f"degraded selection should still synthesize: {degraded_payload}",
+        )
+        assert_ok(
+            degraded_payload["requested_engine"] == "piper",
+            f"requested_engine should preserve requested backend: {degraded_payload}",
+        )
+        assert_ok(
+            degraded_payload["engine"] == "kokoro",
+            f"degraded selection should truthfully report actual engine: {degraded_payload}",
+        )
+        assert_ok(
+            degraded_payload["fallback_used"] is False,
+            f"direct degraded selection must not mark fallback_used: {degraded_payload}",
+        )
     print("PASS: test_tts_backend_selection")
     return 0
 
@@ -98,7 +124,9 @@ def run_adapter(env: dict[str, str], *args: str) -> dict[str, object]:
         cwd=str(REPO_ROOT),
     )
     payload = json.loads(completed.stdout)
-    assert_ok(isinstance(payload, dict), f"adapter stdout was not JSON object: {completed.stdout!r}")
+    assert_ok(
+        isinstance(payload, dict), f"adapter stdout was not JSON object: {completed.stdout!r}"
+    )
     return payload
 
 

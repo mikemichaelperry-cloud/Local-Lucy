@@ -20,12 +20,10 @@ Output:
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
-import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -34,7 +32,6 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import numpy as np
 
 # ---------------------------------------------------------------------------
 # Prompt inventory
@@ -284,25 +281,70 @@ def _build_prompts() -> List[Dict[str, Any]]:
     """Build the full prompt inventory with metadata."""
     prompts: List[Dict[str, Any]] = []
     for i, q in enumerate(_LOCAL_FACTUAL):
-        prompts.append({"id": f"local_factual_{i:02d}", "query": q, "category": "local_factual", "expected_route": "LOCAL"})
+        prompts.append(
+            {
+                "id": f"local_factual_{i:02d}",
+                "query": q,
+                "category": "local_factual",
+                "expected_route": "LOCAL",
+            }
+        )
     for i, q in enumerate(_CREATIVE_CHAT):
-        prompts.append({"id": f"creative_chat_{i:02d}", "query": q, "category": "creative_chat", "expected_route": "LOCAL"})
+        prompts.append(
+            {
+                "id": f"creative_chat_{i:02d}",
+                "query": q,
+                "category": "creative_chat",
+                "expected_route": "LOCAL",
+            }
+        )
     for i, q in enumerate(_MEMORY):
-        prompts.append({"id": f"memory_{i:02d}", "query": q, "category": "memory", "expected_route": "LOCAL"})
+        prompts.append(
+            {"id": f"memory_{i:02d}", "query": q, "category": "memory", "expected_route": "LOCAL"}
+        )
     for i, q in enumerate(_NEWS_EVIDENCE):
-        prompts.append({"id": f"news_evidence_{i:02d}", "query": q, "category": "news_evidence", "expected_route": "NEWS"})
+        prompts.append(
+            {
+                "id": f"news_evidence_{i:02d}",
+                "query": q,
+                "category": "news_evidence",
+                "expected_route": "NEWS",
+            }
+        )
     for i, q in enumerate(_AUGMENTED):
-        prompts.append({"id": f"augmented_{i:02d}", "query": q, "category": "augmented", "expected_route": "AUGMENTED"})
+        prompts.append(
+            {
+                "id": f"augmented_{i:02d}",
+                "query": q,
+                "category": "augmented",
+                "expected_route": "AUGMENTED",
+            }
+        )
     for i, q in enumerate(_VOICE_HMI):
-        prompts.append({"id": f"voice_hmi_{i:02d}", "query": q, "category": "voice_hmi", "expected_route": "LOCAL"})
+        prompts.append(
+            {
+                "id": f"voice_hmi_{i:02d}",
+                "query": q,
+                "category": "voice_hmi",
+                "expected_route": "LOCAL",
+            }
+        )
     for i, q in enumerate(_ADVERSARIAL):
-        prompts.append({"id": f"adversarial_{i:02d}", "query": q, "category": "adversarial", "expected_route": "varies"})
+        prompts.append(
+            {
+                "id": f"adversarial_{i:02d}",
+                "query": q,
+                "category": "adversarial",
+                "expected_route": "varies",
+            }
+        )
     return prompts
 
 
 # ---------------------------------------------------------------------------
 # Result tracking
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class BurnInResult:
@@ -324,6 +366,7 @@ class BurnInResult:
 # Semantic acceptability check (lightweight)
 # ---------------------------------------------------------------------------
 
+
 def _is_acceptable(query: str, text: str, category: str) -> Tuple[bool, str]:
     """Quick semantic acceptability checks."""
     if not text or len(text.strip()) < 5:
@@ -331,7 +374,10 @@ def _is_acceptable(query: str, text: str, category: str) -> Tuple[bool, str]:
 
     # Creative writing must NOT contain the identity preamble
     if category in ("creative_chat", "adversarial"):
-        leakage = "I always answer in first person" in text or "I never refer to myself in third person" in text
+        leakage = (
+            "I always answer in first person" in text
+            or "I never refer to myself in third person" in text
+        )
         if leakage:
             return False, "prompt leakage: identity preamble echoed"
 
@@ -364,6 +410,7 @@ def _is_acceptable(query: str, text: str, category: str) -> Tuple[bool, str]:
 # ---------------------------------------------------------------------------
 # HMI truth check
 # ---------------------------------------------------------------------------
+
 
 def _check_hmi_truth(result: Any, expected_route: str) -> Tuple[bool, str]:
     """Check that HMI state files reflect actual execution."""
@@ -399,10 +446,12 @@ def _check_hmi_truth(result: Any, expected_route: str) -> Tuple[bool, str]:
 # Execution
 # ---------------------------------------------------------------------------
 
+
 def _execute_prompt(query: str, timeout: int = 60) -> Tuple[Any, Optional[str]]:
     """Execute a single prompt through the full router pipeline."""
     try:
         from router_py.main import execute_plan_python
+
         result = execute_plan_python(query, policy="fallback_only", timeout=timeout)
         return result, None
     except Exception as e:
@@ -412,6 +461,7 @@ def _execute_prompt(query: str, timeout: int = 60) -> Tuple[Any, Optional[str]]:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     print("=" * 70)
@@ -430,7 +480,14 @@ def main() -> int:
     for idx, p in enumerate(prompts, 1):
         cat = p["category"]
         if cat not in category_stats:
-            category_stats[cat] = {"total": 0, "route_ok": 0, "answer_ok": 0, "hmi_ok": 0, "errors": 0, "timeouts": 0}
+            category_stats[cat] = {
+                "total": 0,
+                "route_ok": 0,
+                "answer_ok": 0,
+                "hmi_ok": 0,
+                "errors": 0,
+                "timeouts": 0,
+            }
         category_stats[cat]["total"] += 1
 
         print(f"[{idx}/{total}] {p['id']}: {p['query'][:60]}...")
@@ -442,20 +499,22 @@ def main() -> int:
         if error:
             print(f"    ERROR: {error}")
             category_stats[cat]["errors"] += 1
-            results.append(BurnInResult(
-                prompt_id=p["id"],
-                category=cat,
-                query=p["query"],
-                expected_route=p["expected_route"],
-                actual_route="ERROR",
-                response_text="",
-                duration_ms=duration_ms,
-                error=error,
-            ))
+            results.append(
+                BurnInResult(
+                    prompt_id=p["id"],
+                    category=cat,
+                    query=p["query"],
+                    expected_route=p["expected_route"],
+                    actual_route="ERROR",
+                    response_text="",
+                    duration_ms=duration_ms,
+                    error=error,
+                )
+            )
             continue
 
         if exec_result is None:
-            print(f"    ERROR: null result")
+            print("    ERROR: null result")
             category_stats[cat]["errors"] += 1
             continue
 
@@ -472,7 +531,9 @@ def main() -> int:
         elif p["expected_route"] == "NEWS" and route == "LOCAL":
             # News may route LOCAL if no live data available — acceptable
             route_correct = True
-        elif p["expected_route"] == "AUGMENTED" and (route == "LOCAL" or "requires evidence" in text.lower()):
+        elif p["expected_route"] == "AUGMENTED" and (
+            route == "LOCAL" or "requires evidence" in text.lower()
+        ):
             # Augmented may route LOCAL if policy=disabled or provider unavailable
             route_correct = True
 
@@ -495,19 +556,21 @@ def main() -> int:
         if not hmi_ok:
             print(f"    HMI: {hmi_notes}")
 
-        results.append(BurnInResult(
-            prompt_id=p["id"],
-            category=cat,
-            query=p["query"],
-            expected_route=p["expected_route"],
-            actual_route=route,
-            response_text=text,
-            duration_ms=duration_ms,
-            route_correct=route_correct,
-            answer_acceptable=acceptable,
-            hmi_truth=hmi_ok,
-            notes=f"{notes}; {hmi_notes}",
-        ))
+        results.append(
+            BurnInResult(
+                prompt_id=p["id"],
+                category=cat,
+                query=p["query"],
+                expected_route=p["expected_route"],
+                actual_route=route,
+                response_text=text,
+                duration_ms=duration_ms,
+                route_correct=route_correct,
+                answer_acceptable=acceptable,
+                hmi_truth=hmi_ok,
+                notes=f"{notes}; {hmi_notes}",
+            )
+        )
 
     # -------------------------------------------------------------------
     # Summary
@@ -531,12 +594,16 @@ def main() -> int:
         overall["hmi_ok"] += stats["hmi_ok"]
         overall["errors"] += stats["errors"]
 
-        print(f"\n{cat:20s}  n={total_cat:3d}  route={route_pct:5.1f}%  answer={answer_pct:5.1f}%  hmi={hmi_pct:5.1f}%  errors={error_pct:5.1f}%")
+        print(
+            f"\n{cat:20s}  n={total_cat:3d}  route={route_pct:5.1f}%  answer={answer_pct:5.1f}%  hmi={hmi_pct:5.1f}%  errors={error_pct:5.1f}%"
+        )
 
     print()
     print("-" * 70)
     total_all = overall["total"]
-    print(f"{'TOTAL':20s}  n={total_all:3d}  route={overall['route_ok']/total_all*100:5.1f}%  answer={overall['answer_ok']/total_all*100:5.1f}%  hmi={overall['hmi_ok']/total_all*100:5.1f}%  errors={overall['errors']/total_all*100:5.1f}%")
+    print(
+        f"{'TOTAL':20s}  n={total_all:3d}  route={overall['route_ok']/total_all*100:5.1f}%  answer={overall['answer_ok']/total_all*100:5.1f}%  hmi={overall['hmi_ok']/total_all*100:5.1f}%  errors={overall['errors']/total_all*100:5.1f}%"
+    )
     print("=" * 70)
 
     # Promotion verdict
@@ -571,7 +638,9 @@ def main() -> int:
             "hmi_truth_pct": overall["hmi_ok"] / total_all * 100,
             "error_rate_pct": error_rate,
         },
-        "by_category": {cat: {k: v for k, v in stats.items()} for cat, stats in category_stats.items()},
+        "by_category": {
+            cat: {k: v for k, v in stats.items()} for cat, stats in category_stats.items()
+        },
         "results": [
             {
                 "prompt_id": r.prompt_id,
@@ -599,8 +668,16 @@ def main() -> int:
 
 def _get_git_commit() -> str:
     import subprocess
+
     try:
-        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=str(Path(__file__).resolve().parent.parent)).decode().strip()
+        return (
+            subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=str(Path(__file__).resolve().parent.parent),
+            )
+            .decode()
+            .strip()
+        )
     except Exception:
         return "unknown"
 

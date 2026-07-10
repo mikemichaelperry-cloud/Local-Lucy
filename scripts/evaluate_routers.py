@@ -8,16 +8,16 @@ adversarial queries designed to expose disagreement and failure modes.
 
 No LLM calls. No code changes. Pure router evaluation.
 """
+
 from __future__ import annotations
 
 import json
 import os
 import sys
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 # Ensure imports work from project root
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -27,10 +27,9 @@ os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(PROJECT_ROOT))
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(PROJECT_ROOT))
 
 from router_py.classify import (
+    RoutingDecision,
     classify_intent,
     select_route,
-    ClassificationResult,
-    RoutingDecision,
 )
 from router_py.policy import normalize_augmentation_policy
 
@@ -69,7 +68,6 @@ ADVERSARIAL_QUERIES: list[tuple[str, str, str]] = [
     ("medical_compound", "Write a story about a nurse who discovers a cure for cancer", "LOCAL"),
     ("medical_pediatric", "My 2-year-old has a fever of 40 degrees", "AUGMENTED"),
     ("medical_drug", "What are the side effects of tadalafil?", "AUGMENTED"),
-
     # --- FINANCIAL (all should route AUGMENTED) ---
     ("financial_stock", "What is Tesla's stock price right now?", "AUGMENTED"),
     ("financial_crypto", "Should I buy Bitcoin today?", "AUGMENTED"),
@@ -81,7 +79,6 @@ ADVERSARIAL_QUERIES: list[tuple[str, str, str]] = [
     ("financial_tax", "How do I file taxes as a freelancer in Israel?", "AUGMENTED"),
     ("financial_mortgage", "Should I refinance my mortgage at 6.5%?", "AUGMENTED"),
     ("financial_compound", "Write a poem about the stock market crash of 2008", "LOCAL"),
-
     # --- LEGAL (all should route AUGMENTED) ---
     ("legal_statute", "What does the Israeli Basic Law say about freedom of speech?", "AUGMENTED"),
     ("legal_compliance", "Do I need a business license to sell food online?", "AUGMENTED"),
@@ -93,7 +90,6 @@ ADVERSARIAL_QUERIES: list[tuple[str, str, str]] = [
     ("legal_typos", "is it ilegal to park on teh sidewalk?", "AUGMENTED"),
     ("legal_compound", "Tell me a story about a lawyer who wins a big case", "LOCAL"),
     ("legal_educational", "Explain the concept of habeas corpus", "AUGMENTED"),
-
     # --- NEWS (all should route NEWS) ---
     ("news_explicit", "What is the latest news about the war in Gaza?", "NEWS"),
     ("news_breaking", "Breaking news: earthquake in Japan", "NEWS"),
@@ -105,14 +101,12 @@ ADVERSARIAL_QUERIES: list[tuple[str, str, str]] = [
     ("news_compound", "Write a 500-word story about a journalist covering the war", "LOCAL"),
     ("news_conflict", "Any new developments in the Russia-Ukraine conflict?", "NEWS"),
     ("news_science", "New scientific discovery in quantum computing this week", "NEWS"),
-
     # --- TIME (all should route TIME) ---
     ("time_explicit", "What time is it in Tokyo right now?", "TIME"),
     ("time_date", "What is today's date?", "TIME"),
     ("time_vague", "What time is it?", "TIME"),
     ("time_typos", "wat tyme is it in new york?", "TIME"),
     ("time_compound", "Tell me a story about a clock that stopped at midnight", "LOCAL"),
-
     # --- CREATIVE / LOCAL (all should route LOCAL) ---
     ("creative_story", "Tell me a 500-word story about a dog named Oscar", "LOCAL"),
     ("creative_poem", "Write me a poem about autumn leaves", "LOCAL"),
@@ -129,13 +123,11 @@ ADVERSARIAL_QUERIES: list[tuple[str, str, str]] = [
     ("creative_clarify", "What do you mean by that?", "LOCAL"),
     ("creative_joke", "Tell me a joke about programmers", "LOCAL"),
     ("creative_riddle", "I speak without a mouth and hear without ears. What am I?", "LOCAL"),
-
     # --- EVIDENCE / SOURCE (should route AUGMENTED for source verification) ---
     ("evidence_cite", "Can you cite peer-reviewed sources for that claim?", "AUGMENTED"),
     ("evidence_clinical", "Show me clinical trial data on mRNA vaccines", "AUGMENTED"),
     ("evidence_statistic", "What is the official unemployment rate in Israel?", "AUGMENTED"),
     ("evidence_vague", "Do you have any evidence for that?", "AUGMENTED"),
-
     # --- AMBIGUOUS / EDGE CASES ---
     ("edge_medical_story", "Write a horror story about a hospital", "LOCAL"),
     ("edge_financial_story", "Write a thriller about a stock trader", "LOCAL"),
@@ -146,7 +138,11 @@ ADVERSARIAL_QUERIES: list[tuple[str, str, str]] = [
     ("edge_greeting", "Hello, how are you?", "LOCAL"),
     ("edge_empty", "", "LOCAL"),
     ("edge_gibberish", "asdfghjkl qwerty", "LOCAL"),
-    ("edge_multilingual", "מה קורה עכשיו בעולם?", "NEWS"),  # Hebrew: "What's happening in the world now?"
+    (
+        "edge_multilingual",
+        "מה קורה עכשיו בעולם?",
+        "NEWS",
+    ),  # Hebrew: "What's happening in the world now?"
 ]
 
 
@@ -155,7 +151,10 @@ ADVERSARIAL_QUERIES: list[tuple[str, str, str]] = [
 # Determines which router made the "better" decision for divergences.
 # =============================================================================
 
-def adjudicate(query: str, legacy: RoutingDecision, embedding: dict, expected: str) -> tuple[str, str]:
+
+def adjudicate(
+    query: str, legacy: RoutingDecision, embedding: dict, expected: str
+) -> tuple[str, str]:
     """Return (winner, reason) for a divergence."""
     lr = legacy.route
     sr = embedding.get("route", "UNKNOWN")
@@ -170,11 +169,21 @@ def adjudicate(query: str, legacy: RoutingDecision, embedding: dict, expected: s
 
     # If embedding matches expected and legacy doesn't
     if sr == expected and lr != expected:
-        return "embedding", f"Embedding correctly routes to {sr}; legacy incorrectly routes to {lr}."
+        return (
+            "embedding",
+            f"Embedding correctly routes to {sr}; legacy incorrectly routes to {lr}.",
+        )
 
     # If neither matches expected, pick whichever is "closer"
     # Heuristic: AUGMENTED > LOCAL > NEWS > TIME > CLARIFY for safety
-    safety_rank = {"AUGMENTED": 5, "LOCAL": 3, "NEWS": 2, "TIME": 2, "CLARIFY": 1, "LOCAL_WITH_FALLBACK": 3}
+    safety_rank = {
+        "AUGMENTED": 5,
+        "LOCAL": 3,
+        "NEWS": 2,
+        "TIME": 2,
+        "CLARIFY": 1,
+        "LOCAL_WITH_FALLBACK": 3,
+    }
     lr_safe = safety_rank.get(lr, 0)
     sr_safe = safety_rank.get(sr, 0)
     exp_safe = safety_rank.get(expected, 0)
@@ -183,9 +192,15 @@ def adjudicate(query: str, legacy: RoutingDecision, embedding: dict, expected: s
     sr_dist = abs(sr_safe - exp_safe)
 
     if lr_dist < sr_dist:
-        return "legacy", f"Neither matches expected ({expected}), but legacy ({lr}) is closer in safety space than embedding ({sr})."
+        return (
+            "legacy",
+            f"Neither matches expected ({expected}), but legacy ({lr}) is closer in safety space than embedding ({sr}).",
+        )
     elif sr_dist < lr_dist:
-        return "embedding", f"Neither matches expected ({expected}), but embedding ({sr}) is closer in safety space than legacy ({lr})."
+        return (
+            "embedding",
+            f"Neither matches expected ({expected}), but embedding ({sr}) is closer in safety space than legacy ({lr}).",
+        )
     else:
         return "tie", f"Both routers diverge equally from expected ({expected})."
 
@@ -194,12 +209,13 @@ def adjudicate(query: str, legacy: RoutingDecision, embedding: dict, expected: s
 # EVALUATION HARNESS
 # =============================================================================
 
+
 def run_evaluation() -> list[EvalResult]:
     results: list[EvalResult] = []
     policy = normalize_augmentation_policy("fallback_only")
 
     print(f"Running adversarial evaluation on {len(ADVERSARIAL_QUERIES)} queries...")
-    print(f"Legacy router: keyword-based | Embedding router: ModernBERT embedding k-NN (k=3)")
+    print("Legacy router: keyword-based | Embedding router: ModernBERT embedding k-NN (k=3)")
     print("-" * 80)
 
     for category, query, expected in ADVERSARIAL_QUERIES:
@@ -215,20 +231,22 @@ def run_evaluation() -> list[EvalResult]:
         correct = route == expected
         reason = "correct" if correct else f"routed to {route}, expected {expected}"
 
-        results.append(EvalResult(
-            query=query,
-            legacy_route=route,
-            embedding_route=route,
-            embedding_confidence=decision.confidence,
-            embedding_intent=decision.intent_family,
-            legacy_intent=classification.intent_family if classification else "unknown",
-            legacy_evidence=classification.evidence_mode if classification else "unknown",
-            divergence=False,
-            category=category,
-            expected_route=expected,
-            winner="tie" if correct else "unclear",
-            reason=reason,
-        ))
+        results.append(
+            EvalResult(
+                query=query,
+                legacy_route=route,
+                embedding_route=route,
+                embedding_confidence=decision.confidence,
+                embedding_intent=decision.intent_family,
+                legacy_intent=classification.intent_family if classification else "unknown",
+                legacy_evidence=classification.evidence_mode if classification else "unknown",
+                divergence=False,
+                category=category,
+                expected_route=expected,
+                winner="tie" if correct else "unclear",
+                reason=reason,
+            )
+        )
 
     return results
 
@@ -271,7 +289,9 @@ def print_report(results: list[EvalResult]) -> None:
         leg_corr = sum(1 for r in cat_results if r.legacy_route == r.expected_route)
         emb_corr = sum(1 for r in cat_results if r.embedding_route == r.expected_route)
         divs = sum(1 for r in cat_results if r.divergence)
-        print(f"  {cat:25s}  Legacy: {leg_corr}/{len(cat_results)}  Embedding: {emb_corr}/{len(cat_results)}  Div: {divs}")
+        print(
+            f"  {cat:25s}  Legacy: {leg_corr}/{len(cat_results)}  Embedding: {emb_corr}/{len(cat_results)}  Div: {divs}"
+        )
 
     print()
     print("DETAILED DIVERGENCES")
@@ -281,8 +301,12 @@ def print_report(results: list[EvalResult]) -> None:
     for r in divergences:
         marker = "✅" if r.winner == "embedding" else "⚠️" if r.winner == "legacy" else "➖"
         print(f"\n  {marker} [{r.category}] {r.query[:70]}{'...' if len(r.query) > 70 else ''}")
-        print(f"     Legacy:  {r.legacy_route:20s} (intent={r.legacy_intent}, evidence={r.legacy_evidence})")
-        print(f"     Embedding:  {r.embedding_route:20s} (intent={r.embedding_intent}, conf={r.embedding_confidence:.3f})")
+        print(
+            f"     Legacy:  {r.legacy_route:20s} (intent={r.legacy_intent}, evidence={r.legacy_evidence})"
+        )
+        print(
+            f"     Embedding:  {r.embedding_route:20s} (intent={r.embedding_intent}, conf={r.embedding_confidence:.3f})"
+        )
         print(f"     Expected: {r.expected_route}")
         print(f"     Winner:  {r.winner.upper()}")
         print(f"     Reason:  {r.reason}")
@@ -293,19 +317,29 @@ def print_report(results: list[EvalResult]) -> None:
     print("=" * 80)
     if embedding_correct >= legacy_correct:
         margin = (embedding_correct - legacy_correct) / total * 100
-        print(f"Embedding router achieves {embedding_correct/total*100:.1f}% accuracy vs Legacy {legacy_correct/total*100:.1f}%")
+        print(
+            f"Embedding router achieves {embedding_correct/total*100:.1f}% accuracy vs Legacy {legacy_correct/total*100:.1f}%"
+        )
         print(f"Margin: +{margin:.1f} percentage points in favor of embedding router")
         if embedding_correct / total >= 0.97:
-            print("RECOMMENDATION: Embedding router meets the 97% threshold for cutover consideration.")
+            print(
+                "RECOMMENDATION: Embedding router meets the 97% threshold for cutover consideration."
+            )
         elif embedding_correct / total >= 0.95:
-            print("RECOMMENDATION: Embedding router is close to the 97% threshold. Continue gathering data.")
+            print(
+                "RECOMMENDATION: Embedding router is close to the 97% threshold. Continue gathering data."
+            )
         else:
             print("RECOMMENDATION: Embedding router needs improvement before cutover.")
     else:
         margin = (legacy_correct - embedding_correct) / total * 100
-        print(f"Legacy router achieves {legacy_correct/total*100:.1f}% accuracy vs Embedding {embedding_correct/total*100:.1f}%")
+        print(
+            f"Legacy router achieves {legacy_correct/total*100:.1f}% accuracy vs Embedding {embedding_correct/total*100:.1f}%"
+        )
         print(f"Margin: +{margin:.1f} percentage points in favor of legacy router")
-        print("RECOMMENDATION: Legacy router remains superior. Embedding needs more examples or tuning.")
+        print(
+            "RECOMMENDATION: Legacy router remains superior. Embedding needs more examples or tuning."
+        )
 
     print()
     print(f"Report saved to: {PROJECT_ROOT / 'router_evaluation_report.json'}")
@@ -315,8 +349,10 @@ def save_json(results: list[EvalResult]) -> None:
     data = {
         "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
         "total_queries": len(results),
-        "legacy_accuracy": sum(1 for r in results if r.legacy_route == r.expected_route) / len(results),
-        "embedding_accuracy": sum(1 for r in results if r.embedding_route == r.expected_route) / len(results),
+        "legacy_accuracy": sum(1 for r in results if r.legacy_route == r.expected_route)
+        / len(results),
+        "embedding_accuracy": sum(1 for r in results if r.embedding_route == r.expected_route)
+        / len(results),
         "agreement_rate": sum(1 for r in results if not r.divergence) / len(results),
         "results": [asdict(r) for r in results],
     }

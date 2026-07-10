@@ -3,10 +3,9 @@
 
 import os
 import sys
-import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Ensure module under test is importable
 sys.path.insert(0, str(Path(__file__).parent))
@@ -99,9 +98,7 @@ class TestExtractWebpageLive(unittest.TestCase):
     def test_hard_cap_enforced(self):
         """Hard cap prevents callers from requesting excessive content."""
         with patch.object(we, "_extract_with_webclaw", return_value="x" * 10000):
-            result = we.extract_webpage(
-                self.TEST_URL, max_chars=9000, timeout=20
-            )
+            result = we.extract_webpage(self.TEST_URL, max_chars=9000, timeout=20)
         # Should be truncated to hard cap (default 3000)
         self.assertIsNotNone(result)
         self.assertLessEqual(len(result), 3050)

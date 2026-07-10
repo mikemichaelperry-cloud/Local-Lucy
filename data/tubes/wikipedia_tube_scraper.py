@@ -14,14 +14,12 @@ Usage:
 import argparse
 import json
 import re
-import sqlite3
 import sys
 import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Any
-
-import urllib.request
-import urllib.parse
 
 sys.path.insert(0, str(Path(__file__).parent))
 from tube_database import init_db, lookup_tube
@@ -53,10 +51,14 @@ def extract_infobox_params(wikitext: str) -> dict[str, str]:
     """Parse a Wikipedia infobox from wikitext. Returns key-value dict."""
     params: dict[str, str] = {}
     # Find the infobox template
-    match = re.search(r"\{\{Infobox[^}]+vacuum tube[^}]*\}(.*?)\}\}", wikitext, re.IGNORECASE | re.DOTALL)
+    match = re.search(
+        r"\{\{Infobox[^}]+vacuum tube[^}]*\}(.*?)\}\}", wikitext, re.IGNORECASE | re.DOTALL
+    )
     if not match:
         # Try broader match
-        match = re.search(r"\{\{Infobox[^}]+tube[^}]*\}(.*?)\}\}", wikitext, re.IGNORECASE | re.DOTALL)
+        match = re.search(
+            r"\{\{Infobox[^}]+tube[^}]*\}(.*?)\}\}", wikitext, re.IGNORECASE | re.DOTALL
+        )
     if not match:
         return params
 
@@ -126,9 +128,15 @@ def infobox_to_tube_record(tube_type: str, params: dict[str, str]) -> dict[str, 
     elif "tetrode" in class_val:
         construction = "beam power tetrode"
 
-    vplate = parse_numeric(params.get("max anode voltage", "") or params.get("max plate voltage", ""))
-    vscreen = parse_numeric(params.get("max screen voltage", "") or params.get("max grid 2 voltage", ""))
-    pplate = parse_numeric(params.get("max anode dissipation", "") or params.get("max plate dissipation", ""))
+    vplate = parse_numeric(
+        params.get("max anode voltage", "") or params.get("max plate voltage", "")
+    )
+    vscreen = parse_numeric(
+        params.get("max screen voltage", "") or params.get("max grid 2 voltage", "")
+    )
+    pplate = parse_numeric(
+        params.get("max anode dissipation", "") or params.get("max plate dissipation", "")
+    )
     gm = parse_numeric(params.get("transconductance", ""))
     heater_v = parse_numeric(params.get("heater voltage", ""))
     heater_a = parse_numeric(params.get("heater current", ""))
@@ -206,7 +214,11 @@ def main() -> int:
         tube_list = [t.strip().upper() for t in args.tubes.split(",") if t.strip()]
     if args.from_file:
         text = args.from_file.read_text(encoding="utf-8")
-        tube_list = [t.strip().upper() for t in text.splitlines() if t.strip() and not t.strip().startswith("#")]
+        tube_list = [
+            t.strip().upper()
+            for t in text.splitlines()
+            if t.strip() and not t.strip().startswith("#")
+        ]
 
     if not tube_list:
         parser.print_help()
@@ -230,7 +242,9 @@ def main() -> int:
             continue
 
         if args.dry_run:
-            print(f"  [DRY] {tube}: {record['construction']}, {record['vplate_max']}V, {record['pplate_max']}W")
+            print(
+                f"  [DRY] {tube}: {record['construction']}, {record['vplate_max']}V, {record['pplate_max']}W"
+            )
             success += 1
             time.sleep(args.delay)
             continue
@@ -259,7 +273,9 @@ def main() -> int:
         )
         conn.commit()
         success += 1
-        print(f"  [OK] {tube}: {record['construction']}, {record['vplate_max']}V, {record['pplate_max']}W")
+        print(
+            f"  [OK] {tube}: {record['construction']}, {record['vplate_max']}V, {record['pplate_max']}W"
+        )
         time.sleep(args.delay)
 
     conn.close()

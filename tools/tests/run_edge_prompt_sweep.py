@@ -4,8 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
-import shutil
 import subprocess
 import sys
 from collections import Counter, defaultdict
@@ -13,7 +11,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
-
 
 ROOT = Path(__file__).resolve().parents[2]
 EXECUTE_PLAN = ROOT / "tools" / "router" / "execute_plan.sh"
@@ -136,7 +133,9 @@ def case_selector_key(case: Dict[str, Any]) -> str:
     return f"{case['category']}::{case['prompt']}"
 
 
-def select_cases_for_profile(cases: List[Dict[str, Any]], profile: Optional[str]) -> List[Dict[str, Any]]:
+def select_cases_for_profile(
+    cases: List[Dict[str, Any]], profile: Optional[str]
+) -> List[Dict[str, Any]]:
     if not profile or profile == "full":
         return cases
     if profile != "fast":
@@ -195,7 +194,8 @@ def normalization_occurred(outcome: Dict[str, str], prompt: str) -> bool:
     checks = [
         outcome.get("EVIDENCE_NORMALIZER_DETECTOR_FIRED", "").lower() == "true",
         outcome.get("SEMANTIC_INTERPRETER_FIRED", "").lower() == "true"
-        and outcome.get("SEMANTIC_INTERPRETER_SELECTED_NORMALIZED_QUERY", "") not in {"", prompt_norm},
+        and outcome.get("SEMANTIC_INTERPRETER_SELECTED_NORMALIZED_QUERY", "")
+        not in {"", prompt_norm},
         outcome.get("EVIDENCE_NORMALIZER_SELECTED_QUERY", "") not in {"", prompt_norm},
         outcome.get("MEDICATION_DETECTOR_FIRED", "").lower() == "true"
         and outcome.get("MEDICATION_DETECTOR_NORMALIZED_QUERY", "") not in {"", prompt_norm},
@@ -250,7 +250,9 @@ def _manifest_field_issues(fields: Dict[str, str], observed_route: str, source: 
         reasons.append(f"{source}_manifest_context_resolution_invalid:{context_resolution_used}")
 
     if observed_route and selected_route and observed_route.strip().upper() != selected_route:
-        reasons.append(f"{source}_manifest_route_mismatch:{selected_route}->{observed_route.strip().upper()}")
+        reasons.append(
+            f"{source}_manifest_route_mismatch:{selected_route}->{observed_route.strip().upper()}"
+        )
     return reasons
 
 
@@ -274,7 +276,9 @@ def validate_manifest(
     return reasons
 
 
-def evaluate_expectation(case: Dict[str, Any], route: str, response_class: str) -> tuple[bool, List[str], bool]:
+def evaluate_expectation(
+    case: Dict[str, Any], route: str, response_class: str
+) -> tuple[bool, List[str], bool]:
     reasons: List[str] = []
     expected_routes = case.get("expected_routes") or []
     must_not_routes = case.get("must_not_routes") or []
@@ -285,16 +289,24 @@ def evaluate_expectation(case: Dict[str, Any], route: str, response_class: str) 
     if route in must_not_routes:
         route_ok = False
         reasons.append(f"forbidden_route={route}")
-    boundary_violation = bool(case.get("must_not_local")) and route == "LOCAL" and response_class == "local_answer"
+    boundary_violation = (
+        bool(case.get("must_not_local")) and route == "LOCAL" and response_class == "local_answer"
+    )
     if boundary_violation:
         reasons.append("authority_boundary_violation:nonlocal_prompt_answered_locally")
     return route_ok and not boundary_violation, reasons, boundary_violation
 
 
-def make_case(case_id: str, category: str, prompt: str, expected_routes: Iterable[str], *,
-              must_not_routes: Optional[Iterable[str]] = None,
-              must_not_local: bool = False,
-              conversation_key: Optional[str] = None) -> Dict[str, Any]:
+def make_case(
+    case_id: str,
+    category: str,
+    prompt: str,
+    expected_routes: Iterable[str],
+    *,
+    must_not_routes: Optional[Iterable[str]] = None,
+    must_not_local: bool = False,
+    conversation_key: Optional[str] = None,
+) -> Dict[str, Any]:
     return {
         "id": case_id,
         "category": category,
@@ -310,10 +322,15 @@ def build_corpus() -> List[Dict[str, Any]]:
     cases: List[Dict[str, Any]] = []
     idx = defaultdict(int)
 
-    def add(category: str, prompt: str, expected_routes: Iterable[str], *,
-            must_not_routes: Optional[Iterable[str]] = None,
-            must_not_local: bool = False,
-            conversation_key: Optional[str] = None) -> None:
+    def add(
+        category: str,
+        prompt: str,
+        expected_routes: Iterable[str],
+        *,
+        must_not_routes: Optional[Iterable[str]] = None,
+        must_not_local: bool = False,
+        conversation_key: Optional[str] = None,
+    ) -> None:
         idx[category] += 1
         case_id = f"{category}_{idx[category]:03d}"
         cases.append(
@@ -376,7 +393,13 @@ def build_corpus() -> List[Dict[str, Any]]:
         "Does tadalafil raise heart rate?",
         "Can Lipitor interact with other drugs?",
     ]:
-        add("medication_health", prompt, ["EVIDENCE"], must_not_routes=["LOCAL"], must_not_local=True)
+        add(
+            "medication_health",
+            prompt,
+            ["EVIDENCE"],
+            must_not_routes=["LOCAL"],
+            must_not_local=True,
+        )
 
     for prompt in [
         "What is happening in Israel today?",
@@ -392,7 +415,13 @@ def build_corpus() -> List[Dict[str, Any]]:
         "Is there breaking news about OpenAI today?",
         "Latest updates on the Ukraine war.",
     ]:
-        add("current_events", prompt, ["NEWS", "EVIDENCE"], must_not_routes=["LOCAL"], must_not_local=True)
+        add(
+            "current_events",
+            prompt,
+            ["NEWS", "EVIDENCE"],
+            must_not_routes=["LOCAL"],
+            must_not_local=True,
+        )
 
     for prompt in [
         "What is a travel advisory?",
@@ -412,7 +441,13 @@ def build_corpus() -> List[Dict[str, Any]]:
         "Is there currently a ceasefire in Gaza?",
         "Are there sanctions on Iran right now?",
     ]:
-        add("conceptual_live_boundary", prompt, ["EVIDENCE", "NEWS"], must_not_routes=["LOCAL"], must_not_local=True)
+        add(
+            "conceptual_live_boundary",
+            prompt,
+            ["EVIDENCE", "NEWS"],
+            must_not_routes=["LOCAL"],
+            must_not_local=True,
+        )
 
     for prompt in [
         "https://reuters.com",
@@ -428,7 +463,13 @@ def build_corpus() -> List[Dict[str, Any]]:
         "https://www.mayoclinic.org/drugs-supplements",
         "https://jamanetwork.com/",
     ]:
-        add("url_input", prompt, ["EVIDENCE", "NEWS", "DOC"], must_not_routes=["LOCAL"], must_not_local=True)
+        add(
+            "url_input",
+            prompt,
+            ["EVIDENCE", "NEWS", "DOC"],
+            must_not_routes=["LOCAL"],
+            must_not_local=True,
+        )
 
     for prompt, expected_routes, must_not_local in [
         ("Tadalifil?", ["EVIDENCE"], True),
@@ -446,23 +487,47 @@ def build_corpus() -> List[Dict[str, Any]]:
         ("what happening south china sea rn", ["NEWS", "EVIDENCE"], True),
         ("lipitor grapefruit ok?", ["EVIDENCE"], True),
     ]:
-        add("messy_human", prompt, expected_routes, must_not_routes=["LOCAL"] if must_not_local else None, must_not_local=must_not_local)
+        add(
+            "messy_human",
+            prompt,
+            expected_routes,
+            must_not_routes=["LOCAL"] if must_not_local else None,
+            must_not_local=must_not_local,
+        )
 
     for prompt, expected_routes, must_not_local in [
-        ("What does ibuprofen do and is there any current warning about it?", ["EVIDENCE", "NEWS"], True),
+        (
+            "What does ibuprofen do and is there any current warning about it?",
+            ["EVIDENCE", "NEWS"],
+            True,
+        ),
         ("Explain Ohm's law and show a real example.", ["LOCAL"], False),
-        ("What is a travel advisory and is there one for Egypt right now?", ["EVIDENCE", "NEWS"], True),
+        (
+            "What is a travel advisory and is there one for Egypt right now?",
+            ["EVIDENCE", "NEWS"],
+            True,
+        ),
         ("Tell me what RAM is and recommend a current laptop.", ["EVIDENCE", "NEWS"], True),
         ("What is malaria and what is the latest WHO advice on it?", ["EVIDENCE", "NEWS"], True),
         ("Explain inflation and tell me the current US rate.", ["EVIDENCE", "NEWS"], True),
         ("What is Reuters and show me today's Reuters headlines.", ["EVIDENCE", "NEWS"], True),
         ("What is a transistor and why is Nvidia in the news?", ["EVIDENCE", "NEWS"], True),
         ("What does Lipitor do and can it interact with grapefruit?", ["EVIDENCE"], True),
-        ("Explain the Fermi paradox and mention whether there was any new SETI news today.", ["EVIDENCE", "NEWS"], True),
+        (
+            "Explain the Fermi paradox and mention whether there was any new SETI news today.",
+            ["EVIDENCE", "NEWS"],
+            True,
+        ),
         ("What is a ceasefire and is there one in Gaza today?", ["EVIDENCE", "NEWS"], True),
         ("Explain what a klystron is and give one real-world use.", ["LOCAL"], False),
     ]:
-        add("mixed_intent", prompt, expected_routes, must_not_routes=["LOCAL"] if must_not_local else None, must_not_local=must_not_local)
+        add(
+            "mixed_intent",
+            prompt,
+            expected_routes,
+            must_not_routes=["LOCAL"] if must_not_local else None,
+            must_not_local=must_not_local,
+        )
 
     for prompt in [
         "What about that one?",
@@ -494,7 +559,13 @@ def build_corpus() -> List[Dict[str, Any]]:
         ("`What is a Faraday cage?`", ["LOCAL"], False),
         ("--What is Reuters?--", ["LOCAL"], False),
     ]:
-        add("edge_formatting", prompt, expected_routes, must_not_routes=["LOCAL"] if must_not_local else None, must_not_local=must_not_local)
+        add(
+            "edge_formatting",
+            prompt,
+            expected_routes,
+            must_not_routes=["LOCAL"] if must_not_local else None,
+            must_not_local=must_not_local,
+        )
 
     for prompt, expected_routes, must_not_local in [
         ("WHAT is RAM???", ["LOCAL"], False),
@@ -510,15 +581,29 @@ def build_corpus() -> List[Dict[str, Any]]:
         ("WHAT IS A KLYSTRON???", ["LOCAL"], False),
         ("TADALIFIL!!!", ["EVIDENCE"], True),
     ]:
-        add("caps_punct", prompt, expected_routes, must_not_routes=["LOCAL"] if must_not_local else None, must_not_local=must_not_local)
+        add(
+            "caps_punct",
+            prompt,
+            expected_routes,
+            must_not_routes=["LOCAL"] if must_not_local else None,
+            must_not_local=must_not_local,
+        )
 
     for prompt, expected_routes, must_not_local in [
         ("Explain RAM vs ROM and which one is faster.", ["LOCAL"], False),
         ("What does ibuprofen do and can it interact with alcohol?", ["EVIDENCE"], True),
         ("Explain the Antikythera mechanism and where it was found.", ["LOCAL"], False),
         ("What is a travel advisory and who issues them in the US?", ["LOCAL"], False),
-        ("What is a travel advisory and is there one for Lebanon right now?", ["EVIDENCE", "NEWS"], True),
-        ("Explain the difference between a magnetron and a klystron and give one use for each.", ["LOCAL"], False),
+        (
+            "What is a travel advisory and is there one for Lebanon right now?",
+            ["EVIDENCE", "NEWS"],
+            True,
+        ),
+        (
+            "Explain the difference between a magnetron and a klystron and give one use for each.",
+            ["LOCAL"],
+            False,
+        ),
         ("What is Reuters and is Reuters reporting on Israel today?", ["EVIDENCE", "NEWS"], True),
         ("Explain Ohm's law and compare voltage to water pressure.", ["LOCAL"], False),
         ("What is a thixotropic fluid and give one example.", ["LOCAL"], False),
@@ -526,21 +611,67 @@ def build_corpus() -> List[Dict[str, Any]]:
         ("Where is Svalbard and what's the current temperature there?", ["EVIDENCE", "NEWS"], True),
         ("What is malaria and link me to a current source about it.", ["EVIDENCE"], True),
     ]:
-        add("multi_part", prompt, expected_routes, must_not_routes=["LOCAL"] if must_not_local else None, must_not_local=must_not_local)
+        add(
+            "multi_part",
+            prompt,
+            expected_routes,
+            must_not_routes=["LOCAL"] if must_not_local else None,
+            must_not_local=must_not_local,
+        )
 
-    add("context_followup", "Tell me about the Antikythera mechanism.", ["LOCAL"], conversation_key="ctx_antiky")
-    add("context_followup", "What about where it was found?", ["LOCAL"], conversation_key="ctx_antiky")
+    add(
+        "context_followup",
+        "Tell me about the Antikythera mechanism.",
+        ["LOCAL"],
+        conversation_key="ctx_antiky",
+    )
+    add(
+        "context_followup",
+        "What about where it was found?",
+        ["LOCAL"],
+        conversation_key="ctx_antiky",
+    )
     add("context_followup", "What is Reuters?", ["LOCAL"], conversation_key="ctx_reuters")
     add("context_followup", "How reliable is it?", ["LOCAL"], conversation_key="ctx_reuters")
-    add("context_followup", "Is there a travel advisory for Egypt right now?", ["EVIDENCE", "NEWS"], must_not_routes=["LOCAL"], must_not_local=True, conversation_key="ctx_travel")
-    add("context_followup", "What about Jordan?", ["EVIDENCE", "NEWS"], must_not_routes=["LOCAL"], must_not_local=True, conversation_key="ctx_travel")
-    add("context_followup", "What does Lipitor do?", ["EVIDENCE"], must_not_routes=["LOCAL"], must_not_local=True, conversation_key="ctx_lipitor")
-    add("context_followup", "And grapefruit?", ["EVIDENCE"], must_not_routes=["LOCAL"], must_not_local=True, conversation_key="ctx_lipitor")
+    add(
+        "context_followup",
+        "Is there a travel advisory for Egypt right now?",
+        ["EVIDENCE", "NEWS"],
+        must_not_routes=["LOCAL"],
+        must_not_local=True,
+        conversation_key="ctx_travel",
+    )
+    add(
+        "context_followup",
+        "What about Jordan?",
+        ["EVIDENCE", "NEWS"],
+        must_not_routes=["LOCAL"],
+        must_not_local=True,
+        conversation_key="ctx_travel",
+    )
+    add(
+        "context_followup",
+        "What does Lipitor do?",
+        ["EVIDENCE"],
+        must_not_routes=["LOCAL"],
+        must_not_local=True,
+        conversation_key="ctx_lipitor",
+    )
+    add(
+        "context_followup",
+        "And grapefruit?",
+        ["EVIDENCE"],
+        must_not_routes=["LOCAL"],
+        must_not_local=True,
+        conversation_key="ctx_lipitor",
+    )
 
     return cases
 
 
-def run_subprocess(args: List[str], env: Dict[str, str], timeout_s: int) -> subprocess.CompletedProcess[str]:
+def run_subprocess(
+    args: List[str], env: Dict[str, str], timeout_s: int
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         args,
         cwd=str(ROOT),
@@ -576,12 +707,20 @@ def run_case(
 
     dry_env = env.copy()
     dry_env["LUCY_ROUTER_DRYRUN"] = "1"
-    dry = run_subprocess([str(session.workspace_root / "tools" / "router" / "execute_plan.sh"), prompt], dry_env, timeout_s)
+    dry = run_subprocess(
+        [str(session.workspace_root / "tools" / "router" / "execute_plan.sh"), prompt],
+        dry_env,
+        timeout_s,
+    )
     write_text(case_dir / "dryrun.stdout.txt", dry.stdout)
     write_text(case_dir / "dryrun.stderr.txt", dry.stderr)
     dry_fields = parse_kv_lines(dry.stdout)
 
-    live = run_subprocess([str(session.workspace_root / "tools" / "router" / "execute_plan.sh"), prompt], env, timeout_s)
+    live = run_subprocess(
+        [str(session.workspace_root / "tools" / "router" / "execute_plan.sh"), prompt],
+        env,
+        timeout_s,
+    )
     write_text(case_dir / "live.stdout.txt", live.stdout)
     write_text(case_dir / "live.stderr.txt", live.stderr)
 
@@ -589,7 +728,11 @@ def run_case(
     last_route = parse_env_file(session.workspace_root / "state" / "last_route.env")
     diag = parse_diag_file(diag_file, run_id)
 
-    route = last_outcome.get("MODE") or last_outcome.get("GOVERNOR_ROUTE") or dry_fields.get("PIPELINE", "")
+    route = (
+        last_outcome.get("MODE")
+        or last_outcome.get("GOVERNOR_ROUTE")
+        or dry_fields.get("PIPELINE", "")
+    )
     governor_route = last_outcome.get("GOVERNOR_ROUTE") or dry_fields.get("GOVERNOR_ROUTE", "")
     output_mode = dry_fields.get("OUTPUT_MODE", "")
     response_text = live.stdout.strip()
@@ -628,12 +771,20 @@ def run_case(
         "output_mode": output_mode,
         "semantic_interpreter_fired": semantic_fired,
         "semantic_interpreter_use_reason": last_outcome.get("SEMANTIC_INTERPRETER_USE_REASON", ""),
-        "semantic_interpreter_original_query": last_outcome.get("SEMANTIC_INTERPRETER_ORIGINAL_QUERY", ""),
-        "semantic_interpreter_resolved_execution_query": last_outcome.get("SEMANTIC_INTERPRETER_RESOLVED_EXECUTION_QUERY", ""),
+        "semantic_interpreter_original_query": last_outcome.get(
+            "SEMANTIC_INTERPRETER_ORIGINAL_QUERY", ""
+        ),
+        "semantic_interpreter_resolved_execution_query": last_outcome.get(
+            "SEMANTIC_INTERPRETER_RESOLVED_EXECUTION_QUERY", ""
+        ),
         "medication_detector_fired": med_fired,
         "medication_detector_source": last_outcome.get("MEDICATION_DETECTOR_DETECTION_SOURCE", ""),
-        "medication_detector_original_query": last_outcome.get("MEDICATION_DETECTOR_ORIGINAL_QUERY", ""),
-        "medication_detector_resolved_execution_query": last_outcome.get("MEDICATION_DETECTOR_RESOLVED_EXECUTION_QUERY", ""),
+        "medication_detector_original_query": last_outcome.get(
+            "MEDICATION_DETECTOR_ORIGINAL_QUERY", ""
+        ),
+        "medication_detector_resolved_execution_query": last_outcome.get(
+            "MEDICATION_DETECTOR_RESOLVED_EXECUTION_QUERY", ""
+        ),
         "evidence_planner_fired": planner_fired,
         "evidence_normalizer_fired": normalizer_fired,
         "normalization_occurred": normalized,
@@ -643,7 +794,11 @@ def run_case(
         "response_preview": response_text[:240],
         "rc": live.returncode,
         "dryrun_rc": dry.returncode,
-        "rule_ok": rule_ok and provenance_ok and not route_mismatch and manifest_ok and not execution_error,
+        "rule_ok": rule_ok
+        and provenance_ok
+        and not route_mismatch
+        and manifest_ok
+        and not execution_error,
         "rule_reasons": rule_reasons,
         "boundary_violation": boundary_violation,
         "provenance_preserved": provenance_ok,
@@ -661,7 +816,9 @@ def run_case(
         "response_est_tokens": diag.get("response_est_tokens", ""),
         "local_direct_used": last_outcome.get("LOCAL_DIRECT_USED", ""),
         "local_direct_path": last_outcome.get("LOCAL_DIRECT_PATH", ""),
-        "resolved_execution_query": last_outcome.get("SEMANTIC_INTERPRETER_RESOLVED_EXECUTION_QUERY")
+        "resolved_execution_query": last_outcome.get(
+            "SEMANTIC_INTERPRETER_RESOLVED_EXECUTION_QUERY"
+        )
         or last_outcome.get("MEDICATION_DETECTOR_RESOLVED_EXECUTION_QUERY")
         or dry_fields.get("RESOLVED_QUESTION", ""),
         "last_outcome_path": str(session.workspace_root / "state" / "last_outcome.env"),
@@ -684,9 +841,19 @@ def choose_notable_successes(results: List[Dict[str, Any]]) -> List[Dict[str, An
     for result in results:
         if not result["rule_ok"]:
             continue
-        if result["category"] in {"messy_human", "edge_formatting", "caps_punct", "context_followup", "mixed_intent"}:
+        if result["category"] in {
+            "messy_human",
+            "edge_formatting",
+            "caps_punct",
+            "context_followup",
+            "mixed_intent",
+        }:
             out.append(result)
-        elif result["semantic_interpreter_fired"] or result["medication_detector_fired"] or result["evidence_planner_fired"]:
+        elif (
+            result["semantic_interpreter_fired"]
+            or result["medication_detector_fired"]
+            or result["evidence_planner_fired"]
+        ):
             out.append(result)
         if len(out) >= 10:
             break
@@ -700,9 +867,15 @@ def choose_interesting_edges(results: List[Dict[str, Any]]) -> List[Dict[str, An
             continue
         if result["category"] == "context_followup":
             out.append(result)
-        elif result["semantic_interpreter_fired"] and result["category"] in {"messy_human", "mixed_intent"}:
+        elif result["semantic_interpreter_fired"] and result["category"] in {
+            "messy_human",
+            "mixed_intent",
+        }:
             out.append(result)
-        elif result["medication_detector_fired"] and result["category"] in {"messy_human", "medication_health"}:
+        elif result["medication_detector_fired"] and result["category"] in {
+            "messy_human",
+            "medication_health",
+        }:
             out.append(result)
         if len(out) >= 8:
             break
@@ -713,29 +886,52 @@ def build_suggestions(results: List[Dict[str, Any]]) -> List[str]:
     suggestions: List[str] = []
     anomalies = [r for r in results if not r["rule_ok"]]
     if not anomalies:
-        suggestions.append("Keep this sweep in the regression toolbox and rerun it after major router/interpreter changes.")
-    current_event_evidence = sum(1 for r in results if r["category"] == "current_events" and r["pipeline"] == "EVIDENCE")
-    current_event_news = sum(1 for r in results if r["category"] == "current_events" and r["pipeline"] == "NEWS")
+        suggestions.append(
+            "Keep this sweep in the regression toolbox and rerun it after major router/interpreter changes."
+        )
+    current_event_evidence = sum(
+        1 for r in results if r["category"] == "current_events" and r["pipeline"] == "EVIDENCE"
+    )
+    current_event_news = sum(
+        1 for r in results if r["category"] == "current_events" and r["pipeline"] == "NEWS"
+    )
     if current_event_evidence and current_event_news == 0:
-        suggestions.append("Current-events prompts skewed toward EVIDENCE rather than NEWS; review whether NEWS recall should be broadened for headline-style wording.")
-    url_non_doc = sum(1 for r in results if r["category"] == "url_input" and r["pipeline"] not in {"DOC", "EVIDENCE"})
+        suggestions.append(
+            "Current-events prompts skewed toward EVIDENCE rather than NEWS; review whether NEWS recall should be broadened for headline-style wording."
+        )
+    url_non_doc = sum(
+        1
+        for r in results
+        if r["category"] == "url_input" and r["pipeline"] not in {"DOC", "EVIDENCE"}
+    )
     if url_non_doc:
-        suggestions.append("Some URL prompts did not land on a doc-style non-local path; inspect URL surface detection and doc routing.")
+        suggestions.append(
+            "Some URL prompts did not land on a doc-style non-local path; inspect URL surface detection and doc routing."
+        )
     provenance_misses = sum(1 for r in results if not r["provenance_preserved"])
     if provenance_misses:
-        suggestions.append("Some cases lost original-query provenance in traces; inspect QUERY/original-query propagation before further semantic changes.")
+        suggestions.append(
+            "Some cases lost original-query provenance in traces; inspect QUERY/original-query propagation before further semantic changes."
+        )
     boundary_violations = sum(1 for r in results if r["boundary_violation"])
     if boundary_violations:
-        suggestions.append("At least one evidence-required family was answered from LOCAL; prioritize that boundary leak before further tuning.")
+        suggestions.append(
+            "At least one evidence-required family was answered from LOCAL; prioritize that boundary leak before further tuning."
+        )
     med_detector_weird = sum(
-        1 for r in results
+        1
+        for r in results
         if not r["medication_detector_fired"]
         and r["last_outcome"].get("MEDICATION_DETECTOR_CANDIDATE_MEDICATION")
     )
     if med_detector_weird:
-        suggestions.append("Medication detector emits candidate strings even when not fired; consider clearing non-fired candidate fields to reduce trace noise.")
+        suggestions.append(
+            "Medication detector emits candidate strings even when not fired; consider clearing non-fired candidate fields to reduce trace noise."
+        )
     if not suggestions:
-        suggestions.append("No urgent behavioral issues were discovered in this sweep; focus next on adding this corpus to a repeatable nightly validation pass.")
+        suggestions.append(
+            "No urgent behavioral issues were discovered in this sweep; focus next on adding this corpus to a repeatable nightly validation pass."
+        )
     return suggestions[:5]
 
 
@@ -800,7 +996,9 @@ def render_report(
     med_hits = sum(1 for result in results if result["medication_detector_fired"])
     planner_hits = sum(1 for result in results if result["evidence_planner_fired"])
     normalizer_hits = sum(1 for result in results if result["normalization_occurred"])
-    local_direct_hits = sum(1 for result in results if str(result["local_direct_used"]).lower() == "true")
+    local_direct_hits = sum(
+        1 for result in results if str(result["local_direct_used"]).lower() == "true"
+    )
     provenance_hits = sum(1 for result in results if result["provenance_preserved"])
     ok_count = sum(1 for result in results if result["rule_ok"])
     anomalies = [result for result in results if not result["rule_ok"]]
@@ -834,10 +1032,18 @@ def render_report(
     lines.append(f"- prompts tested: {total}")
     lines.append(f"- rule-consistent cases: {ok_count}/{total}")
     lines.append(f"- provenance preserved: {provenance_hits}/{total}")
-    lines.append(f"- semantic interpreter activation rate: {semantic_hits}/{total} ({(semantic_hits / total * 100):.1f}%)")
-    lines.append(f"- medication detector activation rate: {med_hits}/{total} ({(med_hits / total * 100):.1f}%)")
-    lines.append(f"- evidence planner activation rate: {planner_hits}/{total} ({(planner_hits / total * 100):.1f}%)")
-    lines.append(f"- normalization observed: {normalizer_hits}/{total} ({(normalizer_hits / total * 100):.1f}%)")
+    lines.append(
+        f"- semantic interpreter activation rate: {semantic_hits}/{total} ({(semantic_hits / total * 100):.1f}%)"
+    )
+    lines.append(
+        f"- medication detector activation rate: {med_hits}/{total} ({(med_hits / total * 100):.1f}%)"
+    )
+    lines.append(
+        f"- evidence planner activation rate: {planner_hits}/{total} ({(planner_hits / total * 100):.1f}%)"
+    )
+    lines.append(
+        f"- normalization observed: {normalizer_hits}/{total} ({(normalizer_hits / total * 100):.1f}%)"
+    )
     lines.append(f"- LOCAL_DIRECT used: {local_direct_hits}/{total}")
     lines.append("")
     lines.append("Pipeline distribution:")
@@ -898,7 +1104,9 @@ def render_report(
     lines.append("## Boundary confirmation")
     lines.append("- governor/router remained the owner of routing decisions")
     lines.append("- execution remained policy-blind; the sweep only observed existing behavior")
-    lines.append("- evidence/news/doc authority boundaries were preserved unless explicitly listed above")
+    lines.append(
+        "- evidence/news/doc authority boundaries were preserved unless explicitly listed above"
+    )
     lines.append("- original query provenance was checked against structured traces")
     lines.append("")
     text = "\n".join(lines) + "\n"

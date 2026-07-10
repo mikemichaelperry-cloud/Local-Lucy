@@ -7,10 +7,10 @@ in the comprehensive training dataset.
 
 Run: python tools/audit_router_training_data.py
 """
+
 from __future__ import annotations
 
 import json
-import math
 import sys
 from collections import Counter
 from pathlib import Path
@@ -115,15 +115,18 @@ def class_balance_audit(examples: list[dict]) -> dict:
     return {
         "route_counts": dict(sorted(counts.items(), key=lambda x: x[1], reverse=True)),
         "route_pcts": {
-            k: f"{v / total * 100:.1f}%" for k, v in sorted(counts.items(), key=lambda x: x[1], reverse=True)
+            k: f"{v / total * 100:.1f}%"
+            for k, v in sorted(counts.items(), key=lambda x: x[1], reverse=True)
         },
         "intent_counts": dict(sorted(intent_counts.items(), key=lambda x: x[1], reverse=True)),
         "max_class": max_count,
         "min_class": min_count,
         "balance_ratio": round(ratio, 2),
         "balance_status": (
-            "CRITICAL" if ratio > CLASS_BALANCE_RATIO_CRITICAL
-            else "WARN" if ratio > CLASS_BALANCE_RATIO_WARN
+            "CRITICAL"
+            if ratio > CLASS_BALANCE_RATIO_CRITICAL
+            else "WARN"
+            if ratio > CLASS_BALANCE_RATIO_WARN
             else "OK"
         ),
     }
@@ -178,12 +181,17 @@ def cross_route_near_duplicates(examples: list[dict], embeddings: np.ndarray) ->
             route_i = examples[i]["labels"]["route"]
             route_j = examples[j]["labels"]["route"]
             if route_i != route_j:
-                cross_route_pairs.append((
-                    i, j, float(sim_matrix[i, j]),
-                    route_i, route_j,
-                    examples[i]["query"][:60],
-                    examples[j]["query"][:60],
-                ))
+                cross_route_pairs.append(
+                    (
+                        i,
+                        j,
+                        float(sim_matrix[i, j]),
+                        route_i,
+                        route_j,
+                        examples[i]["query"][:60],
+                        examples[j]["query"][:60],
+                    )
+                )
 
     return {
         "count": len(cross_route_pairs),
@@ -252,7 +260,7 @@ def main() -> int:
     print("CLASS BALANCE")
     print("-" * 70)
     bal = class_balance_audit(examples)
-    print(f"Route distribution:")
+    print("Route distribution:")
     for route, count in bal["route_counts"].items():
         pct = bal["route_pcts"][route]
         print(f"  {route:12s} {count:4d}  ({pct})")
@@ -278,7 +286,9 @@ def main() -> int:
     print("QUERY LENGTH DISTRIBUTION")
     print("-" * 70)
     ln = length_audit(examples)
-    print(f"Characters: min={ln['char_min']}, max={ln['char_max']}, mean={ln['char_mean']}, median={ln['char_median']}")
+    print(
+        f"Characters: min={ln['char_min']}, max={ln['char_max']}, mean={ln['char_mean']}, median={ln['char_median']}"
+    )
     print(f"Words:      min={ln['word_min']}, max={ln['word_max']}, mean={ln['word_mean']}")
     print(f"Very short (≤3 words): {ln['very_short_queries']}")
     print(f"Very long (≥30 words): {ln['very_long_queries']}")
@@ -290,7 +300,9 @@ def main() -> int:
     print("=" * 70)
     issues = []
     if dup["duplicate_groups"] > 0:
-        issues.append(f"{dup['duplicate_groups']} exact duplicate groups ({dup['duplicate_examples']} redundant)")
+        issues.append(
+            f"{dup['duplicate_groups']} exact duplicate groups ({dup['duplicate_examples']} redundant)"
+        )
     if near["redundant_examples"] > 0:
         issues.append(f"{near['redundant_examples']} near-duplicate redundant examples")
     if cross["count"] > 0:

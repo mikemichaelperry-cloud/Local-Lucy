@@ -17,7 +17,6 @@ import sqlite3
 import sys
 import time
 from pathlib import Path
-from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
 from tube_database import init_db, lookup_tube
@@ -71,7 +70,10 @@ def extract_batch(client, tubes: list[str], model: str = "gpt-4o-mini") -> list[
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "You extract precise vacuum tube parameters from manufacturer datasheets. Output valid JSON only."},
+                {
+                    "role": "system",
+                    "content": "You extract precise vacuum tube parameters from manufacturer datasheets. Output valid JSON only.",
+                },
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
@@ -127,7 +129,9 @@ def sanitize_record(record: dict) -> dict | None:
         "vscreen_max": to_int(record.get("vscreen_max")),
         "pplate_max": to_float(record.get("pplate_max")),
         "transconductance_ma_v": to_float(record.get("transconductance_ma_v")),
-        "typical_push_pull_watts": str(record["typical_push_pull_watts"]) if record.get("typical_push_pull_watts") else None,
+        "typical_push_pull_watts": str(record["typical_push_pull_watts"])
+        if record.get("typical_push_pull_watts")
+        else None,
         "recommended_load_ohms": to_int(record.get("recommended_load_ohms")),
         "heater_volts": to_float(record.get("heater_volts")),
         "heater_amps": to_float(record.get("heater_amps")),
@@ -181,10 +185,12 @@ def main() -> int:
     args = parser.parse_args()
 
     text = args.from_file.read_text(encoding="utf-8")
-    all_tubes = [t.strip().upper() for t in text.splitlines() if t.strip() and not t.strip().startswith("#")]
+    all_tubes = [
+        t.strip().upper() for t in text.splitlines() if t.strip() and not t.strip().startswith("#")
+    ]
 
     if args.max:
-        all_tubes = all_tubes[:args.max]
+        all_tubes = all_tubes[: args.max]
 
     conn = init_db(args.db)
 
@@ -215,7 +221,7 @@ def main() -> int:
     fail = 0
     skip = 0
 
-    batches = [missing[i:i + args.batch_size] for i in range(0, len(missing), args.batch_size)]
+    batches = [missing[i : i + args.batch_size] for i in range(0, len(missing), args.batch_size)]
 
     for i, batch in enumerate(batches, 1):
         print(f"Batch {i}/{len(batches)}: {batch[0]}... ({len(batch)} tubes)")
@@ -239,7 +245,9 @@ def main() -> int:
                 continue
 
             if insert_record(conn, sanitized):
-                print(f"  [OK] {tube_type}: {sanitized['construction']}, {sanitized['vplate_max']}V, {sanitized['pplate_max']}W")
+                print(
+                    f"  [OK] {tube_type}: {sanitized['construction']}, {sanitized['vplate_max']}V, {sanitized['pplate_max']}W"
+                )
                 success += 1
             else:
                 print(f"  [SKIP] {tube_type}: already exists")

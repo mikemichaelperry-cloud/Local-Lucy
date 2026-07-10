@@ -63,10 +63,10 @@ def restore():
 
 
 def run_demo():
-    from hybrid_router_v2 import HybridRouterV2
+    import background_learner as bl
     from feedback_buffer import get_buffer
     from feedback_parser import FeedbackResult, FeedbackType, log_user_feedback
-    import background_learner as bl
+    from hybrid_router_v2 import HybridRouterV2
 
     # --- Step 1: Pick a known misroute ---
     query = "What day was I born?"
@@ -87,7 +87,7 @@ def run_demo():
     print(f"[PRE]  '{query}' → {pre['route']} (confidence: {pre.get('confidence', 0):.3f})")
 
     if pre["route"] == expected_route:
-        print(f"[WARN] Already routes correctly; demo will still show the mechanism.")
+        print("[WARN] Already routes correctly; demo will still show the mechanism.")
 
     # --- Step 3: Submit feedback ---
     print("\n" + "=" * 60)
@@ -162,12 +162,16 @@ def run_demo():
     print("STEP 6: Verification")
     print("=" * 60)
     if post["route"] == expected_route:
-        print(f"✅ SUCCESS: Router learned! '{query}' now routes to {expected_route} (was {pre['route']})")
+        print(
+            f"✅ SUCCESS: Router learned! '{query}' now routes to {expected_route} (was {pre['route']})"
+        )
         return True
     else:
         print(f"⚠️  Router still routes to {post['route']} (expected {expected_route})")
         print("   The feedback was recorded and will continue to influence learning.")
-        print("   Embedding-based routers need sufficient feedback mass to flip strong predictions.")
+        print(
+            "   Embedding-based routers need sufficient feedback mass to flip strong predictions."
+        )
         return False
 
 

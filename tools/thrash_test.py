@@ -3,15 +3,12 @@
 Local Lucy V8 — Thrash Test
 Pushes the unified Python-native path to its limits.
 """
+
 from __future__ import annotations
 
-import asyncio
 import concurrent.futures
 import os
-import random
-import string
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -21,18 +18,19 @@ os.environ["LUCY_SESSION_MEMORY"] = "1"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
+from router_py.classify import _memory_routing_gate, classify_intent, select_route
 from router_py.main import run
-from router_py.classify import classify_intent, select_route, _memory_routing_gate
-from router_py.execution_engine import ExecutionEngine
 
 results = []
 start_time = time.time()
+
 
 def log(stage: str, name: str, ok: bool, detail: str = ""):
     status = "PASS" if ok else "FAIL"
     elapsed = time.time() - start_time
     results.append((elapsed, stage, status, name, detail))
     print(f"  [{status:4s}] {stage:20s} | {name:40s} {detail}")
+
 
 # ============================================================================
 # STAGE 1: BASIC FUNCTIONALITY
@@ -72,7 +70,12 @@ for provider in providers:
     os.environ["LUCY_AUGMENTED_PROVIDER"] = provider
     for i in range(5):
         try:
-            outcome = run("augmented: What is general relativity?", policy="direct_allowed", surface="cli", timeout=30)
+            outcome = run(
+                "augmented: What is general relativity?",
+                policy="direct_allowed",
+                surface="cli",
+                timeout=30,
+            )
             ok = outcome.provider == provider
             log("Provider", f"{provider} #{i+1}", ok, f"got={outcome.provider}")
         except Exception as e:
@@ -119,9 +122,14 @@ print("STAGE 4: Rapid-Fire Sequential (50 queries)")
 print("=" * 70)
 
 rapid_queries = [
-    "What time is it?", "Weather in Paris", "Explain gravity",
-    "Who won the world series?", "What is pi?", "Tell me a joke",
-    "news: headlines", "augmented: quantum mechanics",
+    "What time is it?",
+    "Weather in Paris",
+    "Explain gravity",
+    "Who won the world series?",
+    "What is pi?",
+    "Tell me a joke",
+    "news: headlines",
+    "augmented: quantum mechanics",
 ] * 6 + ["What time is it?", "Weather in Tokyo"]
 
 success = 0
@@ -133,10 +141,10 @@ for i, q in enumerate(rapid_queries):
             success += 1
         else:
             fail += 1
-    except Exception as e:
+    except Exception:
         fail += 1
 
-log("Rapid", f"50 queries", fail == 0, f"success={success} fail={fail}")
+log("Rapid", "50 queries", fail == 0, f"success={success} fail={fail}")
 
 # ============================================================================
 # STAGE 5: CONCURRENT SUBMISSIONS
@@ -146,14 +154,20 @@ print("STAGE 5: Concurrent Submissions (8 threads, 3 queries each)")
 print("=" * 70)
 
 concurrent_queries = [
-    "What time is it?", "Weather in Berlin", "Explain entropy",
-    "Who wrote Hamlet?", "What is the speed of light?", "Tell me a riddle",
-    "news: breaking news", "augmented: string theory",
+    "What time is it?",
+    "Weather in Berlin",
+    "Explain entropy",
+    "Who wrote Hamlet?",
+    "What is the speed of light?",
+    "Tell me a riddle",
+    "news: breaking news",
+    "augmented: string theory",
 ] * 3
 
 success_c = 0
 fail_c = 0
 lock = False
+
 
 def run_query(q):
     global success_c, fail_c
@@ -163,14 +177,15 @@ def run_query(q):
             success_c += 1
         else:
             fail_c += 1
-    except Exception as e:
+    except Exception:
         fail_c += 1
+
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
     futures = [executor.submit(run_query, q) for q in concurrent_queries]
     concurrent.futures.wait(futures)
 
-log("Concurrent", f"24 queries (8 workers)", fail_c < 5, f"success={success_c} fail={fail_c}")
+log("Concurrent", "24 queries (8 workers)", fail_c < 5, f"success={success_c} fail={fail_c}")
 
 # ============================================================================
 # STAGE 6: MEMORY GATE STRESS
@@ -180,7 +195,8 @@ print("STAGE 6: Memory Gate Stress")
 print("=" * 70)
 
 # Store some memory
-from memory.memory_service import store_turn, clear_session
+from memory.memory_service import clear_session, store_turn
+
 try:
     clear_session()
     store_turn("user", "My dog is named Max.")
@@ -265,13 +281,15 @@ for i in range(10):
     try:
         r = subprocess.run(
             ["bash", "/home/mike/lucy-v10/tools/router/execute_plan.sh", "What time is it?"],
-            capture_output=True, text=True, timeout=30
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if r.returncode == 0 and "time" in r.stdout.lower():
             shim_ok += 1
         else:
             shim_fail += 1
-    except Exception as e:
+    except Exception:
         shim_fail += 1
 
 log("Shim", "10 sequential calls", shim_fail == 0, f"ok={shim_ok} fail={shim_fail}")

@@ -3,22 +3,24 @@ import hashlib
 import json
 import os
 import time
-from urllib.request import Request, build_opener, HTTPRedirectHandler
 from urllib.error import HTTPError, URLError
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 try:
     import yaml
 except Exception:
     yaml = None
 
-from url_safety import parse_and_validate_url
 from extract_text import html_to_text
+from url_safety import parse_and_validate_url
+
 
 def load_yaml(path: str) -> dict:
     if yaml is None:
         raise RuntimeError("PyYAML not installed. Install python3-yaml or convert configs to JSON.")
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
 
 def load_allowlist_txt(path: str) -> dict:
     exact = []
@@ -36,6 +38,7 @@ def load_allowlist_txt(path: str) -> dict:
         "ports": [443],
     }
 
+
 def load_trusted_config(path: str) -> dict:
     if path.lower().endswith(".txt"):
         return load_allowlist_txt(path)
@@ -43,6 +46,7 @@ def load_trusted_config(path: str) -> dict:
     if isinstance(data, dict):
         data.setdefault("_format", "trusted_yaml")
     return data
+
 
 def domain_allowed(host: str, trusted: dict) -> bool:
     exact = set((trusted.get("exact") or []))
@@ -52,6 +56,7 @@ def domain_allowed(host: str, trusted: dict) -> bool:
     if trusted.get("_format") == "allowlist_txt":
         return any(host.endswith("." + d) for d in exact)
     return False
+
 
 class LimitedRedirect(HTTPRedirectHandler):
     def __init__(self, max_redirects: int, trusted: dict):
@@ -72,16 +77,20 @@ class LimitedRedirect(HTTPRedirectHandler):
             raise HTTPError(req.full_url, code, "redirect domain not allowlisted", headers, fp)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
+
 def normalize_content_type(ct: str) -> str:
     if not ct:
         return ""
     return ct.split(";")[0].strip().lower()
 
+
 def ensure_dirs(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
+
 def _sniff_fail(reason: str) -> tuple[bool, str]:
     return (False, reason)
+
 
 def sniff_content(content_type: str, raw: bytes) -> tuple[bool, str]:
     head = raw[:4096]
@@ -120,6 +129,7 @@ def sniff_content(content_type: str, raw: bytes) -> tuple[bool, str]:
         return (True, "ok")
 
     return _sniff_fail("unknown content type in sniff")
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -193,17 +203,30 @@ def main():
     if os.path.exists(meta_path):
         with open(meta_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
-        print(json.dumps({"status": "cached", "key": args.key, "sha256": meta.get("sha256"), "timestamp": meta.get("timestamp")}))
+        print(
+            json.dumps(
+                {
+                    "status": "cached",
+                    "key": args.key,
+                    "sha256": meta.get("sha256"),
+                    "timestamp": meta.get("timestamp"),
+                }
+            )
+        )
         return
 
     opener = build_opener(LimitedRedirect(max_redirects, trusted))
 
     # Avoid accepting compression bombs silently by preferring identity.
-    req = Request(url, method="GET", headers={
-        "User-Agent": "local-lucy-evidence-fetch/1.0",
-        "Accept": ", ".join(sorted(allow_ct)),
-        "Accept-Encoding": "identity",
-    })
+    req = Request(
+        url,
+        method="GET",
+        headers={
+            "User-Agent": "local-lucy-evidence-fetch/1.0",
+            "Accept": ", ".join(sorted(allow_ct)),
+            "Accept-Encoding": "identity",
+        },
+    )
 
     start = time.time()
     raw = b""
@@ -301,11 +324,32 @@ def main():
     except OSError:
         pass
 
-    log_line = json.dumps({"t": ts, "key": args.key, "domain": final_host, "sha256": sha, "bytes": len(raw), "ct": content_type, "sniff": "ok"})
+    log_line = json.dumps(
+        {
+            "t": ts,
+            "key": args.key,
+            "domain": final_host,
+            "sha256": sha,
+            "bytes": len(raw),
+            "ct": content_type,
+            "sniff": "ok",
+        }
+    )
     with open(os.path.join(logs_dir, "fetch.log"), "a", encoding="utf-8") as f:
         f.write(log_line + "\n")
 
-    print(json.dumps({"status": "fetched", "key": args.key, "domain": final_host, "sha256": sha, "timestamp": ts}))
+    print(
+        json.dumps(
+            {
+                "status": "fetched",
+                "key": args.key,
+                "domain": final_host,
+                "sha256": sha,
+                "timestamp": ts,
+            }
+        )
+    )
+
 
 if __name__ == "__main__":
     main()

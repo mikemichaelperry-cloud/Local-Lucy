@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 import json
 import os
-import re
 import subprocess
 import sys
-from typing import Optional, Tuple, Dict, Any
-
 import urllib.request
+from typing import Any, Dict, Optional, Tuple
 
 DISPATCH = os.path.expanduser("~/lucy/tools/internet/tool_router.sh")
 
 ALLOWED_TOOLS = {"search_web", "fetch_url"}
+
 
 def post_chat(payload: dict) -> dict:
     # Ollama chat endpoint
@@ -23,6 +22,7 @@ def post_chat(payload: dict) -> dict:
     )
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.loads(r.read().decode("utf-8", "replace"))
+
 
 def extract_tool_call(text: str) -> Optional[Tuple[str, Dict[str, Any], str]]:
     """
@@ -59,7 +59,7 @@ def extract_tool_call(text: str) -> Optional[Tuple[str, Dict[str, Any], str]]:
                 elif ch == "}":
                     depth -= 1
                     if depth == 0:
-                        return s[start:i+1]
+                        return s[start : i + 1]
         return None
 
     for start in range(n):
@@ -84,7 +84,7 @@ def extract_tool_call(text: str) -> Optional[Tuple[str, Dict[str, Any], str]]:
         canonical = json.dumps(
             {"tool_call": {"name": name, "arguments": args}},
             ensure_ascii=False,
-            separators=(",", ":")
+            separators=(",", ":"),
         )
         return name, args, canonical
 
@@ -112,6 +112,7 @@ def extract_tool_call(text: str) -> Optional[Tuple[str, Dict[str, Any], str]]:
             args = {}
         return name, args, line
     return None
+
 
 def sanitize_args(tool: str, args: Dict[str, Any], fallback_query: str) -> Dict[str, Any]:
     """
@@ -148,6 +149,7 @@ def sanitize_args(tool: str, args: Dict[str, Any], fallback_query: str) -> Dict[
 
     return out
 
+
 def run_tool(tool: str, args: Dict[str, Any]) -> str:
     if tool not in ALLOWED_TOOLS:
         return json.dumps({"error": "tool_not_allowed", "name": tool})
@@ -157,7 +159,10 @@ def run_tool(tool: str, args: Dict[str, Any]) -> str:
         return out.strip()
     except subprocess.CalledProcessError as e:
         # Dispatcher should already print JSON; keep stderr minimal.
-        return (e.output or "").strip() or json.dumps({"error": "tool_failed", "code": e.returncode})
+        return (e.output or "").strip() or json.dumps(
+            {"error": "tool_failed", "code": e.returncode}
+        )
+
 
 def main():
     if len(sys.argv) < 2:
@@ -202,10 +207,13 @@ def main():
             tc = extract_tool_call(assistant)
             # Recovery: model tried to emit a tool_call but JSON was malformed/truncated.
             if (tc is None) and ("tool_call" in assistant):
-                messages.append({"role": "user", "content": "INSTRUCTION: Re-emit the tool_call as a SINGLE LINE of VALID JSON only. No prose. Example: {\"tool_call\":{\"name\":\"search_web\",\"arguments\":{\"query\":\"...\",\"max_results\":5}}}"} )
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": 'INSTRUCTION: Re-emit the tool_call as a SINGLE LINE of VALID JSON only. No prose. Example: {"tool_call":{"name":"search_web","arguments":{"query":"...","max_results":5}}}',
+                    }
+                )
                 continue
-
-
 
             if tc:
                 name, args, json_line = tc
@@ -216,7 +224,12 @@ def main():
 
                 # Enforce: only one tool call per user turn
                 if tool_used_this_turn:
-                    messages.append({"role": "user", "content": "TOOL_RESULT error {\"error\":\"too_many_tool_calls\"}"})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": 'TOOL_RESULT error {"error":"too_many_tool_calls"}',
+                        }
+                    )
                     print('TOOL_RESULT error {"error":"too_many_tool_calls"}')
                     break
 
@@ -256,12 +269,18 @@ def main():
                 tool_used_this_turn = True
 
                 # After tool result, require one synthesis answer only
-                messages.append({"role": "user", "content": "INSTRUCTION: Now answer ONCE. Use ONLY the TOOL_RESULT. Cite URLs from results. No extra tool calls."})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "INSTRUCTION: Now answer ONCE. Use ONLY the TOOL_RESULT. Cite URLs from results. No extra tool calls.",
+                    }
+                )
                 continue
             # no tool call => normal assistant output
             print(assistant)
             messages.append({"role": "assistant", "content": assistant})
             break
+
 
 if __name__ == "__main__":
     main()

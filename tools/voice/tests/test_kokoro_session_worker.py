@@ -6,7 +6,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKER_SOURCE = REPO_ROOT / "tools" / "voice" / "kokoro_session_worker.py"
 sys.path.insert(0, str(REPO_ROOT / "tools"))
@@ -37,17 +36,25 @@ def main() -> int:
             fallback_engine="piper",
         )
         worker.tts_adapter.resolve_root = lambda: Path("/tmp/local-lucy")
-        worker.kokoro_backend.configure_runtime_environment = lambda root, env: calls.setdefault("configured", (root, dict(env)))
+        worker.kokoro_backend.configure_runtime_environment = lambda root, env: calls.setdefault(
+            "configured", (root, dict(env))
+        )
         worker.kokoro_backend.resolve_lang_code = lambda env, voice: "a"
         worker.kokoro_backend.resolve_repo_id = lambda env: "hexgrad/Kokoro-82M"
         worker.kokoro_backend.resolve_device = lambda env: "cpu"
-        worker.kokoro_backend.get_pipeline = lambda **kwargs: calls.setdefault("pipeline", kwargs) or object()
+        worker.kokoro_backend.get_pipeline = (
+            lambda **kwargs: calls.setdefault("pipeline", kwargs) or object()
+        )
 
         prewarm = worker.handle_request({"cmd": "prewarm"}, env={"LUCY_VOICE_TTS_ENGINE": "auto"})
         assert_ok(prewarm["ok"] is True, f"expected successful prewarm: {prewarm}")
         assert_ok(prewarm["engine"] == "kokoro", f"unexpected engine: {prewarm}")
         assert_ok(prewarm["prewarmed"] is True, f"expected prewarmed flag: {prewarm}")
-        assert_ok(calls.get("pipeline") == {"lang_code": "a", "repo_id": "hexgrad/Kokoro-82M", "device": "cpu"}, f"unexpected pipeline call: {calls}")
+        assert_ok(
+            calls.get("pipeline")
+            == {"lang_code": "a", "repo_id": "hexgrad/Kokoro-82M", "device": "cpu"},
+            f"unexpected pipeline call: {calls}",
+        )
 
         worker.tts_adapter.synthesize_text = lambda **kwargs: {
             "ok": True,
@@ -78,7 +85,9 @@ def main() -> int:
 
 def load_worker_module():
     with tempfile.TemporaryDirectory(prefix="kokoro_session_worker_"):
-        spec = importlib.util.spec_from_file_location("kokoro_session_worker_test_module", WORKER_SOURCE)
+        spec = importlib.util.spec_from_file_location(
+            "kokoro_session_worker_test_module", WORKER_SOURCE
+        )
         if spec is None or spec.loader is None:
             raise AssertionError(f"unable to load module spec: {WORKER_SOURCE}")
         module = importlib.util.module_from_spec(spec)

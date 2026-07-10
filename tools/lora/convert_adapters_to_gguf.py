@@ -24,7 +24,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LORA_ROOT = PROJECT_ROOT / "models" / "lora"
 DEFAULT_LLAMA_CPP_ROOT = Path("/tmp/llama.cpp")
@@ -40,7 +39,9 @@ def find_adapter_dirs(root: Path) -> list[Path]:
     return dirs
 
 
-def convert_adapter(adapter_dir: Path, llama_cpp_root: Path, outtype: str, hf_token: str | None) -> None:
+def convert_adapter(
+    adapter_dir: Path, llama_cpp_root: Path, outtype: str, hf_token: str | None
+) -> None:
     """Convert a single adapter directory to GGUF."""
     adapter_file = adapter_dir / "adapter_model.safetensors"
     if not adapter_file.exists():
@@ -77,10 +78,28 @@ def convert_adapter(adapter_dir: Path, llama_cpp_root: Path, outtype: str, hf_to
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Convert LoRA adapters to GGUF")
-    parser.add_argument("--llama-cpp-root", type=Path, default=DEFAULT_LLAMA_CPP_ROOT, help="Path to llama.cpp checkout")
-    parser.add_argument("--outtype", type=str, default="f16", choices=["f32", "f16", "bf16", "q8_0", "auto"], help="GGUF output type")
-    parser.add_argument("--adapter-dir", type=Path, default=None, help="Convert a single adapter directory instead of all")
-    parser.add_argument("--hf-token", type=str, default=os.environ.get("HF_TOKEN"), help="HuggingFace read token")
+    parser.add_argument(
+        "--llama-cpp-root",
+        type=Path,
+        default=DEFAULT_LLAMA_CPP_ROOT,
+        help="Path to llama.cpp checkout",
+    )
+    parser.add_argument(
+        "--outtype",
+        type=str,
+        default="f16",
+        choices=["f32", "f16", "bf16", "q8_0", "auto"],
+        help="GGUF output type",
+    )
+    parser.add_argument(
+        "--adapter-dir",
+        type=Path,
+        default=None,
+        help="Convert a single adapter directory instead of all",
+    )
+    parser.add_argument(
+        "--hf-token", type=str, default=os.environ.get("HF_TOKEN"), help="HuggingFace read token"
+    )
     args = parser.parse_args()
 
     if args.adapter_dir:

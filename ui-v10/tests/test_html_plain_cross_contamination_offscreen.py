@@ -9,13 +9,13 @@ link colouring) can leak without an explicit clear().
 
 This test verifies the `widget.clear()` guard in `_set_plain_text`.
 """
+
 from __future__ import annotations
 
 import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
 
 REPO_UI_ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,19 +29,15 @@ def main() -> int:
         os.environ["LUCY_UI_ROOT"] = str(REPO_UI_ROOT)
         sys.path.insert(0, str(REPO_UI_ROOT))
 
-        from PySide6.QtWidgets import QApplication
         from app.panels.conversation_panel import ConversationPanel
+        from PySide6.QtWidgets import QApplication
 
         app = QApplication([])
         panel = ConversationPanel()
         history = panel._history
 
         # Phase 1 — set HTML with URLs (NEWS path)
-        news_text = (
-            "Sources:\n"
-            "- https://nytimes.com/article-1\n"
-            "- https://bbc.co.uk/article-2"
-        )
+        news_text = "Sources:\n" "- https://nytimes.com/article-1\n" "- https://bbc.co.uk/article-2"
         panel._set_plain_text(history, news_text, reset_scroll=False)
         app.processEvents()
         assert "<a" in history.toHtml(), "NEWS text should render as HTML with <a> tags"
@@ -56,12 +52,7 @@ def main() -> int:
 
         history.clear = spied_clear  # type: ignore[method-assign]
         try:
-            local_text = (
-                "Latest Request\n"
-                "What is 2+2?\n\n"
-                "Latest Answer\n"
-                "The sum is 4."
-            )
+            local_text = "Latest Request\n" "What is 2+2?\n\n" "Latest Answer\n" "The sum is 4."
             panel._set_plain_text(history, local_text, reset_scroll=False)
             app.processEvents()
         finally:

@@ -4,7 +4,9 @@ Test llama3.1 with explicit persistent memory context.
 The key question: will it use personal facts when provided, or still refuse?
 """
 
-import subprocess, json, time
+import json
+import subprocess
+import time
 
 MODEL = "local-lucy-llama31"
 
@@ -20,19 +22,35 @@ QUERIES = [
     "Tell me about my dog.",
 ]
 
-def ollama_generate(model: str, prompt: str, system: str = "", timeout: int = 60) -> tuple[str, float]:
-    payload = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "system": system,
-        "stream": False,
-        "options": {"num_predict": 128},
-    })
+
+def ollama_generate(
+    model: str, prompt: str, system: str = "", timeout: int = 60
+) -> tuple[str, float]:
+    payload = json.dumps(
+        {
+            "model": model,
+            "prompt": prompt,
+            "system": system,
+            "stream": False,
+            "options": {"num_predict": 128},
+        }
+    )
     start = time.perf_counter()
     result = subprocess.run(
-        ["curl", "-s", "-X", "POST", "http://localhost:11434/api/generate",
-         "-H", "Content-Type: application/json", "-d", payload],
-        capture_output=True, text=True, timeout=timeout,
+        [
+            "curl",
+            "-s",
+            "-X",
+            "POST",
+            "http://localhost:11434/api/generate",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            payload,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
     )
     elapsed = time.perf_counter() - start
     try:
@@ -41,6 +59,7 @@ def ollama_generate(model: str, prompt: str, system: str = "", timeout: int = 60
     except Exception as e:
         return f"ERROR: {e}\nRAW: {result.stdout[:200]}", elapsed
 
+
 def main():
     print("Testing llama3.1:8b WITH persistent memory context")
     print("=" * 60)
@@ -48,6 +67,7 @@ def main():
         text, elapsed = ollama_generate(MODEL, query, system=MEMORY_CONTEXT)
         print(f"\nQ: {query}")
         print(f"  ({elapsed:.2f}s) → {text}")
+
 
 if __name__ == "__main__":
     main()

@@ -15,11 +15,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import urllib.request
 from pathlib import Path
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_CASES_PATH = PROJECT_ROOT / "tests" / "golden_persona_cases.jsonl"
@@ -88,7 +86,13 @@ def run_case(
     failed = []
     for check in case.get("checks", []):
         value = check["value"]
-        text = response.lower().replace("\u2019", "'").replace("\u2018", "'").replace("\u201c", '"').replace("\u201d", '"')
+        text = (
+            response.lower()
+            .replace("\u2019", "'")
+            .replace("\u2018", "'")
+            .replace("\u201c", '"')
+            .replace("\u201d", '"')
+        )
         if check["type"] == "contains":
             if value.lower() not in text:
                 failed.append(f"should contain '{value}'")
@@ -130,12 +134,28 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--model", type=str, required=True, help="Ollama model tag to test")
-    parser.add_argument("--persona", type=str, default=None, help="Filter cases by persona (michael)")
-    parser.add_argument("--prompt-persona", type=str, default=None, help="Inject the prompt-level persona fragment for this name (tests fallback path)")
-    parser.add_argument("--cases", type=Path, default=GOLDEN_CASES_PATH, help="Path to golden cases JSONL")
+    parser.add_argument(
+        "--persona", type=str, default=None, help="Filter cases by persona (michael)"
+    )
+    parser.add_argument(
+        "--prompt-persona",
+        type=str,
+        default=None,
+        help="Inject the prompt-level persona fragment for this name (tests fallback path)",
+    )
+    parser.add_argument(
+        "--cases", type=Path, default=GOLDEN_CASES_PATH, help="Path to golden cases JSONL"
+    )
     parser.add_argument("--ollama-url", type=str, default=DEFAULT_OLLAMA_URL, help="Ollama API URL")
-    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON instead of human text")
-    parser.add_argument("--min-pass-rate", type=float, default=60.0, help="Minimum pass rate (%%) to exit with code 0 (default: 60)")
+    parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable JSON instead of human text"
+    )
+    parser.add_argument(
+        "--min-pass-rate",
+        type=float,
+        default=60.0,
+        help="Minimum pass rate (%%) to exit with code 0 (default: 60)",
+    )
     args = parser.parse_args()
 
     if not args.cases.exists():
@@ -202,7 +222,9 @@ def main() -> int:
                 persona: {
                     "passed": sum(1 for x in items if x["passed"]),
                     "total": len(items),
-                    "pass_rate": round(100 * sum(1 for x in items if x["passed"]) / len(items), 1) if items else 0.0,
+                    "pass_rate": round(100 * sum(1 for x in items if x["passed"]) / len(items), 1)
+                    if items
+                    else 0.0,
                 }
                 for persona, items in sorted(per_persona.items())
             },

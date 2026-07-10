@@ -9,7 +9,6 @@ import warnings
 from pathlib import Path
 from typing import Any, Mapping
 
-
 DEFAULT_REPO_ID = "hexgrad/Kokoro-82M"
 DEFAULT_SAMPLE_RATE = 24000
 KNOWN_WARNING_PATTERNS = (
@@ -43,11 +42,14 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
     if explicit:
         path = Path(explicit).expanduser()
         return path if path.exists() else None
-    
+
     # Check if kokoro module is available in current Python
-    if importlib.util.find_spec("kokoro") is not None and importlib.util.find_spec("soundfile") is not None:
+    if (
+        importlib.util.find_spec("kokoro") is not None
+        and importlib.util.find_spec("soundfile") is not None
+    ):
         return Path(sys.executable)
-    
+
     # Check for socket-based worker (runs in separate Python process)
     root = Path(root) if not isinstance(root, Path) else root
     socket_path = root / "tmp" / "run" / "kokoro_tts_worker.sock"
@@ -55,8 +57,9 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
         # Verify socket is responsive
         sock = None
         try:
-            import socket
             import json
+            import socket
+
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(2)
             sock.connect(str(socket_path))
@@ -76,11 +79,13 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
                     sock.close()
                 except Exception:
                     pass
-    
+
     return None
 
 
-def resolve_voice_name(env: Mapping[str, str] | None = None, explicit_voice: str | None = None) -> str:
+def resolve_voice_name(
+    env: Mapping[str, str] | None = None, explicit_voice: str | None = None
+) -> str:
     if explicit_voice and explicit_voice.strip():
         return explicit_voice.strip()
     values = env or os.environ
@@ -133,9 +138,9 @@ def synthesize(
 
 def load_runtime_dependencies() -> tuple[Any, Any, Any]:
     try:
-        from kokoro import KPipeline
         import numpy as np
         import soundfile as sf
+        from kokoro import KPipeline
     except Exception as exc:  # pragma: no cover - exercised in live/runtime environments
         raise KokoroBackendError(f"unable to import kokoro runtime: {exc}") from exc
     return KPipeline, np, sf
@@ -198,7 +203,9 @@ def resolve_lang_code(env: Mapping[str, str], voice: str) -> str:
         return explicit
     trimmed = voice.strip().lower()
     if trimmed.endswith(".pt"):
-        raise KokoroBackendError("kokoro language code is required when using a custom voice tensor")
+        raise KokoroBackendError(
+            "kokoro language code is required when using a custom voice tensor"
+        )
     inferred = normalize_lang_code(trimmed[:1])
     if inferred:
         return inferred
@@ -248,13 +255,22 @@ def resolve_split_pattern(env: Mapping[str, str]) -> str:
 
 def configure_runtime_environment(root: Path, env: Mapping[str, str]) -> None:
     root = Path(root) if not isinstance(root, Path) else root
-    hf_home_raw = str(env.get("HF_HOME", "")).strip() or str(env.get("LUCY_VOICE_KOKORO_CACHE_HOME", "")).strip()
-    hf_home = Path(hf_home_raw).expanduser() if hf_home_raw else root / "runtime" / "voice" / "cache" / "huggingface"
+    hf_home_raw = (
+        str(env.get("HF_HOME", "")).strip()
+        or str(env.get("LUCY_VOICE_KOKORO_CACHE_HOME", "")).strip()
+    )
+    hf_home = (
+        Path(hf_home_raw).expanduser()
+        if hf_home_raw
+        else root / "runtime" / "voice" / "cache" / "huggingface"
+    )
     hub_cache_raw = str(env.get("HF_HUB_CACHE", "")).strip()
     transformers_cache_raw = str(env.get("TRANSFORMERS_CACHE", "")).strip()
     hub_cache = Path(hub_cache_raw).expanduser() if hub_cache_raw else hf_home / "hub"
     transformers_cache = (
-        Path(transformers_cache_raw).expanduser() if transformers_cache_raw else hf_home / "transformers"
+        Path(transformers_cache_raw).expanduser()
+        if transformers_cache_raw
+        else hf_home / "transformers"
     )
     hf_home.mkdir(parents=True, exist_ok=True)
     hub_cache.mkdir(parents=True, exist_ok=True)

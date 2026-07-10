@@ -3,11 +3,9 @@
 
 from __future__ import annotations
 
-import os
 import sys
 import tempfile
 import unittest
-import wave
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

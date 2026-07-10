@@ -4,7 +4,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Final, List, Tuple
 
-
 HUMAN_MEDICATION_HIGH_RISK_PATTERN: Final[str] = (
     r"(^|[^a-z])("
     r"tadalafil|tadalifil|cialis|viagra|sildenafil|vardenafil|"
@@ -109,7 +108,9 @@ MEDICATION_RISK_FRAME_PATTERN: Final[str] = (
     r"contraindication|contraindications|safe with|dose|dosage|mg|alcohol|grapefruit)\b"
 )
 
-MEDICATION_DEFINITION_FRAME_PATTERN: Final[str] = r"\b(what(?:'s| is)|what does|does|is|dose(?: of)?)\b"
+MEDICATION_DEFINITION_FRAME_PATTERN: Final[str] = (
+    r"\b(what(?:'s| is)|what does|does|is|dose(?: of)?)\b"
+)
 MEDICATION_TOPIC_FRAME_PATTERN: Final[str] = (
     r"\b(what(?:'s| is)|what does|does|is|explain|describe|tell me about|tell me more about|"
     r"used for|use for|take for|treat|treatment|for|with|safe|safer|better)\b"
@@ -225,9 +226,14 @@ def detect_human_medication_query(text: str) -> Dict[str, object]:
     normalized = normalize_for_medical_match(original)
     candidate_raw, pattern_family = _extract_candidate(original.lower(), normalized)
     normalized_candidate = _normalize_candidate(candidate_raw)
-    high_risk_terms = re.search(HUMAN_MEDICATION_HIGH_RISK_PATTERN, normalized, flags=re.IGNORECASE) is not None
+    high_risk_terms = (
+        re.search(HUMAN_MEDICATION_HIGH_RISK_PATTERN, normalized, flags=re.IGNORECASE) is not None
+    )
     hypertension_rule = (
-        re.search(r"(high blood pressure|blood pressure|hypertension)", normalized, flags=re.IGNORECASE) is not None
+        re.search(
+            r"(high blood pressure|blood pressure|hypertension)", normalized, flags=re.IGNORECASE
+        )
+        is not None
         and re.search(
             r"(medication|medicine|drug|drugs|treatment|treat|tablet|tablets|pill|pills|dose|dosage|safe|correct)",
             normalized,
@@ -235,11 +241,21 @@ def detect_human_medication_query(text: str) -> Dict[str, object]:
         )
         is not None
     )
-    risk_frame = re.search(MEDICATION_RISK_FRAME_PATTERN, normalized, flags=re.IGNORECASE) is not None
-    definition_frame = re.search(MEDICATION_DEFINITION_FRAME_PATTERN, normalized, flags=re.IGNORECASE) is not None
-    topic_frame = re.search(MEDICATION_TOPIC_FRAME_PATTERN, normalized, flags=re.IGNORECASE) is not None
-    condition_context = re.search(MEDICATION_CONDITION_PATTERN, normalized, flags=re.IGNORECASE) is not None
-    explicit_followup_frame = re.search(r"^\s*(what about|how about)\b", normalized, flags=re.IGNORECASE) is not None
+    risk_frame = (
+        re.search(MEDICATION_RISK_FRAME_PATTERN, normalized, flags=re.IGNORECASE) is not None
+    )
+    definition_frame = (
+        re.search(MEDICATION_DEFINITION_FRAME_PATTERN, normalized, flags=re.IGNORECASE) is not None
+    )
+    topic_frame = (
+        re.search(MEDICATION_TOPIC_FRAME_PATTERN, normalized, flags=re.IGNORECASE) is not None
+    )
+    condition_context = (
+        re.search(MEDICATION_CONDITION_PATTERN, normalized, flags=re.IGNORECASE) is not None
+    )
+    explicit_followup_frame = (
+        re.search(r"^\s*(what about|how about)\b", normalized, flags=re.IGNORECASE) is not None
+    )
     alias_map = _load_medical_alias_data()[1]
 
     fired = False
@@ -254,13 +270,23 @@ def detect_human_medication_query(text: str) -> Dict[str, object]:
             notes.append("alias_normalized_candidate")
         if pattern_family:
             notes.append(f"pattern_family={pattern_family}")
-        if risk_frame and (candidate_raw in alias_map or _token_looks_like_medication(normalized_candidate or candidate_raw)):
+        if risk_frame and (
+            candidate_raw in alias_map
+            or _token_looks_like_medication(normalized_candidate or candidate_raw)
+        ):
             fired = True
-            detection_source = "alias_catalog" if candidate_raw in alias_map else "candidate_heuristic"
+            detection_source = (
+                "alias_catalog" if candidate_raw in alias_map else "candidate_heuristic"
+            )
             score = 0.97 if candidate_raw in alias_map else 0.9
-        elif definition_frame and (candidate_raw in alias_map or _token_looks_like_medication(normalized_candidate or candidate_raw)):
+        elif definition_frame and (
+            candidate_raw in alias_map
+            or _token_looks_like_medication(normalized_candidate or candidate_raw)
+        ):
             fired = True
-            detection_source = "alias_catalog" if candidate_raw in alias_map else "candidate_heuristic"
+            detection_source = (
+                "alias_catalog" if candidate_raw in alias_map else "candidate_heuristic"
+            )
             score = 0.92 if candidate_raw in alias_map else 0.82
 
     if not candidate_raw:
@@ -279,8 +305,11 @@ def detect_human_medication_query(text: str) -> Dict[str, object]:
         score = 0.9
         notes.append("known_high_risk_terms")
 
-    if not fired and candidate_raw and _token_looks_like_medication(normalized_candidate or candidate_raw) and (
-        topic_frame or condition_context or explicit_followup_frame
+    if (
+        not fired
+        and candidate_raw
+        and _token_looks_like_medication(normalized_candidate or candidate_raw)
+        and (topic_frame or condition_context or explicit_followup_frame)
     ):
         fired = True
         detection_source = "topic_frame"
@@ -316,7 +345,9 @@ def detect_human_medication_query(text: str) -> Dict[str, object]:
 
 def has_human_medication_high_risk_terms(text: str) -> bool:
     normalized = normalize_for_medical_match(text)
-    return re.search(HUMAN_MEDICATION_HIGH_RISK_PATTERN, normalized, flags=re.IGNORECASE) is not None
+    return (
+        re.search(HUMAN_MEDICATION_HIGH_RISK_PATTERN, normalized, flags=re.IGNORECASE) is not None
+    )
 
 
 def is_human_medication_high_risk_query(text: str) -> bool:
@@ -329,7 +360,9 @@ def has_human_medication_topic_query(text: str) -> bool:
         return False
     if detect_human_medication_query(text).get("detector_fired"):
         return True
-    medication_tokens = [token for token in _tokenize(normalized) if _token_looks_like_medication(token)]
+    medication_tokens = [
+        token for token in _tokenize(normalized) if _token_looks_like_medication(token)
+    ]
     if not medication_tokens:
         return False
     if re.search(r"^\s*(what about|how about)\b", normalized, flags=re.IGNORECASE):

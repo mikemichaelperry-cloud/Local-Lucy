@@ -14,7 +14,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -101,6 +100,7 @@ class TestWebExtractTelemetry(unittest.TestCase):
         # We can't easily mock webclaw binary presence, so test the internal logic
         # by checking the function signature accepts _telemetry_out
         from internet.web_extract import extract_webpage
+
         # Just verify the parameter exists and the function doesn't crash
         # when _telemetry_out is provided (will fail on actual extraction,
         # but that's OK for signature validation)
@@ -116,6 +116,7 @@ class TestWebExtractTelemetry(unittest.TestCase):
     def test_extract_webpage_populates_telemetry_on_failure(self):
         telemetry = {}
         from internet.web_extract import extract_webpage
+
         # Use a URL that will definitely fail
         result = extract_webpage("http://localhost:99999/nonexistent", _telemetry_out=telemetry)
         self.assertIsNone(result)
@@ -128,6 +129,7 @@ class TestMemoryServiceTelemetry(unittest.TestCase):
 
     def test_empty_query_sets_telemetry(self):
         import memory.memory_service as ms
+
         ms._close_connection()
         fd, path = tempfile.mkstemp(suffix=".db")
         os.close(fd)
@@ -150,6 +152,7 @@ class TestMemoryServiceTelemetry(unittest.TestCase):
 
     def test_no_facts_sets_telemetry(self):
         import memory.memory_service as ms
+
         ms._close_connection()
         fd, path = tempfile.mkstemp(suffix=".db")
         os.close(fd)
@@ -178,6 +181,7 @@ class TestExecutionEngineFallbackPaths(unittest.TestCase):
         # We can't easily instantiate ExecutionEngine, so we verify the helper
         # function exists and produces correct dicts
         from router_py.fallback_telemetry import make
+
         tel = make(
             fallback_used=True,
             fallback_reason="local_worker_failed",
@@ -190,6 +194,7 @@ class TestExecutionEngineFallbackPaths(unittest.TestCase):
 
     def test_fetch_evidence_telemetry_structure(self):
         from router_py.fallback_telemetry import make
+
         # Simulate what _fetch_evidence produces on fallback
         tel = make(
             fallback_used=True,

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Real whisper integration test: verify GPU and CPU paths both work."""
+
 from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import tempfile
 import time
 import wave
@@ -12,7 +12,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 WHISPER_BIN = ROOT / "runtime" / "voice" / "bin" / "whisper"
-MODEL_PATH = ROOT / "runtime" / "voice" / "models" / f"ggml-{os.environ.get('LUCY_VOICE_MODEL', 'large-v3-turbo').strip()}.bin"
+MODEL_PATH = (
+    ROOT
+    / "runtime"
+    / "voice"
+    / "models"
+    / f"ggml-{os.environ.get('LUCY_VOICE_MODEL', 'large-v3-turbo').strip()}.bin"
+)
 
 
 def generate_test_wav(path: Path, duration_sec: float = 3.0) -> None:

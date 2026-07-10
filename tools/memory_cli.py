@@ -7,6 +7,7 @@ Usage:
     python tools/memory_cli.py delete <id>
     python tools/memory_cli.py import-memory-txt
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,10 +19,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
 from memory.memory_service import (
+    _get_connection,
+    delete_persistent_fact,
     get_persistent_facts,
     store_persistent_fact,
-    delete_persistent_fact,
-    _get_connection,
 )
 
 

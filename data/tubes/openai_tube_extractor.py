@@ -97,7 +97,10 @@ def extract_tube(client, tube_type: str, model: str = "gpt-4o-mini") -> Extracti
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "You extract precise technical parameters from vacuum tube datasheets. Output valid JSON only."},
+                {
+                    "role": "system",
+                    "content": "You extract precise technical parameters from vacuum tube datasheets. Output valid JSON only.",
+                },
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
@@ -150,7 +153,9 @@ def extract_tube(client, tube_type: str, model: str = "gpt-4o-mini") -> Extracti
     )
 
 
-def validate_and_insert(conn: sqlite3.Connection, result: ExtractionResult, dry_run: bool = False) -> bool:
+def validate_and_insert(
+    conn: sqlite3.Connection, result: ExtractionResult, dry_run: bool = False
+) -> bool:
     """Validate extraction result and insert into DB. Returns True on success."""
     if result.error:
         print(f"  [FAIL] {result.tube_type}: {result.error}")
@@ -221,9 +226,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Bulk-extract tube parameters via OpenAI")
     parser.add_argument("--tubes", help="Comma-separated list of tube types")
     parser.add_argument("--from-file", type=Path, help="File with one tube type per line")
-    parser.add_argument("--model", default="gpt-4o-mini", help="OpenAI model (default: gpt-4o-mini)")
-    parser.add_argument("--delay", type=float, default=1.0, help="Seconds between API calls (default: 1.0)")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be inserted without writing")
+    parser.add_argument(
+        "--model", default="gpt-4o-mini", help="OpenAI model (default: gpt-4o-mini)"
+    )
+    parser.add_argument(
+        "--delay", type=float, default=1.0, help="Seconds between API calls (default: 1.0)"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be inserted without writing"
+    )
     parser.add_argument("--db", type=Path, default=None, help="Path to SQLite DB")
     args = parser.parse_args()
 
@@ -236,7 +247,9 @@ def main() -> int:
         tube_list = [t.strip() for t in args.tubes.split(",") if t.strip()]
     if args.from_file:
         text = args.from_file.read_text(encoding="utf-8")
-        tube_list.extend([t.strip() for t in text.splitlines() if t.strip() and not t.strip().startswith("#")])
+        tube_list.extend(
+            [t.strip() for t in text.splitlines() if t.strip() and not t.strip().startswith("#")]
+        )
 
     if not tube_list:
         print("No tube types provided.")
@@ -264,7 +277,7 @@ def main() -> int:
             print(f"  ERROR: {result.error}")
         elif lookup_tube(conn, tube):
             skip += 1
-            print(f"  SKIP: already in database")
+            print("  SKIP: already in database")
         else:
             if validate_and_insert(conn, result, dry_run=args.dry_run):
                 success += 1

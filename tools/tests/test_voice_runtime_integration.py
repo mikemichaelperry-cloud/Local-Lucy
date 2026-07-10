@@ -7,16 +7,13 @@ and tests the full voice turn lifecycle through runtime_voice.py functions.
 
 Run with: pytest tools/tests/test_voice_runtime_integration.py -v
 """
+
 from __future__ import annotations
 
 import json
-import os
-import subprocess
 import sys
-import tempfile
 import wave
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -64,9 +61,7 @@ def tmp_runtime(tmp_path: Path):
     )
 
     # Default voice runtime
-    runtime_file.write_text(
-        json.dumps(rv.default_voice_runtime()) + "\n", encoding="utf-8"
-    )
+    runtime_file.write_text(json.dumps(rv.default_voice_runtime()) + "\n", encoding="utf-8")
 
     return {
         "root": tmp_path,
@@ -174,7 +169,9 @@ class TestVoiceRuntimeStateTransitions:
             with patch.object(rv, "detect_backend", return_value=mock_backend):
                 with patch.object(rv, "stop_recorder"):
                     with patch.object(
-                        rv, "transcribe_capture", return_value=rv.TranscriptionResult(text="Hello Lucy")
+                        rv,
+                        "transcribe_capture",
+                        return_value=rv.TranscriptionResult(text="Hello Lucy"),
                     ):
                         payload = rv.handle_ptt_stop(
                             tmp_runtime["runtime_file"],
@@ -273,13 +270,24 @@ class TestTranscriptionFallback:
 
     def test_transcribe_capture_filters_silence_markers(self, monkeypatch):
         """transcribe_capture should return empty text for silence markers."""
-        monkeypatch.setattr(rv, "transcribe_with_whisper", lambda _bin, _path: rv.TranscriptionResult(text="[BLANK_AUDIO]"))
+        monkeypatch.setattr(
+            rv,
+            "transcribe_with_whisper",
+            lambda _bin, _path: rv.TranscriptionResult(text="[BLANK_AUDIO]"),
+        )
         result = rv.transcribe_capture(
             rv.VoiceBackend(
-                available=True, recorder_engine="arecord", recorder_bin="",
-                stt_engine="whisper", stt_bin="whisper", stt_device="gpu",
-                tts_engine="none", tts_bin="", tts_device="none",
-                audio_player="none", reason="ready",
+                available=True,
+                recorder_engine="arecord",
+                recorder_bin="",
+                stt_engine="whisper",
+                stt_bin="whisper",
+                stt_device="gpu",
+                tts_engine="none",
+                tts_bin="",
+                tts_device="none",
+                audio_player="none",
+                reason="ready",
             ),
             Path("/dev/null"),
         )
@@ -402,9 +410,7 @@ class TestVoiceRuntimeHelpers:
         assert payload["transcript"] == "hello"
         assert "request" not in payload
 
-        with_request = rv.build_turn_payload(
-            "completed", "hello", {"response_text": "hi"}, ""
-        )
+        with_request = rv.build_turn_payload("completed", "hello", {"response_text": "hi"}, "")
         assert with_request["request"]["response_text"] == "hi"
 
 
@@ -423,6 +429,7 @@ class TestBackendDetection:
 
     def test_detect_backend_with_recorder_only(self, monkeypatch):
         """detect_backend with only recorder should still be unavailable."""
+
         def fake_which(cmd):
             if cmd == "arecord":
                 return "/usr/bin/arecord"
@@ -450,6 +457,7 @@ class TestAudioLevelHelpers:
     def test_pcm_level_max(self):
         """pcm_level of full-scale square wave should be high."""
         import struct
+
         # 16-bit full-scale samples (little-endian)
         data = struct.pack("<h", 32767) * 512
         level = rv.pcm_level(data)

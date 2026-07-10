@@ -9,7 +9,7 @@ import os
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 os.environ["LUCY_ROOT"] = str(ROOT)
@@ -54,10 +54,18 @@ class TestIsCategorySupported(unittest.TestCase):
 
 
 class TestFormatMedicalResponseWithMockFetch(unittest.TestCase):
-    @patch.object(uct, "_search_restricted", return_value=[
-        {"url": "https://medlineplus.gov/appendicitis.html", "title": "Appendicitis"}
-    ])
-    @patch.object(uct, "_fetch_article_content", return_value="The appendix is a small, tube-like organ attached to the first part of the large intestine. It is located in the lower right part of the abdomen. It has no known function. A blockage inside of the appendix causes appendicitis. The blockage leads to increased pressure, problems with blood flow, and inflammation.")
+    @patch.object(
+        uct,
+        "_search_restricted",
+        return_value=[
+            {"url": "https://medlineplus.gov/appendicitis.html", "title": "Appendicitis"}
+        ],
+    )
+    @patch.object(
+        uct,
+        "_fetch_article_content",
+        return_value="The appendix is a small, tube-like organ attached to the first part of the large intestine. It is located in the lower right part of the abdomen. It has no known function. A blockage inside of the appendix causes appendicitis. The blockage leads to increased pressure, problems with blood flow, and inflammation.",
+    )
     def test_returns_fetched_content_when_available(self, mock_fetch, mock_search):
         domains = ["medlineplus.gov", "mayoclinic.org"]
         result = uct._format_medical_response(domains, "symptoms of appendicitis")
@@ -74,9 +82,13 @@ class TestFormatMedicalResponseWithMockFetch(unittest.TestCase):
         self.assertIn("Medical information is available", result)
         self.assertIn("medlineplus.gov", result)
 
-    @patch.object(uct, "_search_restricted", return_value=[
-        {"url": "https://medlineplus.gov/appendicitis.html", "title": "Appendicitis"}
-    ])
+    @patch.object(
+        uct,
+        "_search_restricted",
+        return_value=[
+            {"url": "https://medlineplus.gov/appendicitis.html", "title": "Appendicitis"}
+        ],
+    )
     @patch.object(uct, "_fetch_article_content", return_value=None)
     def test_falls_back_when_fetch_returns_none(self, mock_fetch, mock_search):
         domains = ["medlineplus.gov"]
@@ -85,10 +97,16 @@ class TestFormatMedicalResponseWithMockFetch(unittest.TestCase):
 
 
 class TestFormatVetResponseWithMockFetch(unittest.TestCase):
-    @patch.object(uct, "_search_restricted", return_value=[
-        {"url": "https://vcahospitals.com/kb/parvovirus", "title": "Parvovirus"}
-    ])
-    @patch.object(uct, "_fetch_article_content", return_value="Parvovirus is a highly contagious viral disease that can produce a life-threatening illness. The virus attacks rapidly dividing cells in a dog's body, most severely affecting the intestinal tract. Parvovirus also attacks the white blood cells, and when young animals are infected, the virus can damage the heart muscle and cause lifelong cardiac problems.")
+    @patch.object(
+        uct,
+        "_search_restricted",
+        return_value=[{"url": "https://vcahospitals.com/kb/parvovirus", "title": "Parvovirus"}],
+    )
+    @patch.object(
+        uct,
+        "_fetch_article_content",
+        return_value="Parvovirus is a highly contagious viral disease that can produce a life-threatening illness. The virus attacks rapidly dividing cells in a dog's body, most severely affecting the intestinal tract. Parvovirus also attacks the white blood cells, and when young animals are infected, the virus can damage the heart muscle and cause lifelong cardiac problems.",
+    )
     def test_returns_fetched_content(self, mock_fetch, mock_search):
         domains = ["vcahospitals.com", "avma.org"]
         result = uct._format_vet_response(domains, "what is parvovirus in dogs")
@@ -103,10 +121,16 @@ class TestFormatVetResponseWithMockFetch(unittest.TestCase):
         self.assertIn("veterinary emergency", result)
         self.assertIn("avma.org", result)
 
-    @patch.object(uct, "_search_restricted", return_value=[
-        {"url": "https://vcahospitals.com/kb/bloat", "title": "Bloat"}
-    ])
-    @patch.object(uct, "_fetch_article_content", return_value="Bloat, also known as gastric dilatation-volvulus (GDV), is a life-threatening condition that can affect dogs. It occurs when the stomach fills with gas, food, or fluid and then twists. This twisting traps the contents and cuts off blood supply to the stomach and sometimes the spleen. Without immediate treatment, bloat can be fatal within hours.")
+    @patch.object(
+        uct,
+        "_search_restricted",
+        return_value=[{"url": "https://vcahospitals.com/kb/bloat", "title": "Bloat"}],
+    )
+    @patch.object(
+        uct,
+        "_fetch_article_content",
+        return_value="Bloat, also known as gastric dilatation-volvulus (GDV), is a life-threatening condition that can affect dogs. It occurs when the stomach fills with gas, food, or fluid and then twists. This twisting traps the contents and cuts off blood supply to the stomach and sometimes the spleen. Without immediate treatment, bloat can be fatal within hours.",
+    )
     def test_emergency_prepended_to_fetched_content(self, mock_fetch, mock_search):
         domains = ["vcahospitals.com"]
         result = uct._format_vet_response(domains, "my dog has bloat")
@@ -115,9 +139,13 @@ class TestFormatVetResponseWithMockFetch(unittest.TestCase):
 
 
 class TestFetchContextEntryPoint(unittest.TestCase):
-    @patch.object(uct, "_search_restricted", return_value=[
-        {"url": "https://medlineplus.gov/appendicitis.html", "title": "Appendicitis"}
-    ])
+    @patch.object(
+        uct,
+        "_search_restricted",
+        return_value=[
+            {"url": "https://medlineplus.gov/appendicitis.html", "title": "Appendicitis"}
+        ],
+    )
     @patch.object(
         uct,
         "_fetch_article_content",
@@ -134,7 +162,9 @@ class TestFetchContextEntryPoint(unittest.TestCase):
     def test_medical_context_returns_bounded(self):
         with patch.object(uct, "_search_restricted", return_value=[]):
             with patch.object(uct, "_try_direct_fetch", return_value=None):
-                result = uct.fetch_context("what is appendicitis", evidence_reason="medical_context")
+                result = uct.fetch_context(
+                    "what is appendicitis", evidence_reason="medical_context"
+                )
         self.assertIsNotNone(result)
         self.assertTrue(result["ok"])
         self.assertTrue(result["bounded_response"])
@@ -169,8 +199,12 @@ class TestVetTopicMapping(unittest.TestCase):
             calls = [c[0][0] for c in mock_fetch.call_args_list]
             # Should include the condition-specific Merck URL
             self.assertTrue(
-                any("merckvetmanual.com/dog-owners/digestive-disorders-of-dogs/vomiting-in-dogs" in c for c in calls),
-                f"Expected Merck vomiting URL in candidates, got: {calls}"
+                any(
+                    "merckvetmanual.com/dog-owners/digestive-disorders-of-dogs/vomiting-in-dogs"
+                    in c
+                    for c in calls
+                ),
+                f"Expected Merck vomiting URL in candidates, got: {calls}",
             )
 
     def test_two_word_condition_phrase_mapped(self):
@@ -178,8 +212,12 @@ class TestVetTopicMapping(unittest.TestCase):
             uct._try_direct_fetch("dog ear infection", "vet")
             calls = [c[0][0] for c in mock_fetch.call_args_list]
             self.assertTrue(
-                any("merckvetmanual.com/dog-owners/ear-disorders-of-dogs/ear-infections-in-dogs" in c for c in calls),
-                f"Expected Merck ear-infection URL in candidates, got: {calls}"
+                any(
+                    "merckvetmanual.com/dog-owners/ear-disorders-of-dogs/ear-infections-in-dogs"
+                    in c
+                    for c in calls
+                ),
+                f"Expected Merck ear-infection URL in candidates, got: {calls}",
             )
 
     def test_unknown_condition_falls_back_to_search(self):
@@ -188,7 +226,7 @@ class TestVetTopicMapping(unittest.TestCase):
             calls = [c[0][0] for c in mock_fetch.call_args_list]
             self.assertTrue(
                 any("merckvetmanual.com/?q=" in c for c in calls),
-                f"Expected Merck search fallback, got: {calls}"
+                f"Expected Merck search fallback, got: {calls}",
             )
 
 

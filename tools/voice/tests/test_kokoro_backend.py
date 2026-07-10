@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
@@ -26,7 +25,9 @@ class FakeSoundFile:
     def write(path: str, data: np.ndarray, sample_rate: int, subtype: str | None = None) -> None:
         del subtype
         clipped = np.clip(np.asarray(data, dtype=np.float32), -1.0, 1.0)
-        frames = b"".join(struct.pack("<h", int(round(float(sample) * 32767))) for sample in clipped)
+        frames = b"".join(
+            struct.pack("<h", int(round(float(sample) * 32767))) for sample in clipped
+        )
         with wave.open(path, "wb") as handle:
             handle.setnchannels(1)
             handle.setsampwidth(2)
@@ -43,10 +44,23 @@ def main() -> int:
         calls: dict[str, object] = {}
 
         class FakePipeline:
-            def __init__(self, lang_code: str, repo_id: str | None = None, device: str | None = None, **_: object) -> None:
+            def __init__(
+                self,
+                lang_code: str,
+                repo_id: str | None = None,
+                device: str | None = None,
+                **_: object,
+            ) -> None:
                 calls["init"] = (lang_code, repo_id, device)
 
-            def __call__(self, text: str, voice: str | None = None, speed: float = 1.0, split_pattern: str | None = None, **_: object):
+            def __call__(
+                self,
+                text: str,
+                voice: str | None = None,
+                speed: float = 1.0,
+                split_pattern: str | None = None,
+                **_: object,
+            ):
                 calls["call"] = (text, voice, speed, split_pattern)
                 yield FakeResult(np.array([0.25, -0.25], dtype=np.float32))
                 yield FakeResult(np.array([0.0, 0.1], dtype=np.float32))
@@ -68,10 +82,21 @@ def main() -> int:
             assert_ok(voice == "af_heart", f"unexpected voice: {voice}")
             assert_ok(output_path.exists(), "expected synthesized wav output")
             with wave.open(str(output_path), "rb") as handle:
-                assert_ok(handle.getframerate() == 24000, f"unexpected sample rate: {handle.getframerate()}")
-                assert_ok(handle.getnframes() == 4, f"unexpected frame count: {handle.getnframes()}")
-            assert_ok(calls.get("init") == ("a", "hexgrad/Kokoro-82M", "cuda"), f"unexpected init call: {calls}")
-            assert_ok(calls.get("call") == ("hello kokoro", "af_heart", 1.0, r"\n+"), f"unexpected synth call: {calls}")
+                assert_ok(
+                    handle.getframerate() == 24000,
+                    f"unexpected sample rate: {handle.getframerate()}",
+                )
+                assert_ok(
+                    handle.getnframes() == 4, f"unexpected frame count: {handle.getnframes()}"
+                )
+            assert_ok(
+                calls.get("init") == ("a", "hexgrad/Kokoro-82M", "cuda"),
+                f"unexpected init call: {calls}",
+            )
+            assert_ok(
+                calls.get("call") == ("hello kokoro", "af_heart", 1.0, r"\n+"),
+                f"unexpected synth call: {calls}",
+            )
 
             kokoro_backend._PIPELINE_CACHE.clear()
 

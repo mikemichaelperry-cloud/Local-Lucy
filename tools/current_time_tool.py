@@ -10,19 +10,17 @@ from __future__ import annotations
 
 import json
 import sys
-import urllib.request
 import urllib.error
-from datetime import datetime
-from pathlib import Path
+import urllib.request
 
 
 def get_current_time(timezone: str = "UTC") -> dict:
     """
     Fetch current time from TimeAPI.io.
-    
+
     Args:
         timezone: Timezone string (e.g., "Australia/Melbourne", "America/New_York")
-    
+
     Returns:
         Dict with time data or error
     """
@@ -39,7 +37,6 @@ def get_current_time(timezone: str = "UTC") -> dict:
         "fiji": "Pacific/Fiji",
         "honolulu": "Pacific/Honolulu",
         "hawaii": "Pacific/Honolulu",
-        
         # Asia
         "tokyo": "Asia/Tokyo",
         "japan": "Asia/Tokyo",
@@ -87,7 +84,6 @@ def get_current_time(timezone: str = "UTC") -> dict:
         "colombo": "Asia/Colombo",
         "myanmar": "Asia/Yangon",
         "yangon": "Asia/Yangon",
-        
         # Europe
         "london": "Europe/London",
         "uk": "Europe/London",
@@ -142,7 +138,6 @@ def get_current_time(timezone: str = "UTC") -> dict:
         "ukraine": "Europe/Kiev",
         "kiev": "Europe/Kiev",
         "kyiv": "Europe/Kiev",
-        
         # Middle East / Africa
         "cairo": "Africa/Cairo",
         "egypt": "Africa/Cairo",
@@ -229,7 +224,6 @@ def get_current_time(timezone: str = "UTC") -> dict:
         "somalia": "Africa/Mogadishu",
         "mogadishu": "Africa/Mogadishu",
         "zanzibar": "Africa/Dar_es_Salaam",
-        
         # Americas
         "new york": "America/New_York",
         "nyc": "America/New_York",
@@ -281,35 +275,37 @@ def get_current_time(timezone: str = "UTC") -> dict:
         "quito": "America/Guayaquil",
         "ecuador": "America/Guayaquil",
     }
-    
+
     # Normalize timezone
     tz_lower = timezone.lower().strip()
     if tz_lower in timezone_aliases:
         timezone = timezone_aliases[tz_lower]
-    
+
     # Ensure proper format (replace spaces with underscores)
     timezone = timezone.replace(" ", "_")
-    
+
     url = f"https://timeapi.io/api/Time/current/zone?timeZone={timezone}"
-    
+
     try:
         req = urllib.request.Request(
             url,
             headers={
                 "User-Agent": "LocalLucy/1.0 (Time Query Tool)",
                 "Accept": "application/json",
-            }
+            },
         )
-        
+
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode("utf-8"))
-            
+
             return {
                 "ok": True,
                 "timezone": data.get("timeZone"),
                 "datetime": data.get("dateTime"),
                 "day_of_week": data.get("dayOfWeek"),
-                "abbreviation": data.get("timeZone", "").split("/")[-1] if "/" in data.get("timeZone", "") else data.get("timeZone"),
+                "abbreviation": data.get("timeZone", "").split("/")[-1]
+                if "/" in data.get("timeZone", "")
+                else data.get("timeZone"),
                 "dst": data.get("dstActive"),
                 "year": data.get("year"),
                 "month": data.get("month"),
@@ -319,7 +315,7 @@ def get_current_time(timezone: str = "UTC") -> dict:
                 "time": data.get("time"),
                 "date": data.get("date"),
             }
-            
+
     except urllib.error.HTTPError as e:
         return {
             "ok": False,
@@ -342,14 +338,14 @@ def format_time_response(data: dict, query_location: str = "") -> str:
     """Format time API response into readable text."""
     if not data.get("ok"):
         return f"Error fetching time: {data.get('error', 'Unknown error')}"
-    
+
     try:
         time_str = data.get("time", "?")
         date_str = data.get("date", "?")
         timezone = data.get("timezone", query_location or "Unknown")
         day = data.get("day_of_week", "")
         dst = data.get("dst", False)
-        
+
         # Format time nicely (e.g., "2:53 PM" from "14:53")
         try:
             hour = int(data.get("hour", 0))
@@ -361,18 +357,18 @@ def format_time_response(data: dict, query_location: str = "") -> str:
             time_formatted = f"{hour_12}:{minute:02d} {ampm}"
         except:
             time_formatted = time_str
-        
+
         lines = [
             f"The current time in {timezone} is {time_formatted}.",
             f"Date: {day}, {date_str}",
         ]
-        
+
         if dst:
             lines.append("Daylight Saving Time is currently active.")
-        
+
         return "\n".join(lines)
-        
-    except Exception as e:
+
+    except Exception:
         return f"Current time in {query_location or 'requested location'}: {data.get('time', 'unknown')}"
 
 
@@ -382,15 +378,15 @@ def main():
         print("Usage: current_time_tool.py <timezone> [--format]", file=sys.stderr)
         print("Example: current_time_tool.py 'Australia/Melbourne' --format", file=sys.stderr)
         sys.exit(1)
-    
+
     args = sys.argv[1:]
     format_output = "--format" in args
     if format_output:
         args.remove("--format")
-    
+
     timezone = " ".join(args)
     result = get_current_time(timezone)
-    
+
     if format_output:
         print(format_time_response(result, timezone))
     else:

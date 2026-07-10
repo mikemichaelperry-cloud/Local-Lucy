@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Tests for tools/voice/download_assets.py — verify-only logic, no network downloads."""
+
 from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -172,7 +171,9 @@ class TestVerifyKokoro:
 
 
 class TestCLI:
-    def test_verify_only_json_output(self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_verify_only_json_output(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         monkeypatch.setenv("LUCY_VOICE_INSTALL_PREFIX", str(tmp_path))
         # Ensure no real downloads happen by using a temp prefix
         sys.argv = ["download_assets.py", "--verify-only", "--json"]

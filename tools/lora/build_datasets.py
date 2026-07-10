@@ -23,7 +23,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATASET_DIR = PROJECT_ROOT / "data" / "lora" / "datasets"
 REPLAY_DIR = PROJECT_ROOT / "data" / "lora" / "replay"
@@ -407,7 +406,9 @@ def _looks_safe(example: TrainingExample) -> bool:
     return not any(p.search(text) for p in FORBIDDEN_PATTERNS)
 
 
-def build_persona_dataset(persona: str, synthetic_count: int = 3, seed: int = 42) -> list[TrainingExample]:
+def build_persona_dataset(
+    persona: str, synthetic_count: int = 3, seed: int = 42
+) -> list[TrainingExample]:
     """Build a shuffled dataset for one persona."""
     random.seed(seed)
     examples: list[TrainingExample] = []
@@ -448,7 +449,9 @@ def write_replay_dataset(path: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build Local Lucy persona LoRA datasets")
-    parser.add_argument("--synthetic-count", type=int, default=3, help="Synthetic variants per template")
+    parser.add_argument(
+        "--synthetic-count", type=int, default=3, help="Synthetic variants per template"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     args = parser.parse_args()
 
@@ -456,7 +459,9 @@ def main() -> int:
     REPLAY_DIR.mkdir(parents=True, exist_ok=True)
 
     for persona in ("michael",):
-        examples = build_persona_dataset(persona, synthetic_count=args.synthetic_count, seed=args.seed)
+        examples = build_persona_dataset(
+            persona, synthetic_count=args.synthetic_count, seed=args.seed
+        )
         out_path = DATASET_DIR / f"{persona}.jsonl"
         write_jsonl(examples, out_path)
         tag_counts: dict[str, int] = {}

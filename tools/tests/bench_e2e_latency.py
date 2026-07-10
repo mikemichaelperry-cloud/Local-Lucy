@@ -15,13 +15,12 @@ Environment:
     LUCY_LATENCY_PROFILE=1  — enables per-stage profiling in request_pipeline.py
 """
 
-import os
-import sys
-import time
 import json
 import statistics
+import sys
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
 from typing import Any
 
 # Ensure project root is on path
@@ -34,11 +33,11 @@ from router_py.main import run
 
 BENCHMARK_QUERIES: list[tuple[str, str, str]] = [
     # (category, query, expected_route)
-    ("LOCAL",     "What is the capital of France?",           "LOCAL"),
-    ("AUGMENTED", "What is diabetes?",                        "AUGMENTED"),
-    ("WEATHER",   "Weather in Paris",                         "WEATHER"),
-    ("TIME",      "Time in New York",                         "TIME"),
-    ("NEWS",      "Latest news on Israel",                    "NEWS"),
+    ("LOCAL", "What is the capital of France?", "LOCAL"),
+    ("AUGMENTED", "What is diabetes?", "AUGMENTED"),
+    ("WEATHER", "Weather in Paris", "WEATHER"),
+    ("TIME", "Time in New York", "TIME"),
+    ("NEWS", "Latest news on Israel", "NEWS"),
 ]
 
 RUNS_PER_QUERY = 3
@@ -173,8 +172,12 @@ def print_summary(results: list[QueryResult]) -> None:
     for r in results:
         if r.route_accuracy < 1.0:
             continue
-        warm_walls = [r.wall_times_ms[i] for i, p in enumerate(r.stage_profiles) if not _is_model_load(p)]
-        cold_walls = [r.wall_times_ms[i] for i, p in enumerate(r.stage_profiles) if _is_model_load(p)]
+        warm_walls = [
+            r.wall_times_ms[i] for i, p in enumerate(r.stage_profiles) if not _is_model_load(p)
+        ]
+        cold_walls = [
+            r.wall_times_ms[i] for i, p in enumerate(r.stage_profiles) if _is_model_load(p)
+        ]
         tag = "cached" if r.category in ("LOCAL", "AUGMENTED") else "live API"
         line = f"  {r.category:<12} {tag:<9}  wall={statistics.median(warm_walls):>7.1f}ms"
         if cold_walls:
@@ -183,7 +186,13 @@ def print_summary(results: list[QueryResult]) -> None:
         # Show stage medians for this mode
         warm_profs = [p for p in r.stage_profiles if not _is_model_load(p)]
         if warm_profs:
-            for sk in ["classify_ms", "route_ms", "provider_resolve_ms", "context_build_ms", "execute_ms"]:
+            for sk in [
+                "classify_ms",
+                "route_ms",
+                "provider_resolve_ms",
+                "context_build_ms",
+                "execute_ms",
+            ]:
                 vals = [p.get(sk, 0) for p in warm_profs]
                 med = statistics.median(vals)
                 if med > 0:
@@ -209,7 +218,9 @@ def print_summary(results: list[QueryResult]) -> None:
     ext_slow: list[tuple[str, float]] = []
     for r in results:
         if r.category in ("WEATHER", "TIME", "NEWS") and r.route_accuracy == 1.0:
-            warm_walls = [r.wall_times_ms[i] for i, p in enumerate(r.stage_profiles) if not _is_model_load(p)]
+            warm_walls = [
+                r.wall_times_ms[i] for i, p in enumerate(r.stage_profiles) if not _is_model_load(p)
+            ]
             if warm_walls:
                 ext_slow.append((r.category, statistics.median(warm_walls)))
     ext_slow.sort(key=lambda x: x[1], reverse=True)
@@ -217,7 +228,7 @@ def print_summary(results: list[QueryResult]) -> None:
     for cat, med in ext_slow:
         print(f"  {priority}. ADD SHORT-TTL CACHE FOR {cat}")
         print(f"     → median={med:.0f}ms dominated by external API latency")
-        print(f"     → Cache identical queries for 30–60s; pipeline overhead is only ~30ms")
+        print("     → Cache identical queries for 30–60s; pipeline overhead is only ~30ms")
         priority += 1
 
     # Pipeline health check
@@ -225,7 +236,10 @@ def print_summary(results: list[QueryResult]) -> None:
     for r in results:
         for p in r.stage_profiles:
             if not _is_model_load(p):
-                oh = sum(p.get(sk, 0) for sk in ["classify_ms", "route_ms", "provider_resolve_ms", "context_build_ms"])
+                oh = sum(
+                    p.get(sk, 0)
+                    for sk in ["classify_ms", "route_ms", "provider_resolve_ms", "context_build_ms"]
+                )
                 pipe_overhead.append(oh)
     if pipe_overhead:
         pipe_med = statistics.median(pipe_overhead)

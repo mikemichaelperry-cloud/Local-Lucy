@@ -14,7 +14,6 @@ Usage:
 from __future__ import annotations
 
 import json
-import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -58,7 +57,6 @@ def load_cases() -> list[dict[str, Any]]:
 def evaluate_hybrid(cases: list[dict[str, Any]]) -> list[EvalResult]:
     """Evaluate using current hybrid router (embedding + keyword guards)."""
     from router_py.classify import classify_intent, select_route
-    from router_py.request_types import ClassificationResult
 
     results = []
     for case in cases:
@@ -75,7 +73,7 @@ def evaluate_hybrid(cases: list[dict[str, Any]]) -> list[EvalResult]:
             )
             hybrid_route = decision.route
             hybrid_provider = decision.provider
-        except Exception as e:
+        except Exception:
             hybrid_route = "ERROR"
             hybrid_provider = "ERROR"
 
@@ -85,21 +83,22 @@ def evaluate_hybrid(cases: list[dict[str, Any]]) -> list[EvalResult]:
         if hybrid_route in forbidden:
             hybrid_err = (hybrid_err or "") + f"; FORBIDDEN route {hybrid_route}"
 
-        results.append({
-            "route": hybrid_route,
-            "provider": hybrid_provider,
-            "error": hybrid_err,
-        })
+        results.append(
+            {
+                "route": hybrid_route,
+                "provider": hybrid_provider,
+                "error": hybrid_err,
+            }
+        )
     return results
 
 
 def evaluate_keyword_only(cases: list[dict[str, Any]]) -> list[EvalResult]:
     """Evaluate with embedding router disabled (keyword guards only)."""
-    from router_py.classify import classify_intent, select_route
-    from router_py.request_types import ClassificationResult
-
     # Monkey-patch _get_router to return None, forcing skip of embedding path
     import router_py.classify as classify_mod
+    from router_py.classify import classify_intent, select_route
+
     original_get_router = getattr(classify_mod, "_get_router", None)
 
     def _noop_router():
@@ -122,7 +121,7 @@ def evaluate_keyword_only(cases: list[dict[str, Any]]) -> list[EvalResult]:
             )
             keyword_route = decision.route
             keyword_provider = decision.provider
-        except Exception as e:
+        except Exception:
             keyword_route = "ERROR"
             keyword_provider = "ERROR"
 
@@ -132,11 +131,13 @@ def evaluate_keyword_only(cases: list[dict[str, Any]]) -> list[EvalResult]:
         if keyword_route in forbidden:
             keyword_err = (keyword_err or "") + f"; FORBIDDEN route {keyword_route}"
 
-        results.append({
-            "route": keyword_route,
-            "provider": keyword_provider,
-            "error": keyword_err,
-        })
+        results.append(
+            {
+                "route": keyword_route,
+                "provider": keyword_provider,
+                "error": keyword_err,
+            }
+        )
 
     # Restore
     if original_get_router:
@@ -162,17 +163,19 @@ def main():
     print("  Done.\n")
 
     # Build per-family stats
-    family_stats = defaultdict(lambda: {
-        "total": 0,
-        "hybrid_correct": 0,
-        "keyword_correct": 0,
-        "both_correct": 0,
-        "both_wrong": 0,
-        "hybrid_only": 0,
-        "keyword_only": 0,
-        "hybrid_errors": [],
-        "keyword_errors": [],
-    })
+    family_stats = defaultdict(
+        lambda: {
+            "total": 0,
+            "hybrid_correct": 0,
+            "keyword_correct": 0,
+            "both_correct": 0,
+            "both_wrong": 0,
+            "hybrid_only": 0,
+            "keyword_only": 0,
+            "hybrid_errors": [],
+            "keyword_errors": [],
+        }
+    )
 
     total_correct_hybrid = 0
     total_correct_keyword = 0
@@ -225,19 +228,25 @@ def main():
                 total_correct_keyword += 1
 
         if hy["route"] != kw["route"]:
-            diffs.append({
-                "id": cid,
-                "family": family,
-                "prompt": prompt[:60],
-                "hybrid": hy["route"],
-                "keyword": kw["route"],
-                "expected": expected,
-            })
+            diffs.append(
+                {
+                    "id": cid,
+                    "family": family,
+                    "prompt": prompt[:60],
+                    "hybrid": hy["route"],
+                    "keyword": kw["route"],
+                    "expected": expected,
+                }
+            )
 
         if not hy_ok and hy["error"]:
-            stats["hybrid_errors"].append(f"[{cid}] {prompt[:50]}... -> {hy['route']} ({hy['error']})")
+            stats["hybrid_errors"].append(
+                f"[{cid}] {prompt[:50]}... -> {hy['route']} ({hy['error']})"
+            )
         if not kw_ok and kw["error"]:
-            stats["keyword_errors"].append(f"[{cid}] {prompt[:50]}... -> {kw['route']} ({kw['error']})")
+            stats["keyword_errors"].append(
+                f"[{cid}] {prompt[:50]}... -> {kw['route']} ({kw['error']})"
+            )
 
     # Summary
     print("-" * 70)
@@ -245,15 +254,21 @@ def main():
     print("-" * 70)
     print(f"  Total cases evaluated:              {len(cases)}")
     print(f"  Cases with expected_route:          {total_with_expected}")
-    print(f"  Hybrid correct (incl. forbidden):   {total_correct_hybrid} / {len(cases)} ({100*total_correct_hybrid/len(cases):.1f}%)")
-    print(f"  Keyword correct (incl. forbidden):  {total_correct_keyword} / {len(cases)} ({100*total_correct_keyword/len(cases):.1f}%)")
+    print(
+        f"  Hybrid correct (incl. forbidden):   {total_correct_hybrid} / {len(cases)} ({100*total_correct_hybrid/len(cases):.1f}%)"
+    )
+    print(
+        f"  Keyword correct (incl. forbidden):  {total_correct_keyword} / {len(cases)} ({100*total_correct_keyword/len(cases):.1f}%)"
+    )
     print(f"  Routes that differed:               {len(diffs)}")
     print()
 
     print("-" * 70)
     print("PER-FAMILY BREAKDOWN")
     print("-" * 70)
-    print(f"{'Family':<30} {'Total':>6} {'Hybrid':>7} {'Keyword':>8} {'BothOK':>7} {'BothBad':>8} {'HyOnly':>7} {'KwOnly':>7}")
+    print(
+        f"{'Family':<30} {'Total':>6} {'Hybrid':>7} {'Keyword':>8} {'BothOK':>7} {'BothBad':>8} {'HyOnly':>7} {'KwOnly':>7}"
+    )
     print("-" * 70)
     for family in sorted(family_stats.keys()):
         s = family_stats[family]
@@ -269,12 +284,21 @@ def main():
     print("-" * 70)
     print("CASES WHERE KEYWORD-ONLY WINS (hybrid wrong, keyword right)")
     print("-" * 70)
-    keyword_wins = [d for d in diffs if any(
-        d["id"] == case["id"] and
-        (case.get("expected_route") == d["keyword"] or
-         (d["keyword"] not in case.get("forbidden_routes", []) and d["hybrid"] in case.get("forbidden_routes", [])))
-        for case in cases
-    )]
+    keyword_wins = [
+        d
+        for d in diffs
+        if any(
+            d["id"] == case["id"]
+            and (
+                case.get("expected_route") == d["keyword"]
+                or (
+                    d["keyword"] not in case.get("forbidden_routes", [])
+                    and d["hybrid"] in case.get("forbidden_routes", [])
+                )
+            )
+            for case in cases
+        )
+    ]
     # Better approach: recompute
     keyword_wins = []
     for case, hy, kw in zip(cases, hybrid_results, keyword_results):
@@ -283,14 +307,16 @@ def main():
         hy_ok = (expected is None or hy["route"] == expected) and hy["route"] not in forbidden
         kw_ok = (expected is None or kw["route"] == expected) and kw["route"] not in forbidden
         if not hy_ok and kw_ok:
-            keyword_wins.append({
-                "id": case["id"],
-                "family": case["family"],
-                "prompt": case["prompt"],
-                "expected": expected,
-                "hybrid": hy["route"],
-                "keyword": kw["route"],
-            })
+            keyword_wins.append(
+                {
+                    "id": case["id"],
+                    "family": case["family"],
+                    "prompt": case["prompt"],
+                    "expected": expected,
+                    "hybrid": hy["route"],
+                    "keyword": kw["route"],
+                }
+            )
 
     print(f"  Count: {len(keyword_wins)}")
     for w in keyword_wins[:20]:
@@ -311,14 +337,16 @@ def main():
         hy_ok = (expected is None or hy["route"] == expected) and hy["route"] not in forbidden
         kw_ok = (expected is None or kw["route"] == expected) and kw["route"] not in forbidden
         if hy_ok and not kw_ok:
-            hybrid_wins.append({
-                "id": case["id"],
-                "family": case["family"],
-                "prompt": case["prompt"],
-                "expected": expected,
-                "hybrid": hy["route"],
-                "keyword": kw["route"],
-            })
+            hybrid_wins.append(
+                {
+                    "id": case["id"],
+                    "family": case["family"],
+                    "prompt": case["prompt"],
+                    "expected": expected,
+                    "hybrid": hy["route"],
+                    "keyword": kw["route"],
+                }
+            )
 
     print(f"  Count: {len(hybrid_wins)}")
     for w in hybrid_wins[:20]:
@@ -339,20 +367,24 @@ def main():
         hy_ok = (expected is None or hy["route"] == expected) and hy["route"] not in forbidden
         kw_ok = (expected is None or kw["route"] == expected) and kw["route"] not in forbidden
         if not hy_ok and not kw_ok:
-            both_wrong.append({
-                "id": case["id"],
-                "family": case["family"],
-                "prompt": case["prompt"],
-                "expected": expected,
-                "hybrid": hy["route"],
-                "keyword": kw["route"],
-                "forbidden": forbidden,
-            })
+            both_wrong.append(
+                {
+                    "id": case["id"],
+                    "family": case["family"],
+                    "prompt": case["prompt"],
+                    "expected": expected,
+                    "hybrid": hy["route"],
+                    "keyword": kw["route"],
+                    "forbidden": forbidden,
+                }
+            )
 
     print(f"  Count: {len(both_wrong)}")
     for w in both_wrong[:15]:
         print(f"    [{w['id']}] {w['prompt'][:55]}...")
-        print(f"      expected={w['expected']}, hybrid={w['hybrid']}, keyword={w['keyword']}, forbidden={w['forbidden']}")
+        print(
+            f"      expected={w['expected']}, hybrid={w['hybrid']}, keyword={w['keyword']}, forbidden={w['forbidden']}"
+        )
     if len(both_wrong) > 15:
         print(f"    ... and {len(both_wrong) - 15} more")
     print()

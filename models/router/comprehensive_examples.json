@@ -17732,14 +17732,14 @@
   {
     "query": "What is the weather in London?",
     "labels": {
-      "intent_family": "current_weather",
+      "intent_family": "local_answer",
       "evidence_mode": "not_required",
       "route": "WEATHER",
       "policy_override": "none"
     },
     "metadata": {
-      "source": "hard_negative_phase4",
-      "category": "weather"
+      "source": "user_feedback",
+      "feedback_type": "route_correction"
     }
   },
   {

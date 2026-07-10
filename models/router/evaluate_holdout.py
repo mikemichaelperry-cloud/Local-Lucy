@@ -8,13 +8,13 @@ Outputs:
     holdout_eval_results.json
     holdout_eval_report.txt
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 import sys
 import tempfile
-from collections import Counter
 from pathlib import Path
 
 # Allow importing the router and the policy layer.
@@ -187,7 +187,9 @@ def _render_report(results: dict) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate old vs new router on holdout set.")
-    parser.add_argument("--policy", action="store_true", help="Also apply deterministic policy gates.")
+    parser.add_argument(
+        "--policy", action="store_true", help="Also apply deterministic policy gates."
+    )
     args = parser.parse_args()
 
     holdout = _load_holdout(HOLDOUT_PATH)

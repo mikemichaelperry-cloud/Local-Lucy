@@ -3,7 +3,11 @@
 Local Lucy v10 — FAST ROUTING STRESS TEST
 Tests hybrid router directly (no LLM, no network). ~100 queries in <10 seconds.
 """
-import gc, json, os, sys, time
+
+import json
+import os
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -11,7 +15,9 @@ sys.path.insert(0, str(Path.home() / "lucy-v10" / "models" / "router"))
 sys.path.insert(0, str(Path(__file__).parent / "app"))
 
 os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v10"))
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
+os.environ.setdefault(
+    "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+)
 
 from hybrid_router_v2 import HybridRouterV2
 
@@ -41,7 +47,6 @@ TEST_CASES = [
     ("Write a poem about the ocean", "LOCAL"),
     ("How do I change a tire?", "LOCAL"),
     ("What is the largest planet?", "LOCAL"),
-
     # TIME
     ("What time is it?", "TIME"),
     ("What time is it in Tokyo?", "TIME"),
@@ -51,7 +56,6 @@ TEST_CASES = [
     ("What is the time right now?", "TIME"),
     ("Tell me the current time", "TIME"),
     ("What time is it in Berlin?", "TIME"),
-
     # WEATHER
     ("What is the weather in London?", "WEATHER"),
     ("Whats the current weather in Hadera Israel?", "WEATHER"),
@@ -63,7 +67,6 @@ TEST_CASES = [
     ("Is it sunny in Barcelona?", "WEATHER"),
     ("What is the weather like outside?", "WEATHER"),
     ("How hot is it in Dubai?", "WEATHER"),
-
     # NEWS
     ("What are todays headlines?", "NEWS"),
     ("Latest news on technology", "NEWS"),
@@ -73,7 +76,6 @@ TEST_CASES = [
     ("Whats in the news?", "NEWS"),
     ("Any news about space?", "NEWS"),
     ("Top stories right now", "NEWS"),
-
     # AUGMENTED (medical, financial, search)
     ("What are symptoms of diabetes?", "AUGMENTED"),
     ("Search Wikipedia for Python programming language", "AUGMENTED"),
@@ -87,14 +89,13 @@ TEST_CASES = [
     ("Apple stock today", "AUGMENTED"),
     ("Ethereum price", "AUGMENTED"),
     ("Search for CRISPR therapy", "AUGMENTED"),
-
     # EDGE / MISDIRECTION (things that used to misfire)
     ("World Cup final", "NEWS"),
     ("World Cup", "NEWS"),
     ("What temperature should I cook chicken at?", "LOCAL"),
     ("What temperature is a fever?", "AUGMENTED"),
     ("What is my favorite color?", "LOCAL"),  # no memory context
-    ("My favorite color is blue", "LOCAL"),    # no memory context
+    ("My favorite color is blue", "LOCAL"),  # no memory context
     ("Do I need a coat?", "WEATHER"),
     ("Is it going to snow?", "WEATHER"),
     ("Give me the headlines", "NEWS"),
@@ -103,13 +104,21 @@ TEST_CASES = [
     ("Gold price", "AUGMENTED"),
 ]
 
+
 def get_gpu():
     try:
         import subprocess
-        out = subprocess.run(["nvidia-smi","--query-gpu=memory.used","--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=5)
+
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
         return int(out.stdout.strip()) if out.returncode == 0 else None
     except Exception:
         return None
+
 
 def main():
     print("=" * 70)
@@ -141,7 +150,17 @@ def main():
         total_ms += ms
         route_counts[route] = route_counts.get(route, 0) + 1
 
-        results.append({"q": q, "expected": expected, "got": route, "intent": intent, "ms": round(ms, 1), "ok": ok, "guards": guards})
+        results.append(
+            {
+                "q": q,
+                "expected": expected,
+                "got": route,
+                "intent": intent,
+                "ms": round(ms, 1),
+                "ok": ok,
+                "guards": guards,
+            }
+        )
 
         status = "✅" if ok else "❌"
         print(f"{status} [{route:8s}] {ms:5.1f}ms | {q[:55]}")
@@ -167,19 +186,24 @@ def main():
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / f"routing_stress_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     with open(report_path, "w") as f:
-        json.dump({
-            "timestamp": datetime.now().isoformat(),
-            "total": len(TEST_CASES),
-            "correct": correct,
-            "accuracy": acc,
-            "avg_ms": total_ms/len(TEST_CASES),
-            "gpu_baseline_mb": gpu0,
-            "gpu_final_mb": gpu1,
-            "routes": route_counts,
-            "results": results,
-        }, f, indent=2)
+        json.dump(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "total": len(TEST_CASES),
+                "correct": correct,
+                "accuracy": acc,
+                "avg_ms": total_ms / len(TEST_CASES),
+                "gpu_baseline_mb": gpu0,
+                "gpu_final_mb": gpu1,
+                "routes": route_counts,
+                "results": results,
+            },
+            f,
+            indent=2,
+        )
     print(f"\n📄 Report saved: {report_path}")
     return 0 if acc >= 90 else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

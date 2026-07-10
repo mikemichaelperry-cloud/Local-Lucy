@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import importlib
 import sys
-from pathlib import Path
 
 REQUIRED_PACKAGES = [
     "torch",
@@ -55,7 +54,9 @@ def check_cuda() -> dict[str, object]:
     if torch.cuda.is_available():
         info["device_name"] = torch.cuda.get_device_name(0)
         info["total_memory_gb"] = torch.cuda.get_device_properties(0).total_memory / 1e9
-        info["free_memory_gb"] = (torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated(0)) / 1e9
+        info["free_memory_gb"] = (
+            torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated(0)
+        ) / 1e9
     return info
 
 
@@ -131,8 +132,14 @@ def run_smoke_test() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate Local Lucy LoRA training environment")
-    parser.add_argument("--smoke-test", action="store_true", help="Run a one-step training smoke test")
-    parser.add_argument("--skip-smoke-if-no-gpu", action="store_true", help="Skip smoke test when no GPU is available")
+    parser.add_argument(
+        "--smoke-test", action="store_true", help="Run a one-step training smoke test"
+    )
+    parser.add_argument(
+        "--skip-smoke-if-no-gpu",
+        action="store_true",
+        help="Skip smoke test when no GPU is available",
+    )
     args = parser.parse_args()
 
     print("=== Local Lucy LoRA Environment Check ===\n")

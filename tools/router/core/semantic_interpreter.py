@@ -2,11 +2,11 @@
 import json
 import os
 import re
+import tempfile
 import time
 import urllib.error
 import urllib.request
 from contextlib import contextmanager
-import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -95,7 +95,9 @@ def _backend_state_path() -> Path:
         return Path(override)
     namespace = _state_namespace()
     if namespace:
-        return _state_root() / "state" / "namespaces" / namespace / "semantic_interpreter_backend.json"
+        return (
+            _state_root() / "state" / "namespaces" / namespace / "semantic_interpreter_backend.json"
+        )
     return _state_root() / "state" / "semantic_interpreter_backend.json"
 
 
@@ -127,7 +129,9 @@ def _write_backend_state(payload: Dict[str, Any]) -> None:
     path = _backend_state_path()
     with _backend_state_lock(path):
         path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=path.parent, delete=False
+        ) as handle:
             handle.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
             tmp_path = Path(handle.name)
         tmp_path.replace(path)
@@ -234,7 +238,9 @@ def _sanitize_payload(question: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         {
             "interpreter_fired": True,
             "inferred_domain": domain if domain in ALLOWED_DOMAINS else "unknown",
-            "inferred_intent_family": intent_family if intent_family in ALLOWED_INTENT_FAMILIES else "unknown",
+            "inferred_intent_family": intent_family
+            if intent_family in ALLOWED_INTENT_FAMILIES
+            else "unknown",
             "normalized_candidates": _candidate_list(payload.get("normalized_candidates")),
             "retrieval_candidates": _candidate_list(payload.get("retrieval_candidates")),
             "ambiguity_flag": bool(payload.get("ambiguity_flag")),
@@ -271,7 +277,9 @@ def _extract_json_object(text: str) -> Dict[str, Any]:
 
 
 def _load_prompt_template() -> str:
-    conf_dir = Path(os.environ.get("LUCY_CONF_DIR") or str(Path(__file__).resolve().parents[3] / "config"))
+    conf_dir = Path(
+        os.environ.get("LUCY_CONF_DIR") or str(Path(__file__).resolve().parents[3] / "config")
+    )
     template_path = conf_dir / "local_semantic_interpreter_prompt.txt"
     try:
         return template_path.read_text(encoding="utf-8")
@@ -311,7 +319,11 @@ def _should_invoke(plan: Dict[str, Any]) -> Tuple[bool, str]:
         return False, "deterministic_nonsemantic"
     if intent_class == "technical_explanation" and confidence >= 0.86:
         return False, "strong_technical_local"
-    if intent_class == "evidence_check" and subcategory in {"medical", "url_reference", "primary_doc"} and confidence >= 0.9:
+    if (
+        intent_class == "evidence_check"
+        and subcategory in {"medical", "url_reference", "primary_doc"}
+        and confidence >= 0.9
+    ):
         return False, "strong_high_stakes_deterministic"
     if intent_class == "current_fact" and subcategory.startswith("news") and confidence >= 0.9:
         return False, "strong_news_deterministic"
@@ -319,7 +331,12 @@ def _should_invoke(plan: Dict[str, Any]) -> Tuple[bool, str]:
         return False, "strong_current_fact_deterministic"
     if intent_class == "mixed":
         return True, "ambiguous_route"
-    if intent_class == "local_knowledge" and subcategory == "general" and confidence <= 0.75 and token_count >= 6:
+    if (
+        intent_class == "local_knowledge"
+        and subcategory == "general"
+        and confidence <= 0.75
+        and token_count >= 6
+    ):
         return True, "weak_general_local"
     if intent_class == "current_fact" and confidence < 0.86:
         return True, "weak_current_fact"
@@ -393,29 +410,39 @@ def _call_local_model(prompt: str) -> Tuple[Dict[str, Any], str]:
         with urllib.request.urlopen(request, timeout=timeout_s) as response:
             raw = response.read().decode("utf-8", errors="ignore")
     except (urllib.error.URLError, TimeoutError, OSError):
-        _append_latency("model_call", max(1, int(round((time.perf_counter() - network_start) * 1000))))
+        _append_latency(
+            "model_call", max(1, int(round((time.perf_counter() - network_start) * 1000)))
+        )
         _append_latency("total", max(1, int(round((time.perf_counter() - total_start) * 1000))))
         return {}, "transport_error"
     _append_latency("model_call", max(1, int(round((time.perf_counter() - network_start) * 1000))))
     parse_start = time.perf_counter()
     payload = _extract_json_object(raw)
     if payload:
-        _append_latency("response_parse", max(1, int(round((time.perf_counter() - parse_start) * 1000))))
+        _append_latency(
+            "response_parse", max(1, int(round((time.perf_counter() - parse_start) * 1000)))
+        )
         _append_latency("total", max(1, int(round((time.perf_counter() - total_start) * 1000))))
         return payload, "ok"
     try:
         outer = json.loads(raw)
     except json.JSONDecodeError:
-        _append_latency("response_parse", max(1, int(round((time.perf_counter() - parse_start) * 1000))))
+        _append_latency(
+            "response_parse", max(1, int(round((time.perf_counter() - parse_start) * 1000)))
+        )
         _append_latency("total", max(1, int(round((time.perf_counter() - total_start) * 1000))))
         return {}, "empty_payload"
     response_text = outer.get("response") if isinstance(outer, dict) else ""
     extracted = _extract_json_object(str(response_text))
     if extracted:
-        _append_latency("response_parse", max(1, int(round((time.perf_counter() - parse_start) * 1000))))
+        _append_latency(
+            "response_parse", max(1, int(round((time.perf_counter() - parse_start) * 1000)))
+        )
         _append_latency("total", max(1, int(round((time.perf_counter() - total_start) * 1000))))
         return extracted, "ok"
-    _append_latency("response_parse", max(1, int(round((time.perf_counter() - parse_start) * 1000))))
+    _append_latency(
+        "response_parse", max(1, int(round((time.perf_counter() - parse_start) * 1000)))
+    )
     _append_latency("total", max(1, int(round((time.perf_counter() - total_start) * 1000))))
     return {}, "empty_payload"
 
@@ -430,7 +457,9 @@ def maybe_interpret_question(question: str, plan: Dict[str, Any]) -> Dict[str, A
     trace["use_reason"] = reason
     if not should_invoke:
         trace["result_status"] = "skipped"
-        _append_latency("maybe_total", max(1, int(round((time.perf_counter() - total_start) * 1000))))
+        _append_latency(
+            "maybe_total", max(1, int(round((time.perf_counter() - total_start) * 1000)))
+        )
         return trace
 
     fixture = _fixture_payload(question)
@@ -439,26 +468,36 @@ def maybe_interpret_question(question: str, plan: Dict[str, Any]) -> Dict[str, A
         fixture["invocation_attempted"] = False
         fixture["result_status"] = "fixture_payload"
         fixture["use_reason"] = reason
-        _append_latency("maybe_total", max(1, int(round((time.perf_counter() - total_start) * 1000))))
+        _append_latency(
+            "maybe_total", max(1, int(round((time.perf_counter() - total_start) * 1000)))
+        )
         return fixture
 
     url = os.environ.get("LUCY_OLLAMA_API_URL") or DEFAULT_API_URL
     model = os.environ.get("LUCY_LOCAL_MODEL") or DEFAULT_MODEL
     cache_start = time.perf_counter()
     if _backend_unavailable_cached(url, model):
-        _append_latency("backend_cache_check", max(1, int(round((time.perf_counter() - cache_start) * 1000))))
+        _append_latency(
+            "backend_cache_check", max(1, int(round((time.perf_counter() - cache_start) * 1000)))
+        )
         trace["use_reason"] = "backend_unavailable_cached"
         trace["result_status"] = "backend_unavailable_cached"
-        _append_latency("maybe_total", max(1, int(round((time.perf_counter() - total_start) * 1000))))
+        _append_latency(
+            "maybe_total", max(1, int(round((time.perf_counter() - total_start) * 1000)))
+        )
         return trace
-    _append_latency("backend_cache_check", max(1, int(round((time.perf_counter() - cache_start) * 1000))))
+    _append_latency(
+        "backend_cache_check", max(1, int(round((time.perf_counter() - cache_start) * 1000)))
+    )
 
     trace["invocation_attempted"] = True
     prompt = _build_prompt(question, plan)
     payload, call_status = _call_local_model(prompt)
     if not payload:
         trace["use_reason"] = "model_unavailable"
-        trace["result_status"] = "model_unavailable" if call_status == "transport_error" else call_status
+        trace["result_status"] = (
+            "model_unavailable" if call_status == "transport_error" else call_status
+        )
         if call_status == "transport_error":
             _write_backend_state(
                 {
@@ -468,14 +507,20 @@ def maybe_interpret_question(question: str, plan: Dict[str, Any]) -> Dict[str, A
                     "model": model,
                 }
             )
-        _append_latency("maybe_total", max(1, int(round((time.perf_counter() - total_start) * 1000))))
+        _append_latency(
+            "maybe_total", max(1, int(round((time.perf_counter() - total_start) * 1000)))
+        )
         return trace
     clear_start = time.perf_counter()
     _clear_backend_unavailable_state()
-    _append_latency("backend_cache_clear", max(1, int(round((time.perf_counter() - clear_start) * 1000))))
+    _append_latency(
+        "backend_cache_clear", max(1, int(round((time.perf_counter() - clear_start) * 1000)))
+    )
     sanitize_start = time.perf_counter()
     interpreted = _sanitize_payload(question, payload)
-    _append_latency("sanitize_payload", max(1, int(round((time.perf_counter() - sanitize_start) * 1000))))
+    _append_latency(
+        "sanitize_payload", max(1, int(round((time.perf_counter() - sanitize_start) * 1000)))
+    )
     interpreted["gate_reason"] = reason
     interpreted["invocation_attempted"] = True
     interpreted["result_status"] = "advisory_available"

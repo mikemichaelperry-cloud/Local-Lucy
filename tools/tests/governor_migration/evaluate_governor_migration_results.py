@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-
 FAILURE_CATEGORIES = {
     "route_drift",
     "clarify_failure",
@@ -40,14 +39,20 @@ ROOT_CAUSE_NOTES = {
 }
 
 OUTCOME_FAMILY_MATCHERS = {
-    "local_success": lambda route, code, response: route == "LOCAL" and code in {"answered", "knowledge_short_circuit_hit"},
-    "local_guarded_medical": lambda route, code, response: route == "LOCAL" and code in {"answered", "knowledge_short_circuit_hit", "local_guard_fallback"},
-    "local_guarded_safety": lambda route, code, response: route == "LOCAL" and code in {"answered", "knowledge_short_circuit_hit", "local_guard_fallback"},
-    "clarify_needed": lambda route, code, response: route == "CLARIFY" and code == "clarification_requested",
+    "local_success": lambda route, code, response: route == "LOCAL"
+    and code in {"answered", "knowledge_short_circuit_hit"},
+    "local_guarded_medical": lambda route, code, response: route == "LOCAL"
+    and code in {"answered", "knowledge_short_circuit_hit", "local_guard_fallback"},
+    "local_guarded_safety": lambda route, code, response: route == "LOCAL"
+    and code in {"answered", "knowledge_short_circuit_hit", "local_guard_fallback"},
+    "clarify_needed": lambda route, code, response: route == "CLARIFY"
+    and code == "clarification_requested",
     "news_success": lambda route, code, response: route == "NEWS" and code == "answered",
     "evidence_success": lambda route, code, response: route == "EVIDENCE" and code == "answered",
-    "evidence_unavailable_offline": lambda route, code, response: route == "EVIDENCE" and code in {"requires_evidence_mode", "validated_insufficient"},
-    "news_unavailable_offline": lambda route, code, response: route == "NEWS" and code in {"requires_evidence_mode", "validated_insufficient"},
+    "evidence_unavailable_offline": lambda route, code, response: route == "EVIDENCE"
+    and code in {"requires_evidence_mode", "validated_insufficient"},
+    "news_unavailable_offline": lambda route, code, response: route == "NEWS"
+    and code in {"requires_evidence_mode", "validated_insufficient"},
 }
 
 MODE_MAP = {
@@ -163,7 +168,9 @@ def actual_route_from(outcome: Dict[str, str], execution_contract: Optional[Dict
     return ""
 
 
-def actual_requires_sources_from(outcome: Dict[str, str], execution_contract: Optional[Dict[str, Any]]) -> Optional[bool]:
+def actual_requires_sources_from(
+    outcome: Dict[str, str], execution_contract: Optional[Dict[str, Any]]
+) -> Optional[bool]:
     if execution_contract:
         contract = execution_contract.get("execution_contract")
         if isinstance(contract, dict) and isinstance(contract.get("requires_sources"), bool):
@@ -173,7 +180,9 @@ def actual_requires_sources_from(outcome: Dict[str, str], execution_contract: Op
     return None
 
 
-def actual_requires_clarification_from(outcome: Dict[str, str], execution_contract: Optional[Dict[str, Any]]) -> Optional[bool]:
+def actual_requires_clarification_from(
+    outcome: Dict[str, str], execution_contract: Optional[Dict[str, Any]]
+) -> Optional[bool]:
     if execution_contract:
         contract = execution_contract.get("execution_contract")
         if isinstance(contract, dict) and isinstance(contract.get("requires_clarification"), bool):
@@ -183,7 +192,9 @@ def actual_requires_clarification_from(outcome: Dict[str, str], execution_contra
     return None
 
 
-def family_match(expected_family: str, actual_route: str, actual_outcome_code: str, response_text: str) -> bool:
+def family_match(
+    expected_family: str, actual_route: str, actual_outcome_code: str, response_text: str
+) -> bool:
     if actual_outcome_code.startswith(expected_family):
         return True
     matcher = OUTCOME_FAMILY_MATCHERS.get(expected_family)
@@ -192,7 +203,9 @@ def family_match(expected_family: str, actual_route: str, actual_outcome_code: s
     return bool(matcher(actual_route, actual_outcome_code, response_text))
 
 
-def collect_forbidden_hits(forbidden: Iterable[Dict[str, Any]], actual_route: str, response_text: str) -> List[str]:
+def collect_forbidden_hits(
+    forbidden: Iterable[Dict[str, Any]], actual_route: str, response_text: str
+) -> List[str]:
     hits: List[str] = []
     response_norm = response_text.lower()
     for rule in forbidden:
@@ -224,8 +237,14 @@ def categorize_failure(
     if not capture_ok:
         return "logging_or_contract_capture_failure"
 
-    gov_contract = governor_contract.get("execution_contract") if isinstance(governor_contract, dict) else None
-    exe_contract = execution_contract.get("execution_contract") if isinstance(execution_contract, dict) else None
+    gov_contract = (
+        governor_contract.get("execution_contract") if isinstance(governor_contract, dict) else None
+    )
+    exe_contract = (
+        execution_contract.get("execution_contract")
+        if isinstance(execution_contract, dict)
+        else None
+    )
     if not isinstance(gov_contract, dict) or not isinstance(exe_contract, dict):
         return "logging_or_contract_capture_failure"
 
@@ -237,7 +256,9 @@ def categorize_failure(
         return "policy_leakage_execution"
     if bool(gov_contract.get("requires_sources")) != bool(exe_contract.get("requires_sources")):
         return "policy_leakage_execution"
-    if bool(gov_contract.get("requires_clarification")) != bool(exe_contract.get("requires_clarification")):
+    if bool(gov_contract.get("requires_clarification")) != bool(
+        exe_contract.get("requires_clarification")
+    ):
         return "policy_leakage_execution"
 
     if actual_route != expected["route"]:
@@ -246,9 +267,13 @@ def categorize_failure(
         if category == "mode_handling":
             return "mode_handling_failure"
         return "route_drift"
-    if actual_requires_sources is None or actual_requires_sources != bool(expected["requires_evidence"]):
+    if actual_requires_sources is None or actual_requires_sources != bool(
+        expected["requires_evidence"]
+    ):
         return "evidence_requirement_drift"
-    if actual_requires_clarify is None or actual_requires_clarify != bool(expected["requires_clarify"]):
+    if actual_requires_clarify is None or actual_requires_clarify != bool(
+        expected["requires_clarify"]
+    ):
         return "clarify_failure"
 
     if forbidden_hits:
@@ -286,13 +311,21 @@ def write_case_artifacts(
         f"STDOUT:\n{stdout_text}\n\nSTDERR:\n{stderr_text}\n",
         encoding="utf-8",
     )
-    (case_artifact_dir / "metadata.json").write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (case_artifact_dir / "metadata.json").write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     if classifier_payload is not None:
-        (case_artifact_dir / "classifier_output.json").write_text(json.dumps(classifier_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (case_artifact_dir / "classifier_output.json").write_text(
+            json.dumps(classifier_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     if governor_payload is not None:
-        (case_artifact_dir / "governor_contract.json").write_text(json.dumps(governor_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (case_artifact_dir / "governor_contract.json").write_text(
+            json.dumps(governor_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     if execution_payload is not None:
-        (case_artifact_dir / "execution_contract.json").write_text(json.dumps(execution_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (case_artifact_dir / "execution_contract.json").write_text(
+            json.dumps(execution_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
 
 
 def run_case(
@@ -354,8 +387,12 @@ def run_case(
     actual_outcome_code = last_outcome.get("OUTCOME_CODE", "")
     forbidden_hits = collect_forbidden_hits(case.get("forbidden", []), actual_route, stdout_text)
 
-    capture_ok = all(payload is not None for payload in (classifier_payload, governor_payload, execution_payload)) and bool(actual_outcome_code)
-    outcome_family_ok = family_match(str(case["expected"]["outcome_family"]), actual_route, actual_outcome_code, stdout_text)
+    capture_ok = all(
+        payload is not None for payload in (classifier_payload, governor_payload, execution_payload)
+    ) and bool(actual_outcome_code)
+    outcome_family_ok = family_match(
+        str(case["expected"]["outcome_family"]), actual_route, actual_outcome_code, stdout_text
+    )
     failure_category = categorize_failure(
         case=case,
         capture_ok=capture_ok,
@@ -384,8 +421,12 @@ def run_case(
         "actual_requires_clarify": actual_requires_clarify,
         "expected_outcome_family": case["expected"]["outcome_family"],
         "actual_outcome_code": actual_outcome_code,
-        "governor_contract": governor_payload.get("execution_contract") if isinstance(governor_payload, dict) else None,
-        "execution_received_contract": execution_payload.get("execution_contract") if isinstance(execution_payload, dict) else None,
+        "governor_contract": governor_payload.get("execution_contract")
+        if isinstance(governor_payload, dict)
+        else None,
+        "execution_received_contract": execution_payload.get("execution_contract")
+        if isinstance(execution_payload, dict)
+        else None,
         "response_text": stdout_text,
         "forbidden_hits": forbidden_hits,
         "pass": failure_category is None,
@@ -400,7 +441,15 @@ def run_case(
         "last_outcome": last_outcome,
         "last_route": last_route,
     }
-    write_case_artifacts(case_artifact_dir, stdout_text, stderr_text, classifier_payload, governor_payload, execution_payload, metadata)
+    write_case_artifacts(
+        case_artifact_dir,
+        stdout_text,
+        stderr_text,
+        classifier_payload,
+        governor_payload,
+        execution_payload,
+        metadata,
+    )
     return result
 
 
@@ -423,7 +472,9 @@ def write_jsonl(path: Path, results: List[Dict[str, Any]]) -> None:
             handle.write(json.dumps(item, sort_keys=True) + "\n")
 
 
-def write_report(path: Path, suite_name: str, results: List[Dict[str, Any]], summary: Dict[str, Any]) -> None:
+def write_report(
+    path: Path, suite_name: str, results: List[Dict[str, Any]], summary: Dict[str, Any]
+) -> None:
     lines: List[str] = []
     totals = summary["totals"]
     lines.append("# Governor Migration Validation Report")
@@ -443,7 +494,9 @@ def write_report(path: Path, suite_name: str, results: List[Dict[str, Any]], sum
     if not failures:
         lines.append("All cases passed.")
     else:
-        lines.append("| test_id | category | failure_category | expected_route | actual_route | outcome |")
+        lines.append(
+            "| test_id | category | failure_category | expected_route | actual_route | outcome |"
+        )
         lines.append("| --- | --- | --- | --- | --- | --- |")
         for item in failures:
             lines.append(
@@ -514,13 +567,17 @@ def main() -> int:
     results: List[Dict[str, Any]] = []
     try:
         for case in filtered_cases:
-            results.append(run_case(real_root, artifacts_dir, workspaces_dir, case, defaults, sessions))
+            results.append(
+                run_case(real_root, artifacts_dir, workspaces_dir, case, defaults, sessions)
+            )
     finally:
         stop_workers(sessions, real_root)
 
     write_jsonl(artifacts_dir / "results.jsonl", results)
     summary = summarize_results(results)
-    write_report(artifacts_dir / "report.md", str(suite.get("suite") or "unknown_suite"), results, summary)
+    write_report(
+        artifacts_dir / "report.md", str(suite.get("suite") or "unknown_suite"), results, summary
+    )
     print(json.dumps({"artifacts_dir": str(artifacts_dir), **summary["totals"]}, sort_keys=True))
     return 0
 

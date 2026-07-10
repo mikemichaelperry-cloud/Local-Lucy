@@ -7,7 +7,6 @@ from typing import Dict, List, Sequence, Tuple
 
 from medical_query_heuristics import detect_human_medication_query, normalize_for_medical_match
 
-
 TRUSTED_MEDICAL_DOMAINS = {
     "medlineplus.gov",
     "dailymed.nlm.nih.gov",
@@ -104,7 +103,9 @@ def parse_evidence_pack(pack_file: str) -> List[Dict[str, str]]:
                 "body": body.strip(),
             }
         )
-    items.sort(key=lambda item: (DOMAIN_PRIORITY.get(item["domain"], 50), item["domain"], item["key"]))
+    items.sort(
+        key=lambda item: (DOMAIN_PRIORITY.get(item["domain"], 50), item["domain"], item["key"])
+    )
     return items
 
 
@@ -127,7 +128,11 @@ def derive_query_family(query: str, detector: Dict[str, object]) -> str:
     pattern_family = str(detector.get("pattern_family") or "")
     if re.search(r"\bcontraindication(?:s)?\b", normalized, flags=re.IGNORECASE):
         return "contraindications"
-    if re.search(r"\b(interaction|interactions|interact|react with|safe with|alcohol|grapefruit)\b", normalized, flags=re.IGNORECASE):
+    if re.search(
+        r"\b(interaction|interactions|interact|react with|safe with|alcohol|grapefruit)\b",
+        normalized,
+        flags=re.IGNORECASE,
+    ):
         return "interactions"
     if re.search(r"\b(dose|dosage|mg|mcg|g|ml)\b", normalized, flags=re.IGNORECASE):
         return "dose"
@@ -182,7 +187,9 @@ def split_sentences(text: str) -> List[str]:
     collapsed = normalize_space(text)
     if not collapsed:
         return []
-    return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", collapsed) if sentence.strip()]
+    return [
+        sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", collapsed) if sentence.strip()
+    ]
 
 
 def extract_section_block(body: str, heading_patterns: Sequence[str]) -> str:
@@ -207,18 +214,29 @@ def extract_section_block(body: str, heading_patterns: Sequence[str]) -> str:
     return ""
 
 
-def sentence_with_patterns(text: str, required_patterns: Sequence[str], context_patterns: Sequence[str] = ()) -> str:
+def sentence_with_patterns(
+    text: str, required_patterns: Sequence[str], context_patterns: Sequence[str] = ()
+) -> str:
     for sentence in split_sentences(text):
-        if not all(re.search(pattern, sentence, flags=re.IGNORECASE) for pattern in required_patterns):
+        if not all(
+            re.search(pattern, sentence, flags=re.IGNORECASE) for pattern in required_patterns
+        ):
             continue
-        if context_patterns and not any(re.search(pattern, sentence, flags=re.IGNORECASE) for pattern in context_patterns):
+        if context_patterns and not any(
+            re.search(pattern, sentence, flags=re.IGNORECASE) for pattern in context_patterns
+        ):
             continue
         return truncate_fact(sentence)
     return ""
 
 
 def extract_dose_fact(items: Sequence[Dict[str, str]]) -> Tuple[str, str]:
-    heading_patterns = (r"\bdosage and administration\b", r"\brecommended dosage\b", r"\bdosage\b", r"\busual adult dose\b")
+    heading_patterns = (
+        r"\bdosage and administration\b",
+        r"\brecommended dosage\b",
+        r"\bdosage\b",
+        r"\busual adult dose\b",
+    )
     sentence_patterns = (
         r"\b\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|mL)\b",
         r"\b(once daily|twice daily|daily|every\s+\d+\s*(?:to\s*\d+\s*)?hours?)\b",
@@ -300,11 +318,17 @@ def extract_fact(query: str, pack_file: str, domains_file: str = "") -> Dict[str
         "MEDICAL_STRUCTURED_EVIDENCE_DOMAIN": "",
         "MEDICAL_STRUCTURED_ACTION_HINT": "",
     }
-    if detector.get("detector_fired") is not True or not candidate or family not in {"dose", "interactions", "contraindications"}:
+    if (
+        detector.get("detector_fired") is not True
+        or not candidate
+        or family not in {"dose", "interactions", "contraindications"}
+    ):
         return result
 
     trusted_domains = domains_from_file(domains_file)
-    items = [item for item in parse_evidence_pack(pack_file) if item["domain"] in TRUSTED_MEDICAL_DOMAINS]
+    items = [
+        item for item in parse_evidence_pack(pack_file) if item["domain"] in TRUSTED_MEDICAL_DOMAINS
+    ]
     result["MEDICAL_STRUCTURED_SUPPORTED"] = "true"
     result["MEDICAL_STRUCTURED_ACTION_HINT"] = action_hint_for_family(family)
 

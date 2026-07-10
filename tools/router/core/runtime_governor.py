@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Optional
 
 from local_policy import match_local_response_id
 
-
 CONTRACT_VERSION = "current"
 
 
@@ -119,7 +118,12 @@ def _fallback_policy(
         return "risk_first"
     if route in {"NEWS", "EVIDENCE"} or requires_sources:
         return "evidence_required"
-    if intent_lower in {"identity_personal", "conversational", "local_knowledge", "technical_explanation"}:
+    if intent_lower in {
+        "identity_personal",
+        "conversational",
+        "local_knowledge",
+        "technical_explanation",
+    }:
         return "local_safe"
     if intent_lower.startswith("identity_"):
         return "local_safe"
@@ -192,7 +196,9 @@ def _audit_tags(
     return tags
 
 
-def _local_response_id(question: str, intent: str, route: str, requires_sources: bool) -> Optional[str]:
+def _local_response_id(
+    question: str, intent: str, route: str, requires_sources: bool
+) -> Optional[str]:
     if route != "LOCAL" or requires_sources:
         return None
     return match_local_response_id(question, intent)
@@ -211,7 +217,9 @@ def build_execution_contract(
     surface: str = "cli",
 ) -> Dict[str, Any]:
     legacy_plan = _legacy_plan(plan)
-    plan_requires_sources = _bool(_first_defined(effective_plan.get("needs_web"), legacy_plan.get("needs_web")))
+    plan_requires_sources = _bool(
+        _first_defined(effective_plan.get("needs_web"), legacy_plan.get("needs_web"))
+    )
     manifest = route_manifest if isinstance(route_manifest, dict) else {}
     route = _manifest_route(manifest)
 

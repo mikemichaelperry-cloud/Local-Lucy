@@ -7,8 +7,7 @@ import argparse
 import os
 import re
 import sys
-from typing import Dict, List, Tuple
-
+from typing import Dict, List
 
 DOMAIN_RE = re.compile(r"^[a-z0-9.-]+$")
 ALLOWED_TIERS = {1, 2, 3}
@@ -46,13 +45,10 @@ def detect_root() -> str:
             fail(f"LUCY_ROOT failed marker check: {root}")
         return root
     script_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    if (
-        os.path.isdir(script_root)
-        and (
-            os.path.isfile(os.path.join(script_root, "lucy_chat.sh"))
-            or os.path.isdir(os.path.join(script_root, "tools"))
-            or os.path.isdir(os.path.join(script_root, "snapshots"))
-        )
+    if os.path.isdir(script_root) and (
+        os.path.isfile(os.path.join(script_root, "lucy_chat.sh"))
+        or os.path.isdir(os.path.join(script_root, "tools"))
+        or os.path.isdir(os.path.join(script_root, "snapshots"))
     ):
         return script_root
     home = os.path.expanduser("~")
@@ -186,8 +182,10 @@ def validate_catalog(domains: Dict[str, Dict]) -> None:
             fail(f"{domain}: tier must be one of 1,2,3")
 
         categories = meta.get("categories")
-        if not isinstance(categories, list) or not categories or not all(
-            isinstance(c, str) and c for c in categories
+        if (
+            not isinstance(categories, list)
+            or not categories
+            or not all(isinstance(c, str) and c for c in categories)
         ):
             fail(f"{domain}: categories must be a non-empty list of strings")
         seen_categories.update(categories)
@@ -208,7 +206,10 @@ def validate_catalog(domains: Dict[str, Dict]) -> None:
 
         probe_expectation = meta.get("probe_expectation")
         if probe_expectation is not None:
-            if not isinstance(probe_expectation, str) or probe_expectation not in ALLOWED_PROBE_EXPECTATIONS:
+            if (
+                not isinstance(probe_expectation, str)
+                or probe_expectation not in ALLOWED_PROBE_EXPECTATIONS
+            ):
                 fail(
                     f"{domain}: probe_expectation must be one of "
                     + ", ".join(sorted(ALLOWED_PROBE_EXPECTATIONS))
@@ -286,11 +287,7 @@ def render_outputs(domains: Dict[str, Dict], fetch_allow_tiers: List[int]) -> Di
 
     def make_runtime(name: str, matcher) -> None:
         vals = with_www_variant(
-            {
-                d
-                for d, meta in domains.items()
-                if matcher(meta) and int(meta["tier"]) in fetch_tiers
-            }
+            {d for d, meta in domains.items() if matcher(meta) and int(meta["tier"]) in fetch_tiers}
         )
         outputs[name] = "\n".join(vals) + "\n"
 

@@ -10,7 +10,6 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ADAPTER = REPO_ROOT / "tools" / "voice" / "tts_adapter.py"
 
@@ -56,7 +55,10 @@ def main() -> int:
             "hello adapter",
         )
         assert_ok(payload["ok"] is True, f"expected ok contract: {payload}")
-        assert_ok(payload["requested_engine"] == "piper", f"missing requested_engine on success: {payload}")
+        assert_ok(
+            payload["requested_engine"] == "piper",
+            f"missing requested_engine on success: {payload}",
+        )
         assert_ok(payload["engine"] == "piper", f"unexpected engine: {payload}")
         assert_ok(payload["device"] == "cpu", f"unexpected device: {payload}")
         assert_ok(payload["voice"] == "en_GB-cori-high", f"unexpected voice: {payload}")
@@ -78,10 +80,18 @@ def main() -> int:
             "",
         )
         assert_ok(failure["ok"] is False, f"expected failure contract: {failure}")
-        assert_ok(failure["requested_engine"] == "piper", f"missing requested_engine on failure: {failure}")
+        assert_ok(
+            failure["requested_engine"] == "piper",
+            f"missing requested_engine on failure: {failure}",
+        )
         assert_ok(failure["device"] == "cpu", f"missing device on failure: {failure}")
-        assert_ok(isinstance(failure["error"], str) and failure["error"], f"missing error detail: {failure}")
-        assert_ok(failure["wav_path"] == "", f"failure contract should not expose wav path: {failure}")
+        assert_ok(
+            isinstance(failure["error"], str) and failure["error"],
+            f"missing error detail: {failure}",
+        )
+        assert_ok(
+            failure["wav_path"] == "", f"failure contract should not expose wav path: {failure}"
+        )
     print("PASS: test_tts_adapter_contract")
     return 0
 
@@ -96,7 +106,9 @@ def run_adapter(env: dict[str, str], *args: str) -> dict[str, object]:
         cwd=str(REPO_ROOT),
     )
     payload = json.loads(completed.stdout)
-    assert_ok(isinstance(payload, dict), f"adapter stdout was not JSON object: {completed.stdout!r}")
+    assert_ok(
+        isinstance(payload, dict), f"adapter stdout was not JSON object: {completed.stdout!r}"
+    )
     return payload
 
 

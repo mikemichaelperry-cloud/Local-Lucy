@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List
 
-
 CONFIDENCE_SCORES = {
     "high": 0.95,
     "medium": 0.75,
@@ -65,12 +64,14 @@ def candidate_from_rules(query: str, mode: str, adapter: str, rules: List[Rule])
         next_query, count = re.subn(rule.pattern, rule.replacement, rewritten, flags=re.IGNORECASE)
         if count > 0:
             rewritten = normalize_space(next_query)
-            applied.append({
-                "pattern": rule.pattern,
-                "replacement": rule.replacement,
-                "count": count,
-                "confidence": rule.confidence,
-            })
+            applied.append(
+                {
+                    "pattern": rule.pattern,
+                    "replacement": rule.replacement,
+                    "count": count,
+                    "confidence": rule.confidence,
+                }
+            )
             confidences.append(CONFIDENCE_SCORES.get(rule.confidence, 0.55))
     if not applied:
         return {}
@@ -93,14 +94,16 @@ def candidate_from_rules(query: str, mode: str, adapter: str, rules: List[Rule])
 
 def build_candidates(query: str, mode: str, rules_by_adapter: Dict[str, List[Rule]]) -> List[dict]:
     original = normalize_space(query)
-    candidates = [{
-        "adapter": "original",
-        "domain": "original",
-        "normalized_query": original,
-        "confidence": "baseline",
-        "confidence_score": 0.0,
-        "applied_rules": [],
-    }]
+    candidates = [
+        {
+            "adapter": "original",
+            "domain": "original",
+            "normalized_query": original,
+            "confidence": "baseline",
+            "confidence_score": 0.0,
+            "applied_rules": [],
+        }
+    ]
     for adapter in sorted(rules_by_adapter):
         candidate = candidate_from_rules(original, mode, adapter, rules_by_adapter[adapter])
         if candidate:
@@ -108,7 +111,10 @@ def build_candidates(query: str, mode: str, rules_by_adapter: Dict[str, List[Rul
 
     deduped = []
     seen = {}
-    for candidate in sorted(candidates, key=lambda item: (-item["confidence_score"], item["adapter"], item["normalized_query"])):
+    for candidate in sorted(
+        candidates,
+        key=lambda item: (-item["confidence_score"], item["adapter"], item["normalized_query"]),
+    ):
         key = candidate["normalized_query"]
         if key in seen:
             continue
@@ -120,7 +126,9 @@ def build_candidates(query: str, mode: str, rules_by_adapter: Dict[str, List[Rul
 def write_env(path: Path, payload: dict) -> None:
     best = payload.get("best_candidate") or {}
     candidates = payload.get("candidates") or []
-    best_rules = "|".join(f"{item['pattern']}=>{item['replacement']}" for item in best.get("applied_rules", []))
+    best_rules = "|".join(
+        f"{item['pattern']}=>{item['replacement']}" for item in best.get("applied_rules", [])
+    )
     lines = [
         f"NORMALIZER_ORIGINAL_QUERY={shell_quote(payload.get('original_query', ''))}",
         f"NORMALIZER_DETECTOR_FIRED={shell_quote('true' if payload.get('detector_fired') else 'false')}",
@@ -138,7 +146,10 @@ def write_env(path: Path, payload: dict) -> None:
 def write_candidates(path: Path, payload: dict) -> None:
     lines = []
     for idx, candidate in enumerate(payload.get("candidates", []), start=1):
-        rules = ",".join(f"{item['pattern']}=>{item['replacement']}" for item in candidate.get("applied_rules", []))
+        rules = ",".join(
+            f"{item['pattern']}=>{item['replacement']}"
+            for item in candidate.get("applied_rules", [])
+        )
         fields = [
             str(idx),
             candidate.get("adapter", ""),
@@ -162,12 +173,17 @@ def main() -> int:
     parser.add_argument("--json-out")
     args = parser.parse_args()
 
-    conf_dir = Path(os.environ.get("LUCY_CONF_DIR") or str(Path(__file__).resolve().parents[1] / "config"))
+    conf_dir = Path(
+        os.environ.get("LUCY_CONF_DIR") or str(Path(__file__).resolve().parents[1] / "config")
+    )
     aliases_file = Path(args.aliases_file or str(conf_dir / "evidence_normalization_aliases.tsv"))
     rules_by_adapter = load_rules(aliases_file)
     mode = (args.mode or "").upper()
     candidates = build_candidates(args.query, mode, rules_by_adapter)
-    best = next((candidate for candidate in candidates if candidate["adapter"] != "original"), candidates[0] if candidates else None)
+    best = next(
+        (candidate for candidate in candidates if candidate["adapter"] != "original"),
+        candidates[0] if candidates else None,
+    )
     payload = {
         "original_query": normalize_space(args.query),
         "mode": mode,
@@ -181,7 +197,9 @@ def main() -> int:
     if args.candidates_out:
         write_candidates(Path(args.candidates_out), payload)
     if args.json_out:
-        Path(args.json_out).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        Path(args.json_out).write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
 
     json.dump(payload, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")

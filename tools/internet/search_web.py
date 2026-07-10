@@ -15,17 +15,18 @@ Env:
   LUCY_AUDIT_LOG               — audit log path
   LUCY_ROOT                    — project root
 """
-import json
-import sys
-import time
+
 import hashlib
+import json
+import os
+import re
+import socket
+import sys
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import socket
-import re
-import os
-import threading
 from html import unescape
 
 try:
@@ -35,6 +36,7 @@ except ImportError:
     _cb_path = os.path.join(os.path.dirname(__file__), "circuit_breaker.py")
     if os.path.exists(_cb_path):
         import importlib.util
+
         _spec = importlib.util.spec_from_file_location("circuit_breaker", _cb_path)
         _cb_mod = importlib.util.module_from_spec(_spec)
         _spec.loader.exec_module(_cb_mod)
@@ -44,10 +46,13 @@ except ImportError:
         class CircuitBreaker:
             def is_open(self, _):
                 return False
+
             def record_success(self, _):
                 pass
+
             def record_failure(self, _):
                 pass
+
 
 _SEARCH_CB = CircuitBreaker(failure_threshold=3, cooldown_sec=300)
 
@@ -81,6 +86,8 @@ def _set_cached(query: str, backend: str, max_results: int, results: list) -> No
     key = _cache_key(query, backend, max_results)
     with _SEARCH_CACHE_LOCK:
         _SEARCH_CACHE[key] = (results, time.time())
+
+
 SEARXNG_HTML_URL = "http://127.0.0.1:8080/search"
 SEARXNG_JSON_URL = "http://127.0.0.1:8080/search?format=json"
 SEARXNG_HEALTH_URL = "http://127.0.0.1:8080/"
@@ -196,6 +203,7 @@ def _categorize_error(exc: Exception) -> str:
 # Backend implementations
 # ---------------------------------------------------------------------------
 
+
 def searxng_search_json(query: str, max_results: int):
     """Search via SearXNG JSON API."""
     params = {"q": query}
@@ -262,7 +270,9 @@ def searxng_search_html(query: str, max_results: int):
         url2 = unescape(m.group(1))
         m2 = re.search(r'href="https?://[^"]+"[^>]*>(.*?)</a>', a, flags=re.I | re.S)
         title = strip_tags(m2.group(1)) if m2 else ""
-        m3 = re.search(r'class="[^"]*\b(content|snippet)\b[^"]*"[^>]*>(.*?)</', a, flags=re.I | re.S)
+        m3 = re.search(
+            r'class="[^"]*\b(content|snippet)\b[^"]*"[^>]*>(.*?)</', a, flags=re.I | re.S
+        )
         snippet = strip_tags(m3.group(2)) if m3 else ""
         if title and url2:
             results.append({"title": title, "url": url2, "snippet": snippet})
@@ -381,6 +391,7 @@ def multi_backend_search(query: str, max_results: int):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     raw = ""
     try:
@@ -429,10 +440,20 @@ def main():
         try:
             env_domains = load_domains_from_file(env_domains_file)
         except Exception:
-            print(json.dumps({"error": "invalid_domains_filter_file", "path": env_domains_file}, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {"error": "invalid_domains_filter_file", "path": env_domains_file},
+                    ensure_ascii=False,
+                )
+            )
             sys.exit(2)
         if not env_domains:
-            print(json.dumps({"error": "empty_domains_filter_file", "path": env_domains_file}, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {"error": "empty_domains_filter_file", "path": env_domains_file},
+                    ensure_ascii=False,
+                )
+            )
             sys.exit(2)
 
     effective_domains = domains
@@ -440,7 +461,11 @@ def main():
         if effective_domains is None:
             effective_domains = env_domains
         else:
-            effective_domains = [d for d in effective_domains if any(d == e or d.endswith("." + e) for e in env_domains)]
+            effective_domains = [
+                d
+                for d in effective_domains
+                if any(d == e or d.endswith("." + e) for e in env_domains)
+            ]
 
     fetched_at = now_utc_iso()
 
@@ -459,21 +484,23 @@ def main():
             "fetched_at_utc": fetched_at,
             "tool_version": TOOL_VERSION,
             "backend": backend,
-        }
+        },
     }
 
     out_json = json.dumps(out, ensure_ascii=False, sort_keys=True)
     out_hash = sha256_text(out_json)
     out["meta"]["output_sha256"] = out_hash
 
-    append_audit({
-        "ts_utc": fetched_at,
-        "tool": "search_web",
-        "tool_version": TOOL_VERSION,
-        "backend": backend,
-        "inputs": {"query": query, "max_results": max_results, "domains": effective_domains},
-        "output_sha256": out_hash,
-    })
+    append_audit(
+        {
+            "ts_utc": fetched_at,
+            "tool": "search_web",
+            "tool_version": TOOL_VERSION,
+            "backend": backend,
+            "inputs": {"query": query, "max_results": max_results, "domains": effective_domains},
+            "output_sha256": out_hash,
+        }
+    )
 
     print(json.dumps(out, ensure_ascii=False))
 

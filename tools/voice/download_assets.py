@@ -18,6 +18,7 @@ Environment overrides:
     LUCY_VOICE_PIPER_VOICE_ONNX_URL Override ONNX download URL
     LUCY_VOICE_PIPER_VOICE_JSON_URL Override JSON config download URL
 """
+
 from __future__ import annotations
 
 import argparse
@@ -27,7 +28,6 @@ import sys
 import urllib.request
 from pathlib import Path
 from typing import Any
-
 
 DEFAULT_WHISPER_MODEL = "small.en"
 DEFAULT_PIPER_VOICE = "en_GB-cori-high"
@@ -116,6 +116,7 @@ def download_file(url: str, dest: Path, chunk_size: int = 8192) -> bool:
 # Whisper
 # ---------------------------------------------------------------------------
 
+
 def resolve_whisper_model_path(model_name: str, prefix: Path) -> Path:
     return prefix / "models" / f"ggml-{model_name}.bin"
 
@@ -169,6 +170,7 @@ def download_whisper(model_name: str, prefix: Path) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Piper
 # ---------------------------------------------------------------------------
+
 
 def resolve_piper_model_dir(voice: str, prefix: Path) -> Path:
     return prefix / "models" / "piper" / voice
@@ -250,6 +252,7 @@ def download_piper(voice: str, prefix: Path) -> dict[str, Any]:
 # Kokoro (HF cache verification only — Kokoro manages its own downloads)
 # ---------------------------------------------------------------------------
 
+
 def resolve_kokoro_cache_home(prefix: Path) -> Path:
     raw = os.environ.get("HF_HOME", "") or os.environ.get("LUCY_VOICE_KOKORO_CACHE_HOME", "")
     if raw:
@@ -294,26 +297,30 @@ def verify_kokoro(
             path = snapshot / name
             exists = path.exists() and path.is_file()
             size = path.stat().st_size if exists else 0
-            required_files.append({
-                "name": name,
-                "path": str(path),
-                "exists": exists,
-                "size": size,
-                "size_formatted": format_size(size),
-            })
+            required_files.append(
+                {
+                    "name": name,
+                    "path": str(path),
+                    "exists": exists,
+                    "size": size,
+                    "size_formatted": format_size(size),
+                }
+            )
             if not exists:
                 all_ready = False
 
         voice_path = snapshot / "voices" / f"{voice}.pt"
         voice_exists = voice_path.exists() and voice_path.is_file()
         voice_size = voice_path.stat().st_size if voice_exists else 0
-        required_files.append({
-            "name": f"voices/{voice}.pt",
-            "path": str(voice_path),
-            "exists": voice_exists,
-            "size": voice_size,
-            "size_formatted": format_size(voice_size),
-        })
+        required_files.append(
+            {
+                "name": f"voices/{voice}.pt",
+                "path": str(voice_path),
+                "exists": voice_exists,
+                "size": voice_size,
+                "size_formatted": format_size(voice_size),
+            }
+        )
         if not voice_exists:
             all_ready = False
     else:
@@ -333,6 +340,7 @@ def verify_kokoro(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -435,7 +443,9 @@ def main() -> int:
                 status = "SIZE MISMATCH"
             say(f"\n[{status}] Whisper STT model: {r['model']}")
             say(f"  Path:  {r['path']}")
-            say(f"  Size:  {r['size_formatted']} {'(expected)' if r['size_known'] else '(unknown expected size)'}")
+            say(
+                f"  Size:  {r['size_formatted']} {'(expected)' if r['size_known'] else '(unknown expected size)'}"
+            )
             say(f"  URL:   {r['url']}")
 
         elif comp == "piper":
@@ -456,7 +466,9 @@ def main() -> int:
                 say(f"  [{fstatus}] {f['name']}: {f['size_formatted']}")
             if not r["ready"]:
                 say("  NOTE: Kokoro assets are auto-downloaded on first use via HuggingFace hub.")
-                say("        Set HF_HOME or LUCY_VOICE_KOKORO_CACHE_HOME to control cache location.")
+                say(
+                    "        Set HF_HOME or LUCY_VOICE_KOKORO_CACHE_HOME to control cache location."
+                )
 
     say("\n" + "=" * 60)
     if all_ok:

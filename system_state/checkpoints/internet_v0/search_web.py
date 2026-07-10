@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+import hashlib
 import json
+import re
 import sys
 import time
-import hashlib
 import urllib.parse
 import urllib.request
-import re
 from html import unescape
 
 TOOL_VERSION = 0
@@ -13,18 +13,23 @@ AUDIT_LOG = "/home/mike/lucy/audit/internet.log"
 SEARXNG_HTML_URL = "http://127.0.0.1:8080/search"
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 
+
 def sha256_text(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
+
 def now_utc_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
 
 def append_audit(entry: dict) -> None:
     with open(AUDIT_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
+
 def clamp(n: int, lo: int, hi: int) -> int:
     return max(lo, min(hi, n))
+
 
 def domain_allowed(url: str, domains):
     if not domains:
@@ -39,13 +44,15 @@ def domain_allowed(url: str, domains):
             return True
     return False
 
+
 def strip_tags(s: str) -> str:
-    s = re.sub(r"<script.*?</script>", " ", s, flags=re.I|re.S)
-    s = re.sub(r"<style.*?</style>", " ", s, flags=re.I|re.S)
+    s = re.sub(r"<script.*?</script>", " ", s, flags=re.I | re.S)
+    s = re.sub(r"<style.*?</style>", " ", s, flags=re.I | re.S)
     s = re.sub(r"<[^>]+>", " ", s)
     s = unescape(s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
+
 
 def searxng_search_html(query: str, max_results: int):
     params = {"q": query}
@@ -73,14 +80,14 @@ def searxng_search_html(query: str, max_results: int):
         # recombine marker+content
         articles = []
         for i in range(1, len(blocks), 2):
-            articles.append(blocks[i] + (blocks[i+1] if i+1 < len(blocks) else ""))
+            articles.append(blocks[i] + (blocks[i + 1] if i + 1 < len(blocks) else ""))
     else:
         # fallback: look for "result" divs
         articles = re.split(r'(<div\b[^>]*class="[^"]*\bresult\b[^"]*"[^>]*>)', html, flags=re.I)
         if len(articles) > 1:
             tmp = []
             for i in range(1, len(articles), 2):
-                tmp.append(articles[i] + (articles[i+1] if i+1 < len(articles) else ""))
+                tmp.append(articles[i] + (articles[i + 1] if i + 1 < len(articles) else ""))
             articles = tmp
         else:
             articles = [html]
@@ -93,11 +100,13 @@ def searxng_search_html(query: str, max_results: int):
         url2 = unescape(m.group(1))
 
         # title: first anchor text after href
-        m2 = re.search(r'href="https?://[^"]+"[^>]*>(.*?)</a>', a, flags=re.I|re.S)
+        m2 = re.search(r'href="https?://[^"]+"[^>]*>(.*?)</a>', a, flags=re.I | re.S)
         title = strip_tags(m2.group(1)) if m2 else ""
 
         # snippet
-        m3 = re.search(r'class="[^"]*\b(content|snippet)\b[^"]*"[^>]*>(.*?)</', a, flags=re.I|re.S)
+        m3 = re.search(
+            r'class="[^"]*\b(content|snippet)\b[^"]*"[^>]*>(.*?)</', a, flags=re.I | re.S
+        )
         snippet = strip_tags(m3.group(2)) if m3 else ""
 
         if title and url2:
@@ -106,6 +115,7 @@ def searxng_search_html(query: str, max_results: int):
             break
 
     return results
+
 
 def main():
     # Tool protocol: prefer JSON on stdin, but allow argv fallback for scripts.
@@ -166,23 +176,26 @@ def main():
             "fetched_at_utc": fetched_at,
             "tool_version": TOOL_VERSION,
             "backend": "searxng_localhost_html",
-        }
+        },
     }
 
     out_json = json.dumps(out, ensure_ascii=False, sort_keys=True)
     out_hash = sha256_text(out_json)
     out["meta"]["output_sha256"] = out_hash
 
-    append_audit({
-        "ts_utc": fetched_at,
-        "tool": "search_web",
-        "tool_version": TOOL_VERSION,
-        "backend": "searxng_localhost_html",
-        "inputs": {"query": query, "max_results": max_results, "domains": domains},
-        "output_sha256": out_hash,
-    })
+    append_audit(
+        {
+            "ts_utc": fetched_at,
+            "tool": "search_web",
+            "tool_version": TOOL_VERSION,
+            "backend": "searxng_localhost_html",
+            "inputs": {"query": query, "max_results": max_results, "domains": domains},
+            "output_sha256": out_hash,
+        }
+    )
 
     print(json.dumps(out, ensure_ascii=False))
+
 
 if __name__ == "__main__":
     main()

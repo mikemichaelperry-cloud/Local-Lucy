@@ -8,23 +8,23 @@ Run: cd ~/lucy-v10/ui-v10 && python3 comprehensive_stress_test.py
 
 from __future__ import annotations
 
-import gc
 import json
 import os
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent / "app"))
 sys.path.insert(0, str(Path.home() / "lucy-v10" / "models" / "router"))
 
 os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v10"))
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
+os.environ.setdefault(
+    "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+)
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")
 os.environ.setdefault("LUCY_EVIDENCE_ENABLED", "1")
@@ -59,7 +59,10 @@ def get_gpu_memory() -> tuple[int, int] | tuple[None, None]:
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5, check=False
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
         if out.returncode == 0:
             used, total = out.stdout.strip().split(",")
@@ -94,11 +97,15 @@ def snapshot(label: str = "") -> ResourceSnapshot:
         system_ram_total_mb=ram_total,
     )
     if label:
-        print(f"  [{label}] GPU: {gpu_used or '?'} / {gpu_total or '?'} MB | RAM: {ram_used} / {ram_total} MB")
+        print(
+            f"  [{label}] GPU: {gpu_used or '?'} / {gpu_total or '?'} MB | RAM: {ram_used} / {ram_total} MB"
+        )
     return snap
 
 
-def run_query(query: str, expected_route: str | None = None, expected_contains: str | None = None) -> TestResult:
+def run_query(
+    query: str, expected_route: str | None = None, expected_contains: str | None = None
+) -> TestResult:
     """Execute a single query and return results."""
     t0 = time.time()
     try:
@@ -352,58 +359,76 @@ def main() -> int:
     print(f"Failed:               {len(failed)} ({len(failed)*100//len(results)}%)")
     print(f"Correct (validated):  {len(correct)} ({len(correct)*100//len(results)}%)")
     print(f"Incorrect content:    {len(incorrect)}")
-    print(f"\nLatency:")
+    print("\nLatency:")
     print(f"  Average: {avg_latency:.0f}ms")
     print(f"  Min:     {min_latency:.0f}ms")
     print(f"  Max:     {max_latency:.0f}ms")
-    print(f"\nRoute distribution:")
+    print("\nRoute distribution:")
     for route, count in sorted(routes.items(), key=lambda x: -x[1]):
         print(f"  {route:12s}: {count}")
 
     # Resource delta
     if baseline.gpu_mem_used_mb is not None and final.gpu_mem_used_mb is not None:
         gpu_delta = final.gpu_mem_used_mb - baseline.gpu_mem_used_mb
-        print(f"\nGPU memory delta:     {gpu_delta:+d} MB ({baseline.gpu_mem_used_mb} → {final.gpu_mem_used_mb})")
+        print(
+            f"\nGPU memory delta:     {gpu_delta:+d} MB ({baseline.gpu_mem_used_mb} → {final.gpu_mem_used_mb})"
+        )
     ram_delta = final.system_ram_used_mb - baseline.system_ram_used_mb
-    print(f"System RAM delta:     {ram_delta:+d} MB ({baseline.system_ram_used_mb} → {final.system_ram_used_mb})")
+    print(
+        f"System RAM delta:     {ram_delta:+d} MB ({baseline.system_ram_used_mb} → {final.system_ram_used_mb})"
+    )
 
     # Failures detail
     if failed:
-        print(f"\n❌ FAILED QUERIES:")
+        print("\n❌ FAILED QUERIES:")
         for r in failed:
             print(f"  [{r.route}] {r.query}")
             print(f"    Error: {r.error[:100]}")
 
     if incorrect:
-        print(f"\n⚠️  INCORRECT CONTENT:")
+        print("\n⚠️  INCORRECT CONTENT:")
         for r in incorrect:
             print(f"  [{r.route}] {r.query}")
             print(f"    Response: {r.response[:100]}...")
 
     # Overall verdict
     success_rate = len(correct) / len(results) * 100 if results else 0
-    print(f"\n{'✅' if success_rate >= 90 else '⚠️' if success_rate >= 70 else '❌'} OVERALL: {success_rate:.0f}% success rate")
+    print(
+        f"\n{'✅' if success_rate >= 90 else '⚠️' if success_rate >= 70 else '❌'} OVERALL: {success_rate:.0f}% success rate"
+    )
 
     # Save report
-    report_path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "logs" / f"stress_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    report_path = (
+        Path.home()
+        / ".codex-api-home"
+        / "lucy"
+        / "runtime-v10"
+        / "logs"
+        / f"stress_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "w") as f:
-        json.dump({
-            "timestamp": datetime.now().isoformat(),
-            "total_queries": len(results),
-            "completed": len(completed),
-            "failed": len(failed),
-            "correct": len(correct),
-            "incorrect": len(incorrect),
-            "avg_latency_ms": avg_latency,
-            "max_latency_ms": max_latency,
-            "routes": routes,
-            "gpu_delta_mb": gpu_delta if baseline.gpu_mem_used_mb else None,
-            "ram_delta_mb": ram_delta,
-            "baseline": vars(baseline),
-            "final": vars(final),
-            "results": [vars(r) for r in results],
-        }, f, indent=2, default=str)
+        json.dump(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "total_queries": len(results),
+                "completed": len(completed),
+                "failed": len(failed),
+                "correct": len(correct),
+                "incorrect": len(incorrect),
+                "avg_latency_ms": avg_latency,
+                "max_latency_ms": max_latency,
+                "routes": routes,
+                "gpu_delta_mb": gpu_delta if baseline.gpu_mem_used_mb else None,
+                "ram_delta_mb": ram_delta,
+                "baseline": vars(baseline),
+                "final": vars(final),
+                "results": [vars(r) for r in results],
+            },
+            f,
+            indent=2,
+            default=str,
+        )
     print(f"\n📄 Full report saved to: {report_path}")
 
     return 0 if success_rate >= 90 else 1

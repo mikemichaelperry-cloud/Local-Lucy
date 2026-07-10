@@ -8,7 +8,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -30,7 +29,9 @@ def set_memory_toggle(value: str):
     env["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_V8)
     result = subprocess.run(
         [sys.executable, str(RUNTIME_CONTROL), "set-memory", "--value", value],
-        capture_output=True, text=True, env=env,
+        capture_output=True,
+        text=True,
+        env=env,
     )
     return result.returncode == 0
 
@@ -62,13 +63,13 @@ def clear_memory():
 
 def test_memory_toggle_basic():
     """Test that memory toggle updates state file."""
-    print("="*60)
+    print("=" * 60)
     print("TEST 1: Memory Toggle - State File Update")
-    print("="*60)
-    
+    print("=" * 60)
+
     # Save original state
     original = get_state()
-    
+
     # Test ON
     print("\nSetting memory to ON...")
     assert set_memory_toggle("on"), "Failed to set memory ON"
@@ -76,7 +77,7 @@ def test_memory_toggle_basic():
     state = get_state()
     assert state["memory"] == "on", f"Expected memory=on, got {state['memory']}"
     print("✓ State file shows memory=on")
-    
+
     # Test OFF
     print("\nSetting memory to OFF...")
     assert set_memory_toggle("off"), "Failed to set memory OFF"
@@ -84,7 +85,7 @@ def test_memory_toggle_basic():
     state = get_state()
     assert state["memory"] == "off", f"Expected memory=off, got {state['memory']}"
     print("✓ State file shows memory=off")
-    
+
     # Restore original
     with open(STATE_FILE, "w") as f:
         json.dump(original, f, indent=2)
@@ -93,50 +94,56 @@ def test_memory_toggle_basic():
 
 def test_memory_env_var():
     """Test that memory toggle sets env var correctly."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 2: Memory Toggle - Environment Variable")
-    print("="*60)
-    
+    print("=" * 60)
+
     # Save original state
     original = get_state()
-    
+
     # Test ON
     print("\nSetting memory to ON...")
     set_memory_toggle("on")
     time.sleep(0.5)
-    
+
     # Check env var via runtime_control
     env = os.environ.copy()
     env["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "0"
     env["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_V8)
     result = subprocess.run(
         [sys.executable, str(RUNTIME_CONTROL), "print-env"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
         env=env,
     )
     env_output = result.stdout
-    
-    assert "LUCY_SESSION_MEMORY=1" in env_output, f"Expected LUCY_SESSION_MEMORY=1, got: {env_output}"
+
+    assert (
+        "LUCY_SESSION_MEMORY=1" in env_output
+    ), f"Expected LUCY_SESSION_MEMORY=1, got: {env_output}"
     print("✓ LUCY_SESSION_MEMORY=1 when memory=on")
-    
+
     # Test OFF
     print("\nSetting memory to OFF...")
     set_memory_toggle("off")
     time.sleep(0.5)
-    
+
     env = os.environ.copy()
     env["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "0"
     env["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_V8)
     result = subprocess.run(
         [sys.executable, str(RUNTIME_CONTROL), "print-env"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
         env=env,
     )
     env_output = result.stdout
-    
-    assert "LUCY_SESSION_MEMORY=0" in env_output, f"Expected LUCY_SESSION_MEMORY=0, got: {env_output}"
+
+    assert (
+        "LUCY_SESSION_MEMORY=0" in env_output
+    ), f"Expected LUCY_SESSION_MEMORY=0, got: {env_output}"
     print("✓ LUCY_SESSION_MEMORY=0 when memory=off")
-    
+
     # Restore original
     with open(STATE_FILE, "w") as f:
         json.dump(original, f, indent=2)
@@ -145,27 +152,27 @@ def test_memory_env_var():
 
 def test_memory_file_operations():
     """Test that memory file is written and read correctly."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 3: Memory File Operations")
-    print("="*60)
-    
+    print("=" * 60)
+
     # Clear any existing memory
     clear_memory()
-    
+
     # Test writing memory
     print("\nWriting test memory...")
     test_content = "User: What is Python?\nAssistant: Python is a programming language.\n\n"
     write_memory(test_content)
-    
+
     # Verify it was written
     content = read_memory()
-    assert content == test_content, f"Memory content mismatch"
+    assert content == test_content, "Memory content mismatch"
     print("✓ Memory file written correctly")
-    
+
     # Verify it can be read
     assert "Python" in content, "Expected 'Python' in memory"
     print("✓ Memory file read correctly")
-    
+
     # Clean up
     clear_memory()
     print("\n✓ TEST 3 PASSED")
@@ -173,25 +180,25 @@ def test_memory_file_operations():
 
 def test_memory_context_in_prompt():
     """Test that memory context is included in prompt when enabled."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 4: Memory Context in Prompt (Integration)")
-    print("="*60)
-    
+    print("=" * 60)
+
     from router_py.local_answer import LocalAnswer, LocalAnswerConfig
-    
+
     # Save original state
     original = get_state()
-    
+
     # Test with memory ON
     print("\n1. Testing with memory=ON...")
     set_memory_toggle("on")
-    
+
     # Create test memory
     test_memory = "User: My dog's name is Oscar.\nAssistant: Got it. Oscar is your dog.\n\n"
-    
+
     config = LocalAnswerConfig()
     answer = LocalAnswer(config)
-    
+
     # Build prompt with memory
     prompt = answer._build_prompt(
         query="Who is my dog?",
@@ -199,33 +206,35 @@ def test_memory_context_in_prompt():
         generation_profile="chat",
         budget_instruction="",
         conversation_mode_active=False,
-        conversation_system_block=False
+        conversation_system_block=False,
     )
-    
+
     assert "Oscar" in prompt, f"Memory context NOT included in prompt: {prompt[:500]}"
     print("✓ Memory context included in prompt when enabled")
-    
+
     # Test with memory OFF (should not include)
     print("\n2. Testing with memory=OFF...")
     set_memory_toggle("off")
-    
+
     prompt_no_memory = answer._build_prompt(
         query="Who is my dog?",
         session_memory="",  # Empty memory
         generation_profile="chat",
         budget_instruction="",
         conversation_mode_active=False,
-        conversation_system_block=False
+        conversation_system_block=False,
     )
-    
+
     # Session memory block should NOT be present when memory is off.
     # Note: persistent facts (from SQLite) are loaded independently of
     # the memory toggle and may still contain "Oscar" — that's by design.
     # We check for the specific session-memory block header, not the
     # words "session memory" which also appear in the self-knowledge block.
-    assert "The user has enabled session memory" not in prompt_no_memory, "Session memory block included when disabled"
+    assert (
+        "The user has enabled session memory" not in prompt_no_memory
+    ), "Session memory block included when disabled"
     print("✓ Session memory block NOT included when disabled")
-    
+
     # Restore original state
     with open(STATE_FILE, "w") as f:
         json.dump(original, f, indent=2)
@@ -234,14 +243,14 @@ def test_memory_context_in_prompt():
 
 def test_memory_unsafe_queries():
     """Test that memory is excluded for backchannel/vague queries."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 5: Memory Safety - Backchannel Queries")
-    print("="*60)
-    
+    print("=" * 60)
+
     from router_py.local_answer import LocalAnswer, LocalAnswerConfig
-    
+
     answer = LocalAnswer(LocalAnswerConfig())
-    
+
     # Test backchannel queries (should not allow memory context)
     backchannel_queries = [
         "Hmm",
@@ -249,13 +258,13 @@ def test_memory_unsafe_queries():
         "Thanks",
         "Ugh",
     ]
-    
+
     print("\nTesting backchannel queries (memory should be disabled)...")
     for query in backchannel_queries:
         allowed = answer._is_memory_context_allowed(query)
         assert not allowed, f"'{query}' - memory should be disabled"
         print(f"✓ '{query}' - memory correctly DISABLED")
-    
+
     # Test normal queries (should allow memory)
     normal_queries = [
         "What is Python?",
@@ -263,26 +272,26 @@ def test_memory_unsafe_queries():
         "How do I bake bread?",
         "What are the side effects of ibuprofen?",  # Medical is still allowed for memory
     ]
-    
+
     print("\nTesting normal queries (memory should be enabled)...")
     for query in normal_queries:
         allowed = answer._is_memory_context_allowed(query)
         assert allowed, f"'{query}' - memory should be enabled"
         print(f"✓ '{query[:40]}...' - memory correctly ENABLED")
-    
+
     print("\n✓ TEST 5 PASSED")
 
 
 def main():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("MEMORY TOGGLE TEST SUITE")
-    print("="*60)
-    
+    print("=" * 60)
+
     # Set required env vars
     os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(LUCY_V8))
     os.environ.setdefault("LUCY_UI_ROOT", str(Path.home() / "lucy-v10" / "ui-v10"))
     os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(RUNTIME_V8))
-    
+
     tests = [
         ("State File Update", test_memory_toggle_basic),
         ("Environment Variable", test_memory_env_var),
@@ -290,10 +299,10 @@ def main():
         ("Memory in Prompt", test_memory_context_in_prompt),
         ("Memory Safety", test_memory_unsafe_queries),
     ]
-    
+
     passed = 0
     failed = 0
-    
+
     for name, test_func in tests:
         try:
             test_func()
@@ -306,15 +315,16 @@ def main():
             print(f"\n✗ TEST FAILED: {name}")
             print(f"Error: {e}")
             import traceback
+
             traceback.print_exc()
             failed += 1
-    
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("SUMMARY")
-    print("="*60)
+    print("=" * 60)
     print(f"Passed: {passed}/{len(tests)}")
     print(f"Failed: {failed}/{len(tests)}")
-    
+
     if failed == 0:
         print("\n✓ ALL TESTS PASSED - Memory toggle is working correctly!")
         return 0

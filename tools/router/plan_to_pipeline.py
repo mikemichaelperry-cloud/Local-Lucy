@@ -34,8 +34,8 @@ from medical_query_heuristics import detect_human_medication_query
 from pet_food_policy import resolve_pet_food_policy
 from policy_router import route_intent
 from route_manifest import build_route_manifest
-from runtime_governor import build_execution_contract
 from routing_signals import should_use_israel_news_region
+from runtime_governor import build_execution_contract
 from semantic_interpreter import maybe_interpret_question
 
 
@@ -96,7 +96,9 @@ def _rewrite_news_query(question: str) -> str:
             count=1,
         )
     elif _has_re(rewritten, r"\blatest developments?\b"):
-        rewritten = re.sub(r"(?i)\blatest developments?\b", "latest news and developments", rewritten, count=1)
+        rewritten = re.sub(
+            r"(?i)\blatest developments?\b", "latest news and developments", rewritten, count=1
+        )
     elif _has_re(rewritten, r"\b(most significant|major|key)\s+developments?\b"):
         rewritten = re.sub(
             r"(?i)\b(most significant|major|key)\s+developments?\b",
@@ -105,7 +107,9 @@ def _rewrite_news_query(question: str) -> str:
             count=1,
         )
     elif _has_re(rewritten, r"\blatest on\b"):
-        rewritten = re.sub(r"(?i)\blatest on\b", "the latest news and developments on", rewritten, count=1)
+        rewritten = re.sub(
+            r"(?i)\blatest on\b", "the latest news and developments on", rewritten, count=1
+        )
     elif _has_re(rewritten, r"\b(today|latest|recent|right now|now)\b"):
         rewritten = rewritten.rstrip("?.! ")
         rewritten = f"{rewritten}. Focus on the latest news and developments."
@@ -159,7 +163,9 @@ def _media_reliability_local_plan() -> Dict[str, object]:
     }
 
 
-def _patch_classification_for_effective_plan(plan: Dict[str, object], effective_plan: Dict[str, object]) -> Dict[str, object]:
+def _patch_classification_for_effective_plan(
+    plan: Dict[str, object], effective_plan: Dict[str, object]
+) -> Dict[str, object]:
     patched = dict(plan)
     patched["legacy_plan"] = dict(effective_plan)
     patched["intent"] = effective_plan.get("intent")
@@ -180,7 +186,14 @@ def _patch_classification_for_effective_plan(plan: Dict[str, object], effective_
         patched["clarification_question"] = None
         patched["mixed_intent"] = False
         routing_signals = dict(patched.get("routing_signals") or {})
-        for signal_name in ("temporal", "news", "source_request", "url", "current_product_recommendation", "ambiguity_followup"):
+        for signal_name in (
+            "temporal",
+            "news",
+            "source_request",
+            "url",
+            "current_product_recommendation",
+            "ambiguity_followup",
+        ):
             routing_signals[signal_name] = False
         patched["routing_signals"] = routing_signals
     if effective_plan.get("intent") == "MEDICAL_INFO":
@@ -273,7 +286,10 @@ def _patch_plan_with_classification(
 def _semantic_use_allowed(plan: Dict[str, object], semantic_trace: Dict[str, object]) -> bool:
     if not semantic_trace.get("interpreter_fired"):
         return False
-    if semantic_trace.get("ambiguity_flag") and float(semantic_trace.get("confidence") or 0.0) < 0.7:
+    if (
+        semantic_trace.get("ambiguity_flag")
+        and float(semantic_trace.get("confidence") or 0.0) < 0.7
+    ):
         return False
     try:
         semantic_confidence = float(semantic_trace.get("confidence") or 0.0)
@@ -285,7 +301,11 @@ def _semantic_use_allowed(plan: Dict[str, object], semantic_trace: Dict[str, obj
     subcategory = str(plan.get("subcategory") or "").strip().lower()
     if intent_class == "technical_explanation" and float(plan.get("confidence") or 0.0) >= 0.86:
         return False
-    if intent_class == "evidence_check" and subcategory in {"medical", "url_reference", "primary_doc"}:
+    if intent_class == "evidence_check" and subcategory in {
+        "medical",
+        "url_reference",
+        "primary_doc",
+    }:
         return False
     if intent_class == "current_fact" and subcategory.startswith("news"):
         return False
@@ -302,8 +322,12 @@ def _apply_semantic_interpretation(
 
     intent_class = str(plan.get("intent_class") or "").strip().lower()
     inferred_domain = str(semantic_trace.get("inferred_domain") or "unknown").strip().lower()
-    inferred_intent_family = str(semantic_trace.get("inferred_intent_family") or "unknown").strip().lower()
-    confidence = max(float(plan.get("confidence") or 0.0), float(semantic_trace.get("confidence") or 0.0))
+    inferred_intent_family = (
+        str(semantic_trace.get("inferred_intent_family") or "unknown").strip().lower()
+    )
+    confidence = max(
+        float(plan.get("confidence") or 0.0), float(semantic_trace.get("confidence") or 0.0)
+    )
     question_lower = (question or "").strip().lower()
 
     if inferred_intent_family == "url_reference":
@@ -318,7 +342,8 @@ def _apply_semantic_interpretation(
         )
 
     if inferred_domain == "medical" or (
-        inferred_intent_family == "evidence_check" and re.search(r"\b(medical|medication|drug|blood pressure|hypertension)\b", question_lower)
+        inferred_intent_family == "evidence_check"
+        and re.search(r"\b(medical|medication|drug|blood pressure|hypertension)\b", question_lower)
     ):
         semantic_trace["used_for_routing"] = True
         semantic_trace["use_reason"] = "upgrade_to_medical_evidence"
@@ -371,7 +396,9 @@ def _apply_semantic_interpretation(
         )
 
     if inferred_intent_family == "clarify" or (
-        semantic_trace.get("ambiguity_flag") and float(semantic_trace.get("confidence") or 0.0) < 0.82 and intent_class in {"mixed", "local_knowledge"}
+        semantic_trace.get("ambiguity_flag")
+        and float(semantic_trace.get("confidence") or 0.0) < 0.82
+        and intent_class in {"mixed", "local_knowledge"}
     ):
         semantic_trace["used_for_routing"] = True
         semantic_trace["use_reason"] = "prefer_clarify_over_speculation"
@@ -418,7 +445,9 @@ def main() -> int:
     route_prefix = (args.route_prefix or "").strip().lower()
     stage_start = time.perf_counter()
     root_dir = _root_dir()
-    _append_latency("resolve_root_dir", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "resolve_root_dir", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
     original_question = args.question or ""
     question_for_execution = original_question
     route_reason_override = ""
@@ -444,23 +473,33 @@ def main() -> int:
                 "reclassify_followup_question",
                 max(1, int(round((time.perf_counter() - classify_start) * 1000))),
             )
-    _append_latency("contextual_followup", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "contextual_followup", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
 
     stage_start = time.perf_counter()
     semantic_trace = maybe_interpret_question(question_for_execution or original_question, plan)
     semantic_trace["original_query"] = original_question
     semantic_trace["resolved_execution_query"] = question_for_execution or original_question
-    _append_latency("semantic_interpreter", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "semantic_interpreter", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
 
     stage_start = time.perf_counter()
     medical_detector = detect_human_medication_query(question_for_execution or original_question)
     medical_detector["original_query"] = original_question
     medical_detector["resolved_execution_query"] = question_for_execution or original_question
-    _append_latency("medical_detector", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "medical_detector", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
 
     stage_start = time.perf_counter()
-    plan = _apply_semantic_interpretation(plan, question_for_execution or original_question, semantic_trace)
-    _append_latency("semantic_plan_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    plan = _apply_semantic_interpretation(
+        plan, question_for_execution or original_question, semantic_trace
+    )
+    _append_latency(
+        "semantic_plan_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
 
     base_plan = _legacy_plan(plan)
     effective_plan = dict(base_plan)
@@ -475,32 +514,45 @@ def main() -> int:
         effective_plan["needs_web"] = False
         effective_plan["min_sources"] = 1
         effective_plan["output_mode"] = "CHAT"
-    _append_latency("route_prefix_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "route_prefix_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
 
     stage_start = time.perf_counter()
     if contextual_followup_kind == "media_reliability":
         effective_plan = _media_reliability_local_plan()
         plan = _patch_classification_for_effective_plan(plan, effective_plan)
-    _append_latency("contextual_plan_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "contextual_plan_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
 
     stage_start = time.perf_counter()
     if original_question and not local_response_text:
         local_context_resolution = resolve_local_context_response(original_question, root_dir)
         if local_context_resolution:
-            route_reason_override = str(local_context_resolution.get("route_reason_override") or route_reason_override)
-            outcome_code_override = str(local_context_resolution.get("outcome_code_override") or outcome_code_override)
+            route_reason_override = str(
+                local_context_resolution.get("route_reason_override") or route_reason_override
+            )
+            outcome_code_override = str(
+                local_context_resolution.get("outcome_code_override") or outcome_code_override
+            )
             local_response_text = str(local_context_resolution.get("local_response_text") or "")
             local_response_operator_override = str(
-                local_context_resolution.get("operator_override") or "governor_local_context_response"
+                local_context_resolution.get("operator_override")
+                or "governor_local_context_response"
             )
-    _append_latency("local_context_resolution", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "local_context_resolution", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
 
     stage_start = time.perf_counter()
     if original_question and str(effective_plan.get("intent") or "") == "PET_FOOD":
         pet_food_resolution = resolve_pet_food_policy(root_dir, question_for_execution)
         if pet_food_resolution:
             knowledge_path = str(pet_food_resolution.get("knowledge_path") or "")
-            route_reason_override = str(pet_food_resolution.get("route_reason_override") or route_reason_override)
+            route_reason_override = str(
+                pet_food_resolution.get("route_reason_override") or route_reason_override
+            )
             outcome_code_override = str(pet_food_resolution.get("outcome_code_override") or "")
             if pet_food_resolution.get("matched"):
                 local_response_text = str(pet_food_resolution.get("local_response_text") or "")
@@ -508,18 +560,23 @@ def main() -> int:
             else:
                 effective_plan = _pet_food_medical_plan()
                 plan = _patch_classification_for_effective_plan(plan, effective_plan)
-    _append_latency("pet_food_policy", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "pet_food_policy", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
 
     stage_start = time.perf_counter()
     local_response_id_hint = match_local_response_id(
         question_for_execution or original_question,
         str(effective_plan.get("intent") or plan.get("intent") or ""),
     )
-    _append_latency("local_response_match", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "local_response_match", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
     proven_local_capability = bool(
         local_response_text
         or local_response_id_hint
-        or str(plan.get("intent_class") or "").strip().lower() in {"conversational", "identity_personal"}
+        or str(plan.get("intent_class") or "").strip().lower()
+        in {"conversational", "identity_personal"}
     )
 
     router_input = dict(plan)
@@ -545,7 +602,10 @@ def main() -> int:
         and not semantic_trace.get("ambiguity_flag")
         and float(semantic_trace.get("confidence") or 0.0) >= 0.78
         and route_decision.get("route_mode") in {"NEWS", "EVIDENCE"}
-        and (semantic_trace.get("normalized_candidates") or semantic_trace.get("retrieval_candidates"))
+        and (
+            semantic_trace.get("normalized_candidates")
+            or semantic_trace.get("retrieval_candidates")
+        )
     )
     semantic_trace["forward_candidates"] = semantic_forward_candidates
     if str(route_decision.get("route_mode") or "").upper() == "NEWS":
@@ -570,7 +630,9 @@ def main() -> int:
             }
         )
     stage_start = time.perf_counter()
-    manifest_selected_route = str(route_decision.get("force_mode") or route_decision.get("route_mode") or "")
+    manifest_selected_route = str(
+        route_decision.get("force_mode") or route_decision.get("route_mode") or ""
+    )
     offline_action = str(route_decision.get("offline_action") or "").strip().lower()
     if (
         offline_action
@@ -582,7 +644,9 @@ def main() -> int:
         )
     ):
         manifest_selected_route = str(
-            route_decision.get("policy_base_recommended_route") or route_decision.get("policy_recommended_route") or manifest_selected_route
+            route_decision.get("policy_base_recommended_route")
+            or route_decision.get("policy_recommended_route")
+            or manifest_selected_route
         )
     route_manifest = build_route_manifest(
         original_query=original_question,
@@ -599,7 +663,9 @@ def main() -> int:
         route_prefix=route_prefix,
         local_response_selected=bool(local_response_text),
     )
-    _append_latency("route_manifest", max(1, int(round((time.perf_counter() - stage_start) * 1000))))
+    _append_latency(
+        "route_manifest", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+    )
     governor_start = time.perf_counter()
     execution_contract = build_execution_contract(
         plan=plan,
@@ -607,7 +673,9 @@ def main() -> int:
         route_decision=route_decision,
         route_manifest=route_manifest,
         question=question_for_execution,
-        resolved_question=question_for_execution if question_for_execution != original_question else "",
+        resolved_question=question_for_execution
+        if question_for_execution != original_question
+        else "",
         local_response_text=local_response_text,
         route_control_mode=route_control_mode,
         route_prefix=route_prefix,
@@ -615,8 +683,12 @@ def main() -> int:
     )
     governor_ms = max(1, int(round((time.perf_counter() - governor_start) * 1000)))
     _append_latency("runtime_governor", governor_ms)
-    _append_latency("module_import_and_init", max(1, int(round((main_start - MODULE_IMPORT_START) * 1000))))
-    _append_latency("main_body_total", max(1, int(round((time.perf_counter() - main_start) * 1000))))
+    _append_latency(
+        "module_import_and_init", max(1, int(round((main_start - MODULE_IMPORT_START) * 1000)))
+    )
+    _append_latency(
+        "main_body_total", max(1, int(round((time.perf_counter() - main_start) * 1000)))
+    )
     compatibility_route = str(route_manifest.get("selected_route") or "").strip().upper()
     compatibility_policy_route = compatibility_route.lower()
 
@@ -657,7 +729,9 @@ def main() -> int:
         "manifest_selected_route": route_manifest.get("selected_route"),
         "manifest_winning_signal": route_manifest.get("winning_signal"),
         "manifest_authority_basis": route_manifest.get("authority_basis"),
-        "resolved_question": question_for_execution if question_for_execution != original_question else "",
+        "resolved_question": question_for_execution
+        if question_for_execution != original_question
+        else "",
         "contextual_followup_applied": contextual_followup_applied,
         "contextual_followup_kind": contextual_followup_kind,
         "route_reason_override": route_reason_override,
@@ -666,7 +740,9 @@ def main() -> int:
         "semantic_interpreter": semantic_trace,
         "semantic_interpreter_fired": semantic_trace.get("interpreter_fired"),
         "semantic_interpreter_original_query": semantic_trace.get("original_query"),
-        "semantic_interpreter_resolved_execution_query": semantic_trace.get("resolved_execution_query"),
+        "semantic_interpreter_resolved_execution_query": semantic_trace.get(
+            "resolved_execution_query"
+        ),
         "semantic_interpreter_inferred_domain": semantic_trace.get("inferred_domain"),
         "semantic_interpreter_inferred_intent_family": semantic_trace.get("inferred_intent_family"),
         "semantic_interpreter_confidence": semantic_trace.get("confidence"),
@@ -677,16 +753,30 @@ def main() -> int:
         "semantic_interpreter_use_reason": semantic_trace.get("use_reason"),
         "semantic_interpreter_used_for_routing": semantic_trace.get("used_for_routing"),
         "semantic_interpreter_forward_candidates": semantic_trace.get("forward_candidates"),
-        "semantic_interpreter_selected_normalized_query": semantic_trace.get("selected_normalized_query"),
-        "semantic_interpreter_selected_retrieval_query": semantic_trace.get("selected_retrieval_query"),
-        "semantic_interpreter_normalized_candidates_csv": ",".join(semantic_trace.get("normalized_candidates") or []),
-        "semantic_interpreter_retrieval_candidates_csv": ",".join(semantic_trace.get("retrieval_candidates") or []),
-        "semantic_interpreter_normalized_candidates_json": _json_array(semantic_trace.get("normalized_candidates") or []),
-        "semantic_interpreter_retrieval_candidates_json": _json_array(semantic_trace.get("retrieval_candidates") or []),
+        "semantic_interpreter_selected_normalized_query": semantic_trace.get(
+            "selected_normalized_query"
+        ),
+        "semantic_interpreter_selected_retrieval_query": semantic_trace.get(
+            "selected_retrieval_query"
+        ),
+        "semantic_interpreter_normalized_candidates_csv": ",".join(
+            semantic_trace.get("normalized_candidates") or []
+        ),
+        "semantic_interpreter_retrieval_candidates_csv": ",".join(
+            semantic_trace.get("retrieval_candidates") or []
+        ),
+        "semantic_interpreter_normalized_candidates_json": _json_array(
+            semantic_trace.get("normalized_candidates") or []
+        ),
+        "semantic_interpreter_retrieval_candidates_json": _json_array(
+            semantic_trace.get("retrieval_candidates") or []
+        ),
         "medical_detector": medical_detector,
         "medical_detector_fired": medical_detector.get("detector_fired"),
         "medical_detector_original_query": medical_detector.get("original_query"),
-        "medical_detector_resolved_execution_query": medical_detector.get("resolved_execution_query"),
+        "medical_detector_resolved_execution_query": medical_detector.get(
+            "resolved_execution_query"
+        ),
         "medical_detector_detection_source": medical_detector.get("detection_source"),
         "medical_detector_pattern_family": medical_detector.get("pattern_family"),
         "medical_detector_candidate_medication": medical_detector.get("candidate_medication"),
@@ -694,7 +784,9 @@ def main() -> int:
         "medical_detector_normalized_query": medical_detector.get("normalized_query"),
         "medical_detector_confidence": medical_detector.get("confidence"),
         "medical_detector_confidence_score": medical_detector.get("confidence_score"),
-        "medical_detector_provenance_notes_json": _json_array(medical_detector.get("provenance_notes") or []),
+        "medical_detector_provenance_notes_json": _json_array(
+            medical_detector.get("provenance_notes") or []
+        ),
     }
     print(json.dumps(output, separators=(",", ":"), sort_keys=True))
     return 0

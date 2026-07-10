@@ -20,7 +20,6 @@ from runtime_control import (
     write_state_file,
 )
 
-
 PROFILE_FIELDS = ("profile", "model", "status")
 
 
@@ -33,7 +32,12 @@ def main() -> int:
         state_file = resolve_state_file(args.state_file)
         if args.command == "show":
             state = load_or_create_state(state_file, refresh_timestamp=False)
-            print(json.dumps(build_payload("show", state_file, state, changed=False, changed_fields=[]), sort_keys=True))
+            print(
+                json.dumps(
+                    build_payload("show", state_file, state, changed=False, changed_fields=[]),
+                    sort_keys=True,
+                )
+            )
             return 0
         if args.command == "reload":
             payload = reload_profile_state(state_file)

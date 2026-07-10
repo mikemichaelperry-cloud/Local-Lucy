@@ -1,10 +1,10 @@
-import os
-import subprocess
-import re
-import csv
-import wave
-import contextlib
 import argparse
+import contextlib
+import csv
+import os
+import re
+import subprocess
+import wave
 
 
 # Custom action to handle comma-separated list
@@ -95,12 +95,8 @@ def check_file_exists(file: str) -> bool:
 
 def get_git_short_hash() -> str:
     try:
-        return (
-            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
-            .decode()
-            .strip()
-        )
-    except subprocess.CalledProcessError as e:
+        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
+    except subprocess.CalledProcessError:
         return ""
 
 

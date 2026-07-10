@@ -11,14 +11,13 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from voice import playback, tts_adapter
 from voice.backends import kokoro_backend
-
 
 UTTERANCES = [
     ("short", "Lucy status nominal."),
@@ -80,39 +79,55 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run a narrow TTS latency pass against the Local Lucy v7 adapter seam.")
+    parser = argparse.ArgumentParser(
+        description="Run a narrow TTS latency pass against the Local Lucy v7 adapter seam."
+    )
     parser.add_argument("--runs", type=int, default=3, help="Runs per backend/text combination.")
     parser.add_argument(
         "--output-dir",
         default=str(tts_adapter.resolve_root() / "tmp" / "run"),
         help="Directory for temporary synthesized wav files.",
     )
-    parser.add_argument("--json-out", default="", help="Optional path to write the full JSON benchmark payload.")
+    parser.add_argument(
+        "--json-out", default="", help="Optional path to write the full JSON benchmark payload."
+    )
     return parser.parse_args(argv)
 
 
 def select_variants() -> list[BackendVariant]:
     variants: list[BackendVariant] = []
     base_env = os.environ.copy()
-    
+
     # Check for Kokoro - either via Python module or session worker
     kokoro_available = backend_available("kokoro", base_env)
     if not kokoro_available:
         # Check for running session worker as fallback
         # V8 ISOLATION: Use v8 path only
-        socket_path = Path(os.environ.get("LUCY_VOICE_KOKORO_SOCKET", 
-                                         str(Path(__file__).resolve().parents[2] / "tmp" / "run" / "kokoro_tts_worker.sock")))
+        socket_path = Path(
+            os.environ.get(
+                "LUCY_VOICE_KOKORO_SOCKET",
+                str(Path(__file__).resolve().parents[2] / "tmp" / "run" / "kokoro_tts_worker.sock"),
+            )
+        )
         if socket_path.exists():
             kokoro_available = True
-    
+
     if kokoro_available:
         variants.append(BackendVariant(name="kokoro", engine="kokoro", env_updates={}))
-        variants.append(BackendVariant(name="kokoro-cpu", engine="kokoro", env_updates={"LUCY_VOICE_KOKORO_DEVICE": "cpu"}))
+        variants.append(
+            BackendVariant(
+                name="kokoro-cpu", engine="kokoro", env_updates={"LUCY_VOICE_KOKORO_DEVICE": "cpu"}
+            )
+        )
         if kokoro_backend.cuda_available():
             variants.append(
-                BackendVariant(name="kokoro-cuda", engine="kokoro", env_updates={"LUCY_VOICE_KOKORO_DEVICE": "cuda"})
+                BackendVariant(
+                    name="kokoro-cuda",
+                    engine="kokoro",
+                    env_updates={"LUCY_VOICE_KOKORO_DEVICE": "cuda"},
+                )
             )
-    
+
     if backend_available("piper", base_env):
         variants.append(BackendVariant(name="piper", engine="piper", env_updates={}))
 
@@ -162,7 +177,12 @@ def benchmark_one(
         timings["wav_path_alloc_ms"] = elapsed_ms(begin)
         return path
 
-    def wrapped_run_backend_synthesis(selected: tts_adapter.SelectedBackend, clean_text: str, output_path: Path, values: dict[str, str]) -> str:
+    def wrapped_run_backend_synthesis(
+        selected: tts_adapter.SelectedBackend,
+        clean_text: str,
+        output_path: Path,
+        values: dict[str, str],
+    ) -> str:
         nonlocal backend_started_at
         backend_started_at = time.perf_counter()
         timings["backend_engine"] = selected.engine  # type: ignore[assignment]
@@ -198,7 +218,9 @@ def benchmark_one(
         repo_id = str(kwargs.get("repo_id", ""))
         device = str(kwargs.get("device", ""))
         cache_key = (lang_code, repo_id, device)
-        timings["backend_init_cache_hit"] = 1.0 if cache_key in kokoro_backend._PIPELINE_CACHE else 0.0
+        timings["backend_init_cache_hit"] = (
+            1.0 if cache_key in kokoro_backend._PIPELINE_CACHE else 0.0
+        )
         try:
             return original_get_pipeline(*args, **kwargs)
         finally:
@@ -237,7 +259,9 @@ def benchmark_one(
 
     timings["adapter_total_ms"] = elapsed_ms(synth_start)
     timings["adapter_dispatch_ms"] = (
-        max((backend_started_at - synth_start) * 1000.0, 0.0) if backend_started_at is not None else None
+        max((backend_started_at - synth_start) * 1000.0, 0.0)
+        if backend_started_at is not None
+        else None
     )  # type: ignore[assignment]
 
     result: dict[str, Any] = {
@@ -271,7 +295,9 @@ def benchmark_one(
     result["first_audible_proxy"] = "player_process_dispatch"
 
     if variant.engine == "piper":
-        result["notes"].append("backend init/load, core synthesis, and wav write are not separable inside the CLI backend process")
+        result["notes"].append(
+            "backend init/load, core synthesis, and wav write are not separable inside the CLI backend process"
+        )
     if variant.engine == "kokoro" and timings.get("backend_init_cache_hit", 0.0) >= 1.0:
         result["notes"].append("kokoro pipeline cache hit")
     if cold:
@@ -282,7 +308,12 @@ def benchmark_one(
 def benchmark_playback(wav_path: Path, engine: str, env: dict[str, str]) -> dict[str, Any]:
     player = playback.detect_audio_player()
     if not player:
-        return {"player": "none", "playback_prepare_ms": None, "playback_start_proxy_ms": None, "playback_total_ms": None}
+        return {
+            "player": "none",
+            "playback_prepare_ms": None,
+            "playback_start_proxy_ms": None,
+            "playback_total_ms": None,
+        }
 
     prepad_ms = 0
     if engine == "piper":
@@ -308,7 +339,9 @@ def benchmark_playback(wav_path: Path, engine: str, env: dict[str, str]) -> dict
         command = ["paplay", str(playback_path)]
 
     started = time.perf_counter()
-    process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=False)
+    process = subprocess.Popen(
+        command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=False
+    )
     start_proxy_ms = elapsed_ms(started)
     try:
         process.wait(timeout=120)

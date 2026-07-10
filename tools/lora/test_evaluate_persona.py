@@ -9,7 +9,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -154,7 +154,18 @@ class TestMainIntegration(unittest.TestCase):
             )
             + "\n"
         )
-        with patch("sys.argv", ["evaluate_persona.py", "--model", "m", "--cases", cases, "--prompt-persona", "michael"]):
+        with patch(
+            "sys.argv",
+            [
+                "evaluate_persona.py",
+                "--model",
+                "m",
+                "--cases",
+                cases,
+                "--prompt-persona",
+                "michael",
+            ],
+        ):
             ep.main()
         # The system prompt should be the michael fragment.
         _, kwargs = mock_query.call_args

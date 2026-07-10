@@ -12,7 +12,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
-from typing import Callable, TypeVar, Tuple, Union
+from typing import Callable, Tuple, TypeVar, Union
 
 
 @dataclass

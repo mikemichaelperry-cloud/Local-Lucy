@@ -1,6 +1,7 @@
 import json
 import sys
 
+
 def main():
     if len(sys.argv) < 3:
         print("ERR: verify_sources.py MODE META1 [META2 ...]")
@@ -28,6 +29,7 @@ def main():
 
     print("OK")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

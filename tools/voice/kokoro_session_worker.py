@@ -12,6 +12,7 @@ from typing import Any, Mapping
 # Kokoro synthesis is CPU-bound; using all threads cuts latency ~35%.
 try:
     import torch
+
     torch.set_num_threads(12)
 except Exception:
     pass
@@ -19,8 +20,8 @@ except Exception:
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from voice.backends import kokoro_backend
 from voice import tts_adapter
+from voice.backends import kokoro_backend
 
 
 def resolve_root() -> Path:
@@ -44,13 +45,17 @@ def _failure(error: str, **extra: Any) -> dict[str, Any]:
     return payload
 
 
-def handle_request(payload: Mapping[str, Any], env: Mapping[str, str] | None = None) -> dict[str, Any]:
+def handle_request(
+    payload: Mapping[str, Any], env: Mapping[str, str] | None = None
+) -> dict[str, Any]:
     values = dict(env or os.environ)
     command = _clean_text(payload.get("cmd")).lower()
     if command == "prewarm":
         return handle_prewarm(payload, values)
     if command == "synthesize":
-        requested_engine = _clean_text(payload.get("engine")) or values.get("LUCY_VOICE_TTS_ENGINE") or "auto"
+        requested_engine = (
+            _clean_text(payload.get("engine")) or values.get("LUCY_VOICE_TTS_ENGINE") or "auto"
+        )
         return tts_adapter.synthesize_text(
             text=_clean_text(payload.get("text")),
             requested_engine=requested_engine,
@@ -65,7 +70,9 @@ def handle_request(payload: Mapping[str, Any], env: Mapping[str, str] | None = N
 
 
 def handle_prewarm(payload: Mapping[str, Any], env: Mapping[str, str]) -> dict[str, Any]:
-    requested_engine = _clean_text(payload.get("engine")) or env.get("LUCY_VOICE_TTS_ENGINE") or "auto"
+    requested_engine = (
+        _clean_text(payload.get("engine")) or env.get("LUCY_VOICE_TTS_ENGINE") or "auto"
+    )
     requested_voice = _clean_text(payload.get("voice")) or None
     fallback_engine = _clean_text(payload.get("fallback_engine")) or None
     selected = tts_adapter.resolve_selected_backend(
@@ -143,7 +150,7 @@ def serve_main(argv: list[str]) -> int:
     socket_path: Path | None = None
     daemon_mode = False
     pid_file: Path | None = None
-    
+
     i = 0
     while i < len(argv):
         if argv[i] == "--socket" and i + 1 < len(argv):
@@ -157,20 +164,20 @@ def serve_main(argv: list[str]) -> int:
             i += 2
         else:
             i += 1
-    
+
     if socket_path is None:
         # Default socket path
         root = resolve_root()
         socket_path = root / "tmp" / "run" / "kokoro_tts_worker.sock"
-    
+
     if pid_file is None:
         root = resolve_root()
         pid_file = root / "tmp" / "run" / "kokoro_tts_worker.pid"
-    
+
     socket_path.parent.mkdir(parents=True, exist_ok=True)
     if socket_path.exists():
         socket_path.unlink()
-    
+
     if daemon_mode:
         # Daemonize: fork, detach, write PID file
         try:
@@ -181,11 +188,11 @@ def serve_main(argv: list[str]) -> int:
         except OSError as e:
             print(json.dumps(_failure(f"fork failed: {e}"), sort_keys=True), file=sys.stderr)
             return 1
-        
+
         # Child process
         os.setsid()
         os.umask(0o022)
-        
+
         # Second fork to prevent re-acquiring terminal
         try:
             pid = os.fork()
@@ -194,17 +201,17 @@ def serve_main(argv: list[str]) -> int:
         except OSError as e:
             print(json.dumps(_failure(f"second fork failed: {e}"), sort_keys=True), file=sys.stderr)
             return 1
-        
+
         # Write PID file
         pid_file.write_text(str(os.getpid()))
-        
+
         # Redirect stdout/stderr to /dev/null
         sys.stdout.flush()
         sys.stderr.flush()
         with open("/dev/null", "w") as devnull:
             os.dup2(devnull.fileno(), sys.stdout.fileno())
             os.dup2(devnull.fileno(), sys.stderr.fileno())
-    
+
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         server.bind(str(socket_path))

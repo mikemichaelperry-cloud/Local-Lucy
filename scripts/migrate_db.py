@@ -17,7 +17,6 @@ import sqlite3
 import sys
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Schema versions
 # ---------------------------------------------------------------------------
@@ -158,7 +157,11 @@ def main() -> int:
 
     if args.memory:
         print("[memory DB]")
-        memory_db = Path(os.environ.get("LUCY_MEMORY_DB_PATH", "~/.codex-api-home/lucy/runtime-v10/state/memory.db")).expanduser()
+        memory_db = Path(
+            os.environ.get(
+                "LUCY_MEMORY_DB_PATH", "~/.codex-api-home/lucy/runtime-v10/state/memory.db"
+            )
+        ).expanduser()
         if migrate(memory_db, _MEMORY_MIGRATIONS, _CURRENT_MEMORY_VERSION, dry_run=args.dry_run):
             changed = True
 

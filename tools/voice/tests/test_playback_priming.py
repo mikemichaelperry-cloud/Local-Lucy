@@ -11,7 +11,6 @@ import textwrap
 import wave
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
@@ -32,17 +31,28 @@ def main() -> int:
         os.environ["PATH"] = f"{bin_dir}:/usr/bin:/bin"
         os.environ["LUCY_TEST_APLAY_LOG"] = str(log_path)
         try:
-            playback.play_wav_file(wav_path, player="aplay", prime_ms=80, prepad_ms=0, timeout_seconds=5)
+            playback.play_wav_file(
+                wav_path, player="aplay", prime_ms=80, prepad_ms=0, timeout_seconds=5
+            )
         finally:
             if original_path is None:
                 os.environ.pop("PATH", None)
             else:
                 os.environ["PATH"] = original_path
 
-        entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        entries = [
+            json.loads(line)
+            for line in log_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
         assert_ok(len(entries) == 2, f"expected prime + real playback, got: {entries}")
-        assert_ok(entries[0]["first_nonzero_frame"] is None, f"expected silent prime playback first, got: {entries}")
-        assert_ok(entries[1]["first_nonzero_frame"] == 0, f"expected real playback second, got: {entries}")
+        assert_ok(
+            entries[0]["first_nonzero_frame"] is None,
+            f"expected silent prime playback first, got: {entries}",
+        )
+        assert_ok(
+            entries[1]["first_nonzero_frame"] == 0, f"expected real playback second, got: {entries}"
+        )
     print("PASS: test_playback_priming")
     return 0
 

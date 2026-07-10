@@ -4,9 +4,14 @@ Local Lucy v10 — End-to-End Smoke Test
 Small but representative set of full-pipeline queries.
 Pre-warms Ollama to keep model loaded.
 """
+
 from __future__ import annotations
 
-import gc, json, os, subprocess, sys, time
+import json
+import os
+import subprocess
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -15,7 +20,9 @@ sys.path.insert(0, str(Path(__file__).parent / "app"))
 sys.path.insert(0, str(Path.home() / "lucy-v10" / "models" / "router"))
 
 os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path.home() / "lucy-v10"))
-os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
+os.environ.setdefault(
+    "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+)
 os.environ.setdefault("LUCY_ROUTER_PY", "1")
 os.environ.setdefault("LUCY_EXEC_PY", "1")
 os.environ.setdefault("LUCY_EVIDENCE_ENABLED", "1")
@@ -26,7 +33,12 @@ from app.backend import execute_plan_python
 
 def get_gpu():
     try:
-        out = subprocess.run(["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=5)
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
         return int(out.stdout.strip()) if out.returncode == 0 else None
     except Exception:
         return None
@@ -49,12 +61,17 @@ def warm_ollama():
     print("🔥 Pre-warming Ollama model...")
     try:
         import requests
-        requests.post("http://localhost:11434/api/generate", json={
-            "model": "local-lucy",
-            "prompt": "hi",
-            "stream": False,
-            "options": {"num_predict": 1}
-        }, timeout=120)
+
+        requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "local-lucy",
+                "prompt": "hi",
+                "stream": False,
+                "options": {"num_predict": 1},
+            },
+            timeout=120,
+        )
     except Exception as e:
         print(f"  Warm-up warning: {e}")
     # Wait for model to settle
@@ -79,15 +96,23 @@ def run_query(query, expected_route=None, expected_contains=None):
         if expected_contains and expected_contains.lower() not in response.lower():
             ok = False
         return {
-            "query": query, "route": result.route, "status": result.status,
-            "response": response[:300], "latency_ms": latency, "ok": ok,
-            "error": result.error_message or ""
+            "query": query,
+            "route": result.route,
+            "status": result.status,
+            "response": response[:300],
+            "latency_ms": latency,
+            "ok": ok,
+            "error": result.error_message or "",
         }
     except Exception as e:
         return {
-            "query": query, "route": "ERROR", "status": "failed",
-            "response": "", "latency_ms": (time.time() - t0) * 1000, "ok": False,
-            "error": str(e)
+            "query": query,
+            "route": "ERROR",
+            "status": "failed",
+            "response": "",
+            "latency_ms": (time.time() - t0) * 1000,
+            "ok": False,
+            "error": str(e),
         }
 
 
@@ -166,7 +191,9 @@ def main():
     # ── Batch 6: MEMORY ──
     print("\n🧪 MEMORY PIPELINE (2 queries)")
     r1 = run_query("My favorite color is blue")
-    print(f"  {'✅' if r1['status']=='completed' else '❌'} STORE  {r1['latency_ms']:6.0f}ms | {r1['query']}")
+    print(
+        f"  {'✅' if r1['status']=='completed' else '❌'} STORE  {r1['latency_ms']:6.0f}ms | {r1['query']}"
+    )
     results.append(r1)
     time.sleep(0.5)
     r2 = run_query("What is my favorite color?", None, "blue")
@@ -202,21 +229,35 @@ def main():
         for r in failed:
             print(f"  [{r['route']}] {r['query']}: {r['error'][:80]}")
 
-    report_path = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "logs" / f"e2e_smoke_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    report_path = (
+        Path.home()
+        / ".codex-api-home"
+        / "lucy"
+        / "runtime-v10"
+        / "logs"
+        / f"e2e_smoke_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "w") as f:
-        json.dump({
-            "timestamp": datetime.now().isoformat(),
-            "total": len(results),
-            "completed": len(completed),
-            "failed": len(failed),
-            "correct": len(correct),
-            "avg_ms": avg_lat,
-            "max_ms": max_lat,
-            "gpu0": gpu0, "gpu1": gpu1,
-            "ram0": ram0, "ram1": ram1,
-            "results": results,
-        }, f, indent=2, default=str)
+        json.dump(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "total": len(results),
+                "completed": len(completed),
+                "failed": len(failed),
+                "correct": len(correct),
+                "avg_ms": avg_lat,
+                "max_ms": max_lat,
+                "gpu0": gpu0,
+                "gpu1": gpu1,
+                "ram0": ram0,
+                "ram1": ram1,
+                "results": results,
+            },
+            f,
+            indent=2,
+            default=str,
+        )
     print(f"\n📄 Report: {report_path}")
 
     return 0 if len(correct) >= len(results) * 0.85 else 1

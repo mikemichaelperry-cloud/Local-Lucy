@@ -3,6 +3,7 @@
 
 Provides cloud TTS fallback for English text. Requires internet connectivity.
 """
+
 from __future__ import annotations
 
 import os
@@ -10,8 +11,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Mapping
-
+from typing import Mapping
 
 DEFAULT_VOICE = "en-US-AriaNeural"
 SAMPLE_RATE = 16000
@@ -31,7 +31,9 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
     return Path(__import__("sys").executable)
 
 
-def resolve_voice_name(env: Mapping[str, str] | None = None, explicit_voice: str | None = None) -> str:
+def resolve_voice_name(
+    env: Mapping[str, str] | None = None, explicit_voice: str | None = None
+) -> str:
     if explicit_voice and explicit_voice.strip():
         return explicit_voice.strip()
     values = env or os.environ
@@ -110,7 +112,9 @@ def synthesize(
             timeout=timeout_seconds,
         )
     except subprocess.CalledProcessError as exc:
-        raise EdgeTtsBackendError(f"ffmpeg conversion failed: {exc.stderr.decode('utf-8', errors='ignore')[:200]}") from exc
+        raise EdgeTtsBackendError(
+            f"ffmpeg conversion failed: {exc.stderr.decode('utf-8', errors='ignore')[:200]}"
+        ) from exc
     except Exception as exc:
         raise EdgeTtsBackendError(f"edge-tts synthesis failed: {exc}") from exc
     finally:

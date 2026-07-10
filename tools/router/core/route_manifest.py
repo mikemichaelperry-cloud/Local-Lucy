@@ -11,10 +11,16 @@ narrow conceptual band. Provider selection remains downstream and manifest-led.
 
 from typing import Any, Dict, List, Tuple
 
-
 MANIFEST_VERSION = "current"
 KNOWN_ROUTES: Tuple[str, ...] = ("LOCAL", "NEWS", "EVIDENCE", "AUGMENTED", "CLARIFY")
-KNOWN_INTENT_FAMILIES = {"", "self_review", "current_evidence", "background_overview", "synthesis_explanation", "local_answer"}
+KNOWN_INTENT_FAMILIES = {
+    "",
+    "self_review",
+    "current_evidence",
+    "background_overview",
+    "synthesis_explanation",
+    "local_answer",
+}
 EVIDENCE_ROUTES = {"NEWS", "EVIDENCE"}
 EVIDENCE_MODES = {"LIGHT", "FULL"}
 EVIDENCE_MODE_REASON_DEFAULT = "default_light"
@@ -92,6 +98,7 @@ def _canonical_signals(signal_flags: Dict[str, Any]) -> Dict[str, bool]:
         "current_product": _bool(source.get("current_product_recommendation")),
     }
 
+
 def _choose_evidence_mode(route: str, signals: Dict[str, bool]) -> Tuple[str, str]:
     if route not in EVIDENCE_ROUTES:
         return "", EVIDENCE_MODE_REASON_NON_EVIDENCE
@@ -138,7 +145,12 @@ def _authority_basis(
         return "medical_high_stakes"
     if signals.get("current_product"):
         return "current_product_request"
-    if signals.get("temporal") or signals.get("news") or signals.get("conflict") or signals.get("israel_region_live"):
+    if (
+        signals.get("temporal")
+        or signals.get("news")
+        or signals.get("conflict")
+        or signals.get("israel_region_live")
+    ):
         return "live_current_prompt"
     if selected_route == "AUGMENTED":
         return "conceptual_augmented_prompt"
@@ -147,11 +159,20 @@ def _authority_basis(
     return "policy_selected_route"
 
 
-def _context_referent_confidence(context_resolution_used: bool, contextual_followup_kind: str) -> str:
+def _context_referent_confidence(
+    context_resolution_used: bool, contextual_followup_kind: str
+) -> str:
     if not context_resolution_used:
         return ""
     kind = _text(contextual_followup_kind).strip().lower()
-    if kind in {"comparison", "single_subject", "medical", "travel_advisory", "news", "media_reliability"}:
+    if kind in {
+        "comparison",
+        "single_subject",
+        "medical",
+        "travel_advisory",
+        "news",
+        "media_reliability",
+    }:
         return "high"
     return "medium"
 
@@ -213,7 +234,9 @@ def build_route_manifest(
         ),
         "signals": signals,
         "context_resolution_used": context_used,
-        "context_referent_confidence": _context_referent_confidence(context_used, contextual_followup_kind),
+        "context_referent_confidence": _context_referent_confidence(
+            context_used, contextual_followup_kind
+        ),
     }
     validate_route_manifest(manifest)
     return manifest
@@ -238,14 +261,20 @@ def validate_route_manifest(manifest: Dict[str, Any]) -> None:
         if not isinstance(manifest.get(field), str):
             raise ValueError(f"route_manifest.{field} must be a string")
     if manifest.get("manifest_version") != MANIFEST_VERSION:
-        raise ValueError(f"unsupported route_manifest version: {manifest.get('manifest_version')!r}")
+        raise ValueError(
+            f"unsupported route_manifest version: {manifest.get('manifest_version')!r}"
+        )
 
     selected_route = _normalize_route(manifest.get("selected_route"))
     if not selected_route:
-        raise ValueError("route_manifest.selected_route must be one of LOCAL/NEWS/EVIDENCE/AUGMENTED/CLARIFY")
+        raise ValueError(
+            "route_manifest.selected_route must be one of LOCAL/NEWS/EVIDENCE/AUGMENTED/CLARIFY"
+        )
     intent_family = _text(manifest.get("intent_family", "")).strip()
     if intent_family not in KNOWN_INTENT_FAMILIES:
-        raise ValueError("route_manifest.intent_family must be one of self_review/current_evidence/background_overview/synthesis_explanation/local_answer or empty")
+        raise ValueError(
+            "route_manifest.intent_family must be one of self_review/current_evidence/background_overview/synthesis_explanation/local_answer or empty"
+        )
 
     for field in ("allowed_routes", "forbidden_routes"):
         values = manifest.get(field)
@@ -306,6 +335,10 @@ def validate_route_manifest(manifest: Dict[str, Any]) -> None:
     normalized_reason = canonical_evidence_mode_reason(evidence_mode, evidence_reason)
     if evidence_mode:
         if normalized_reason not in EVIDENCE_MODE_REASONS - {EVIDENCE_MODE_REASON_NON_EVIDENCE}:
-            raise ValueError("route_manifest.evidence_mode_reason must be a canonical evidence reason for LIGHT/FULL routes")
+            raise ValueError(
+                "route_manifest.evidence_mode_reason must be a canonical evidence reason for LIGHT/FULL routes"
+            )
     elif normalized_reason not in {"", EVIDENCE_MODE_REASON_NON_EVIDENCE}:
-        raise ValueError("route_manifest.evidence_mode_reason must be empty or not_evidence_route for non-evidence routes")
+        raise ValueError(
+            "route_manifest.evidence_mode_reason must be empty or not_evidence_route for non-evidence routes"
+        )
