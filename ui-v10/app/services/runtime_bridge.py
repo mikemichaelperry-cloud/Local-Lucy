@@ -820,7 +820,9 @@ class RuntimeBridge:
                 except Exception:
                     pass
 
-                # Prewarm Whisper STT server (~3-5s on cold start for CPU mode)
+                # Prewarm Whisper STT server (~3-5s on cold start for CPU mode).
+                # Keep the worker CPU-only and resident in RAM to avoid GPU VRAM
+                # contention and repeated model loads per utterance.
                 try:
                     backend = runtime_voice.detect_backend(include_tts=False)
                     ensure_whisper_worker = getattr(runtime_voice, "ensure_whisper_worker", None)
@@ -830,7 +832,7 @@ class RuntimeBridge:
                         and backend.available
                     ):
                         model_path = runtime_voice.resolve_whisper_model_path()
-                        ensure_whisper_worker(model_path)
+                        ensure_whisper_worker(model_path, use_gpu=False)
                 except Exception:
                     pass
         except Exception:

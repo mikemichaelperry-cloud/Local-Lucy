@@ -60,7 +60,7 @@ try:
     if str(router_py_path) not in sys.path:
         sys.path.insert(0, str(router_py_path.parent))
 
-    from router_py.voice_tool import VADConfig, VoicePipeline, VoiceResult
+    from router_py.voice_tool import VoicePipeline
 
     _VOICE_TOOL_AVAILABLE = True
 except ImportError:
@@ -971,12 +971,14 @@ def handle_ptt_start(runtime_file: Path, state_file: Path, capture_dir: Path) ->
     if should_prewarm_kokoro and backend.tts_engine == "kokoro":
         prewarm_kokoro_worker()
 
-    # Pre-warm whisper worker for fast STT (GPU stays loaded)
+    # Pre-warm whisper worker for fast STT. In resident CPU mode the model stays
+    # loaded in system RAM, avoiding the per-turn load latency on GPU-constrained
+    # hardware.
     if ensure_whisper_worker is not None:
         try:
             if backend.stt_engine == "whisper" and backend.available:
                 model_path = resolve_whisper_model_path()
-                ensure_whisper_worker(model_path)
+                ensure_whisper_worker(model_path, use_gpu=False)
         except Exception:
             pass  # Non-fatal: fallback to whisper-cli remains available
 
@@ -1495,11 +1497,26 @@ def _resolve_whisper_model_path_from_spec(root: Path, spec: str) -> Path:
 def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionResult:
     if not stt_bin or not Path(stt_bin).is_file():
         raise RuntimeVoiceError("whisper binary not found or not executable")
-    # On-demand GPU worker: start whisper-server, transcribe, then stop to free VRAM
+
+    # Resident worker mode: keep whisper-server loaded in CPU RAM across utterances.
+    # This removes the per-turn model load time, which is the dominant latency on CPU.
+    resident = os.environ.get("LUCY_VOICE_WHISPER_RESIDENT", "0").strip() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    use_gpu = os.environ.get("LUCY_VOICE_WHISPER_GPU", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
     if ensure_whisper_worker is not None and stop_whisper_worker is not None:
         try:
             model_path = resolve_whisper_model_path()
-            port = ensure_whisper_worker(model_path)
+            port = ensure_whisper_worker(model_path, use_gpu=use_gpu)
             if port:
                 try:
                     result = transcribe_with_worker(capture_path, port, timeout=30.0)
@@ -1510,9 +1527,11 @@ def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionRe
                         fallback_reason=result["fallback_reason"],
                     )
                 finally:
-                    # Always stop the worker after transcription to free GPU VRAM
-                    # for the LLM and other GPU workloads.
-                    stop_whisper_worker()
+                    # In non-resident mode, stop the worker after each turn to free GPU VRAM.
+                    # In resident mode, the worker is shut down cleanly by the HMI closeEvent or
+                    # the START_LUCY stale-worker cleanup on the next launch.
+                    if not resident:
+                        stop_whisper_worker()
         except WhisperWorkerError:
             pass  # Fall through to whisper-cli subprocess path
         except Exception:
@@ -1581,13 +1600,13 @@ def transcribe_with_whisper(stt_bin: str, capture_path: Path) -> TranscriptionRe
         if completed.returncode == 0:
             return TranscriptionResult(text=_extract_text(completed), backend="gpu")
 
-        # GPU failed — check if it's a GPU-specific error
+        # GPU failed — capture the error and always try CPU fallback.
+        # The first line of stderr is often just a model-load message, so the
+        # old GPU-keyword heuristic could miss real CUDA OOMs and abort before
+        # falling back. For a local assistant, CPU fallback is the safe default.
         error_text = first_nonempty_line(completed.stderr) or first_nonempty_line(completed.stdout)
         if not error_text:
             error_text = f"whisper exited with status {completed.returncode}"
-
-        if not _is_gpu_error(error_text):
-            raise_with_state(error_text, PTT_STOP_TRANSCRIBE_FAILED)
 
         # Retry with CPU fallback (--no-gpu)
         command_cpu = command + ["--no-gpu"]
@@ -1715,8 +1734,7 @@ def _clear_history_file() -> None:
     try:
         # Truncate the file (clear all entries)
         history_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(history_file, "w", encoding="utf-8") as f:
-            pass  # Opening in "w" mode truncates the file
+        history_file.write_text("", encoding="utf-8")
         _debug_log("History file cleared successfully")
     except Exception as e:
         _debug_log(f"Warning: failed to clear history file: {e}")
@@ -2407,7 +2425,6 @@ def handle_ptt_stop_python(
 
     # Read recorder PID and capture path from runtime file
     with locked_state_file(runtime_file):
-        current_state = load_or_create_state(state_file, refresh_timestamp=False)
         runtime_state = load_voice_runtime_locked(runtime_file)
 
         if not runtime_state.get("listening"):

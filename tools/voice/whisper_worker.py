@@ -254,21 +254,60 @@ def ensure_whisper_worker(
     return None
 
 
+def _find_whisper_server_pids() -> list[int]:
+    """Find any whisper-server processes that match our binary path.
+
+    Used as a fallback when the PID file is missing or stale, so a resident
+    worker does not leak across Local Lucy restarts.
+    """
+    binary = resolve_whisper_server_binary()
+    pids: list[int] = []
+    try:
+        for proc_dir in Path("/proc").glob("[0-9]*"):
+            try:
+                pid = int(proc_dir.name)
+            except ValueError:
+                continue
+            try:
+                cmdline = (proc_dir / "cmdline").read_text(errors="replace")
+            except (OSError, PermissionError):
+                continue
+            # cmdline uses NUL separators; look for the binary path or name.
+            if str(binary) in cmdline or "whisper-server" in cmdline:
+                pids.append(pid)
+    except Exception:
+        pass
+    return pids
+
+
+def _kill_pid(pid: int) -> None:
+    """Send SIGTERM, then SIGKILL if necessary."""
+    if pid <= 0 or not _is_process_running(pid):
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+        for _ in range(20):
+            if not _is_process_running(pid):
+                return
+            time.sleep(0.05)
+        if _is_process_running(pid):
+            os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+
+
 def stop_whisper_worker() -> None:
     """Terminate the whisper-server worker if it is running."""
     pid_file = resolve_whisper_worker_pid_file()
     worker_pid = _read_pid_file(pid_file)
-    if worker_pid is not None and _is_process_running(worker_pid):
-        try:
-            os.kill(worker_pid, signal.SIGTERM)
-            for _ in range(20):
-                if not _is_process_running(worker_pid):
-                    break
-                time.sleep(0.05)
-            if _is_process_running(worker_pid):
-                os.kill(worker_pid, signal.SIGKILL)
-        except OSError:
-            pass
+    if worker_pid is not None:
+        _kill_pid(worker_pid)
+
+    # Fallback: any other whisper-server processes spawned from this binary path.
+    for pid in _find_whisper_server_pids():
+        if pid != worker_pid:
+            _kill_pid(pid)
+
     _remove_stale_whisper_worker_files()
 
 
@@ -317,3 +356,8 @@ def transcribe_with_worker(
         "fallback_used": False,
         "fallback_reason": "",
     }
+
+
+if __name__ == "__main__":
+    # Minimal CLI: called by START_LUCY.sh to stop any stale resident worker.
+    stop_whisper_worker()

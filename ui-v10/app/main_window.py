@@ -372,17 +372,18 @@ class OperatorConsoleWindow(QMainWindow):
                 client.close()
         except Exception:
             pass
-        # Kill whisper-server
+        # Kill whisper-server (PID-file or process-name fallback for resident worker)
         try:
+            import sys
             from pathlib import Path
-            import os
-            import signal
 
             root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10")).resolve()
-            whisper_pid_file = root / "tmp" / "run" / "whisper_worker.pid"
-            if whisper_pid_file.exists():
-                whisper_pid = int(whisper_pid_file.read_text().strip())
-                os.kill(whisper_pid, signal.SIGTERM)
+            tools_voice = root / "tools" / "voice"
+            if str(tools_voice) not in sys.path:
+                sys.path.insert(0, str(tools_voice))
+            from whisper_worker import stop_whisper_worker
+
+            stop_whisper_worker()
         except Exception:
             pass
         event.accept()

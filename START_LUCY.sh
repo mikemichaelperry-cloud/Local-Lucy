@@ -97,6 +97,14 @@ export LUCY_VOICE_KOKORO_DEVICE=cpu
 export LUCY_VOICE_KOKORO_SPEED=1.2
 export LUCY_VOICE_TTS_CHUNK_MAX_CHARS=400
 
+# Voice STT (Whisper) defaults for low-latency CPU resident worker.
+# base.en is English-only, ~148 MB, and much faster on CPU than small/multilingual.
+# Keep the worker resident in RAM across utterrances instead of reloading per turn.
+export LUCY_VOICE_MODEL="${LUCY_VOICE_MODEL:-base.en}"
+export LUCY_VOICE_WHISPER_MODEL="${LUCY_VOICE_WHISPER_MODEL:-base.en}"
+export LUCY_VOICE_WHISPER_GPU=0
+export LUCY_VOICE_WHISPER_RESIDENT=1
+
 # Voice STT (Whisper) library path
 export LD_LIBRARY_PATH="${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src/ggml-cuda:${LD_LIBRARY_PATH:-}"
 
@@ -140,9 +148,11 @@ done
 # Clear stale worker PID / socket files
 # Workers create sockets under LUCY_RUNTIME_AUTHORITY_ROOT (project root),
 # not LUCY_RUNTIME_NAMESPACE_ROOT. Clean both to be safe.
+# Stop any orphaned resident whisper worker (PID file or process-name fallback).
+python3 "${SCRIPT_DIR}/tools/voice/whisper_worker.py" 2>/dev/null || true
 rm -f "${LUCY_RUNTIME_NAMESPACE_ROOT}/tmp/run/whisper_worker.pid"
-rm -f "${LUCY_RUNTIME_NAMESPACE_ROOT}/tmp/run/kokoro_tts_worker.sock"
 rm -f "${LUCY_RUNTIME_AUTHORITY_ROOT}/tmp/run/whisper_worker.pid"
+rm -f "${LUCY_RUNTIME_NAMESPACE_ROOT}/tmp/run/kokoro_tts_worker.sock"
 rm -f "${LUCY_RUNTIME_AUTHORITY_ROOT}/tmp/run/kokoro_tts_worker.sock"
 
 # =============================================================================
