@@ -587,7 +587,12 @@ class OperatorConsoleWindow(QMainWindow):
             return
         if self._voice_action_in_flight:
             return
-        if not self._voice_ptt_active:
+        # Trust either the UI intent flag OR the authoritative runtime snapshot.
+        # The flag can be cleared by a start timeout while the backend recorder is
+        # still running; the snapshot is the ground truth in that case.
+        if not self._voice_ptt_active and not bool(
+            self._latest_state_snapshot.voice_runtime.get("listening", False)
+        ):
             return
 
         self._voice_ptt_active = False

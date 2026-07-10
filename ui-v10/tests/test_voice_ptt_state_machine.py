@@ -210,6 +210,18 @@ class TestVoicePTTStateMachine(unittest.TestCase):
         self.assertTrue(self.window._voice_action_in_flight)
         self.assertEqual(self.window._pending_voice_action_label, "voice ptt stop")
 
+    def test_flag_staleness_does_not_block_release(self):
+        """Release should work when backend is listening even if UI flag is stale."""
+        # Simulate: start timed out/cleared the UI flag, but backend recorder is still running
+        self.window._voice_ptt_active = False
+        self.window._latest_state_snapshot.voice_runtime["listening"] = True
+        self.window._voice_action_in_flight = False
+
+        self.window._handle_voice_ptt_released()
+        # Should have sent stop because the authoritative snapshot says listening
+        self.assertTrue(self.window._voice_action_in_flight)
+        self.assertEqual(self.window._pending_voice_action_label, "voice ptt stop")
+
 
 if __name__ == "__main__":
     unittest.main()
