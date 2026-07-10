@@ -94,9 +94,16 @@ def _detect_gpu_status() -> dict[str, Any]:
         "model_loaded": False,
     }
 
-    # Check for NVIDIA GPU via pynvml when available
+    # Check for NVIDIA GPU via pynvml when available.
+    # nvidia-ml-py exposes the legacy pynvml module name but emits a
+    # deprecation warning; suppress it here because the package is already
+    # the recommended modern binding.
     try:
-        import pynvml
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            import pynvml
 
         pynvml.nvmlInit()
         try:
