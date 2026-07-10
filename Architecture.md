@@ -1,11 +1,13 @@
 # Local Lucy V11 — Architecture
 
-**Date:** 2026-07-09
+**Date:** 2026-07-10
 **Version:** v11
 **Branch:** v10-dev
 **Scope:** English-only primary runtime
 
-> This document describes **v11 as implemented**. Hebrew / Racheli support has been separated from the primary runtime and is maintained in its own isolation layer.
+> This document describes **v11 as implemented**. Hebrew / Racheli support has been removed from the primary runtime; the standalone Hebrew assistant was archived separately on 2026-07-10.
+>
+> Latest commits on `v10-dev`: Racheli/Hebrew artifact purge (`87208d0`) and bulk pre-commit cleanup (`dd82304`).
 
 ---
 
@@ -70,7 +72,8 @@ lucy-v10/
 │   ├── evidence_policy.yaml
 │   ├── trusted_domains.yaml
 │   ├── url_map.yaml
-│   └── latency_optimizations.env
+│   ├── latency_optimizations.env
+│   └── quarantined/           # Removed/disabled artifacts (e.g., old persona variants)
 ├── models/router/             # Fine-tuned MiniLM router, examples, learner
 │   ├── hybrid_router_v2.py
 │   ├── comprehensive_examples.json
@@ -239,10 +242,11 @@ SYSTEM """
 You are Local Lucy, an AI running locally on the user's computer via Ollama.
 Rules:
 - Speak in first person as "I". Never use third person.
-- Do not fabricate facts. Say "I don't know" when uncertain.
-- Answer directly and factually. Never apologize, hedge, or add disclaimers.
+- Do not fabricate facts. Say "insufficient data" or "unknown" when uncertain.
+- Answer directly and factually. Avoid generic disclaimers and boilerplate.
 - Do not refuse questions about the user, their family, or their pets.
-- Facts only. Nothing else.
+- Separate facts, assumptions, inferences, and opinions clearly.
+- When using retrieved context, cite the source.
 """
 ```
 
@@ -357,7 +361,7 @@ python3 -m pytest test_policy_router.py test_classify.py test_routing_edge_cases
 
 | V10 claim | V11 reality |
 |-----------|-------------|
-| Hebrew / Racheli persona in primary runtime | **Separated** into an isolated layer; primary runtime is English-only |
+| Hebrew / Racheli persona in primary runtime | **Removed** from the primary runtime on 2026-07-10; English-only |
 | Five-model manual selector | **Auto default** with automatic model selection in shadow mode |
 | Evidence could include OpenAI/Kimi as sources | **Wikipedia/official APIs are evidence**; OpenAI/Kimi are synthesis only |
 | Local-first with broad local fallback | **Local-first strengthened**; "when in doubt, route out" for high-stakes/current facts |
