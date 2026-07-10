@@ -2,14 +2,13 @@
 
 ## Overview
 
-Local Lucy v10 supports two user-specific personas:
+Local Lucy v10 supports a single user-specific persona:
 
 - **Michael** — direct, technically precise, evidence-first, dry pragmatic tone.
-- **Racheli** — clear, warm, practical, bilingual (English/Hebrew), study-support oriented.
 
-A persona becomes active when the user declares their identity (for example, "I am Michael" or "I am Racheli") or when the HMI Control Panel persona selector is set to `Michael` or `Racheli`. The active identity is stored in session memory and is used until the user clears it from the HMI or declares a different identity.
+A persona becomes active when the user declares their identity (for example, "I am Michael") or when the HMI Control Panel persona selector is set to `Michael`. The active identity is stored in session memory and is used until the user clears it from the HMI or declares a different identity.
 
-> **HMI force switch:** The Control Panel has a `persona` selector (`auto` / `Michael` / `Racheli`) that forces the active identity for all models, independent of voice-declared identity. `auto` returns to identity detection from the user's words.
+> **HMI force switch:** The Control Panel has a `persona` selector that forces the active identity for all models, independent of voice-declared identity. `auto` returns to identity detection from the user's words.
 
 ## How Personas Work
 
@@ -22,11 +21,11 @@ The runtime resolution is handled in `tools/router_py/local_answer.py`.
 
 ## Current Adapter Status
 
-| Base model | Ollama tag | Size | Michael | Racheli | Implementation |
-|---|---|---|---|---|---|
-| Llama 3.1 8B Instruct | `local-lucy-llama31` | ~8B | ⚠️ Archived (`local-lucy-llama31-michael`) | ⚠️ Archived (`local-lucy-llama31-racheli`) | Pre-trained adapters backed up to `backups/v10-dev-cleanup/2026-07-04/lora/`; prompt-level fallback is active until restored or retrained |
-| Qwen3 14B | `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` | ~14B | ⚠️ Prompt-level fallback | ⚠️ Prompt-level fallback | Cannot train on RTX 3060 12 GB (OOM) |
-| Mistral-Nemo 12B | `local-lucy-mistral` | ~12B | ⚠️ Prompt-level fallback | ⚠️ Prompt-level fallback | Cannot train on RTX 3060 12 GB (OOM); prompt fallback is used |
+| Base model | Ollama tag | Size | Michael | Implementation |
+|---|---|---|---|---|
+| Llama 3.1 8B Instruct | `local-lucy-llama31` | ~8B | ⚠️ Archived (`local-lucy-llama31-michael`) | Pre-trained adapter backed up to `backups/v10-dev-cleanup/2026-07-04/lora/`; prompt-level fallback is active until restored or retrained |
+| Qwen3 14B | `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` | ~14B | ⚠️ Prompt-level fallback | Cannot train on RTX 3060 12 GB (OOM) |
+| Mistral-Nemo 12B | `local-lucy-mistral` | ~12B | ⚠️ Prompt-level fallback | Cannot train on RTX 3060 12 GB (OOM); prompt fallback is used |
 
 > **Legend:** ✅ LoRA adapter installed and registered
 > **⚠️** Falls back to prompt-level persona injection
@@ -45,13 +44,11 @@ The runtime resolution is handled in `tools/router_py/local_answer.py`.
 | File | Purpose |
 |---|---|
 | `config/personas/michael.txt` | Prompt fragment for Michael |
-| `config/personas/racheli.txt` | Prompt fragment for Racheli |
 | `backups/v10-dev-cleanup/2026-07-04/lora/datasets/michael.jsonl` | Archived training conversations for Michael LoRA |
-| `backups/v10-dev-cleanup/2026-07-04/lora/datasets/racheli.jsonl` | Archived training conversations for Racheli LoRA |
 
 ## Training a Persona LoRA Adapter
 
-> **Note:** The pre-trained LoRA adapters and datasets were archived to `backups/v10-dev-cleanup/2026-07-04/lora/` as part of the v10-dev cleanup. To use the existing adapters, restore them to `models/lora/` and `data/lora/` or update the corresponding `config/Modelfile.*` ADAPTER paths. The workflow below regenerates the adapters from the built-in specs.
+> **Note:** The pre-trained LoRA adapters and datasets were archived to `backups/v10-dev-cleanup/2026-07-04/lora/` as part of the v10-dev cleanup. To use the existing adapter, restore it to `models/lora/` and `data/lora/` or update the corresponding `config/Modelfile.*` ADAPTER paths. The workflow below regenerates the adapter from the built-in spec.
 
 ### One adapter manually
 
@@ -98,32 +95,26 @@ Run the golden-case evaluator against a LoRA model:
 
 ```bash
 python3 tools/lora/evaluate_persona.py --model local-lucy-llama31-michael
-python3 tools/lora/evaluate_persona.py --model local-lucy-llama31-racheli
 ```
 
 Run the same cases against the base model with prompt-level persona injection:
 
 ```bash
 python3 tools/lora/evaluate_persona.py --model local-lucy-llama31 --prompt-persona michael --persona michael
-python3 tools/lora/evaluate_persona.py --model local-lucy-llama31 --prompt-persona racheli --persona racheli
 
 # Test qwen3 14B prompt-level fallback
 python3 tools/lora/evaluate_persona.py --model local-lucy --prompt-persona michael --persona michael
-python3 tools/lora/evaluate_persona.py --model local-lucy --prompt-persona racheli --persona racheli
 ```
 
-Golden cases live in `tests/golden_persona_cases.jsonl` and cover both LoRA and prompt-level paths.
+Golden cases live in `tests/golden_persona_cases.jsonl`.
 
 ### Latest validation results (RTX 3060 12 GB)
 
 | Model / path | Persona | Pass rate | Notes |
 |---|---|---|---|
 | `local-lucy-llama31-michael` (LoRA) | Michael | 100% (9/9) | Trained adapter |
-| `local-lucy-llama31-racheli` (LoRA) | Racheli | 100% (12/12) | Trained adapter |
 | `local-lucy` + prompt (`local-lucy-qwen3`) | Michael | 88.9% (8/9) | Strong prompt-level compliance |
-| `local-lucy` + prompt (`local-lucy-qwen3`) | Racheli | 100% (12/12) | Empathetic, multilingual, criminology-aligned |
 | `local-lucy-mistral` + prompt | Michael | 88.9% (8/9) | Good direct style after prompt tuning |
-| `local-lucy-mistral` + prompt | Racheli | 91.7% (11/12) | Warm; occasional formal preamble |
 
 > Pass rates are measured against `tests/golden_persona_cases.jsonl` with `--min-pass-rate 60`. Minor variance between runs is normal due to sampling.
 

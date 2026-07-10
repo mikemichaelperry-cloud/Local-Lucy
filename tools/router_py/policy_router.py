@@ -1420,106 +1420,6 @@ def gate_attachment(
     return None
 
 
-# Hebrew-script queries need deterministic routing because the embedding router
-# and English keyword gates miss them. These patterns cover the most common
-# Hebrew intents; anything unmatched falls through to the normal gates.
-_HEBREW_RE = re.compile(r"[\u0590-\u05FF]")
-_HEBREW_NEWS_TERMS = frozenset({"חדשות", "חדשות היום", "מה חדש", "עדכונים"})
-_HEBREW_TIME_TERMS = frozenset({"מה השעה", "שעה עכשיו", "השעה בא"})
-_HEBREW_WEATHER_TERMS = frozenset({"מזג אוויר", "תחזית", "מזג האוויר"})
-_HEBREW_FACT_PATTERNS = tuple(
-    re.compile(p)
-    for p in (
-        r"^מה[יוה]?\s+",
-        r"^מי\s+",
-        r"^איפה\s+",
-        r"^מתי\s+",
-        r"^למה\s+",
-    )
-)
-# Hebrew translation/creative requests should stay LOCAL.
-_HEBREW_LOCAL_PATTERNS = tuple(
-    re.compile(p)
-    for p in (
-        r"איך\s+אומרים",
-        r"איך\s+מגיעים",
-        r"תכתוב\s+לי",
-        r"כתוב\s+לי",
-        r"ספר\s+לי\s+בדיחה",
-    )
-)
-
-
-def gate_hebrew_query(
-    query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
-) -> PolicyDecision | None:
-    """Deterministic routing for Hebrew-script queries.
-
-    The English keyword gates and embedding router often misroute Hebrew.
-    This gate catches the high-frequency Hebrew intents explicitly so that
-    Hebrew Wikipedia / news / time / weather sources are used.
-    """
-    if not query or not _HEBREW_RE.search(query):
-        return None
-    q = query.strip()
-    q_lower = q.lower()
-
-    # Time
-    if any(term in q_lower for term in _HEBREW_TIME_TERMS):
-        return PolicyDecision(
-            route="TIME",
-            reason_code="policy:hebrew_time_query",
-            matched_rule="hebrew_query",
-            ephemeral=True,
-            provider="timeapi",
-            provider_usage_class="free",
-            evidence_reason="time_query",
-            policy_reason="hebrew_time_query",
-        )
-
-    # Weather
-    if any(term in q_lower for term in _HEBREW_WEATHER_TERMS):
-        return PolicyDecision(
-            route="WEATHER",
-            reason_code="policy:hebrew_weather_query",
-            matched_rule="hebrew_query",
-            ephemeral=True,
-            provider="weather",
-            provider_usage_class="free",
-            evidence_reason="weather_query",
-            policy_reason="hebrew_weather_query",
-        )
-
-    # News
-    if any(term in q_lower for term in _HEBREW_NEWS_TERMS):
-        return PolicyDecision(
-            route="NEWS",
-            reason_code="policy:hebrew_news_query",
-            matched_rule="hebrew_query",
-            ephemeral=True,
-            provider="news",
-            provider_usage_class="local",
-            evidence_reason="news_synthesis",
-            policy_reason="hebrew_news_query",
-        )
-
-    # Factual lookup (what/who/where/when/why/how)
-    if any(p.search(q) for p in _HEBREW_FACT_PATTERNS):
-        return PolicyDecision(
-            route="AUGMENTED",
-            reason_code="policy:hebrew_factual_lookup",
-            matched_rule="hebrew_query",
-            evidence_mode="required",
-            evidence_reason="hebrew_factual_lookup",
-            requires_evidence=True,
-            provider="wikipedia",
-            provider_usage_class="free",
-            policy_reason="hebrew_factual_lookup",
-        )
-
-    return None
-
-
 def _last_exchange_was_medical_vet() -> bool:
     """Return True when the most recent feedback-buffer exchange was medical/vet EVIDENCE."""
     import json
@@ -1643,10 +1543,6 @@ class PolicyRouter:
         # Run it early so symbol-only or placeholder input does not accidentally
         # match a downstream weather/news/finance keyword heuristic.
         gate_garbage_nonsense,
-        # Hebrew-script query gate has been removed from the primary runtime
-        # as part of the V11 English-only scope. The function is retained below
-        # as an isolated utility for a separate Hebrew assistant.
-        #
         # Dedicated external-source gates run next so time/weather/news/finance
         # /conflict/age/current queries keep their routes and reason codes.
         gate_finance,

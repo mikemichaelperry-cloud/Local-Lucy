@@ -125,7 +125,7 @@ python3 -c "import sys; sys.path.insert(0,'tools'); from router_py.main import e
 
 ## Persona LoRA Pipeline
 
-User-specific personas (Michael, Racheli) are triggered by identity declarations such as "I am Michael" or by the HMI Control Panel persona selector (`auto` / `Michael` / `Racheli`). Two mechanisms work together:
+The primary runtime supports a single user-specific persona (Michael). It is triggered by identity declarations such as "I am Michael" or by the HMI Control Panel persona selector. Two mechanisms work together:
 
 1. **Prompt-level persona injection** — `tools/router_py/local_answer.py` injects the matching fragment from `config/personas/<name>.txt` whenever an identity is active. The fragment is injected **after** the self-knowledge block so it is the last high-level instruction before the user turn.
 2. **Model-level LoRA adapters** — If a persona-tagged Ollama model exists (e.g., `local-lucy-llama31-michael`), Local Lucy resolves to that model automatically; otherwise it falls back to the base model + prompt fragment.
@@ -139,7 +139,7 @@ User-specific personas (Michael, Racheli) are triggered by identity declarations
 | `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` (qwen3:14b) | **Prompt-level fallback** | LoRA training OOMs at `prepare_model_for_kbit_training` on 12 GB VRAM; fallback is seamless via `local_answer.py` |
 
 ### Files
-- `tools/lora/build_datasets.py` — generates `data/lora/datasets/{michael,racheli}.jsonl`
+- `tools/lora/build_datasets.py` — generates `data/lora/datasets/michael.jsonl`
 - `tools/lora/train_persona_lora.py` — QLoRA training per base model/persona
 - `tools/lora/convert_adapters_to_gguf.py` — converts Safetensors adapters to GGUF for Ollama 0.14.x
 - `tools/lora/build_modelfiles.py` — generates `config/Modelfile.<base>-<persona>`
@@ -150,7 +150,7 @@ User-specific personas (Michael, Racheli) are triggered by identity declarations
 
 ### Typical workflow
 
-> **Note:** The pre-trained Michael/Racheli LoRA artifacts and datasets were archived to `backups/v10-dev-cleanup/2026-07-04/lora/` as part of the v10-dev cleanup. The commands below regenerate them at their original paths from the built-in specs.
+> **Note:** The pre-trained Michael LoRA artifacts and datasets were archived to `backups/v10-dev-cleanup/2026-07-04/lora/` as part of the v10-dev cleanup. The commands below regenerate them at their original paths from the built-in specs.
 
 ```bash
 cd ~/lucy-v10
@@ -170,20 +170,18 @@ Evaluate both LoRA and prompt-level paths:
 ```bash
 # LoRA path (llama3.1)
 python3 tools/lora/evaluate_persona.py --model local-lucy-llama31-michael --persona michael
-python3 tools/lora/evaluate_persona.py --model local-lucy-llama31-racheli --persona racheli
 
 # Prompt-level fallback path (qwen3 14B)
 python3 tools/lora/evaluate_persona.py --model local-lucy --prompt-persona michael --persona michael
-python3 tools/lora/evaluate_persona.py --model local-lucy --prompt-persona racheli --persona racheli
 ```
 
 ### Current adapter status
 
-| Base tag | Backend model | Michael | Racheli | Notes |
-|---|---|---|---|---|
-| `local-lucy-llama31` | Llama 3.1 8B | ⚠️ Archived | ⚠️ Archived | Artifacts backed up to `backups/v10-dev-cleanup/2026-07-04/lora/`; prompt fallback remains active |
-| `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` | Qwen3 14B | ⚠️ Prompt fallback | ⚠️ Prompt fallback | OOM on RTX 3060 12 GB |
-| `local-lucy-mistral` | Mistral-Nemo 12B | ⚠️ Prompt fallback | ⚠️ Prompt fallback | OOM on RTX 3060 12 GB |
+| Base tag | Backend model | Michael | Notes |
+|---|---|---|---|
+| `local-lucy-llama31` | Llama 3.1 8B | ⚠️ Archived | Artifacts backed up to `backups/v10-dev-cleanup/2026-07-04/lora/`; prompt fallback remains active |
+| `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` | Qwen3 14B | ⚠️ Prompt fallback | OOM on RTX 3060 12 GB |
+| `local-lucy-mistral` | Mistral-Nemo 12B | ⚠️ Prompt fallback | OOM on RTX 3060 12 GB |
 
 ### Hardware limitation: Qwen3 14B
 

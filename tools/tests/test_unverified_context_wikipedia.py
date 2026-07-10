@@ -101,64 +101,6 @@ def test_quantum_computing_direct_summary_accepted(monkeypatch, tmp_path):
     assert result["title"] == "Quantum computing"
 
 
-def test_hebrew_query_uses_hebrew_wikipedia(monkeypatch, tmp_path):
-    """Hebrew queries should be answered from Hebrew Wikipedia."""
-    monkeypatch.setenv("LUCY_ROOT", str(tmp_path))
-
-    hebrew_query = "מהי בירת ישראל"
-    direct = {
-        ("he", "מהי בירת ישראל"): None,
-        ("he", "ירושלים"): {
-            "extract": "ירושלים היא בירת מדינת ישראל.",
-            "title": "ירושלים",
-            "content_urls": {
-                "desktop": {
-                    "page": "https://he.wikipedia.org/wiki/%D7%99%D7%A8%D7%95%D7%A9%D7%9C%D7%99%D7%9D"
-                }
-            },
-        },
-    }
-    search = {
-        ("he", "מהי בירת ישראל"): [{"title": "ירושלים"}],
-    }
-
-    with patch.object(wiki, "_http_json", side_effect=_make_http_mock(direct, search)):
-        result = wiki.fetch_context(hebrew_query)
-
-    assert result["ok"] is True
-    assert result["title"] == "ירושלים"
-    assert "he.wikipedia.org" in result["url"]
-
-
-def test_hebrew_query_falls_back_to_english_when_hebrew_missing(monkeypatch, tmp_path):
-    """If Hebrew Wikipedia has no match, fall back to English."""
-    monkeypatch.setenv("LUCY_ROOT", str(tmp_path))
-
-    hebrew_query = "מהי בירת ישראל"
-    direct = {
-        ("he", "מהי בירת ישראל"): None,
-        ("he", "ירושלים"): None,
-        ("en", "מהי בירת ישראל"): None,
-        ("en", "Jerusalem"): {
-            "extract": "Jerusalem is the capital of Israel.",
-            "title": "Jerusalem",
-            "content_urls": {"desktop": {"page": "https://en.wikipedia.org/wiki/Jerusalem"}},
-        },
-    }
-    search = {
-        ("he", "מהי בירת ישראל"): [],
-        ("he", "ירושלים"): [],
-        ("en", "מהי בירת ישראל"): [{"title": "Jerusalem"}],
-    }
-
-    with patch.object(wiki, "_http_json", side_effect=_make_http_mock(direct, search)):
-        result = wiki.fetch_context(hebrew_query)
-
-    assert result["ok"] is True
-    assert result["title"] == "Jerusalem"
-    assert "en.wikipedia.org" in result["url"]
-
-
 def test_extract_place_tail_recognizes_trailing_place():
     assert wiki._extract_place_tail("main tourist attractions in Japan") == "Japan"
     assert wiki._extract_place_tail("capital of France") == "France"
@@ -174,8 +116,3 @@ def test_title_matches_query_requires_place_tail():
         wiki._title_matches_query("Tourism in China", "main tourist attractions in Japan", "Japan")
         is False
     )
-
-
-def test_is_hebrew_query_detects_hebrew_characters():
-    assert wiki._is_hebrew_query("מהי בירת ישראל") is True
-    assert wiki._is_hebrew_query("What is the capital of Israel?") is False

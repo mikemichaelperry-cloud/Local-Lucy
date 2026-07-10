@@ -48,7 +48,6 @@ bdbc9d9737ecfa51a6c5ae7b6b5b0e55b4db6d43fa7ffe4c9fb2389a80100ed7  ./config/Model
 e62bdb00e26570ea33cde9aca67c0f1257756002959181bc963fb69a10cc27e3  ./config/Modelfile.local-lucy-qwen3
 a01b347bd804182045a85329e4c200bf16c8cf759e1eaeae83eecb0b1ccbce74  ./config/Modelfile.local-lucy-stable
 9f348e272b1de6833ec531e8cf2a977f82d7e1f1d6870705a507a0de8072e34f  ./config/modes/mike.yaml
-ff8cd1b15bf8b5de8e8996cb596462d25c7c937f1494fa6655714fd3d3845de0  ./config/modes/racheli.yaml
 7945a9cd9c33b312c70676290c9b81f8a989cb4cfdff97e2e65599d9b139fc48  ./config/query_to_keys.tsv
 e033c392c65eb43db6c0b8b570200ada263de683034e4dfb9a9bb6b4d0202c5b  ./config/system_prompt.dev.txt
 c3a8a1a76995fbae9116fca3ced1d2619ea2ebba3abc7d2c113404f74fa58309  ./config/system_prompt.stable.txt

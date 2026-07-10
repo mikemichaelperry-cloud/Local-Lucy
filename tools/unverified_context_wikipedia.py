@@ -44,7 +44,6 @@ def _http_json(url: str, timeout: float | None = None) -> dict:
 
 
 # Common words that should not be used on their own to judge title relevance.
-_HEBREW_RE = re.compile(r"[\u0590-\u05FF]")
 _STOP_WORDS = {
     "the",
     "a",
@@ -259,11 +258,6 @@ def _is_tourism_query(query: str) -> bool:
     return any(term in q for term in ("tourism", "tourist", "attraction", "sightsee", "vacation"))
 
 
-def _is_hebrew_query(query: str) -> bool:
-    """Return True if the query contains Hebrew characters."""
-    return bool(_HEBREW_RE.search(query))
-
-
 def _title_matches_query(title: str, query: str, tail: str | None = None) -> bool:
     """Return True if the fetched article title is plausibly about the query.
 
@@ -282,18 +276,6 @@ def _title_matches_query(title: str, query: str, tail: str | None = None) -> boo
         return False
 
     # No place tail: check that at least one meaningful keyword appears.
-    # For Hebrew, prefer a title that shares Hebrew characters. If the title is
-    # entirely non-Hebrew, we are likely in English-Wikipedia fallback mode, so
-    # accept the API's top result rather than returning no answer at all.
-    if _is_hebrew_query(query):
-        he_chars = _HEBREW_RE.findall(query)
-        if he_chars and any(c in title_lower for c in set(he_chars)):
-            return True
-        # English fallback: accept if the title has no Hebrew characters.
-        if not _HEBREW_RE.search(title):
-            return True
-        return False
-
     words = [
         w for w in re.findall(r"[a-zA-Z]+", query.lower()) if len(w) > 3 and w not in _STOP_WORDS
     ]
@@ -398,13 +380,6 @@ def fetch_context(query: str) -> dict[str, Any]:
     cached_payload = _load_cached_payload(normalized_query)
     if cached_payload is not None:
         return cached_payload
-
-    # Hebrew query: try Hebrew Wikipedia first, then fall back to English.
-    if _is_hebrew_query(normalized_query):
-        result = _fetch_wikipedia_context(normalized_query, lang="he")
-        if result is not None:
-            _store_cached_payload(normalized_query, result)
-            return result
 
     result = _fetch_wikipedia_context(normalized_query, lang="en")
     if result is not None:
