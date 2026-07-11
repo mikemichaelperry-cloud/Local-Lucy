@@ -197,53 +197,40 @@ def load_state_from_file() -> dict[str, Any]:
 
 def ensure_control_env() -> None:
     """
-    Ensure control environment variables are set from state file if not in environment.
-    This matches behavior of runtime_request.py's build_request_env.
-    """
-    if os.environ.get("LUCY_EVIDENCE_ENABLED") and os.environ.get("LUCY_AUGMENTATION_POLICY"):
-        # Already set, nothing to do
-        return
+    Ensure control environment variables reflect the current state file.
 
+    This is the single source of truth for control toggles: the process env is
+    overwritten from current_state.json on every call so that HMI toggles always
+    drive live process behavior. Callers must re-read these env vars after this
+    function returns.
+    """
     state = load_state_from_file()
     if not state:
         return
 
-    # Set from state file if not already in environment
-    if "LUCY_EVIDENCE_ENABLED" not in os.environ:
-        evidence = state.get("evidence", "off")
-        os.environ["LUCY_EVIDENCE_ENABLED"] = "1" if evidence in ("on", "true", "1") else "0"
+    evidence = state.get("evidence", "off")
+    os.environ["LUCY_EVIDENCE_ENABLED"] = "1" if evidence in ("on", "true", "1") else "0"
+    # Mirror evidence for the legacy internet flag.
+    os.environ["LUCY_ENABLE_INTERNET"] = os.environ["LUCY_EVIDENCE_ENABLED"]
 
-    if "LUCY_ENABLE_INTERNET" not in os.environ:
-        # Mirror LUCY_EVIDENCE_ENABLED
-        os.environ["LUCY_ENABLE_INTERNET"] = os.environ.get("LUCY_EVIDENCE_ENABLED", "0")
+    policy = state.get("augmentation_policy", "disabled")
+    os.environ["LUCY_AUGMENTATION_POLICY"] = policy
 
-    if "LUCY_AUGMENTATION_POLICY" not in os.environ:
-        policy = state.get("augmentation_policy", "disabled")
-        os.environ["LUCY_AUGMENTATION_POLICY"] = policy
+    provider = state.get("augmented_provider", "wikipedia")
+    os.environ["LUCY_AUGMENTED_PROVIDER"] = provider
 
-    if "LUCY_AUGMENTED_PROVIDER" not in os.environ:
-        provider = state.get("augmented_provider", "wikipedia")
-        os.environ["LUCY_AUGMENTED_PROVIDER"] = provider
+    conv = state.get("conversation", "off")
+    os.environ["LUCY_CONVERSATION_MODE_FORCE"] = "1" if conv in ("on", "true", "1") else "0"
 
-    if "LUCY_CONVERSATION_MODE_FORCE" not in os.environ:
-        conv = state.get("conversation", "off")
-        os.environ["LUCY_CONVERSATION_MODE_FORCE"] = "1" if conv in ("on", "true", "1") else "0"
+    mem = state.get("memory", "off")
+    os.environ["LUCY_SESSION_MEMORY"] = "1" if mem in ("on", "true", "1") else "0"
 
-    if "LUCY_SESSION_MEMORY" not in os.environ:
-        mem = state.get("memory", "off")
-        os.environ["LUCY_SESSION_MEMORY"] = "1" if mem in ("on", "true", "1") else "0"
+    voice = state.get("voice", "off")
+    os.environ["LUCY_VOICE_ENABLED"] = "1" if voice in ("on", "true", "1") else "0"
 
-    if "LUCY_VOICE_ENABLED" not in os.environ:
-        voice = state.get("voice", "off")
-        os.environ["LUCY_VOICE_ENABLED"] = "1" if voice in ("on", "true", "1") else "0"
-
-    if "LUCY_MODEL" not in os.environ:
-        model = state.get("model", "local-lucy-llama31")
-        os.environ["LUCY_MODEL"] = model
-
-    if "LUCY_LOCAL_MODEL" not in os.environ:
-        model = state.get("model", "local-lucy-llama31")
-        os.environ["LUCY_LOCAL_MODEL"] = model
+    model = state.get("model", "local-lucy-llama31")
+    os.environ["LUCY_MODEL"] = model
+    os.environ["LUCY_LOCAL_MODEL"] = model
 
 
 def _persist_memory_turn(question: str, response_text: str, session_id: str = "default") -> None:

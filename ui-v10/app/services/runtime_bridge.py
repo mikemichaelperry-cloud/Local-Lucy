@@ -538,6 +538,32 @@ class RuntimeBridge:
         "learner_toggle": ("set-learner", "learner"),
     }
 
+    def _apply_state_to_env(self) -> None:
+        """Force process env to match current_state.json control toggles.
+
+        This prevents the live process from continuing to use stale env values
+        after the user changes a toggle in the HMI.
+        """
+        from router_py.main import load_state_from_file
+
+        state = load_state_from_file()
+        if not state:
+            return
+
+        def _bool_env(value: str) -> str:
+            return "1" if str(value).lower() in ("on", "true", "1") else "0"
+
+        os.environ["LUCY_EVIDENCE_ENABLED"] = _bool_env(state.get("evidence", "off"))
+        os.environ["LUCY_ENABLE_INTERNET"] = os.environ["LUCY_EVIDENCE_ENABLED"]
+        os.environ["LUCY_AUGMENTATION_POLICY"] = state.get("augmentation_policy", "disabled")
+        os.environ["LUCY_AUGMENTED_PROVIDER"] = state.get("augmented_provider", "wikipedia")
+        os.environ["LUCY_CONVERSATION_MODE_FORCE"] = _bool_env(state.get("conversation", "off"))
+        os.environ["LUCY_SESSION_MEMORY"] = _bool_env(state.get("memory", "off"))
+        os.environ["LUCY_VOICE_ENABLED"] = _bool_env(state.get("voice", "off"))
+        model = state.get("model", "local-lucy-llama31")
+        os.environ["LUCY_MODEL"] = model
+        os.environ["LUCY_LOCAL_MODEL"] = model
+
     def _run_control_action_direct(self, action: str, requested_value: str) -> CommandResult:
         command_name, field = self._CONTROL_ACTION_MAP[action]
         try:
@@ -569,6 +595,10 @@ class RuntimeBridge:
                 timed_out=False,
                 payload=None,
             )
+
+        # Keep the live process env in sync with the newly saved state so the
+        # HMI toggles always drive actual behavior.
+        self._apply_state_to_env()
 
         if action == "model_selection":
             # Evict every other loaded model immediately so the user does not
@@ -688,6 +718,23 @@ class RuntimeBridge:
                 response.read()
         except (urllib.error.URLError, TimeoutError, OSError):
             pass
+
+        # Keep the background keep-alive threads in sync with the newly selected
+        # model. Without this, the previous heartbeat/warmup threads continue to
+        # ping the old model and re-load it after _unload_other_ollama_models()
+        # evicted it, causing the HMI to show a stale "still loaded" status.
+        if model and str(model).lower() != "auto":
+            try:
+                from router_py.local_answer import (
+                    LocalAnswer,
+                    LocalAnswerConfig,
+                    start_ollama_heartbeat,
+                )
+
+                start_ollama_heartbeat(str(model))
+                LocalAnswer.start_recurring_warmup(config=LocalAnswerConfig(model=str(model)))
+            except Exception:
+                pass
 
     def _unload_ollama_model(self, model: str) -> None:
         """Unload a model from Ollama to free VRAM before loading another.
