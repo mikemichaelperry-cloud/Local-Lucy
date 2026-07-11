@@ -164,33 +164,46 @@ def _write_outcome_telemetry(
         pass
 
 
+def _home_fallback_runtime_namespace_root() -> Path:
+    """Mirror runtime_control.home_fallback_runtime_namespace_root()."""
+    home = Path.home()
+    workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10"
+
+
 def load_state_from_file() -> dict[str, Any]:
     """Load control state from state file (fallback when env vars not set).
 
-    Respects LUCY_RUNTIME_STATE_FILE env var to stay in sync with
-    runtime_control.py and the HMI state store.
+    Respects LUCY_RUNTIME_STATE_FILE and LUCY_RUNTIME_NAMESPACE_ROOT env vars
+    to stay in sync with runtime_control.py and the HMI state store.
     """
     import json
 
-    # 1. Env var override (same contract as runtime_control.py)
+    candidates: list[Path] = []
+
+    # 1. Explicit env var override (same contract as runtime_control.py)
     env_path = os.environ.get("LUCY_RUNTIME_STATE_FILE", "").strip()
     if env_path:
+        candidates.append(Path(env_path).expanduser())
+
+    # 2. Namespace-root env var
+    namespace_root = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "").strip()
+    if namespace_root:
+        candidates.append(Path(namespace_root).expanduser() / "state" / "current_state.json")
+
+    # 3. Home fallback namespace
+    candidates.append(_home_fallback_runtime_namespace_root() / "state" / "current_state.json")
+
+    # 4. Legacy fallback (project root state dir)
+    candidates.append(ROOT_DIR / "state" / "state" / "current_state.json")
+
+    for state_file in candidates:
         try:
-            state_file = Path(env_path).expanduser()
             if state_file.exists():
                 with open(state_file) as f:
                     return json.load(f)
         except Exception:
             pass
-
-    # 2. Legacy fallback (project root state dir)
-    try:
-        state_file = ROOT_DIR / "state" / "state" / "current_state.json"
-        if state_file.exists():
-            with open(state_file) as f:
-                return json.load(f)
-    except Exception:
-        pass
 
     return {}
 

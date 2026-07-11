@@ -476,6 +476,14 @@ class TestJsonStateFiles:
         self, writer, sample_route, sample_result, sample_context, tmp_path, monkeypatch
     ):
         monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_path))
+        # Isolate from the real HMI state file so this test has deterministic
+        # control_state values regardless of what current_state.json contains.
+        monkeypatch.setenv("LUCY_SESSION_MEMORY", "0")
+        monkeypatch.setenv("LUCY_EVIDENCE_ENABLED", "0")
+        monkeypatch.setenv("LUCY_VOICE_ENABLED", "0")
+        monkeypatch.setenv("LUCY_AUGMENTATION_POLICY", "disabled")
+        monkeypatch.setenv("LUCY_AUGMENTED_PROVIDER", "wikipedia")
+        monkeypatch.setenv("LUCY_MODEL", "auto")
         writer.write_json_state_files(sample_route, sample_result, sample_context)
         payload = json.loads((tmp_path / "last_request_result.json").read_text(encoding="utf-8"))
         assert payload["status"] == "completed"
