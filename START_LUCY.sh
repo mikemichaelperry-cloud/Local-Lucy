@@ -45,6 +45,9 @@ export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
 export LUCY_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/local-lucy"
 export LUCY_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/local-lucy"
 
+# Memory database: explicit env override wins, then XDG state dir, then legacy.
+export LUCY_MEMORY_DB_PATH="${LUCY_MEMORY_DB_PATH:-$LUCY_RUNTIME_NAMESPACE_ROOT/state/memory.db}"
+
 # Ensure directories exist
 mkdir -p "$LUCY_RUNTIME_NAMESPACE_ROOT/state"
 mkdir -p "$LUCY_RUNTIME_NAMESPACE_ROOT/logs"

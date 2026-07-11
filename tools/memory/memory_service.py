@@ -73,15 +73,21 @@ def _strip_thinking_blocks(text: str) -> str:
 # Paths
 # ---------------------------------------------------------------------------
 
-DEFAULT_MEMORY_DB = Path("~/.codex-api-home/lucy/runtime-v10/state/memory.db")
-
 
 def _resolve_db_path() -> Path:
-    """Resolve the SQLite DB path, respecting env overrides."""
+    """Resolve the SQLite DB path, respecting env overrides and XDG paths."""
     raw = os.environ.get("LUCY_MEMORY_DB_PATH", "").strip()
     if raw:
         return Path(raw).expanduser()
-    return Path(DEFAULT_MEMORY_DB).expanduser()
+
+    # Prefer the shared XDG path resolver; fall back to a legacy default if
+    # the import is unavailable (e.g., standalone use without full repo path).
+    try:
+        from tools.xdg_paths import lucy_memory_db_path
+
+        return lucy_memory_db_path()
+    except Exception:
+        return Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "memory.db"
 
 
 # ---------------------------------------------------------------------------
