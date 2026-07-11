@@ -125,6 +125,7 @@ ignore = ["E501"]
 "ui-v10/tests/test_state_store_last_request_provider_truth.py" = ["E402"]
 "ui-v10/tests/test_status_panel_trusted_metadata.py" = ["E402"]
 "ui-v10/tests/test_voice_ptt_state_machine.py" = ["F841", "E402"]
+"ui-v10/tests/test_runtime_action_task_cancel.py" = ["E402"]
 "ui-v10/tests/test_changes_verification.py" = ["F841"]
 "tools/router_py/test_feedback_loop_integration.py" = ["F841"]
 # Legacy backend modules with pre-existing import-order, bare-except, unused-variable,

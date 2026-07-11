@@ -67,13 +67,33 @@ class RuntimeActionTask(QRunnable):
         self._requested_value = requested_value
         self._context = context
         self.signals = RuntimeActionTaskSignals()
+        self._cancelled = False
+
+    def cancel(self) -> None:
+        """Request cooperative cancellation of the task."""
+        self._cancelled = True
+
+    def is_cancelled(self) -> bool:
+        return self._cancelled
 
     @Slot()
     def run(self) -> None:
         try:
-            result = self._bridge.run_action(
-                self._action, self._requested_value, context=self._context
-            )
+            if self._cancelled:
+                result = CommandResult(
+                    action=self._action,
+                    requested_value=self._requested_value,
+                    status="cancelled",
+                    returncode=None,
+                    stdout="",
+                    stderr="task cancelled before run",
+                    timed_out=False,
+                    payload=None,
+                )
+            else:
+                result = self._bridge.run_action(
+                    self._action, self._requested_value, context=self._context
+                )
         except Exception as exc:  # pragma: no cover - defensive UI worker guard
             result = CommandResult(
                 action=self._action,
@@ -85,7 +105,8 @@ class RuntimeActionTask(QRunnable):
                 timed_out=False,
                 payload=None,
             )
-        self.signals.finished.emit(result)
+        if not self._cancelled:
+            self.signals.finished.emit(result)
 
 
 class RuntimeBridge:
