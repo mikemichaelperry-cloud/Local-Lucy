@@ -13,10 +13,13 @@ from unittest.mock import MagicMock, patch
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+import local_answer
 from local_answer import (
     LocalAnswer,
     LocalAnswerConfig,
     _OllamaWarmupThread,
+    start_ollama_heartbeat,
+    stop_ollama_heartbeat,
 )
 
 
@@ -456,6 +459,34 @@ class TestCompletionGuards(unittest.TestCase):
         self.assertEqual(reason, "trimmed_to_last_complete_sentence")
 
 
+class TestHeartbeat(unittest.TestCase):
+    """Test module-level Ollama heartbeat thread."""
+
+    def tearDown(self):
+        """Stop any leftover heartbeat thread."""
+        stop_ollama_heartbeat()
+        if local_answer._heartbeat_thread is not None:
+            try:
+                local_answer._heartbeat_thread.join(timeout=1.0)
+            except Exception:
+                pass
+            local_answer._heartbeat_thread = None
+
+    def test_heartbeat_restarts_on_model_change(self):
+        """Calling start_ollama_heartbeat with a new model must restart the thread."""
+        local_answer._heartbeat_thread = None
+        start_ollama_heartbeat("model-a")
+        first_thread = local_answer._heartbeat_thread
+        self.assertIsNotNone(first_thread)
+        self.assertTrue(first_thread.is_alive())
+
+        start_ollama_heartbeat("model-b")
+        second_thread = local_answer._heartbeat_thread
+        self.assertIsNotNone(second_thread)
+        self.assertIsNot(first_thread, second_thread)
+        self.assertTrue(second_thread.is_alive())
+
+
 class TestWarmup(unittest.TestCase):
     """Test Ollama warmup thread and recurring warmup starter."""
 
@@ -536,9 +567,24 @@ class TestWarmup(unittest.TestCase):
             self.assertIsNotNone(first_thread)
             self.assertTrue(first_thread.is_alive())
 
-            # Second call should be a no-op
+            # Second call with the same model should be a no-op
             LocalAnswer.start_recurring_warmup(config=cfg)
             self.assertIs(LocalAnswer._warmup_thread, first_thread)
+
+    def test_start_recurring_warmup_restarts_on_model_change(self):
+        """Test start_recurring_warmup starts a new thread when the model changes."""
+        with patch.dict(os.environ, {"LUCY_WARMUP_ENABLED": "1"}):
+            LocalAnswer.start_recurring_warmup(config=LocalAnswerConfig(model="model-a"))
+            first_thread = LocalAnswer._warmup_thread
+            self.assertIsNotNone(first_thread)
+            self.assertTrue(first_thread.is_alive())
+
+            LocalAnswer.start_recurring_warmup(config=LocalAnswerConfig(model="model-b"))
+            second_thread = LocalAnswer._warmup_thread
+            self.assertIsNotNone(second_thread)
+            self.assertIsNot(first_thread, second_thread)
+            self.assertTrue(second_thread.is_alive())
+            self.assertEqual(second_thread.model, "model-b")
 
     def test_start_recurring_warmup_zero_interval_is_noop(self):
         """Test interval <= 0 prevents thread start."""

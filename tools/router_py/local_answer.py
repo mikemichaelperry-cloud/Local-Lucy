@@ -82,6 +82,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _heartbeat_thread: threading.Thread | None = None
 _heartbeat_stop = threading.Event()
+_heartbeat_model: str | None = None
 
 
 def _ollama_heartbeat_ping(
@@ -110,11 +111,21 @@ def _heartbeat_loop(model: str, interval: float = 30.0) -> None:
 
 
 def start_ollama_heartbeat(model: str = "local-lucy-llama31") -> None:
-    """Start background heartbeat thread (idempotent)."""
-    global _heartbeat_thread
-    if _heartbeat_thread is not None and _heartbeat_thread.is_alive():
+    """Start background heartbeat thread, restarting it if the model changed.
+
+    The heartbeat keeps only the currently selected model warm. When the user
+    switches models, any previous heartbeat thread is stopped and a new one is
+    started for the new model so the old model is not re-loaded behind the
+    caller's back.
+    """
+    global _heartbeat_thread, _heartbeat_model
+    if _heartbeat_thread is not None and _heartbeat_thread.is_alive() and _heartbeat_model == model:
         return
+    stop_ollama_heartbeat()
+    if _heartbeat_thread is not None:
+        _heartbeat_thread.join(timeout=1.0)
     _heartbeat_stop.clear()
+    _heartbeat_model = model
     _heartbeat_thread = threading.Thread(
         target=_heartbeat_loop,
         args=(model,),
@@ -720,11 +731,11 @@ class LocalAnswer:
                 (default: same as LUCY_LOCAL_KEEP_ALIVE or "10m").
 
         The thread is a daemon, so it will not block process exit.
-        Calling this method multiple times is safe — only one thread is started.
+        Calling this method multiple times with the same model is safe — only
+        one thread is started. Calling it with a different model stops the old
+        thread and starts a new one for the new model, so the previous model is
+        not kept warm after a switch.
         """
-        if cls._warmup_thread is not None and cls._warmup_thread.is_alive():
-            return
-
         enabled = os.environ.get("LUCY_WARMUP_ENABLED", "1").lower() in ("1", "true", "yes", "on")
         if not enabled:
             return
@@ -736,6 +747,17 @@ class LocalAnswer:
         cfg = config or LocalAnswerConfig.from_env()
         if not cfg.model:
             return
+
+        if (
+            cls._warmup_thread is not None
+            and cls._warmup_thread.is_alive()
+            and cls._warmup_thread.model == cfg.model
+        ):
+            return
+
+        if cls._warmup_thread is not None:
+            cls._warmup_thread.stop()
+            cls._warmup_thread.join(timeout=1.0)
 
         api_url = os.environ.get("LUCY_OLLAMA_API_URL", cfg.ollama_url)
         keep_alive = os.environ.get(
@@ -1602,7 +1624,7 @@ class LocalAnswer:
                     f"[FACTS] Retrieved {len(persistent_facts)} persistent facts for query: {query[:60]}"
                 )
                 for i, f in enumerate(persistent_facts):
-                    logger.info(f"[FACTS]  #{i+1}: {f[:100]}")
+                    logger.info(f"[FACTS]  #{i + 1}: {f[:100]}")
             except Exception as e:
                 persistent_facts = []
                 logger.warning(
