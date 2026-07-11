@@ -60,8 +60,8 @@ def isolated_learner(tmp_path: Path, monkeypatch):
     # Ensure versions dir exists
     bl.VERSIONS_DIR.mkdir(exist_ok=True)
 
-    # Ensure auto-learn is enabled
-    monkeypatch.delenv("LUCY_AUTO_LEARN", raising=False)
+    # Ensure auto-learn is enabled for tests that need it.
+    monkeypatch.setenv("LUCY_AUTO_LEARN", "1")
     if bl.DISABLE_FLAG.exists():
         bl.DISABLE_FLAG.unlink()
 

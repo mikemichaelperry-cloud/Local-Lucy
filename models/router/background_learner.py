@@ -115,14 +115,15 @@ def is_learning_enabled() -> bool:
 
     Respects two mechanisms (checked in order):
     1. DISABLE_FLAG file: if `.learner_disable` exists, learning is OFF.
-    2. Environment variable: LUCY_AUTO_LEARN=0 disables, anything else enables.
+    2. Environment variable: LUCY_AUTO_LEARN=1 explicitly enables.
 
-    Returns True if learning may proceed.
+    Auto-learning defaults to OFF for production safety; it must be explicitly
+    opted in. Returns True if learning may proceed.
     """
     if DISABLE_FLAG.exists():
         return False
-    env = os.environ.get("LUCY_AUTO_LEARN", "1").strip().lower()
-    return env not in ("0", "false", "no", "off")
+    env = os.environ.get("LUCY_AUTO_LEARN", "0").strip().lower()
+    return env in ("1", "true", "yes", "on")
 
 
 def disable_learning(reason: str = "") -> None:
@@ -371,7 +372,8 @@ def _is_high_stakes_feedback(query: str, route: str) -> bool:
         ):
             return True
     except Exception:
-        pass
+        # Fail closed: if policy evaluation breaks, do not auto-learn.
+        return True
 
     return False
 

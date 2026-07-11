@@ -10,6 +10,7 @@ Bug: trigger_background_learning() calls maybe_auto_learn(min_entries=1),
 """
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -22,6 +23,10 @@ ROUTER_DIR = Path(__file__).parent.resolve()
 
 class TestFeedbackTriggerBug(unittest.TestCase):
     """Test that user feedback triggers background learning."""
+
+    def setUp(self):
+        """Enable auto-learning for these tests."""
+        os.environ["LUCY_AUTO_LEARN"] = "1"
 
     def test_maybe_auto_learn_ignores_user_feedback(self):
         """
@@ -53,13 +58,9 @@ class TestFeedbackTriggerBug(unittest.TestCase):
                 + "\n"
             )
 
-            # auto_feedback.jsonl is EMPTY (normal state)
-            auto_fb.write_text("")
-
-            # Patch the paths
+            # Patch the user feedback path so the test is isolated.
             with patch.object(sys.modules["background_learner"], "FEEDBACK_PATH", user_fb):
-                with patch.object(sys.modules["auto_feedback"], "AUTO_FEEDBACK_PATH", auto_fb):
-                    result = maybe_auto_learn(min_entries=1)
+                result = maybe_auto_learn(min_entries=1)
 
             # BUG: This returns False because auto_feedback is empty,
             # even though user_feedback has 1 entry.
