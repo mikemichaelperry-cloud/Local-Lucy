@@ -16,7 +16,7 @@ umask 077
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${LUCY_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)}"
-LUCY_WORKSPACE_ROOT="$(CDPATH= cd -- "${ROOT}/../.." && pwd)"
+LUCY_WORKSPACE_ROOT="${ROOT}"
 NL_CHAT_BIN="${LUCY_VOICE_NL_CHAT_BIN:-${ROOT}/tools/lucy_nl_chat.sh}"
 TTS_ADAPTER="${ROOT}/tools/voice/tts_adapter.py"
 TTS_PLAYBACK="${ROOT}/tools/voice/playback.py"
