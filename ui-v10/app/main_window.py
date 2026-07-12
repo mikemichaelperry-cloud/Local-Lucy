@@ -499,6 +499,11 @@ class OperatorConsoleWindow(QMainWindow):
         self.control_panel.model_change_requested.connect(
             lambda value: self._execute_backend_action("model_selection", value, "model change")
         )
+        self.control_panel.gemma4_smart_routing_change_requested.connect(
+            lambda value: self._execute_backend_action(
+                "gemma4_smart_routing_toggle", value, "Gemma 4 smart routing change"
+            )
+        )
         self.control_panel.learner_change_requested.connect(
             lambda value: self._execute_backend_action("learner_toggle", value, "learner toggle")
         )
