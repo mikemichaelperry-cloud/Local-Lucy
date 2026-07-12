@@ -63,6 +63,51 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Gemma 4 smart-routing helpers
+# ---------------------------------------------------------------------------
+
+_NEWS_RE = re.compile(r"\b(news|headlines|latest|breaking)\b", re.IGNORECASE)
+_EVIDENCE_RE = re.compile(r"\b(research|study|evidence|paper|source|according to)\b", re.IGNORECASE)
+
+
+def _is_gemma4_smart_routing_enabled(model: str) -> bool:
+    """Return True if Gemma 4 smart routing is enabled for the given model."""
+    if not model or not model.lower().startswith("gemma4"):
+        return False
+    return os.environ.get("LUCY_GEMMA4_SMART_ROUTING", "").lower() in ("1", "true", "on")
+
+
+def _gemma4_bypass_decision(question: str) -> tuple[ClassificationResult, RoutingDecision]:
+    """Create minimal classification + LOCAL routing decision for Gemma 4 bypass."""
+    classification = ClassificationResult(
+        intent="general",
+        intent_family="general",
+        intent_class="general",
+        confidence=1.0,
+        force_local=True,
+    )
+    decision = RoutingDecision(
+        route="LOCAL",
+        mode="SMART",
+        intent_family="general",
+        confidence=1.0,
+        provider="local",
+        provider_usage_class="local",
+        evidence_mode="none",
+        policy_reason="gemma4_smart_routing",
+    )
+    return classification, decision
+
+
+def _looks_like_news(query: str) -> bool:
+    return bool(_NEWS_RE.search(query))
+
+
+def _looks_like_evidence(query: str) -> bool:
+    return bool(_EVIDENCE_RE.search(query))
+
+
+# ---------------------------------------------------------------------------
 # Pipeline choke point
 # ---------------------------------------------------------------------------
 
@@ -106,6 +151,25 @@ def process(
     _profiling = os.environ.get("LUCY_LATENCY_PROFILE", "").lower() in {"1", "true", "yes"}
     _profile: dict[str, int] = {}
     start_time = _time.time()
+
+    # ------------------------------------------------------------------
+    # 0. Gemma 4 smart-routing bypass
+    # ------------------------------------------------------------------
+    active_model = (
+        model or os.environ.get("LUCY_MODEL", "") or os.environ.get("LUCY_LOCAL_MODEL", "")
+    )
+    if (
+        classification is None
+        and decision is None
+        and _is_gemma4_smart_routing_enabled(active_model)
+        and not route_prefix
+    ):
+        if _looks_like_news(question):
+            route_prefix = "NEWS"
+        elif _looks_like_evidence(question):
+            route_prefix = "EVIDENCE"
+        else:
+            classification, decision = _gemma4_bypass_decision(question)
 
     # ------------------------------------------------------------------
     # 1. Classify (skipped if caller provides classification)
