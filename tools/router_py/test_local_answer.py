@@ -801,6 +801,17 @@ class TestCacheFactRevision(unittest.TestCase):
         self.assertIsNone(cached2)
 
 
+class TestVramHelper(unittest.TestCase):
+    """Test GPU VRAM detection helper."""
+
+    def test_get_gpu_free_vram_mb_returns_int_or_none(self):
+        """Helper returns a non-negative int or None when detection fails."""
+        result = local_answer.get_gpu_free_vram_mb()
+        self.assertTrue(result is None or isinstance(result, int))
+        if result is not None:
+            self.assertGreaterEqual(result, 0)
+
+
 def run_tests():
     """Run all tests."""
     loader = unittest.TestLoader()
@@ -821,6 +832,7 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
     suite.addTests(loader.loadTestsFromTestCase(TestPersonalFamilyFactResolver))
     suite.addTests(loader.loadTestsFromTestCase(TestCacheFactRevision))
+    suite.addTests(loader.loadTestsFromTestCase(TestVramHelper))
 
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

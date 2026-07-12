@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -635,6 +636,35 @@ class _OllamaWarmupThread(threading.Thread):
 
     def stop(self) -> None:
         self._stop_event.set()
+
+
+def get_gpu_free_vram_mb() -> int | None:
+    """Return free NVIDIA VRAM in MB, or None if not detectable."""
+    try:
+        import pynvml  # type: ignore
+
+        pynvml.nvmlInit()
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        return int(info.free // (1024 * 1024))
+    except Exception:
+        pass
+    try:
+        out = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if out.returncode == 0:
+            return int(out.stdout.strip().split("\n")[0].strip())
+    except Exception:
+        pass
+    return None
 
 
 class LocalAnswer:
