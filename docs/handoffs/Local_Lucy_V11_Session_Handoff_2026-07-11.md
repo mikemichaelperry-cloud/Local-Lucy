@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-11 (updated 2026-07-12)
 **Branch:** `v10-dev`
-**Latest commit:** `bb382a1`
+**Latest commit:** `1cc0180`
 **Repo:** `/home/mike/lucy-v10`
 
 ---
@@ -27,29 +27,32 @@
 - **XDG data dir double-app-name bug:** `tools/xdg_paths.py` was building `~/.local/share/local-lucy/local-lucy/...`; it now correctly resolves to `~/.local/share/local-lucy/...`.
 - **Per-model semantic-regression goldens:** `tests/golden_semantic_responses.json` now stores responses per model. Goldens exist for `local-lucy-llama31` and `local-lucy`; the 10 previously-skipped tests now pass for both models.
 
+## Gemma 4 12B integration (2026-07-12)
+
+- Upgraded Ollama to 0.31.2 and pulled `gemma4:12b-it-qat` (~7.2 GB).
+- Registered `gemma4:12b-it-qat` as an optional local model in:
+  - `ui-v10/app/panels/control_panel.py`
+  - `ui-v10/app/services/runtime_bridge.py`
+- Fixed empty-response issue: Gemma 4 emits internal reasoning tokens via `/api/generate`, so `local_answer.py` now treats `gemma4` as a thinking model and applies the 4× `num_predict` multiplier.
+- Recorded per-model semantic-regression goldens for Gemma 4.
+- Relaxed the `honesty_uncertainty` structural gate so valid paraphrases of "I don't know" are not rejected.
+
 ---
 
 ## Current state
 
 - All changes are committed locally on `v10-dev`.
-- Working tree is clean except for three untracked files:
+- Working tree is clean except for untracked files:
   - `count_inotify_watches.py` (diagnostic script from the inotify investigation)
-  - `docs/Session_Report_Grok_2026-07-10_Ubuntu_Chess_and_Local_Lucy.md`
-  - `docs/superpowers/plans/2026-07-11-grok-top-issues.md`
+  - `memory.db`, `memory.db-shm`, `memory.db-wal` (runtime SQLite artifacts from test runs)
 
 ### Verification evidence
 
 | Suite | Result |
 |---|---|
-| `LUCY_TEST_LIVE_APIS=1 make test` | **1073 passed, 10 skipped, 1 deselected** |
-| `tools/router_py/test_e2e_hmi_voice.py` | **15/15 passed** |
-| `tools/tests/test_voice_*.sh` (5 scripts) | **5/5 passed** |
-| `tools/router_py/test_local_answer.py` + `test_utils.py` | **70/70 passed** |
-| `tools/tests/test_memory_*.py` | **118/118 passed** |
-| `tools/router_py/test_semantic_regression.py` | **10/10 passed** (both `local-lucy` and `local-lucy-llama31`) |
-| `tools/thrash_test_fast.py` | **28/28 passed** |
-| Voice E2E stress loop (5 runs) | **75/75 passed** |
-| `tools/router_py/run_barrage.py` | **12/12 completed** |
+| `LUCY_LOCAL_MODEL=gemma4:12b-it-qat LUCY_TEST_LIVE_APIS=1 make test` | **1085 passed, 1 deselected, 6 warnings** |
+| `tools/router_py/test_e2e_hmi_voice.py` (Gemma 4) | **15/15 passed** |
+| `tools/router_py/test_semantic_regression.py` (Gemma 4) | **10/10 passed** |
 
 - inotify usage is **499/524,288 watches** — no current pressure.
 
@@ -58,7 +61,70 @@
 ## Known limitations / next session
 
 1. **Bloat cleanup is the next priority.** The repo has accumulated large, repetitive files from earlier agents. The next session should audit and trim them without changing runtime behavior.
-2. `run_barrage.py` has no `--count` option; it always runs the fixed pilot list.
+2. **Gemma 4 shadow-router assessment** is drafted below; implementation was intentionally deferred.
+3. `run_barrage.py` has no `--count` option; it always runs the fixed pilot list.
+
+---
+
+## Gemma 4 shadow-router assessment (no code changes)
+
+### Suitability as reasoning / multimodal specialist
+
+Yes. On the RTX 3090 24 GB, `gemma4:12b-it-qat` loads comfortably (~7 GB weights + projector) and leaves plenty of VRAM for Whisper, TTS, and embeddings. The regression suite passes end-to-end. Initial observations:
+
+- **Reasoning:** noticeably stronger structured reasoning than the older 12B models; the `reasoning_structured` test produced a clean step-by-step argument.
+- **Instruction following:** good first-person framing and self-knowledge accuracy.
+- **Paraphrase variance:** Gemma 4 rephrases uncertainty admissions more freely than Llama 3.1, so rigid exact-match or narrow regex gates need to be relaxed.
+- **Thinking tokens:** must be budgeted via the existing thinking-model multiplier; otherwise Ollama `/api/generate` returns an empty response when reasoning consumes the token limit.
+- **Multimodality:** not exercised by the current suite. Native image/audio input would need new test cases and adapter work.
+
+### What would need to change for a shadow routing pass
+
+A minimal shadow router would run Gemma 4 in parallel with the existing router, log its proposal, and return the existing router's decision unchanged.
+
+Likely touch points:
+
+1. **Model registration**
+   - `tools/router_py/model_selector.py`: add Gemma 4 to capability/latency buckets.
+   - `tools/router_py/local_answer.py`: add Gemma 4 self-knowledge string if it becomes a primary model.
+
+2. **Shadow invocation point**
+   - `tools/router_py/request_pipeline.py:process()`, after `select_route()` and before `apply_provider()`.
+   - New function/class (e.g., `Gemma4ShadowRouter`) builds a constrained JSON prompt asking for:
+     - `intent`, `domain`, `freshness_required`, `memory_required`, `tools_required`
+     - `preferred_model`, `fallback_model`, `response_mode`, `reason`
+   - Call Gemma 4 with `temperature=0`, parse the JSON, validate schema.
+
+3. **Logging / comparison**
+   - Extend `tools/router_py/metrics.py` with `record_routing_shadow()`.
+   - Emit: shadow route, primary route, agreement, latency, parse errors.
+   - Reuse existing `router_decisions.jsonl` or add a dedicated `shadow_routes.jsonl`.
+
+4. **Configuration toggle**
+   - Env var `LUCY_GEMMA4_SHADOW_ENABLED=1`.
+   - Optional mode: shadow-only for ambiguous routes (low margin / low confidence).
+
+### What must stay deterministic
+
+Do not let Gemma 4 decide or override:
+
+- Medical / veterinary evidence requirements.
+- Personal / family facts (authoritative in SQLite/templates).
+- Keel / hard policy rules (`config/keel.yaml`, `config/trust/policy.yaml`).
+- Tool execution authorization and filesystem permissions.
+- Model availability and VRAM limits.
+- Cache invalidation, logging, rollback, kill switches.
+
+The right boundary is: **Gemma 4 interprets; Local Lucy authorizes.**
+
+### Recommended next steps and effort estimate
+
+1. **Run a shadow-model selection evaluation first** (low effort, ~1 hour): route 50–100 real or adversarial requests through Gemma 4 offline and compare against the current router's decisions. This reveals whether the gains justify the latency cost.
+2. **Add a gated shadow pass** (medium effort, ~2–3 hours): implement `Gemma4ShadowRouter` behind `LUCY_GEMMA4_SHADOW_ENABLED`, log disagreements, do not affect production routing.
+3. **Add multimodal smoke tests** (medium effort, ~3–4 hours): image + PDF understanding via the existing HMI/execution pipeline.
+4. **Promote to production router only after** shadow agreement is high (>90% on golden + adversarial sets) and dangerous false negatives are near zero.
+
+Estimate for a safe, observable shadow integration: **half a day**. Promoting it to primary routing is a separate, larger decision that should wait until shadow data proves it reduces misroutes without adding latency the user notices.
 
 ---
 
