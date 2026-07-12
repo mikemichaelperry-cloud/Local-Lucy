@@ -49,6 +49,7 @@ class ControlPanel(QFrame):
         "local-lucy": "local-lucy (qwen3 14B)",
         "local-lucy-fast": "local-lucy-fast (qwen3 14B)",
         "local-lucy-mistral": "local-lucy-mistral (mistral-nemo 12B)",
+        "gemma4:12b-it-qat": "gemma4:12b-it-qat (gemma4 12B reasoning/multimodal)",
     }
 
     def __init__(self) -> None:

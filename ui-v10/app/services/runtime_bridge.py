@@ -386,6 +386,7 @@ class RuntimeBridge:
                     "local-lucy",
                     "local-lucy-fast",
                     "local-lucy-mistral",
+                    "gemma4:12b-it-qat",
                 ),
                 reason=reason,
             ),
