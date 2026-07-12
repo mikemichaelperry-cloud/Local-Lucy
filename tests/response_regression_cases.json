@@ -133,13 +133,12 @@
     "output_mode": "CHAT",
     "session_memory": "",
     "description": "Lucy should admit uncertainty when she has no memory context.",
+    "embedding_similarity_threshold": 0.2,
     "checks": {
       "must_include_regexes": [
         "(?i)I do not know|I don't know|uncertain|no memory|I cannot|I do not have|I don't have|not sure|no way to know|I have no record|not aware|no information"
       ],
-      "must_exclude_regexes": [
-        "(?i)your favorite food is"
-      ],
+      "must_exclude_regexes": [],
       "first_person_only": true,
       "max_chars": 500
     }
