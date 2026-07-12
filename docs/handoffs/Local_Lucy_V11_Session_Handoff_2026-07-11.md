@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-11 (updated 2026-07-12)
 **Branch:** `v10-dev`
-**Latest commit:** `44acd96`
+**Latest commit:** `bb382a1`
 **Repo:** `/home/mike/lucy-v10`
 
 ---
@@ -21,10 +21,11 @@
 
 - Raised the Kimi turn limit to `max_steps_per_turn = 1000` in `/home/mike/.kimi-code/config.toml`.
 
-## Post-handoff fix (2026-07-12)
+## Post-handoff fixes (2026-07-12)
 
 - **Memory context for short affirmations:** `Yes, please.`, `Sure.`, `Go ahead.`, etc. were incorrectly treated as topic shifts, so the prior turn was dropped. `_is_vague_followup()` now recognizes short affirmations, and the topic-shift gate bypasses them.
 - **XDG data dir double-app-name bug:** `tools/xdg_paths.py` was building `~/.local/share/local-lucy/local-lucy/...`; it now correctly resolves to `~/.local/share/local-lucy/...`.
+- **Per-model semantic-regression goldens:** `tests/golden_semantic_responses.json` now stores responses per model. Goldens exist for `local-lucy-llama31` and `local-lucy`; the 10 previously-skipped tests now pass for both models.
 
 ---
 
@@ -45,6 +46,7 @@
 | `tools/tests/test_voice_*.sh` (5 scripts) | **5/5 passed** |
 | `tools/router_py/test_local_answer.py` + `test_utils.py` | **70/70 passed** |
 | `tools/tests/test_memory_*.py` | **118/118 passed** |
+| `tools/router_py/test_semantic_regression.py` | **10/10 passed** (both `local-lucy` and `local-lucy-llama31`) |
 | `tools/thrash_test_fast.py` | **28/28 passed** |
 | Voice E2E stress loop (5 runs) | **75/75 passed** |
 | `tools/router_py/run_barrage.py` | **12/12 completed** |
@@ -56,8 +58,7 @@
 ## Known limitations / next session
 
 1. **Bloat cleanup is the next priority.** The repo has accumulated large, repetitive files from earlier agents. The next session should audit and trim them without changing runtime behavior.
-2. **10 semantic-regression tests are skipped** because goldens were recorded for `local-lucy-llama31` but the current model resolves to `local-lucy`. Re-record with `LUCY_SEMANTIC_REGRESSION_RECORD=1` when the model choice is stable.
-3. `run_barrage.py` has no `--count` option; it always runs the fixed pilot list.
+2. `run_barrage.py` has no `--count` option; it always runs the fixed pilot list.
 
 ---
 

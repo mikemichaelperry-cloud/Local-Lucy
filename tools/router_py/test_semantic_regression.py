@@ -273,6 +273,32 @@ def _save_json(path: Path, data: Any) -> None:
         f.write("\n")
 
 
+def _get_model_goldens(golden_data: Any, model: str) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    """Return (responses_dict, metadata_dict) for *model*.
+
+    Supports the per-model structure:
+        golden_data["models"][model]["responses"]
+    Falls back to the legacy top-level "responses" for single-model files.
+    """
+    if not isinstance(golden_data, dict):
+        return {}, {}
+    models = golden_data.get("models")
+    if isinstance(models, dict) and model in models:
+        model_entry = models[model]
+        if isinstance(model_entry, dict):
+            return model_entry.get("responses", {}), model_entry
+    return golden_data.get("responses", {}), golden_data
+
+
+def _ensure_model_goldens(golden_data: Dict[str, Any], model: str) -> Dict[str, Any]:
+    """Create or return the per-model entry used during recording."""
+    if not isinstance(golden_data.get("models"), dict):
+        golden_data["models"] = {}
+    if model not in golden_data["models"]:
+        golden_data["models"][model] = {}
+    return golden_data["models"][model]
+
+
 def _check_first_person(text: str) -> tuple[bool, str]:
     """Return (ok, reason) verifying first-person self-reference."""
     if not re.search(r"\b(I|me|my|myself|we|us|our|ourselves)\b", text, re.IGNORECASE):
@@ -404,10 +430,6 @@ async def test_semantic_regression(case, golden_data, request, skip_without_olla
     request.node.user_properties.append(("case_id", case_id))
     request.node.user_properties.append(("description", description))
 
-    # --- Golden response handling ---
-    golden_responses = golden_data.get("responses", {})
-    golden = golden_responses.get(case_id)
-
     with tempfile.TemporaryDirectory() as tmpdir:
         config = LocalAnswerConfig.from_env()
         config.cache_enabled = False
@@ -416,20 +438,15 @@ async def test_semantic_regression(case, golden_data, request, skip_without_olla
         config.top_p = 1.0
         config.cache_dir = Path(tmpdir)
 
-        # If the golden responses were recorded under a different model or prompt
-        # revision, skip the test early instead of burning tokens on a comparison
-        # that would be invalid. Re-record to update the golden file.
+        # --- Golden response handling (per-model) ---
+        golden_responses, _ = _get_model_goldens(golden_data, config.model)
+        golden = golden_responses.get(case_id)
+
         if not RECORD_MODE:
             if golden is None:
                 pytest.fail(
-                    f"No golden response for case '{case_id}'.\n"
+                    f"No golden response for case '{case_id}' and model '{config.model}'.\n"
                     f"Run with LUCY_SEMANTIC_REGRESSION_RECORD=1 to record it."
-                )
-            golden_model = golden_data.get("model")
-            if golden_model and golden_model != config.model:
-                pytest.skip(
-                    f"Golden recorded for model '{golden_model}' but current model is "
-                    f"'{config.model}'. Run LUCY_SEMANTIC_REGRESSION_RECORD=1 to update."
                 )
 
         answer = LocalAnswer(config)
@@ -452,18 +469,19 @@ async def test_semantic_regression(case, golden_data, request, skip_without_olla
 
     if RECORD_MODE:
         all_golden = _load_json(GOLDEN_PATH)
+        model_entry = _ensure_model_goldens(all_golden, config.model)
         record = {
             "text": text,
             "duration_ms": duration_ms,
             "embedding": _compute_embedding(text),
             "concepts": sorted(_compute_concepts(text)),
         }
-        all_golden.setdefault("responses", {})[case_id] = record
-        all_golden["recorded_at"] = datetime.now(timezone.utc).isoformat()
-        all_golden["model"] = config.model
-        all_golden["seed"] = config.seed
-        all_golden["temperature"] = config.temperature
-        all_golden["embedding_model"] = "all-MiniLM-L6-v2"
+        model_entry.setdefault("responses", {})[case_id] = record
+        model_entry["recorded_at"] = datetime.now(timezone.utc).isoformat()
+        model_entry["model"] = config.model
+        model_entry["seed"] = config.seed
+        model_entry["temperature"] = config.temperature
+        model_entry["embedding_model"] = "all-MiniLM-L6-v2"
         _save_json(GOLDEN_PATH, all_golden)
         if check_failures:
             warn_msg = (
@@ -472,7 +490,7 @@ async def test_semantic_regression(case, golden_data, request, skip_without_olla
             )
             pytest.skip(warn_msg)
         else:
-            pytest.skip(f"Recorded golden response for '{case_id}'")
+            pytest.skip(f"Recorded golden response for '{case_id}' ({config.model})")
 
     # In compare mode, enforce structural checks before semantic comparison
     if check_failures:
@@ -582,13 +600,15 @@ def _run_direct():
                             "embedding": _compute_embedding(text),
                             "concepts": sorted(_compute_concepts(text)),
                         }
-                        golden.setdefault("responses", {})[case_id] = record
-                        print(f"  RECORDED ({result.duration_ms}ms)")
+                        model_entry = _ensure_model_goldens(golden, config.model)
+                        model_entry.setdefault("responses", {})[case_id] = record
+                        print(f"  RECORDED ({result.duration_ms}ms) for {config.model}")
                         continue
 
-                    golden_resp = golden.get("responses", {}).get(case_id)
+                    golden_responses, _ = _get_model_goldens(golden, config.model)
+                    golden_resp = golden_responses.get(case_id)
                     if not golden_resp:
-                        print("  MISSING GOLDEN — run with RECORD=1")
+                        print(f"  MISSING GOLDEN for {config.model} — run with RECORD=1")
                         all_passed = False
                         continue
 
@@ -635,13 +655,14 @@ def _run_direct():
                 await answer.close()
 
         if RECORD_MODE:
-            golden["recorded_at"] = datetime.now(timezone.utc).isoformat()
-            golden["model"] = config.model
-            golden["seed"] = config.seed
-            golden["temperature"] = config.temperature
-            golden["embedding_model"] = "all-MiniLM-L6-v2"
+            model_entry = _ensure_model_goldens(golden, config.model)
+            model_entry["recorded_at"] = datetime.now(timezone.utc).isoformat()
+            model_entry["model"] = config.model
+            model_entry["seed"] = config.seed
+            model_entry["temperature"] = config.temperature
+            model_entry["embedding_model"] = "all-MiniLM-L6-v2"
             _save_json(GOLDEN_PATH, golden)
-            print(f"\nRecorded {len(cases)} golden responses to {GOLDEN_PATH}")
+            print(f"\nRecorded {len(cases)} golden responses for {config.model} to {GOLDEN_PATH}")
 
     asyncio.run(_run_all())
 
