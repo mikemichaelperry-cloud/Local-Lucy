@@ -49,7 +49,7 @@ When smart routing is OFF, the full existing router stack runs unchanged.
 
 When the user selects a `gemma4:*` model, the HMI reads available VRAM. If free VRAM is < 12 GB, a non-blocking warning is shown:
 
-> Gemma 4 12B may be tight on this GPU. Short conversations and single-model operation are fine; long context or concurrent models may hit VRAM limits.
+> Gemma 4 12B may be tight on this GPU. Short conversations and single-model operation are fine; long context or concurrent models may hit VRAM limits. Ollama can fall back to system RAM if needed, but responses will be slower.
 
 The warning does not block selection; it is informational.
 
@@ -104,6 +104,17 @@ The HMI will detect available VRAM using one of these methods, in order of prefe
 3. Fallback: no warning if detection fails.
 
 Only a warning is shown; selection is not blocked.
+
+---
+
+## CPU / RAM fallback and crash-proofing
+
+Ollama/llama.cpp already supports CPU offloading when a model does not fit entirely in VRAM. Local Lucy must not force GPU-only execution for Gemma 4. Requirements:
+
+1. **No GPU-only options** in Local Lucy’s Ollama payload for Gemma 4 (e.g., do not set `num_gpu` to all layers if it would crash on low-VRAM GPUs).
+2. **Graceful degrade:** if Ollama returns an out-of-memory or model-load error, Local Lucy must catch it, log it, and return a readable error message instead of crashing the HMI or pipeline.
+3. **Allow system RAM usage:** if VRAM is exhausted, Ollama should offload layers to system RAM automatically. Local Lucy will not block this.
+4. **HMI warning updated:** the low-VRAM warning should note that CPU/RAM fallback may be used, but performance will be slower.
 
 ---
 
