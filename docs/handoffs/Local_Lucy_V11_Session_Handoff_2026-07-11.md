@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-11 (updated 2026-07-12)
 **Branch:** `v10-dev`
-**Latest commit:** `1cc0180`
+**Latest commit:** `357ce55`
 **Repo:** `/home/mike/lucy-v10`
 
 ---
@@ -36,6 +36,9 @@
 - Fixed empty-response issue: Gemma 4 emits internal reasoning tokens via `/api/generate`, so `local_answer.py` now treats `gemma4` as a thinking model and applies the 4× `num_predict` multiplier.
 - Recorded per-model semantic-regression goldens for Gemma 4.
 - Relaxed the `honesty_uncertainty` structural gate so valid paraphrases of "I don't know" are not rejected.
+- **Gemma 4 smart-routing bypass:** added an HMI toggle that, when on, skips `classify_intent()` and `select_route()` for Gemma 4 and routes ordinary queries straight to `LOCAL`. Explicit `news:`/`evidence:`/`augmented:` prefixes and existing news/evidence pattern fast paths are preserved.
+- **Low-VRAM warning:** the HMI now warns when Gemma 4 is selected on a GPU with <12 GB free VRAM, noting that Ollama can fall back to system RAM.
+- **VRAM helper:** `tools/router_py/local_answer.py:get_gpu_free_vram_mb()` probes free VRAM via `pynvml` or `nvidia-smi`.
 
 ---
 
@@ -50,9 +53,11 @@
 
 | Suite | Result |
 |---|---|
-| `LUCY_LOCAL_MODEL=gemma4:12b-it-qat LUCY_TEST_LIVE_APIS=1 make test` | **1085 passed, 1 deselected, 6 warnings** |
+| `LUCY_LOCAL_MODEL=gemma4:12b-it-qat LUCY_TEST_LIVE_APIS=1 make test` | **1095 passed, 1 deselected, 6 warnings** |
 | `tools/router_py/test_e2e_hmi_voice.py` (Gemma 4) | **15/15 passed** |
 | `tools/router_py/test_semantic_regression.py` (Gemma 4) | **10/10 passed** |
+| `tools/router_py/test_request_pipeline.py` | **9/9 passed** |
+| `tools/router_py/test_local_answer.py::TestVramHelper` | **1/1 passed** |
 
 - inotify usage is **499/524,288 watches** — no current pressure.
 
@@ -61,8 +66,7 @@
 ## Known limitations / next session
 
 1. **Bloat cleanup is the next priority.** The repo has accumulated large, repetitive files from earlier agents. The next session should audit and trim them without changing runtime behavior.
-2. **Gemma 4 shadow-router assessment** is drafted below; implementation was intentionally deferred.
-3. `run_barrage.py` has no `--count` option; it always runs the fixed pilot list.
+2. `run_barrage.py` has no `--count` option; it always runs the fixed pilot list.
 
 ---
 
