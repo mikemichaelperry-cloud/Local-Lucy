@@ -1843,7 +1843,7 @@ class LocalAnswer:
         model = (self.config.model or "").lower().split(":")[0]
         if model in self._THINKING_MODEL_TAGS:
             return True
-        return any(name in model for name in ("qwen3", "deepseek-r1", "o3", "o1"))
+        return any(name in model for name in ("qwen3", "deepseek-r1", "gemma4", "o3", "o1"))
 
     def _thinking_model_token_multiplier(self) -> int:
         """Return multiplier for num_predict on thinking models."""
