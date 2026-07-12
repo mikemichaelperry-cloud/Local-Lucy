@@ -1,13 +1,13 @@
 # Local Lucy V11 — Architecture
 
-**Date:** 2026-07-10
+**Date:** 2026-07-12
 **Version:** v11
 **Branch:** v10-dev
 **Scope:** English-only primary runtime
 
 > This document describes **v11 as implemented**. Hebrew / Racheli support has been removed from the primary runtime; the standalone Hebrew assistant was archived separately on 2026-07-10.
 >
-> Latest commits on `v10-dev`: Racheli/Hebrew artifact purge (`87208d0`) and bulk pre-commit cleanup (`dd82304`).
+> Latest commits on `v10-dev`: Gemma 4 12B integration + smart-routing bypass (`357ce55`), low-VRAM warning (`fce4aa4`).
 
 ---
 
@@ -114,18 +114,29 @@ lucy-v10/
 
 1. **Ingest** — `main.run(query, attachments, session_id, overrides)`
 2. **Feedback detection** — Corrections and thumbs-up/down short-circuit to the feedback buffer / background learner.
-3. **Classify & route** — `classify.classify_intent()` + `select_route()` produce a `RoutingDecision`.
-4. **Resolve provider** — `provider_resolver` maps the route to a concrete provider plan.
-5. **Execute** — `execution_engine` runs the plan in a sandboxed Python namespace.
-6. **Guard context** — `context_guard` filters evidence and memory for relevance.
-7. **Generate answer** — `local_answer` streams the final response from Ollama (or formats external provider output).
-8. **Persist** — Turn is written to SQLite; feedback/state files are updated.
+3. **Gemma 4 smart-routing bypass (optional)** — If `gemma4_smart_routing` is enabled and the active model is a `gemma4:*` tag, ordinary queries short-circuit to `LOCAL` without running `classify_intent()` or `select_route()`. Explicit route prefixes and existing news/evidence pattern fast paths still win.
+4. **Classify & route** — `classify.classify_intent()` + `select_route()` produce a `RoutingDecision`.
+5. **Resolve provider** — `provider_resolver` maps the route to a concrete provider plan.
+6. **Execute** — `execution_engine` runs the plan in a sandboxed Python namespace.
+7. **Guard context** — `context_guard` filters evidence and memory for relevance.
+8. **Generate answer** — `local_answer` streams the final response from Ollama (or formats external provider output).
+9. **Persist** — Turn is written to SQLite; feedback/state files are updated.
 
 ---
 
 ## 5. Routing & Classification
 
 Routing is **deterministic-first, semantic-second**.
+
+### 5.0 Gemma 4 Smart-Routing Bypass
+
+When the HMI toggle `gemma4_smart_routing` is on and the selected model is `gemma4:*`, `tools/router_py/request_pipeline.py` constructs a minimal `LOCAL` `RoutingDecision` directly. This skips the policy router, embedding router, and intent classifier for ordinary queries. It preserves:
+
+- Explicit route prefixes (`news:`, `evidence:`, `augmented:`).
+- Existing news/evidence pattern fast paths (`latest news about ...`, `evidence for ...`).
+- Execution-engine guardrails (tool authorization, permissions, etc.).
+
+The bypass is off by default; non-Gemma models always use the full router stack.
 
 ### 5.1 Policy Router (`tools/router_py/policy_router.py`)
 
@@ -224,10 +235,18 @@ The file shrank from ~3,900 lines to ~2,216 lines after the shell removal, reduc
 - Async Ollama client with streaming support.
 - Builds the final prompt from the selected Modelfile, session memory, persistent facts, and any fetched external context.
 - Enforces first-person self-reference and self-knowledge boundaries through the system prompt.
+- Detects thinking models (Qwen3, DeepSeek-R1, Gemma 4, etc.) and applies a token-budget multiplier so reasoning tokens do not swallow the visible response.
+- Provides `get_gpu_free_vram_mb()` for HMI resource warnings.
 
 ### 8.2 Model Selector (`tools/router_py/model_selector.py`)
 
-The UI exposes an **Auto** default. In shadow mode, the selector automatically chooses the most appropriate local model by query bucket. Manual overrides remain available for power users.
+The UI exposes an **Auto** default. In shadow mode, the selector automatically chooses the most appropriate local model by query bucket. Manual overrides remain available for power users. `gemma4:12b-it-qat` is available as an optional reasoning/multimodal model.
+
+### 8.3 VRAM Management
+
+- The HMI warns when Gemma 4 is selected on a GPU with <12 GB free VRAM.
+- Local Lucy does not force GPU-only execution; Ollama/llama.cpp may offload layers to system RAM when VRAM is exhausted.
+- The runtime evicts other loaded Ollama models when switching models, keeping only the active model in VRAM.
 
 ### 8.3 Default Modelfile (`config/Modelfile.local-lucy-llama31`)
 
