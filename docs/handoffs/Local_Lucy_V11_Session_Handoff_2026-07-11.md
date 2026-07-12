@@ -1,8 +1,8 @@
 # Local Lucy V11 — Session Handoff
 
-**Date:** 2026-07-11
+**Date:** 2026-07-11 (updated 2026-07-12)
 **Branch:** `v10-dev`
-**Latest commit:** `999739d`
+**Latest commit:** `44acd96`
 **Repo:** `/home/mike/lucy-v10`
 
 ---
@@ -20,6 +20,11 @@
   8. **Test cleanup:** removed stale shell-router comparison tests from `tools/router_py/test_utils.py`.
 
 - Raised the Kimi turn limit to `max_steps_per_turn = 1000` in `/home/mike/.kimi-code/config.toml`.
+
+## Post-handoff fix (2026-07-12)
+
+- **Memory context for short affirmations:** `Yes, please.`, `Sure.`, `Go ahead.`, etc. were incorrectly treated as topic shifts, so the prior turn was dropped. `_is_vague_followup()` now recognizes short affirmations, and the topic-shift gate bypasses them.
+- **XDG data dir double-app-name bug:** `tools/xdg_paths.py` was building `~/.local/share/local-lucy/local-lucy/...`; it now correctly resolves to `~/.local/share/local-lucy/...`.
 
 ---
 
@@ -39,6 +44,7 @@
 | `tools/router_py/test_e2e_hmi_voice.py` | **15/15 passed** |
 | `tools/tests/test_voice_*.sh` (5 scripts) | **5/5 passed** |
 | `tools/router_py/test_local_answer.py` + `test_utils.py` | **70/70 passed** |
+| `tools/tests/test_memory_*.py` | **118/118 passed** |
 | `tools/thrash_test_fast.py` | **28/28 passed** |
 | Voice E2E stress loop (5 runs) | **75/75 passed** |
 | `tools/router_py/run_barrage.py` | **12/12 completed** |

@@ -1264,6 +1264,16 @@ _VAGUE_FOLLOWUP_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Short affirmations that continue the prior turn (e.g. "Yes, please.",
+# "Sure", "Go ahead").  These carry no topic of their own and must keep context.
+_AFFIRMATION_FOLLOWUP_RE = re.compile(
+    r"^(?:\s*)(?:"
+    r"yes|yeah|yep|yup|sure|absolutely|definitely|exactly|right|correct|"
+    r"ok|okay|please|go ahead|do it"
+    r")(?:\s*[,.]?\s*please)?[\s\W]*$",
+    re.IGNORECASE,
+)
+
 # Explicit continuation markers that may be followed by a topic phrase.
 # "Back to what we discussed earlier", "One more thing about relativity",
 # "What about this evening?" and "Also, why does it work?" all keep context.
@@ -1408,6 +1418,8 @@ def _is_vague_followup(query: str) -> bool:
     if not q:
         return False
     if _VAGUE_FOLLOWUP_RE.search(q):
+        return True
+    if _AFFIRMATION_FOLLOWUP_RE.search(q):
         return True
     if _has_explicit_continuation(q):
         return True

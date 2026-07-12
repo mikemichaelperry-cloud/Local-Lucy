@@ -395,6 +395,51 @@ class TestMemoryTopicShift(unittest.TestCase):
                     f"{q!r} should be detected as a vague follow-up",
                 )
 
+    def test_affirmation_followup_keeps_context(self):
+        """Short affirmations like 'Yes, please.' must keep recent turns."""
+        ms.store_turn("user", "Do you have a good recipe for roast beef and Yorkshire pudding?")
+        ms.store_turn(
+            "assistant",
+            "I can provide you with a classic recipe... Would you like the detailed steps?",
+        )
+
+        # Orthogonal embeddings would normally trigger a topic-shift block.
+        with patch.object(
+            ms,
+            "_get_embedding",
+            side_effect=[
+                [1.0, 0.0, 0.0],  # previous turn embedding
+                [0.0, 1.0, 0.0],  # current query embedding (orthogonal)
+            ],
+        ):
+            ctx, telem = ms.assemble_context_with_telemetry(
+                query="Yes, please.",
+                depth="shallow",
+                mode="local",
+            )
+
+        self.assertIn("roast beef", ctx.lower())
+        self.assertNotIn("memory_topic_shift_detected", telem)
+        self.assertEqual(telem["memory_context_used"], "true")
+
+    def test_affirmation_followup_variants(self):
+        """Common short affirmations should be treated as vague follow-ups."""
+        variants = [
+            "Yes, please.",
+            "Sure.",
+            "Go ahead.",
+            "Yeah.",
+            "Please.",
+            "OK.",
+            "Absolutely.",
+        ]
+        for q in variants:
+            with self.subTest(query=q):
+                self.assertTrue(
+                    ms._is_vague_followup(q),
+                    f"{q!r} should be detected as a vague follow-up",
+                )
+
     # ------------------------------------------------------------------
     # Greetings / social openers must not pull stale context
     # ------------------------------------------------------------------

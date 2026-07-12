@@ -28,19 +28,19 @@ def lucy_data_dir() -> Path:
     legacy = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "").strip()
     if legacy:
         return Path(legacy)
-    fallback = Path.home() / ".local" / "share" / _APP_NAME
+    fallback = Path.home() / ".local" / "share"
     return _xdg_dir("XDG_DATA_HOME", fallback) / _APP_NAME
 
 
 def lucy_config_dir() -> Path:
     """User config: Modelfiles, prompts, trust rules."""
-    fallback = Path.home() / ".config" / _APP_NAME
+    fallback = Path.home() / ".config"
     return _xdg_dir("XDG_CONFIG_HOME", fallback) / _APP_NAME
 
 
 def lucy_cache_dir() -> Path:
     """User cache: downloaded assets, temp build artifacts."""
-    fallback = Path.home() / ".cache" / _APP_NAME
+    fallback = Path.home() / ".cache"
     return _xdg_dir("XDG_CACHE_HOME", fallback) / _APP_NAME
 
 
