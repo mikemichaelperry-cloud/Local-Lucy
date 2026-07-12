@@ -6,6 +6,7 @@ from typing import Any
 
 from PySide6.QtCore import Signal, QTimer
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFrame,
     QGroupBox,
@@ -36,6 +37,7 @@ class ControlPanel(QFrame):
     augmented_policy_change_requested = Signal(str)
     augmented_provider_change_requested = Signal(str)
     model_change_requested = Signal(str)
+    gemma4_smart_routing_change_requested = Signal(str)
     learner_change_requested = Signal(str)
     ptt_pressed_requested = Signal()
     ptt_released_requested = Signal()
@@ -100,6 +102,7 @@ class ControlPanel(QFrame):
             "augmentation_policy": "",
             "augmented_provider": "",
             "model": "",
+            "gemma4_smart_routing": "",
             "profile": "",
             "learner": "",
         }
@@ -235,6 +238,20 @@ class ControlPanel(QFrame):
         self._model_selector.addItems(list(self._MODEL_LABELS.values()))
         self._model_selector.activated.connect(self._handle_model_activated)
 
+        self._gemma4_smart_routing_selector = QCheckBox("Gemma 4 Smart Routing")
+        self._gemma4_smart_routing_selector.setToolTip(
+            "When on and Gemma 4 is selected, bypass the classifier/router and let Gemma 4 route internally."
+        )
+        self._gemma4_smart_routing_selector.setEnabled(False)
+        self._gemma4_smart_routing_selector.stateChanged.connect(
+            self._handle_gemma4_smart_routing_changed
+        )
+
+        self._gemma4_vram_warning_label = QLabel("")
+        self._gemma4_vram_warning_label.setWordWrap(True)
+        self._gemma4_vram_warning_label.setObjectName("cardValue")
+        self._gemma4_vram_warning_label.setVisible(False)
+
         self._model_recommendation_label = QLabel("Model recommendation: —")
         self._model_recommendation_label.setObjectName("cardLabel")
         self._model_recommendation_label.setWordWrap(True)
@@ -285,6 +302,8 @@ class ControlPanel(QFrame):
         )
         layout.addWidget(self._build_labeled_row("auto-learn", self._learner_selector))
         layout.addWidget(self._build_labeled_row("model", self._model_selector))
+        layout.addWidget(self._gemma4_smart_routing_selector)
+        layout.addWidget(self._gemma4_vram_warning_label)
         layout.addWidget(self._model_recommendation_label)
         layout.addWidget(self._eng_selected_route_label)
         layout.addWidget(self._eng_selected_model_label)
@@ -661,6 +680,10 @@ class ControlPanel(QFrame):
             "model": configured_model,
             "learner": top_status.get("Learner", "").strip().lower(),
         }
+        if isinstance(current_state, dict):
+            values["gemma4_smart_routing"] = (
+                str(current_state.get("gemma4_smart_routing", "off")).strip().lower()
+            )
         self._current_values.update(values)
         if self._profile_value_label is not None:
             profile_text = values["profile"] or "unavailable"
@@ -674,6 +697,11 @@ class ControlPanel(QFrame):
         self._set_selector_value(self._augmented_provider_selector, values["augmented_provider"])
         self._set_selector_value(self._learner_selector, values.get("learner", ""))
         self._set_selector_value(self._model_selector, values.get("model", ""))
+        if self._gemma4_smart_routing_selector is not None:
+            self._gemma4_smart_routing_selector.setChecked(
+                values.get("gemma4_smart_routing", "off") == "on"
+            )
+        self._update_gemma4_smart_routing_visibility(values.get("model", ""))
         self._refresh_voice_ptt()
 
     def update_trace_summary(
@@ -958,6 +986,36 @@ class ControlPanel(QFrame):
             model_value,
             self.model_change_requested,
         )
+        self._update_gemma4_smart_routing_visibility(model_value)
+
+    def _handle_gemma4_smart_routing_changed(self, state: int) -> None:
+        value = "on" if state == 2 else "off"
+        self._emit_if_changed(
+            "gemma4_smart_routing",
+            value,
+            self.gemma4_smart_routing_change_requested,
+        )
+
+    def _update_gemma4_smart_routing_visibility(self, model: str) -> None:
+        is_gemma = bool(model) and model.lower().startswith("gemma4")
+        self._gemma4_smart_routing_selector.setEnabled(is_gemma)
+        if not is_gemma:
+            self._gemma4_vram_warning_label.setText("")
+            self._gemma4_vram_warning_label.setVisible(False)
+            return
+        from router_py.local_answer import get_gpu_free_vram_mb
+
+        free_vram_mb = get_gpu_free_vram_mb()
+        if free_vram_mb is not None and free_vram_mb < 12 * 1024:
+            self._gemma4_vram_warning_label.setText(
+                "Warning: Gemma 4 12B may be tight on this GPU. "
+                "Short conversations are fine; long context or concurrent models may hit VRAM limits. "
+                "Ollama can fall back to system RAM, but responses will be slower."
+            )
+            self._gemma4_vram_warning_label.setVisible(True)
+        else:
+            self._gemma4_vram_warning_label.setText("")
+            self._gemma4_vram_warning_label.setVisible(False)
 
     def set_model_recommendation(self, text: str) -> None:
         """Update the engineering-only model recommendation read-out."""
