@@ -91,7 +91,7 @@ def run(
         augmented_direct_once: Force augmented route for this query
         self_review: Whether this is a self-review request
         context: Extra execution context (merged into engine context)
-        model: Override LLM model (e.g., "local-lucy-fast" for voice safety)
+        model: Override LLM model (e.g., "local-lucy-llama31" for voice safety)
 
     Returns:
         RouterOutcome with status, route, provider, response_text, etc.
