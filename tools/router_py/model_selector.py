@@ -23,13 +23,12 @@ logger = logging.getLogger(__name__)
 # Base capability buckets.  Persona variants are resolved at runtime.
 _CAPABILITY_DEFAULTS: dict[str, str] = {
     "general": "local-lucy-llama31",
-    "fast": "local-lucy-fast",
-    "memory": "local-lucy-memory",
-    "reasoning": "local-lucy-stable",
-    # Use the installed 30B parameter model for deep-thought queries.
-    "deep_thought": "qwen3:30b",
-    "coding": "local-lucy-qwen3",
-    "creative": "local-lucy-mistral",
+    "fast": "local-lucy-llama31",
+    "memory": "local-lucy-llama31",
+    "reasoning": "local-lucy-llama31",
+    "deep_thought": "gemma4:12b-it-qat",
+    "coding": "local-lucy-llama31",
+    "creative": "local-lucy-llama31",
 }
 
 # Query-pattern heuristics.  Order matters: more specific patterns first.
@@ -145,17 +144,23 @@ def _resolve_installed_tag(candidate: str, installed: set[str]) -> str | None:
     return None
 
 
+_ALLOWED_PERSONA_BASES: frozenset[str] = frozenset({"local-lucy-llama31", "gemma4:12b-it-qat"})
+
+
 def _resolve_persona_model(base_model: str, persona: str, available: set[str]) -> str:
-    """Prefer a persona-tuned variant when one exists and is installed."""
+    """Prefer a persona-tuned variant when one exists and is installed.
+
+    Only the allowed base models may have active persona variants; otherwise
+    fall back to the base model.
+    """
     if not persona:
+        return base_model
+    base_model = _base_name(base_model)
+    if base_model not in _ALLOWED_PERSONA_BASES:
         return base_model
     persona = persona.strip().lower()
     candidate = f"{base_model}-{persona}"
     resolved = _resolve_installed_tag(candidate, available)
-    if resolved:
-        return resolved
-    # Some older naming used the persona as a suffix on the root tag.
-    resolved = _resolve_installed_tag(f"{base_model}-{persona}", available)
     if resolved:
         return resolved
     return base_model
@@ -194,12 +199,7 @@ def _available_models(preferred: list[str] | None = None) -> set[str]:
     # Fallback static list for environments where ollama is not reachable.
     return {
         "local-lucy-llama31",
-        "local-lucy",
-        "local-lucy-fast",
-        "local-lucy-stable",
-        "local-lucy-qwen3",
-        "local-lucy-mistral",
-        "local-lucy-memory",
+        "gemma4:12b-it-qat",
     }
 
 
@@ -304,14 +304,8 @@ _CREATIVE_RE = re.compile(
 # Latency budgets by base model name (milliseconds). These are planning
 # estimates, not hard timeouts.
 _LATENCY_BUDGETS_MS: dict[str, int] = {
-    "local-lucy-fast": 3000,
-    "local-lucy": 8000,
-    "local-lucy-qwen3": 8000,
     "local-lucy-llama31": 5000,
-    "local-lucy-stable": 8000,
-    "local-lucy-memory": 5000,
-    "local-lucy-mistral": 8000,
-    "qwen3:30b": 25000,
+    "gemma4:12b-it-qat": 12000,
 }
 
 
@@ -373,27 +367,17 @@ def _confidence_for_bucket(
 def _competing_model(recommended: str, installed: set[str]) -> str:
     """Pick a sensible competing model for shadow A/B comparisons."""
     base = _base_name(recommended)
-    candidates: list[str] = []
-    if base == "local-lucy-llama31":
-        candidates = ["local-lucy-qwen3", "local-lucy-stable", "local-lucy-fast"]
-    elif base in ("local-lucy-qwen3", "local-lucy"):
-        candidates = ["local-lucy-llama31", "local-lucy-fast"]
-    elif base == "local-lucy-fast":
-        candidates = ["local-lucy", "local-lucy-llama31"]
-    elif base == "local-lucy-memory":
+    candidates: list[str]
+    if base == "gemma4:12b-it-qat":
         candidates = ["local-lucy-llama31"]
-    elif base == "qwen3:30b":
-        candidates = ["local-lucy-stable", "local-lucy-llama31"]
-    elif base == "local-lucy-stable":
-        candidates = ["qwen3:30b", "local-lucy-llama31"]
     else:
-        candidates = ["local-lucy-llama31", "local-lucy-fast"]
+        candidates = ["gemma4:12b-it-qat"]
 
     for cand in candidates:
         resolved = _resolve_installed_tag(cand, installed)
         if resolved:
             return resolved
-    # Final fallback to the first installed model, or Llama 3.1.
+    # Final fallback to the first installed allowed model, or Llama 3.1.
     return next(iter(installed), "local-lucy-llama31")
 
 
@@ -438,52 +422,19 @@ def select_model(
     recommended: str
     reason: str
 
-    if route_name in _FACTUAL_ROUTES:
+    if bucket == "deep_thought":
+        recommended = _resolve_installed_tag("gemma4:12b-it-qat", installed) or "gemma4:12b-it-qat"
+        reason = "Deep-thought pattern; using Gemma 4"
+    elif route_name in _FACTUAL_ROUTES:
         recommended = (
             _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
         )
         reason = f"{route_name} route requires factual accuracy; defaulting to Llama 3.1"
-    elif route_name == "AUGMENTED" and intent_family == "factual":
-        recommended = (
-            _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
-        )
-        reason = "AUGMENTED factual query; using Llama 3.1 for accuracy"
     elif _is_factual_current_query(query):
         recommended = (
             _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
         )
         reason = "Query asks for factual/current information; using Llama 3.1"
-    elif bucket == "memory":
-        recommended = _resolve_installed_tag("local-lucy-memory", installed) or "local-lucy-memory"
-        reason = "Memory/personal-fact query; using memory-tuned model"
-    elif bucket == "deep_thought":
-        resolved = _resolve_installed_tag("qwen3:30b", installed)
-        if resolved:
-            recommended = resolved
-            reason = "Deep-thought pattern; using qwen3:30b"
-        else:
-            recommended = (
-                _resolve_installed_tag("local-lucy-stable", installed) or "local-lucy-stable"
-            )
-            reason = "Deep-thought pattern; qwen3:30b unavailable, using stable model"
-    elif bucket in ("coding", "reasoning"):
-        resolved = _resolve_installed_tag("local-lucy-qwen3", installed)
-        if resolved:
-            recommended = resolved
-            reason = f"{bucket} query; qwen3:14b installed"
-        else:
-            recommended = (
-                _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
-            )
-            reason = f"{bucket} query; qwen3:14b not installed, using Llama 3.1"
-    elif bucket == "fast" or intent_family == "creative" or _is_creative_query(query):
-        resolved = _resolve_installed_tag("local-lucy", installed)
-        if resolved:
-            recommended = resolved
-            reason = "Creative/short-chat/low-latency query; using qwen3:14b with shorter budget"
-        else:
-            recommended = _resolve_installed_tag("local-lucy-fast", installed) or "local-lucy-fast"
-            reason = "Creative/short-chat/low-latency query; using fast model"
     else:
         recommended = (
             _resolve_installed_tag("local-lucy-llama31", installed) or "local-lucy-llama31"
