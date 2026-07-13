@@ -158,9 +158,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=(
             "auto",
             "local-lucy-llama31",
-            "local-lucy",
-            "local-lucy-fast",
-            "local-lucy-mistral",
+            "gemma4:12b-it-qat",
         ),
     )
 
