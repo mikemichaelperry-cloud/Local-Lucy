@@ -266,9 +266,8 @@ _SELF_KNOWLEDGE_TEMPLATE = (
 _MODEL_IDENTITIES: dict[str, tuple[str, str]] = {
     # backend_name -> (ollama_model_name, parameter_description)
     "local-lucy-llama31": ("llama3.1:8b", "~8B parameters, 4096-token context"),
-    "local-lucy": ("qwen3:14b", "~14B parameters, 2048-token context"),
-    "local-lucy-fast": ("qwen3:14b", "~14B parameters, 2048-token context"),
-    "local-lucy-mistral": ("mistral-nemo", "~12B parameters, 2048-token context"),
+    "local-lucy-llama31:latest": ("llama3.1:8b", "~8B parameters, 4096-token context"),
+    "gemma4:12b-it-qat": ("gemma4:12b-it-qat", "~12B parameters, 128k-token context"),
 }
 
 
