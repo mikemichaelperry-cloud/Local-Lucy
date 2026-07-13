@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Signal, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -127,6 +127,7 @@ class ControlPanel(QFrame):
         scroll_area.setObjectName("panelScrollArea")
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._scroll_area = scroll_area
         root_layout.addWidget(scroll_area)
 
