@@ -42,7 +42,7 @@ def test_model_selector():
                 "voice": "off",
                 "augmentation_policy": "disabled",
                 "augmented_provider": "wikipedia",
-                "model": "local-lucy",
+                "model": "local-lucy-llama31",
                 "approval_required": False,
                 "status": "ready",
                 "last_updated": "2026-03-25T00:00:00Z",
@@ -64,8 +64,9 @@ def test_model_selector():
     # 1. Model selector should reflect runtime state
     model_selector = window.control_panel._model_selector
     assert_ok(model_selector is not None, "control panel should expose model selector")
+    expected_label = "local-lucy-llama31 (llama3.1 8B)"
     assert_ok(
-        model_selector.currentText() == "local-lucy (qwen3 14B)",
+        model_selector.currentText() == expected_label,
         f"model selector should reflect current state, got={model_selector.currentText()!r}",
     )
 
@@ -73,31 +74,35 @@ def test_model_selector():
     status_labels = window.status_panel._runtime_summary_labels
     model_status_text = status_labels["Model"].text()
     assert_ok(
-        "local-lucy (qwen3 14B)" in model_status_text,
+        expected_label in model_status_text,
         f"status panel should show configured model with status, got={model_status_text!r}",
     )
 
-    # 3. Available models should include the expected option
+    # 3. Available models should include the expected option and only the allowed set
     items = [model_selector.itemText(i) for i in range(model_selector.count())]
-    assert_ok("local-lucy (qwen3 14B)" in items, "model selector should offer local-lucy")
+    assert_ok(expected_label in items, "model selector should offer local-lucy-llama31")
+    assert_ok(
+        len(items) == 3,
+        f"model selector should offer exactly the allowed three options, got={items!r}",
+    )
 
     # 4. Changing model should emit signal
     # Prime _current_values so the control panel sees a change
     window.control_panel._current_values["model"] = "other-model"
     received: list[str] = []
     window.control_panel.model_change_requested.connect(lambda v: received.append(v))
-    model_selector.setCurrentIndex(model_selector.findText("local-lucy (qwen3 14B)"))
+    model_selector.setCurrentIndex(model_selector.findText(expected_label))
     model_selector.activated.emit(model_selector.currentIndex())
     app.processEvents()
     assert_ok(
-        received == ["local-lucy"],
+        received == ["local-lucy-llama31"],
         f"model change signal should emit selected model, got={received!r}",
     )
 
-    # 5. Selector should not allow invalid values
+    # 5. Selector should not allow removed/invalid values
     assert_ok(
         model_selector.findText("qwen3:30b") == -1,
-        "model selector should not offer models that exceed GPU VRAM",
+        "model selector should not offer removed models",
     )
 
     window.close()

@@ -22,52 +22,52 @@ from router_py.request_types import RoutingDecision
 def test_simple_query_defaults_to_general_model():
     model = select_local_model(
         "What is the capital of France?",
-        available=["local-lucy-llama31", "local-lucy-qwen3"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
     assert model == "local-lucy-llama31"
 
 
-def test_memory_query_selects_memory_model():
+def test_memory_query_defaults_to_llama31():
     model = select_local_model(
         "What did we discuss earlier?",
-        available=["local-lucy-llama31", "local-lucy-memory"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert model == "local-lucy-memory"
+    assert model == "local-lucy-llama31"
 
 
-def test_coding_query_selects_coding_model():
+def test_coding_query_defaults_to_llama31():
     model = select_local_model(
         "Write a Python function to reverse a string.",
-        available=["local-lucy-llama31", "local-lucy-qwen3"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert model == "local-lucy-qwen3"
+    assert model == "local-lucy-llama31"
 
 
-def test_reasoning_query_selects_reasoning_model():
+def test_reasoning_query_defaults_to_llama31():
     model = select_local_model(
         "Explain your reasoning for rejecting the null hypothesis.",
-        available=["local-lucy-llama31", "local-lucy-stable"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert model == "local-lucy-stable"
+    assert model == "local-lucy-llama31"
 
 
 def test_pinned_model_is_respected():
     model = select_local_model(
         "What is the capital of France?",
-        context={"LUCY_LOCAL_MODEL": "local-lucy-mistral"},
-        available=["local-lucy-llama31", "local-lucy-mistral"],
+        context={"LUCY_LOCAL_MODEL": "gemma4:12b-it-qat"},
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert model == "local-lucy-mistral"
+    assert model == "gemma4:12b-it-qat"
 
 
 def test_autonomous_mode_overrides_pin():
     model = select_local_model(
         "What is the capital of France?",
         context={
-            "LUCY_LOCAL_MODEL": "local-lucy-qwen3",
+            "LUCY_LOCAL_MODEL": "gemma4:12b-it-qat",
             "LUCY_AUTONOMOUS_MODEL_SELECTION": "true",
         },
-        available=["local-lucy-llama31", "local-lucy-qwen3"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
     assert model == "local-lucy-llama31"
 
@@ -102,9 +102,9 @@ def test_route_intent_family_influences_selection():
     model = select_local_model(
         "Tell me about climate change.",
         route=route,
-        available=["local-lucy-llama31", "local-lucy-stable"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert model == "local-lucy-stable"
+    assert model == "local-lucy-llama31"
 
 
 def test_query_bucket_classification():
@@ -118,9 +118,9 @@ def test_query_bucket_classification():
 def test_deep_thought_query_selects_heavy_model():
     model = select_local_model(
         "Provide a deep analysis of the philosophical implications of free will.",
-        available=["local-lucy-llama31", "qwen3:30b"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert model == "qwen3:30b"
+    assert model == "gemma4:12b-it-qat"
 
 
 def test_deep_thought_bucket_classification():
@@ -138,7 +138,7 @@ def test_base_name_matches_latest_tag():
     """A base model name should resolve to the installed :latest variant."""
     model = select_local_model(
         "What is the capital of France?",
-        available=["local-lucy-llama31:latest", "local-lucy-qwen3:latest"],
+        available=["local-lucy-llama31:latest", "gemma4:12b-it-qat:latest"],
     )
     assert model == "local-lucy-llama31:latest"
 
@@ -146,18 +146,18 @@ def test_base_name_matches_latest_tag():
 def test_coding_base_name_matches_latest_tag():
     model = select_local_model(
         "Write a Python function to reverse a string.",
-        available=["local-lucy-llama31:latest", "local-lucy-qwen3:latest"],
+        available=["local-lucy-llama31:latest", "gemma4:12b-it-qat:latest"],
     )
-    assert model == "local-lucy-qwen3:latest"
+    assert model == "local-lucy-llama31:latest"
 
 
 def test_select_model_general_defaults_to_llama31():
     rec = select_model(
         "What is the capital of France?",
-        available=["local-lucy-llama31", "local-lucy-qwen3"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
     assert rec["recommended"] == "local-lucy-llama31"
-    assert rec["competing"] == "local-lucy-qwen3"
+    assert rec["competing"] == "gemma4:12b-it-qat"
     assert rec["confidence"] > 0.7
     assert "latency_budget_ms" in rec
 
@@ -167,64 +167,64 @@ def test_select_model_factual_route_uses_llama31():
         rec = select_model(
             "test query",
             route=route,
-            available=["local-lucy-llama31", "local-lucy-qwen3", "qwen3:30b"],
+            available=["local-lucy-llama31", "gemma4:12b-it-qat"],
         )
         assert rec["recommended"] == "local-lucy-llama31", route
         assert "factual" in rec["reason"].lower() or route in rec["reason"], rec["reason"]
 
 
-def test_select_model_coding_uses_qwen3_when_installed():
+def test_select_model_coding_uses_llama31():
     rec = select_model(
         "Write a Python function to reverse a string.",
-        available=["local-lucy-llama31", "local-lucy-qwen3"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert rec["recommended"] == "local-lucy-qwen3"
-    assert rec["competing"] == "local-lucy-llama31"
+    assert rec["recommended"] == "local-lucy-llama31"
+    assert rec["competing"] == "gemma4:12b-it-qat"
 
 
-def test_select_model_coding_falls_back_without_qwen3():
+def test_select_model_coding_falls_back_without_gemma4():
     rec = select_model(
         "Write a Python function to reverse a string.",
         available=["local-lucy-llama31"],
     )
     assert rec["recommended"] == "local-lucy-llama31"
-    assert "qwen3" in rec["reason"].lower()
+    assert "llama" in rec["reason"].lower()
 
 
-def test_select_model_deep_thought_prefers_qwen30b():
+def test_select_model_deep_thought_prefers_gemma4():
     rec = select_model(
         "Provide a deep analysis of free will.",
-        available=["local-lucy-llama31", "qwen3:30b"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert rec["recommended"] == "qwen3:30b"
+    assert rec["recommended"] == "gemma4:12b-it-qat"
 
 
-def test_select_model_deep_thought_falls_back_to_stable():
+def test_select_model_deep_thought_recommends_gemma4_regardless_of_available():
     rec = select_model(
         "Provide a deep analysis of free will.",
-        available=["local-lucy-llama31", "local-lucy-stable"],
+        available=["local-lucy-llama31"],
     )
-    assert rec["recommended"] == "local-lucy-stable"
+    assert rec["recommended"] == "gemma4:12b-it-qat"
 
 
-def test_select_model_memory_uses_memory_model():
+def test_select_model_memory_uses_llama31():
     rec = select_model(
         "What did I say earlier?",
-        available=["local-lucy-llama31", "local-lucy-memory"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert rec["recommended"] == "local-lucy-memory"
+    assert rec["recommended"] == "local-lucy-llama31"
 
 
-def test_select_model_creative_uses_local_lucy():
+def test_select_model_creative_uses_llama31():
     rec = select_model(
         "Write a short poem about autumn.",
-        available=["local-lucy-llama31", "local-lucy", "local-lucy-fast"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
-    assert rec["recommended"] == "local-lucy"
+    assert rec["recommended"] == "local-lucy-llama31"
 
 
 def test_select_model_qwen_not_recommended_for_factual_classes():
-    """Qwen must not be the recommendation for factual/current/evidence classes."""
+    """Removed Qwen tags must not be recommended for factual/current/evidence classes."""
     queries = [
         ("What is the latest news?", "NEWS"),
         ("What time is it in Tokyo?", "TIME"),
@@ -232,7 +232,7 @@ def test_select_model_qwen_not_recommended_for_factual_classes():
         ("What is Apple's stock price?", "FINANCE"),
         ("What are the symptoms of flu?", "EVIDENCE"),
     ]
-    available = ["local-lucy-llama31", "local-lucy-qwen3", "qwen3:30b"]
+    available = ["local-lucy-llama31", "gemma4:12b-it-qat"]
     for query, route in queries:
         rec = select_model(query, route=route, available=available)
         assert rec["recommended"] == "local-lucy-llama31", (query, route, rec)
@@ -251,8 +251,8 @@ def test_is_auto_model_detects_auto():
 def test_generate_ab_pair_returns_recommended_and_competing():
     model_a, model_b = generate_ab_pair(
         "What is the capital of France?",
-        available=["local-lucy-llama31", "local-lucy-qwen3"],
+        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
     )
     assert model_a == "local-lucy-llama31"
-    assert model_b == "local-lucy-qwen3"
+    assert model_b == "gemma4:12b-it-qat"
     assert model_a != model_b

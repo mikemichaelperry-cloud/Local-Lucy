@@ -57,14 +57,14 @@ class TestLocalAnswerConfig(unittest.TestCase):
             state_dir = Path(tmpdir) / "state"
             state_dir.mkdir()
             state_file = state_dir / "current_state.json"
-            state_file.write_text(json.dumps({"model": "local-lucy-mistral"}))
+            state_file.write_text(json.dumps({"model": "gemma4:12b-it-qat"}))
             env = {
                 "LUCY_LOCAL_MODEL": "",
                 "LUCY_RUNTIME_NAMESPACE_ROOT": tmpdir,
             }
             with patch.dict(os.environ, env, clear=False):
                 config = LocalAnswerConfig.from_env()
-            self.assertEqual(config.model, "local-lucy-mistral")
+            self.assertEqual(config.model, "gemma4:12b-it-qat")
 
 
 class TestQueryClassification(unittest.TestCase):
@@ -509,14 +509,16 @@ class TestWarmup(unittest.TestCase):
             api_url="http://127.0.0.1:11434/api/generate",
             keep_alive="5m",
         )
-        with patch("urllib.request.urlopen") as mock_urlopen:
-            mock_resp = MagicMock()
-            mock_resp.read.return_value = b"{}"
-            mock_urlopen.return_value.__enter__ = MagicMock(return_value=mock_resp)
-            mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
-            thread._ping()
+        # Isolate from any real runtime state file on disk.
+        with patch("local_answer._get_active_model_from_state", return_value="test-model"):
+            with patch("urllib.request.urlopen") as mock_urlopen:
+                mock_resp = MagicMock()
+                mock_resp.read.return_value = b"{}"
+                mock_urlopen.return_value.__enter__ = MagicMock(return_value=mock_resp)
+                mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+                thread._ping()
 
-            mock_urlopen.assert_called_once()
+                mock_urlopen.assert_called_once()
             req = mock_urlopen.call_args[0][0]
             self.assertEqual(req.full_url, "http://127.0.0.1:11434/api/generate")
             self.assertEqual(req.method, "POST")
