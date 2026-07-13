@@ -278,6 +278,7 @@ class RuntimeBridge:
         env.setdefault("LUCY_SESSION_MEMORY", os.environ.get("LUCY_SESSION_MEMORY", "0"))
         env.setdefault("LUCY_AUGMENTED_PROVIDER", self._resolve_augmented_provider())
         # Propagate model selection so subprocess paths match direct-Python path
+        # Default to the single allowed fast Llama wrapper.
         env.setdefault("LUCY_MODEL", os.environ.get("LUCY_MODEL", "local-lucy-llama31"))
         env.setdefault("LUCY_LOCAL_MODEL", os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-llama31"))
         # Ollama model used by the memory service for summarization/embedding fallback
@@ -382,11 +383,8 @@ class RuntimeBridge:
                 available=available,
                 allowed_values=(
                     "auto",
-                    "local-lucy-llama31",
-                    "local-lucy",
-                    "local-lucy-fast",
-                    "local-lucy-mistral",
                     "gemma4:12b-it-qat",
+                    "local-lucy-llama31",
                 ),
                 reason=reason,
             ),
