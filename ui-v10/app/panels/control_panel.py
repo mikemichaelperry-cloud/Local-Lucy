@@ -48,9 +48,6 @@ class ControlPanel(QFrame):
     _MODEL_LABELS: dict[str, str] = {
         "auto": "Auto (Lucy chooses per query)",
         "local-lucy-llama31": "local-lucy-llama31 (llama3.1 8B)",
-        "local-lucy": "local-lucy (qwen3 14B)",
-        "local-lucy-fast": "local-lucy-fast (qwen3 14B)",
-        "local-lucy-mistral": "local-lucy-mistral (mistral-nemo 12B)",
         "gemma4:12b-it-qat": "gemma4:12b-it-qat (gemma4 12B reasoning/multimodal)",
     }
 
