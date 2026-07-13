@@ -394,6 +394,12 @@ class RuntimeBridge:
                 allowed_values=("on", "off"),
                 reason=reason,
             ),
+            "gemma4_smart_routing_toggle": ActionCapability(
+                name="gemma4_smart_routing_toggle",
+                available=available,
+                allowed_values=("on", "off"),
+                reason=reason,
+            ),
         }
 
     def _discover_request_capability(self) -> ActionCapability:
@@ -1093,19 +1099,19 @@ class RuntimeBridge:
                     except Exception:
                         pass
 
-            # Phase 7: keep the most-likely-next model warm (non-blocking).
-            # Use the selector's recommendation if available; otherwise warm the
-            # model that just handled this request.
+            # Phase 7: keep the model that actually answered this request warm
+            # (non-blocking). Warming the selector's shadow recommendation instead
+            # of the effective model can evict the active model and produce the
+            # HMI "mismatch" status, so we always warm the model that was used.
             if os.environ.get("LUCY_KEEP_MODEL_WARM", "1").lower() in (
                 "1",
                 "true",
                 "yes",
                 "on",
             ):
-                warmup_model = recommendation["recommended"] if recommendation else effective_model
                 threading.Thread(
                     target=self._warmup_ollama_model,
-                    args=(warmup_model,),
+                    args=(effective_model,),
                     daemon=True,
                 ).start()
 

@@ -7,7 +7,7 @@
 set -euo pipefail
 
 BASE_MODEL="${1:-llama3.1:8b}"
-RUNTIME_MODEL="local-lucy-mem"
+RUNTIME_MODEL="local-lucy-llama31"
 TS="$(date -Is)"
 
 SYSTEM_PROMPT_FILE="$HOME/lucy/config/system_prompt.dev.txt"

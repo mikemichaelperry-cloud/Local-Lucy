@@ -37,11 +37,7 @@ QUERIES = [
 
 MODELS = [
     "local-lucy-llama31",
-    "local-lucy-stable",
-    "local-lucy",
-    "local-lucy-fast",
-    "local-lucy-mistral",
-    "local-lucy-memory",
+    "gemma4:12b-it-qat",
 ]
 
 

@@ -245,6 +245,11 @@ def ensure_control_env() -> None:
     os.environ["LUCY_MODEL"] = model
     os.environ["LUCY_LOCAL_MODEL"] = model
 
+    gemma4_smart_routing = state.get("gemma4_smart_routing", "off")
+    os.environ["LUCY_GEMMA4_SMART_ROUTING"] = (
+        "1" if gemma4_smart_routing in ("on", "true", "1") else "0"
+    )
+
 
 def _persist_memory_turn(question: str, response_text: str, session_id: str = "default") -> None:
     """Persist a conversation turn to chat memory (SQLite + text file)."""

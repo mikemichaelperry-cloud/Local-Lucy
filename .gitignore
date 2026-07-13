@@ -17,6 +17,7 @@ burn_in_logs/
 
 # Local / runtime state (generated during execution)
 cache/
+memory.db*
 state/*.db
 state/evidence_session_*.json
 state/voice_runtime.json

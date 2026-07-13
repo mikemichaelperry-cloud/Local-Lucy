@@ -20,7 +20,7 @@ from runtime_control import (
     write_state_file,
 )
 
-PROFILE_FIELDS = ("profile", "model", "status")
+PROFILE_FIELDS = ("profile", "status")
 
 
 def main() -> int:

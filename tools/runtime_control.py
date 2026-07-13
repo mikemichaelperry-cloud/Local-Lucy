@@ -35,6 +35,7 @@ KNOWN_FIELDS = {
     "augmentation_policy",
     "augmented_provider",
     "model",
+    "gemma4_smart_routing",
     "learner",
     "approval_required",
     "status",
@@ -104,6 +105,8 @@ def main() -> int:
             result = update_state_field(state_file, "augmented_provider", args.value)
         elif args.command == "set-model":
             result = update_state_field(state_file, "model", args.value)
+        elif args.command == "set-gemma4-smart-routing":
+            result = update_state_field(state_file, "gemma4_smart_routing", args.value)
         elif args.command == "set-learner":
             result = update_learner_state(state_file, args.value)
         else:
@@ -136,7 +139,14 @@ def build_parser() -> argparse.ArgumentParser:
     mode_parser = subparsers.add_parser("set-mode")
     mode_parser.add_argument("--value", required=True, choices=sorted(MODE_TO_ROUTE_CONTROL))
 
-    for name in ("set-conversation", "set-memory", "set-evidence", "set-voice", "set-learner"):
+    for name in (
+        "set-conversation",
+        "set-memory",
+        "set-evidence",
+        "set-voice",
+        "set-gemma4-smart-routing",
+        "set-learner",
+    ):
         toggle_parser = subparsers.add_parser(name)
         toggle_parser.add_argument("--value", required=True, choices=("on", "off"))
     augmentation_parser = subparsers.add_parser("set-augmentation")
@@ -324,6 +334,7 @@ def default_state() -> dict[str, Any]:
         "model": os.environ.get("LUCY_RUNTIME_MODEL")
         or os.environ.get("LUCY_LOCAL_MODEL")
         or "local-lucy-llama31",
+        "gemma4_smart_routing": "off",
         "learner": _resolve_initial_learner_state(),
         "approval_required": False,
         "status": "ready",
@@ -401,6 +412,7 @@ def update_state_field(state_file: Path, field: str, requested_value: str) -> Up
             "augmentation_policy",
             "augmented_provider",
             "model",
+            "gemma4_smart_routing",
             "learner",
         }:
             state["status"] = "ready"
@@ -473,6 +485,8 @@ def normalize_state(payload: dict[str, Any] | None) -> dict[str, Any]:
     state["augmentation_policy"] = coerce_augmentation_policy(state.get("augmentation_policy"))
     state["augmented_provider"] = coerce_augmented_provider(state.get("augmented_provider"))
     state["model"] = clean_text(state.get("model")) or default_state()["model"]
+    state["active_model"] = state["model"]
+    state["gemma4_smart_routing"] = coerce_toggle(state.get("gemma4_smart_routing", "off"))
     state["learner"] = coerce_toggle(state.get("learner"))
     state["approval_required"] = bool(state.get("approval_required", False))
     state["status"] = clean_text(state.get("status")) or "ready"
@@ -657,6 +671,7 @@ def render_env(state: dict[str, Any]) -> str:
             f"LUCY_AUGMENTATION_POLICY={state['augmentation_policy']}",
             f"LUCY_AUGMENTED_PROVIDER={state['augmented_provider']}",
             f"LUCY_LOCAL_MODEL={state['model']}",
+            f"LUCY_GEMMA4_SMART_ROUTING={toggle_to_flag(state['gemma4_smart_routing'])}",
         ]
     )
 

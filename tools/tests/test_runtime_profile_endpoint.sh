@@ -65,7 +65,7 @@ noop_payload = json.loads(sys.argv[4])
 state = json.loads(state_path.read_text(encoding="utf-8"))
 
 assert state["profile"] == "profile-reloaded"
-assert state["model"] == "model-reloaded"
+assert state["model"] == "stale-model"
 assert state["status"] == "ready"
 assert state["mode"] == "offline"
 assert state["memory"] == "off"
@@ -77,13 +77,13 @@ assert state["last_updated"]
 assert reload_payload["ok"] is True
 assert reload_payload["action"] == "reload"
 assert reload_payload["changed"] is True
-assert sorted(reload_payload["changed_fields"]) == ["model", "profile", "status"]
+assert sorted(reload_payload["changed_fields"]) == ["profile", "status"]
 
 assert show_payload["ok"] is True
 assert show_payload["action"] == "show"
 assert show_payload["changed"] is False
 assert show_payload["state"]["profile"] == "profile-reloaded"
-assert show_payload["state"]["model"] == "model-reloaded"
+assert show_payload["state"]["model"] == "stale-model"
 
 assert noop_payload["ok"] is True
 assert noop_payload["action"] == "reload"

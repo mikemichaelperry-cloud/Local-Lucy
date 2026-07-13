@@ -55,10 +55,8 @@ DEFAULT_PORT = 8765
 DEFAULT_MAX_QUESTION = 4000
 SUPPORTED_MODELS = frozenset(
     {
-        "local-lucy",
-        "local-lucy-fast",
         "local-lucy-llama31",
-        "local-lucy-mistral",
+        "gemma4:12b-it-qat",
     }
 )
 

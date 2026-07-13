@@ -86,10 +86,40 @@ _heartbeat_stop = threading.Event()
 _heartbeat_model: str | None = None
 
 
+def _get_active_model_from_state() -> str | None:
+    """Read the currently selected model from the authoritative state file.
+
+    Heartbeat/warmup threads use this instead of relying only on their
+    thread-local model argument. That way a state change made through the
+    HMI, CLI, or a profile reload is respected even if no new heartbeat
+    thread is explicitly started for the new model.
+    """
+    raw_state_file = os.environ.get("LUCY_RUNTIME_STATE_FILE", "").strip()
+    if raw_state_file:
+        state_file = Path(raw_state_file).expanduser()
+    else:
+        namespace = os.environ.get(
+            "LUCY_RUNTIME_NAMESPACE_ROOT",
+            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+        )
+        state_file = Path(namespace).expanduser() / "state" / "current_state.json"
+    try:
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        model = str(state.get("model", "")).strip()
+        if model and model.lower() != "auto":
+            return model
+    except Exception:
+        pass
+    return None
+
+
 def _ollama_heartbeat_ping(
     model: str = "local-lucy-llama31", url: str = "http://127.0.0.1:11434/api/generate"
 ) -> None:
     """Lightweight ping to keep the model loaded in Ollama VRAM."""
+    # Abort if the heartbeat has been stopped or retargeted to a different model.
+    if _heartbeat_stop.is_set() or _heartbeat_model != model:
+        return
     try:
         req = urllib.request.Request(
             url,
@@ -107,7 +137,16 @@ def _ollama_heartbeat_ping(
 
 def _heartbeat_loop(model: str, interval: float = 30.0) -> None:
     while not _heartbeat_stop.is_set():
+        # If the authoritative state file now points to a different model,
+        # exit so the old model is not re-loaded behind the caller's back.
+        active_model = _get_active_model_from_state() or model
+        if active_model != model:
+            break
         _ollama_heartbeat_ping(model)
+        # Check again in case the model was switched while the ping was in flight.
+        active_model = _get_active_model_from_state() or model
+        if active_model != model:
+            break
         _heartbeat_stop.wait(interval)
 
 
@@ -611,9 +650,25 @@ class _OllamaWarmupThread(threading.Thread):
             # Wait for the interval, but wake early if stopped
             if self._stop_event.wait(self.interval_s):
                 break
+            # If the authoritative state file now points to a different model,
+            # exit without pinging so the old model is not re-loaded.
+            active_model = _get_active_model_from_state() or self.model
+            if active_model != self.model:
+                break
+            if LocalAnswer._warmup_thread is not None and LocalAnswer._warmup_thread is not self:
+                break
             self._ping()
 
     def _ping(self) -> None:
+        # Abort if the authoritative state file points to a different model or
+        # a newer warmup thread has replaced this one.
+        active_model = _get_active_model_from_state() or self.model
+        if (
+            active_model != self.model
+            or (LocalAnswer._warmup_thread is not None and LocalAnswer._warmup_thread is not self)
+            or self._stop_event.is_set()
+        ):
+            return
         body = {
             "model": self.model,
             "prompt": "",
@@ -1724,17 +1779,24 @@ class LocalAnswer:
             if session_memory.strip():
                 instruction += " Also use the session memory facts."
         elif session_memory.strip():
-            # Session memory is context, not a script. The model must answer the
-            # current query from its own knowledge unless the query is clearly a
-            # follow-up to the prior conversation. This prevents a stale or wrong
-            # prior turn (e.g. a mis-retrieved evidence article) from dominating
-            # the response to an unrelated or poorly-transcribed question.
-            instruction = (
-                "Session memory is provided above for context only. "
-                "If the current query is a follow-up to the prior conversation, you may use it. "
-                "Otherwise answer from your own knowledge and ignore any unrelated prior turns. "
-                "Do not assume the previous topic still applies unless the user explicitly continues it."
-            )
+            if self._context_followup_requested(query):
+                # Obvious continuations should lean on the prior conversation.
+                instruction = (
+                    "The user's query is a continuation of the prior conversation. "
+                    "Use the session memory above to answer the follow-up in context."
+                )
+            else:
+                # Session memory is context, not a script. The model must answer the
+                # current query from its own knowledge unless the query is clearly a
+                # follow-up to the prior conversation. This prevents a stale or wrong
+                # prior turn (e.g. a mis-retrieved evidence article) from dominating
+                # the response to an unrelated or poorly-transcribed question.
+                instruction = (
+                    "Session memory is provided above for context only. "
+                    "If the current query is a follow-up to the prior conversation, you may use it. "
+                    "Otherwise answer from your own knowledge and ignore any unrelated prior turns. "
+                    "Do not assume the previous topic still applies unless the user explicitly continues it."
+                )
         elif is_personal_query and persistent_facts:
             instruction = (
                 "Answer using the [PERSISTENT FACTS] block above. "
@@ -1849,20 +1911,9 @@ class LocalAnswer:
             return "Which person or company do you want the current status for?"
         return "Which person or company do you mean?"
 
-    # Model tags known to be based on Qwen3 / other thinking architectures.
-    # These models emit an internal 'thinking' block that can consume the token
-    # budget and leave the visible response empty unless we reserve headroom.
-    _THINKING_MODEL_TAGS: frozenset[str] = frozenset(
-        {
-            "local-lucy",
-            "local-lucy-fast",
-            "local-lucy-qwen3",
-            "local-lucy-qwen3:30b",
-            "qwen3",
-            "qwen3:14b",
-            "qwen3:30b",
-        }
-    )
+    # Exact tags known to emit an internal 'thinking' block. Substring checks
+    # below catch families such as qwen3, deepseek-r1, and gemma4.
+    _THINKING_MODEL_TAGS: frozenset[str] = frozenset()
 
     def _is_thinking_model(self) -> bool:
         """Detect models that emit an internal 'thinking' block.
@@ -1997,11 +2048,13 @@ class LocalAnswer:
         if not self._is_memory_context_allowed(q_eval):
             session_memory = ""
         elif session_memory.strip():
-            # If the user is explicitly asking about prior conversation, keep the
-            # memory as-is. Semantic filtering tends to drop generic "what did we
-            # discuss earlier?" turns because the query shares few keywords with
-            # the concrete prior topic.
-            if not self._is_explicit_memory_query(q_eval):
+            # If the user is explicitly asking about prior conversation, or if
+            # the query is an obvious continuation ("what about...", "how about..."),
+            # keep the memory unfiltered. Semantic filtering tends to drop these
+            # short follow-ups because they share few keywords with the prior topic.
+            if not self._is_explicit_memory_query(q_eval) and not self._context_followup_requested(
+                q_eval
+            ):
                 session_memory = filter_memory_context(q_eval, session_memory)
             if session_memory.strip():
                 self._diag_append("context_relevance_gate", "reuse_context")

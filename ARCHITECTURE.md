@@ -64,11 +64,6 @@ Local Lucy V11 is a privacy-first, locally-hosted AI assistant. The primary runt
 lucy-v10/
 ├── config/                    # Modelfiles, system prompts, policy configs
 │   ├── Modelfile.local-lucy-llama31
-│   ├── Modelfile.local-lucy-qwen3
-│   ├── Modelfile.local-lucy-mistral
-│   ├── Modelfile.local-lucy-fast
-│   ├── Modelfile.local-lucy-stable
-│   ├── Modelfile.local-lucy-mem
 │   ├── evidence_policy.yaml
 │   ├── trusted_domains.yaml
 │   ├── url_map.yaml

@@ -4,7 +4,7 @@
 # Preferred replacement: START_LUCY.sh
 set -euo pipefail
 echo "=== Local Lucy (STABLE) ==="
-echo "Model: local-lucy-stable"
+echo "Model: local-lucy-llama31"
 echo "Started: $(date -Is)"
 echo
-exec ollama run local-lucy-stable
+exec ollama run local-lucy-llama31

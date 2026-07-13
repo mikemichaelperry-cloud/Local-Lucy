@@ -8,9 +8,7 @@ performance.
 
 Models tested:
   - local-lucy-llama31 (llama3.1 8B, default)
-  - local-lucy        (qwen3:14b, standard)
-  - local-lucy-fast   (qwen3:14b, optimized)
-  - local-lucy-mistral (mistral-nemo 12B)
+  - gemma4:12b-it-qat  (gemma4 12B reasoning/multimodal)
 """
 
 import json
@@ -39,9 +37,7 @@ REPORT_FILE = (
 
 MODELS = [
     ("local-lucy-llama31", "llama3.1 8B default"),
-    ("local-lucy", "qwen3:14b standard"),
-    ("local-lucy-fast", "qwen3:14b optimized"),
-    ("local-lucy-mistral", "mistral-nemo 12B"),
+    ("gemma4:12b-it-qat", "gemma4 12B reasoning/multimodal"),
 ]
 
 PROMPTS = [

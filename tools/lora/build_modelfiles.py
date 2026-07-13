@@ -20,9 +20,6 @@ LORA_ROOT = PROJECT_ROOT / "models" / "lora"
 
 SELECTABLE_TAGS = [
     "local-lucy-llama31",
-    "local-lucy",
-    "local-lucy-fast",
-    "local-lucy-mistral",
 ]
 
 PERSONAS = ["michael"]
@@ -36,7 +33,6 @@ def read_text(path: Path) -> str:
 def build_modelfile(base_tag: str, persona: str) -> str:
     """Return the contents of a persona Modelfile."""
     system_prompt = read_text(CONFIG_DIR / "system_prompt.txt")
-    persona_fragment = read_text(PERSONA_DIR / f"{persona}.txt")
 
     # GGUF adapter path relative to the config/ directory.
     adapter_rel_path = f"../models/lora/{base_tag}/{persona}/adapter.gguf"

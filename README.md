@@ -79,7 +79,7 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 - **Michael** persona with a distinct response style: dry, precise, pragmatic
 - Triggered by saying "I am Michael" in chat or voice
 - **LoRA adapter path**: `local-lucy-llama31-michael` uses a trained LoRA adapter on top of llama3.1:8b
-- **Prompt-level fallback**: `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` (qwen3:14b) and `local-lucy-mistral` (mistral-nemo:12b) inject the persona fragment at runtime; LoRA training OOMs on an RTX 3060 12 GB for these larger models
+- **Active wrappers**: `local-lucy-llama31` (llama3.1:8b). Removed Qwen3/Mistral wrappers live in `config/quarantined/` for restoration if needed.
 - The HMI shows the active persona in the Control Panel and Runtime Summary status cards
 
 ## Architecture
@@ -149,16 +149,8 @@ pip install -r ui-v10/requirements.txt
 ollama pull llama3.1:8b
 ollama create local-lucy-llama31 -f config/Modelfile.local-lucy-llama31
 
-# Optional: persona LoRA tag for Michael (trained on Llama 3.1 8B)
-ollama create local-lucy-llama31-michael -f config/Modelfile.local-lucy-llama31-michael
-
-# Legacy options (still selectable in the HMI)
-ollama pull qwen3:14b
-ollama create local-lucy -f config/Modelfile.local-lucy
-ollama create local-lucy-fast -f config/Modelfile.local-lucy-fast
-
-ollama pull mistral-nemo
-ollama create local-lucy-mistral -f config/Modelfile.local-lucy-mistral
+# Optional: Gemma 4 reasoning/multimodal model
+ollama pull gemma4:12b-it-qat
 
 # (Optional) Copy and configure API keys for cloud providers
 cp .env.example .env
@@ -290,9 +282,8 @@ The end-to-end script trains, converts, and registers adapters for the models th
 
 | Base model | Persona | Path |
 |------------|---------|------|
-| `local-lucy-llama31` (llama3.1:8b) | Michael | LoRA adapter (`local-lucy-llama31-michael`) |
-| `local-lucy-mistral` (mistral-nemo:12b) | Michael | **Prompt-level fallback** — mistral-nemo 12B cannot be LoRA-trained on 12 GB VRAM (OOM at `prepare_model_for_kbit_training`) |
-| `local-lucy` / `local-lucy-fast` / `local-lucy-qwen3` (qwen3:14b) | Michael | **Prompt-level fallback** — qwen3 14B cannot be LoRA-trained on 12 GB VRAM (OOM at `prepare_model_for_kbit_training`) |
+| `local-lucy-llama31` (llama3.1:8b) | — | Default fast/local wrapper |
+| `gemma4:12b-it-qat` | — | Reasoning/multimodal option |
 
 Evaluate either path against `tests/golden_persona_cases.jsonl`:
 

@@ -76,7 +76,8 @@ async def test_models_endpoint(app_no_auth):
         assert resp.status == 200
         data = await resp.json()
         assert data["ok"] is True
-        assert "local-lucy" in data["models"]
+        assert "local-lucy-llama31" in data["models"]
+        assert "gemma4:12b-it-qat" in data["models"]
         assert data["active_model"] in data["models"] or data["active_model"] == "unknown"
 
 
@@ -158,10 +159,10 @@ async def test_ask_with_model_override_mocked(app_no_auth, monkeypatch):
     async with TestClient(TestServer(app_no_auth)) as client:
         resp = await client.post(
             "/api/ask",
-            json={"question": "Hello?", "model": "local-lucy-fast"},
+            json={"question": "Hello?", "model": "local-lucy-llama31"},
         )
         assert resp.status == 200
-        assert captured["model"] == "local-lucy-fast"
+        assert captured["model"] == "local-lucy-llama31"
 
 
 @pytest.mark.asyncio

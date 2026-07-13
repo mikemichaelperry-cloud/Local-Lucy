@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODEL="local-lucy-mem"
+MODEL="local-lucy-llama31"
 Q="${*:-}"
 
 REFUSAL="Not provided in this session's user messages."

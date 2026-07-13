@@ -78,7 +78,7 @@ def check_ollama() -> bool:
 def check_models() -> bool:
     print("[4/8] Required models")
     required = ["local-lucy-llama31"]
-    recommended = ["local-lucy-fast", "local-lucy-mistral"]
+    recommended = ["gemma4:12b-it-qat"]
     ok = True
 
     try:
