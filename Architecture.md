@@ -7,7 +7,7 @@
 
 > This document describes **v11 as implemented**. Hebrew / Racheli support has been removed from the primary runtime; the standalone Hebrew assistant was archived separately on 2026-07-10.
 >
-> Latest commits on `v10-dev`: Gemma 4 12B integration + smart-routing bypass (`357ce55`), low-VRAM warning (`fce4aa4`), heartbeat retargeting + HMI recursion guard (`<this-session>`).
+> Latest commits on `v10-dev`: Gemma 4 12B integration + smart-routing bypass (`357ce55`), low-VRAM warning (`fce4aa4`), heartbeat retargeting + HMI recursion guard, and voice CUDA orchestration with rollback (`<this-session>`).
 
 ---
 
@@ -255,7 +255,7 @@ The UI exposes an **Auto** default. In shadow mode, the selector automatically c
 - Local Lucy does not force GPU-only execution; Ollama/llama.cpp may offload layers to system RAM when VRAM is exhausted.
 - The runtime evicts other loaded Ollama models when switching models, keeping only the active model in VRAM.
 
-### 8.3 Default Modelfile (`config/Modelfile.local-lucy-llama31`)
+### 8.4 Default Modelfile (`config/Modelfile.local-lucy-llama31`)
 
 ```modelfile
 FROM llama3.1:8b
@@ -275,6 +275,27 @@ Rules:
 - When using retrieved context, cite the source.
 """
 ```
+
+### 8.5 Voice Mode & CUDA Orchestration
+
+Voice mode uses **Whisper** for STT and **Kokoro** (with Piper/Edge fallbacks) for TTS. On a 12 GB RTX 3060, leaving both voice models resident on the GPU together with the active LLM can exceed VRAM, so voice CUDA orchestration loads and unloads them sequentially.
+
+**Feature flag:** `LUCY_VOICE_CUDA_ORCHESTRATION`
+- Default: **unset / `0`** — previous behavior (CPU-bound voice, models cached in RAM).
+- Set to `1` to enable sequential GPU loading.
+
+**Sequence when enabled:**
+1. PTT pressed → load Whisper on CUDA for STT.
+2. Transcription done → release Whisper before the LLM request starts.
+3. LLM response ready → load Kokoro on CUDA for TTS.
+4. TTS done → release Kokoro.
+
+**Implementation:**
+- `tools/runtime_voice.py` exposes `_ensure_stt_gpu()`, `_release_stt()`, `_ensure_tts_gpu()`, `_release_tts()` and gates them with `_cuda_orchestration_enabled()`.
+- `tools/voice/backends/kokoro_backend.py` adds `clear_pipeline_cache()` so Kokoro can be unloaded on demand.
+- `ui-v10/app/services/runtime_bridge.py` skips Kokoro prewarm and only prewarms Whisper on GPU when the flag is on.
+
+**Rollback:** unset `LUCY_VOICE_CUDA_ORCHESTRATION` or set it to `0` and restart Local Lucy.
 
 ---
 

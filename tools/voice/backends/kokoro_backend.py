@@ -161,6 +161,11 @@ def get_pipeline(*, lang_code: str, repo_id: str, device: str) -> Any:
     return pipeline
 
 
+def clear_pipeline_cache() -> None:
+    """Release cached Kokoro pipelines so VRAM can be reclaimed for other models."""
+    _PIPELINE_CACHE.clear()
+
+
 def synthesize_audio(
     *,
     pipeline: Any,

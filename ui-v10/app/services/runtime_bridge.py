@@ -875,10 +875,15 @@ class RuntimeBridge:
                 runtime_file = runtime_voice.resolve_voice_runtime_file(None)
                 state_file = runtime_voice.resolve_state_file(None)
 
-                # Prewarm Kokoro TTS worker (~2s on cold start)
+                # Prewarm Kokoro TTS worker (~2s on cold start). In CUDA-
+                # orchestration mode we skip this; Kokoro is loaded on the GPU only
+                # after the LLM response is ready, then released again.
                 try:
                     backend = runtime_voice.detect_backend()
-                    if backend.tts_engine == "kokoro":
+                    if (
+                        backend.tts_engine == "kokoro"
+                        and not runtime_voice._cuda_orchestration_enabled()
+                    ):
                         runtime_voice.prewarm_kokoro_worker()
                         # Update voice runtime state so UI reflects the detected TTS backend
                         if backend.tts_engine != "none":
@@ -897,9 +902,9 @@ class RuntimeBridge:
                 except Exception:
                     pass
 
-                # Prewarm Whisper STT server (~3-5s on cold start for CPU mode).
-                # Keep the worker CPU-only and resident in RAM to avoid GPU VRAM
-                # contention and repeated model loads per utterance.
+                # Prewarm Whisper STT server. In CUDA-orchestration mode we load
+                # it on the GPU just before voice input; otherwise keep the legacy
+                # resident-CPU behavior to avoid GPU VRAM contention.
                 try:
                     backend = runtime_voice.detect_backend(include_tts=False)
                     ensure_whisper_worker = getattr(runtime_voice, "ensure_whisper_worker", None)
@@ -909,7 +914,8 @@ class RuntimeBridge:
                         and backend.available
                     ):
                         model_path = runtime_voice.resolve_whisper_model_path()
-                        ensure_whisper_worker(model_path, use_gpu=False)
+                        use_gpu = bool(runtime_voice._cuda_orchestration_enabled())
+                        ensure_whisper_worker(model_path, use_gpu=use_gpu)
                 except Exception:
                     pass
         except Exception:

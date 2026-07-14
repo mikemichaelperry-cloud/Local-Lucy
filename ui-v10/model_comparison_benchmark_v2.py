@@ -145,10 +145,53 @@ def run_query(prompt, model, timeout=130):
         return 0.0, False, str(e)
 
 
+def _set_state_model(model_alias: str, smart_routing: str) -> None:
+    """Align the authoritative state file with the benchmark target config.
+
+    runtime_request.py / main.py read current_state.json, so env vars alone are
+    not enough to guarantee the intended model is actually loaded.
+    """
+    control_tool = SNAPSHOT_ROOT / "tools" / "runtime_control.py"
+    model_value = "auto" if model_alias == "auto" else model_alias
+    env = os.environ.copy()
+    env["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(SNAPSHOT_ROOT)
+    env["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_NS)
+    try:
+        subprocess.run(
+            [sys.executable, str(control_tool), "set-model", "--value", model_value],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+            cwd=str(SNAPSHOT_ROOT),
+            check=False,
+        )
+        subprocess.run(
+            [
+                sys.executable,
+                str(control_tool),
+                "set-gemma4-smart-routing",
+                "--value",
+                "on" if smart_routing in ("on", "true", "1") else "off",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+            cwd=str(SNAPSHOT_ROOT),
+            check=False,
+        )
+    except Exception as exc:
+        log(f"Warning: failed to set state model/routing: {exc}")
+
+
 def benchmark_one(model_alias, model_label, smart_routing: str = "off"):
     log(f"{'='*60}")
     log(f"MODEL: {model_alias} ({model_label})  [smart_routing={smart_routing}]")
     log(f"{'='*60}")
+
+    # STEP 0: Make sure the authoritative state matches the benchmark target
+    _set_state_model(model_alias, smart_routing)
 
     # STEP 1: Unload everything and wait for clean slate
     log("Unloading all models from Ollama...")

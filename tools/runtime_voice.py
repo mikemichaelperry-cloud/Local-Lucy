@@ -72,6 +72,14 @@ def use_python_voice() -> bool:
     return os.environ.get("LUCY_VOICE_PY", "0") == "1" and _VOICE_TOOL_AVAILABLE
 
 
+try:
+    from voice.backends import kokoro_backend
+
+    _KOKORO_BACKEND = kokoro_backend
+except Exception:
+    _KOKORO_BACKEND = None  # type: ignore[assignment]
+
+
 PTT_START_DISABLED = 2
 PTT_START_UNAVAILABLE = 3
 PTT_START_ALREADY_LISTENING = 4
@@ -120,6 +128,65 @@ class TranscriptionResult:
 
 # Keywords that indicate a GPU/CUDA failure requiring CPU fallback
 _GPU_ERROR_KEYWORDS = ("cuda", "cublas", "gpu", "out of memory", "oom")
+
+
+# ---------------------------------------------------------------------------
+# CUDA / VRAM orchestration helpers
+# ---------------------------------------------------------------------------
+# When LUCY_VOICE_CUDA_ORCHESTRATION=1, voice STT/TTS models are loaded on the
+# GPU only while they are actively needed, then released so the LLM can use the
+# full 12 GB VRAM budget. Set the variable to 0 (or unset) to keep the legacy
+# resident-CPU-whisper / keep-warm behavior.
+
+
+def _cuda_orchestration_enabled() -> bool:
+    return os.environ.get("LUCY_VOICE_CUDA_ORCHESTRATION", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def _ensure_stt_gpu() -> None:
+    """Start whisper-server on GPU so STT is fast during voice input."""
+    if not _cuda_orchestration_enabled() or ensure_whisper_worker is None:
+        return
+    try:
+        model_path = resolve_whisper_model_path()
+        port = ensure_whisper_worker(model_path, use_gpu=True)
+        if port is None:
+            _voice_logger.warning("CUDA orchestration: failed to start GPU whisper worker")
+    except Exception as exc:
+        _voice_logger.warning(f"CUDA orchestration: STT GPU setup failed: {exc}")
+
+
+def _release_stt() -> None:
+    """Stop whisper-server to free VRAM before LLM inference."""
+    if stop_whisper_worker is None:
+        return
+    try:
+        stop_whisper_worker()
+    except Exception as exc:
+        _voice_logger.warning(f"CUDA orchestration: STT release failed: {exc}")
+
+
+def _ensure_tts_gpu() -> None:
+    """Make sure Kokoro uses CUDA for the upcoming TTS pass."""
+    if not _cuda_orchestration_enabled():
+        return
+    os.environ["LUCY_VOICE_KOKORO_DEVICE"] = "cuda"
+
+
+def _release_tts() -> None:
+    """Release cached Kokoro pipelines to free VRAM after TTS completes."""
+    if not _cuda_orchestration_enabled():
+        return
+    if _KOKORO_BACKEND is not None:
+        try:
+            _KOKORO_BACKEND.clear_pipeline_cache()
+        except Exception as exc:
+            _voice_logger.warning(f"CUDA orchestration: TTS cache clear failed: {exc}")
 
 
 def main() -> int:
@@ -971,14 +1038,13 @@ def handle_ptt_start(runtime_file: Path, state_file: Path, capture_dir: Path) ->
     if should_prewarm_kokoro and backend.tts_engine == "kokoro":
         prewarm_kokoro_worker()
 
-    # Pre-warm whisper worker for fast STT. In resident CPU mode the model stays
-    # loaded in system RAM, avoiding the per-turn load latency on GPU-constrained
-    # hardware.
+    # Pre-warm whisper worker for fast STT. In CUDA-orchestration mode we load it
+    # on the GPU; otherwise we keep the legacy resident-CPU behavior.
     if ensure_whisper_worker is not None:
         try:
             if backend.stt_engine == "whisper" and backend.available:
                 model_path = resolve_whisper_model_path()
-                ensure_whisper_worker(model_path, use_gpu=False)
+                ensure_whisper_worker(model_path, use_gpu=_cuda_orchestration_enabled())
         except Exception:
             pass  # Non-fatal: fallback to whisper-cli remains available
 
@@ -1092,6 +1158,9 @@ def handle_ptt_stop(runtime_file: Path, state_file: Path, capture_dir: Path) -> 
         )
         raise
     finally:
+        # Always release the whisper worker after the STT phase so the next LLM
+        # call has the full VRAM budget, even if transcription failed.
+        _release_stt()
         if capture_path is not None:
             try:
                 if capture_path.exists():
@@ -1931,6 +2000,11 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
         chunks = split_tts_chunks(spoken_text)
         if not chunks:
             return "skipped"
+
+        # Ensure Kokoro targets CUDA before we synthesize. This is a no-op when
+        # CUDA orchestration is disabled (legacy path).
+        _ensure_tts_gpu()
+
         pause_ms = resolve_tts_chunk_pause_ms()
         output_dir = resolve_capture_directory(None)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -2007,6 +2081,10 @@ def speak_response(backend: VoiceBackend, response_text: str) -> str:
     except (PlaybackError, RuntimeVoiceError) as exc:
         print(f"ERROR: TTS playback failed: {exc}", file=sys.stderr)
         return "failed"
+    finally:
+        # TTS pass is complete; release cached Kokoro pipelines so the LLM can
+        # reclaim the VRAM on the next turn.
+        _release_tts()
     return "skipped"
 
 
