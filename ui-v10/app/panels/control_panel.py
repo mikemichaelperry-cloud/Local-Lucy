@@ -1100,9 +1100,14 @@ class ControlPanel(QFrame):
             status_text = "Voice PTT: backend busy"
             button_enabled = False
 
-        self._voice_ptt_button.setText(button_text)
-        self._voice_ptt_button.setEnabled(button_enabled)
-        self._voice_ptt_button.setProperty("voiceState", button_state)
-        self._voice_ptt_button.style().unpolish(self._voice_ptt_button)
-        self._voice_ptt_button.style().polish(self._voice_ptt_button)
+        # If the user is currently pressing the PTT button, do not mutate its
+        # text or enabled state.  Changing those while the button is down can
+        # cancel the active press and prevent the released() signal from firing,
+        # which breaks release-to-send.
+        if not self._voice_ptt_button.isDown():
+            self._voice_ptt_button.setText(button_text)
+            self._voice_ptt_button.setEnabled(button_enabled)
+            self._voice_ptt_button.setProperty("voiceState", button_state)
+            self._voice_ptt_button.style().unpolish(self._voice_ptt_button)
+            self._voice_ptt_button.style().polish(self._voice_ptt_button)
         self._voice_ptt_status_label.setText(status_text)
