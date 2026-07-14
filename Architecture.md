@@ -247,6 +247,8 @@ The file shrank from ~3,900 lines to ~2,216 lines after the shell removal, reduc
 
 The UI exposes an **Auto** default. In shadow mode, the selector automatically chooses the most appropriate local model by query bucket. Manual overrides remain available for power users. `gemma4:12b-it-qat` is available as an optional reasoning/multimodal model.
 
+**Benchmarking:** `ui-v10/model_comparison_benchmark_v2.py` measures clean-slate cold-start and warm-run latency for every selectable mode (`auto`, `local-lucy-llama31`, `gemma4:12b-it-qat`). It unloads Ollama between modes, disables the repeat cache, and writes a JSON report plus a Markdown summary to the Desktop.
+
 ### 8.3 VRAM Management
 
 - The HMI warns when Gemma 4 is selected on a GPU with <12 GB free VRAM.

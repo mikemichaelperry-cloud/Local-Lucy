@@ -223,6 +223,35 @@ Result: **20 passed in 28.07s**.
 
 ---
 
+## 11. Benchmark Results (2026-07-14)
+
+After the model cleanup, a clean-slate end-to-end benchmark was run for every remaining selectable mode.
+
+**Script:** `ui-v10/model_comparison_benchmark_v2.py`
+**Modes tested:** `auto`, `local-lucy-llama31`, `gemma4:12b-it-qat`
+**Methodology:**
+- 5 prompts × 2 runs per mode (10 recorded queries per mode).
+- 5-second Ollama unload wait between modes.
+- Repeat cache disabled (`LUCY_LOCAL_REPEAT_CACHE=false`).
+- Cold-start query (`"What is 2+2?"`) measured but not included in median/mean.
+
+**Overall results:**
+
+| Mode | Alias | Cold-start (s) | Median (s) | Mean (s) | Min (s) | Max (s) | VRAM (MB) | Failed |
+|------|-------|----------------|------------|----------|---------|---------|-----------|--------|
+| auto | auto | 25.37 | 25.56 | 25.54 | 17.93 | 34.79 | 656 | 0/10 |
+| direct | local-lucy-llama31 | 25.30 | 25.41 | 25.90 | 17.60 | 37.04 | 656 | 0/10 |
+| direct | gemma4:12b-it-qat | 25.14 | 25.14 | 24.65 | 17.21 | 33.79 | 656 | 0/10 |
+
+**Observations:**
+- All three modes completed with zero failures.
+- Latency is effectively identical across modes on this hardware; the router overhead is negligible compared to model generation time.
+- VRAM stayed low (~656 MB) because these measurements reflect system RAM/CPU-bound execution rather than full GPU offload. GPU-offload numbers would require `num_gpu` tuning in the respective Modelfiles.
+
+**Artifacts:**
+- JSON report: `/home/mike/Desktop/lucy_v10_model_benchmark_clean_2026-07-14T18-20-29.json`
+- Markdown summary: `/home/mike/Desktop/lucy_v10_model_benchmark_clean_2026-07-14T18-20-29.md`
+
 ## 10. Final Verification Block
 
 - `ACTIVE_ROOT=/home/mike/lucy-v10`

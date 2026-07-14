@@ -45,6 +45,7 @@ REPORT_FILE = (
 )
 
 MODELS = [
+    ("auto", "automatic selector (Llama/Gemma per query)"),
     ("local-lucy-llama31", "llama3.1 8B default"),
     ("gemma4:12b-it-qat", "gemma4 12B reasoning/multimodal"),
 ]
@@ -127,8 +128,12 @@ def run_query(prompt: str, model: str, timeout: int = 130) -> tuple[float, bool,
     env["LUCY_UI_ROOT"] = str(SNAPSHOT_ROOT / "ui-v10")
     env["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_NS)
     env["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
-    env["LUCY_MODEL"] = model
-    env["LUCY_LOCAL_MODEL"] = model
+    if model == "auto":
+        env["LUCY_MODEL"] = "auto"
+        env["LUCY_LOCAL_MODEL"] = "local-lucy-llama31"
+    else:
+        env["LUCY_MODEL"] = model
+        env["LUCY_LOCAL_MODEL"] = model
     env["LUCY_LOCAL_REPEAT_CACHE"] = "false"  # Disable cache for fair comparison
 
     start = time.time()

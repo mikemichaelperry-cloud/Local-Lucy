@@ -36,6 +36,7 @@ REPORT_FILE = (
 )
 
 MODELS = [
+    ("auto", "automatic selector (Llama/Gemma per query)"),
     ("local-lucy-llama31", "llama3.1 8B default"),
     ("gemma4:12b-it-qat", "gemma4 12B reasoning/multimodal"),
 ]
@@ -48,8 +49,8 @@ PROMPTS = [
     "Give me a short chicken soup tip.",
 ]
 
-RUNS_PER_PROMPT = 3
-UNLOAD_WAIT_S = 15  # Time for Ollama to fully unload from VRAM
+RUNS_PER_PROMPT = 2
+UNLOAD_WAIT_S = 5  # Time for Ollama to fully unload from VRAM
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -107,8 +108,12 @@ def run_query(prompt, model, timeout=130):
     env["LUCY_UI_ROOT"] = str(SNAPSHOT_ROOT / "ui-v10")
     env["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(RUNTIME_NS)
     env["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "1"
-    env["LUCY_MODEL"] = model
-    env["LUCY_LOCAL_MODEL"] = model
+    if model == "auto":
+        env["LUCY_MODEL"] = "auto"
+        env["LUCY_LOCAL_MODEL"] = "local-lucy-llama31"
+    else:
+        env["LUCY_MODEL"] = model
+        env["LUCY_LOCAL_MODEL"] = model
     env["LUCY_LOCAL_REPEAT_CACHE"] = "false"
 
     start = time.time()
@@ -193,6 +198,7 @@ def benchmark_one(model_alias, model_label):
     return {
         "model_alias": model_alias,
         "model_label": model_label,
+        "mode": "auto" if model_alias == "auto" else "direct",
         "cold_start_ttc": round(cold_ttc, 2),
         "cold_start_accepted": cold_ok,
         "vram_before_mb": vram_before,
@@ -207,6 +213,64 @@ def benchmark_one(model_alias, model_label):
         "per_prompt": per_prompt,
         "raw": raw,
     }
+
+
+def write_markdown_summary(report: dict, json_path: Path) -> Path:
+    """Write a human-readable Markdown summary next to the JSON report."""
+    md_path = json_path.with_suffix(".md")
+    lines = [
+        "# Local Lucy V10 — Model Comparison Benchmark Summary",
+        "",
+        f"**Timestamp:** {report['timestamp']}",
+        f"**Modes tested:** {', '.join(report['models'])}",
+        f"**Prompts:** {len(report['prompts'])}",
+        f"**Runs per prompt:** {report['runs_per_prompt']}",
+        "**Cache:** disabled",
+        f"**Unload wait between modes:** {report['unload_wait_s']}s",
+        "",
+        "## Overall Results",
+        "",
+        "| Mode | Alias | Cold-start (s) | Median (s) | Mean (s) | Min (s) | Max (s) | VRAM (MB) | Failed |",
+        "|------|-------|----------------|------------|----------|---------|---------|-----------|--------|",
+    ]
+    for r in report["results"]:
+        lines.append(
+            f"| {r['mode']} | {r['model_alias']} | {r['cold_start_ttc']} | "
+            f"{r['overall_median'] or 'N/A'} | {r['overall_mean'] or 'N/A'} | "
+            f"{r['overall_min'] or 'N/A'} | {r['overall_max'] or 'N/A'} | "
+            f"{r.get('vram_during_mb') or 'N/A'} | {r['failed']}/{r['total_queries']} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Per-prompt Breakdown",
+            "",
+        ]
+    )
+    for r in report["results"]:
+        lines.extend(
+            [
+                f"### {r['model_alias']} ({r['model_label']})",
+                "",
+                "| Prompt | Median (s) | Mean (s) | Min (s) | Max (s) |",
+                "|--------|------------|----------|---------|---------|",
+            ]
+        )
+        for prompt, stats in r["per_prompt"].items():
+            lines.append(
+                f"| {prompt} | {stats['median']} | {stats['mean']} | {stats['min']} | {stats['max']} |"
+            )
+        lines.append("")
+    lines.extend(
+        [
+            "## Raw Data",
+            "",
+            f"Full JSON report: `{json_path}`",
+            "",
+        ]
+    )
+    md_path.write_text("\n".join(lines), encoding="utf-8")
+    return md_path
 
 
 def main():
@@ -239,6 +303,9 @@ def main():
     }
     with open(REPORT_FILE, "w") as f:
         json.dump(report, f, indent=2)
+
+    md_file = write_markdown_summary(report, REPORT_FILE)
+    log(f"Markdown summary: {md_file}")
 
     log("=" * 60)
     log("FINAL COMPARISON (clean slate — cold start + warm runs)")

@@ -95,7 +95,8 @@ lucy-v10/
 │   └── voices/
 ├── ui-v10/                    # PySide6 desktop HMI
 │   ├── app/panels/
-│   └── app/services/runtime_bridge.py
+│   ├── app/services/runtime_bridge.py
+│   └── model_comparison_benchmark_v2.py  # Clean-slate benchmark for all selectable modes
 ├── web_adapter/               # Optional stateless HTTP API
 │   └── server.py
 ├── tests/                     # Regression cases, golden responses
