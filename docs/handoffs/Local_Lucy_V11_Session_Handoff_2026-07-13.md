@@ -237,16 +237,18 @@ After the model cleanup, a clean-slate end-to-end benchmark was run for every re
 
 **Overall results:**
 
-| Mode | Alias | Cold-start (s) | Median (s) | Mean (s) | Min (s) | Max (s) | VRAM (MB) | Failed |
-|------|-------|----------------|------------|----------|---------|---------|-----------|--------|
-| auto | auto | 25.37 | 25.56 | 25.54 | 17.93 | 34.79 | 656 | 0/10 |
-| direct | local-lucy-llama31 | 25.30 | 25.41 | 25.90 | 17.60 | 37.04 | 656 | 0/10 |
-| direct | gemma4:12b-it-qat | 25.14 | 25.14 | 24.65 | 17.21 | 33.79 | 656 | 0/10 |
+| Mode | Alias | Smart Routing | Cold-start (s) | Median (s) | Mean (s) | Min (s) | Max (s) | VRAM (MB) | Failed |
+|------|-------|---------------|----------------|------------|----------|---------|---------|-----------|--------|
+| auto | auto | off | 25.37 | 25.56 | 25.54 | 17.93 | 34.79 | 656 | 0/10 |
+| direct | local-lucy-llama31 | off | 25.30 | 25.41 | 25.90 | 17.60 | 37.04 | 656 | 0/10 |
+| direct | gemma4:12b-it-qat | off | 25.14 | 25.14 | 24.65 | 17.21 | 33.79 | 656 | 0/10 |
+| direct | gemma4:12b-it-qat | on | 25.58 | 25.37 | 24.60 | 17.65 | 33.94 | 192 | 0/10 |
 
 **Observations:**
-- All three modes completed with zero failures.
+- All modes completed with zero failures.
 - Latency is effectively identical across modes on this hardware; the router overhead is negligible compared to model generation time.
-- VRAM stayed low (~656 MB) because these measurements reflect system RAM/CPU-bound execution rather than full GPU offload. GPU-offload numbers would require `num_gpu` tuning in the respective Modelfiles.
+- Enabling `gemma4_smart_routing` while Gemma 4 is selected does not change latency in a meaningful way for these prompts, which is expected because the benchmark queries are not routed through the evidence/Wikipedia path that the bypass avoids.
+- VRAM numbers are low (~656 MB and ~192 MB) because these measurements reflect system RAM/CPU-bound execution rather than full GPU offload. GPU-offload numbers would require `num_gpu` tuning in the respective Modelfiles.
 
 **Artifacts:**
 - JSON report: `/home/mike/Desktop/lucy_v10_model_benchmark_clean_2026-07-14T18-20-29.json`

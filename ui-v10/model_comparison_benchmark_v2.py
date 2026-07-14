@@ -11,6 +11,7 @@ Models tested:
   - gemma4:12b-it-qat  (gemma4 12B reasoning/multimodal)
 """
 
+import argparse
 import json
 import os
 import statistics
@@ -19,6 +20,9 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
+# Runtime setting controlled by --smart-routing CLI flag.
+_SMART_ROUTING = "off"
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -115,6 +119,7 @@ def run_query(prompt, model, timeout=130):
         env["LUCY_MODEL"] = model
         env["LUCY_LOCAL_MODEL"] = model
     env["LUCY_LOCAL_REPEAT_CACHE"] = "false"
+    env["LUCY_GEMMA4_SMART_ROUTING"] = "1" if _SMART_ROUTING in ("on", "true", "1") else "0"
 
     start = time.time()
     try:
@@ -140,9 +145,9 @@ def run_query(prompt, model, timeout=130):
         return 0.0, False, str(e)
 
 
-def benchmark_one(model_alias, model_label):
+def benchmark_one(model_alias, model_label, smart_routing: str = "off"):
     log(f"{'='*60}")
-    log(f"MODEL: {model_alias} ({model_label})")
+    log(f"MODEL: {model_alias} ({model_label})  [smart_routing={smart_routing}]")
     log(f"{'='*60}")
 
     # STEP 1: Unload everything and wait for clean slate
@@ -199,6 +204,7 @@ def benchmark_one(model_alias, model_label):
         "model_alias": model_alias,
         "model_label": model_label,
         "mode": "auto" if model_alias == "auto" else "direct",
+        "gemma4_smart_routing": smart_routing,
         "cold_start_ttc": round(cold_ttc, 2),
         "cold_start_accepted": cold_ok,
         "vram_before_mb": vram_before,
@@ -230,12 +236,12 @@ def write_markdown_summary(report: dict, json_path: Path) -> Path:
         "",
         "## Overall Results",
         "",
-        "| Mode | Alias | Cold-start (s) | Median (s) | Mean (s) | Min (s) | Max (s) | VRAM (MB) | Failed |",
-        "|------|-------|----------------|------------|----------|---------|---------|-----------|--------|",
+        "| Mode | Alias | Smart Routing | Cold-start (s) | Median (s) | Mean (s) | Min (s) | Max (s) | VRAM (MB) | Failed |",
+        "|------|-------|---------------|----------------|------------|----------|---------|---------|-----------|--------|",
     ]
     for r in report["results"]:
         lines.append(
-            f"| {r['mode']} | {r['model_alias']} | {r['cold_start_ttc']} | "
+            f"| {r['mode']} | {r['model_alias']} | {r.get('gemma4_smart_routing', 'off')} | {r['cold_start_ttc']} | "
             f"{r['overall_median'] or 'N/A'} | {r['overall_mean'] or 'N/A'} | "
             f"{r['overall_min'] or 'N/A'} | {r['overall_max'] or 'N/A'} | "
             f"{r.get('vram_during_mb') or 'N/A'} | {r['failed']}/{r['total_queries']} |"
@@ -274,50 +280,111 @@ def write_markdown_summary(report: dict, json_path: Path) -> Path:
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Clean-slate benchmark for Local Lucy selectable modes."
+    )
+    parser.add_argument(
+        "--model",
+        choices=[m[0] for m in MODELS],
+        help="Benchmark only this model instead of the full list.",
+    )
+    parser.add_argument(
+        "--smart-routing",
+        choices=["on", "off"],
+        default="off",
+        help="Set gemma4_smart_routing state for this run (default: off).",
+    )
+    parser.add_argument(
+        "--append-to",
+        type=Path,
+        help="Load an existing JSON report, append this run's result, and rewrite the summary.",
+    )
+    args = parser.parse_args()
+
+    global _SMART_ROUTING
+    _SMART_ROUTING = args.smart_routing
+
+    models = [next((m for m in MODELS if m[0] == args.model), None)] if args.model else MODELS
+    models = [m for m in models if m is not None]
+
     log("=" * 60)
     log("LOCAL LUCY V10 — CLEAN SLATE MODEL COMPARISON")
     log("=" * 60)
-    log(f"Models: {', '.join(m[0] for m in MODELS)}")
+    log(f"Models: {', '.join(m[0] for m in models)}")
+    log(f"Smart routing: {args.smart_routing}")
     log(f"Prompts: {len(PROMPTS)} x {RUNS_PER_PROMPT} runs")
     log("Cache: DISABLED")
     log(f"Unload wait: {UNLOAD_WAIT_S}s between models")
-    log(f"Report: {REPORT_FILE}")
     log("=" * 60)
 
     results = []
-    for alias, label in MODELS:
-        r = benchmark_one(alias, label)
+    for alias, label in models:
+        r = benchmark_one(alias, label, smart_routing=args.smart_routing)
         results.append(r)
         log(
             f"Summary for {alias}: median={r['overall_median']}s, mean={r['overall_mean']}s, failed={r['failed']}/{r['total_queries']}"
         )
 
-    # Report
-    report = {
-        "timestamp": datetime.now().isoformat(),
-        "models": [m[0] for m in MODELS],
-        "prompts": PROMPTS,
-        "runs_per_prompt": RUNS_PER_PROMPT,
-        "unload_wait_s": UNLOAD_WAIT_S,
-        "results": results,
-    }
-    with open(REPORT_FILE, "w") as f:
+    # Determine report file and merge behavior
+    if args.append_to:
+        report_path = args.append_to
+        try:
+            with open(report_path, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            existing = {"results": []}
+        existing_results = existing.get("results", [])
+        # Replace any prior result for the same alias + smart_routing state
+        existing_results = [
+            er
+            for er in existing_results
+            if not (
+                er.get("model_alias") == results[0]["model_alias"]
+                and er.get("gemma4_smart_routing") == results[0]["gemma4_smart_routing"]
+            )
+        ]
+        existing_results.extend(results)
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "models": sorted({er.get("model_alias") for er in existing_results}),
+            "prompts": PROMPTS,
+            "runs_per_prompt": RUNS_PER_PROMPT,
+            "unload_wait_s": UNLOAD_WAIT_S,
+            "results": existing_results,
+        }
+    else:
+        report_path = REPORT_FILE
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "models": [m[0] for m in MODELS],
+            "prompts": PROMPTS,
+            "runs_per_prompt": RUNS_PER_PROMPT,
+            "unload_wait_s": UNLOAD_WAIT_S,
+            "results": results,
+        }
+
+    with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
 
-    md_file = write_markdown_summary(report, REPORT_FILE)
+    md_file = write_markdown_summary(report, report_path)
     log(f"Markdown summary: {md_file}")
 
     log("=" * 60)
     log("FINAL COMPARISON (clean slate — cold start + warm runs)")
     log("=" * 60)
-    log(f"{'Model':<25} {'Cold':<8} {'Median':<8} {'Mean':<8} {'Min':<8} {'Max':<8} {'VRAM':<8}")
-    log("-" * 80)
-    for r in results:
+    log(
+        f"{'Model':<30} {'Smart':<8} {'Cold':<8} {'Median':<8} {'Mean':<8} {'Min':<8} {'Max':<8} {'VRAM':<8}"
+    )
+    log("-" * 90)
+    for r in report["results"]:
         log(
-            f"{r['model_alias']:<25} {r['cold_start_ttc']:<8} {r['overall_median'] or 'N/A':<8} {r['overall_mean'] or 'N/A':<8} {r['overall_min'] or 'N/A':<8} {r['overall_max'] or 'N/A':<8} {r.get('vram_during_mb') or 'N/A':<8}"
+            f"{r['model_alias']:<30} {r.get('gemma4_smart_routing', 'off'):<8} "
+            f"{r['cold_start_ttc']:<8} {r['overall_median'] or 'N/A':<8} "
+            f"{r['overall_mean'] or 'N/A':<8} {r['overall_min'] or 'N/A':<8} "
+            f"{r['overall_max'] or 'N/A':<8} {r.get('vram_during_mb') or 'N/A':<8}"
         )
 
-    log(f"\nFull report: {REPORT_FILE}")
+    log(f"\nFull report: {report_path}")
 
 
 if __name__ == "__main__":
