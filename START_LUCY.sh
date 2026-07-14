@@ -108,6 +108,12 @@ export LUCY_VOICE_WHISPER_MODEL="${LUCY_VOICE_WHISPER_MODEL:-base.en}"
 export LUCY_VOICE_WHISPER_GPU=0
 export LUCY_VOICE_WHISPER_RESIDENT=1
 
+# Enable sequential CUDA orchestration for voice mode.
+# Whisper runs on GPU during STT and is unloaded before the LLM request;
+# Kokoro runs on GPU during TTS and is unloaded after speaking.
+# Set to 0 or unset to restore the legacy CPU/resident-whisper behavior.
+export LUCY_VOICE_CUDA_ORCHESTRATION=1
+
 # Voice STT (Whisper) library path
 export LD_LIBRARY_PATH="${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src:${SCRIPT_DIR}/runtime/voice/whisper.cpp/build/ggml/src/ggml-cuda:${LD_LIBRARY_PATH:-}"
 
