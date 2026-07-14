@@ -152,6 +152,8 @@ def _ensure_stt_gpu() -> None:
     """Start whisper-server on GPU so STT is fast during voice input."""
     if not _cuda_orchestration_enabled() or ensure_whisper_worker is None:
         return
+    # Signal downstream transcription to use the GPU worker we are about to start.
+    os.environ["LUCY_VOICE_WHISPER_GPU"] = "1"
     try:
         model_path = resolve_whisper_model_path()
         port = ensure_whisper_worker(model_path, use_gpu=True)
@@ -163,7 +165,7 @@ def _ensure_stt_gpu() -> None:
 
 def _release_stt() -> None:
     """Stop whisper-server to free VRAM before LLM inference."""
-    if stop_whisper_worker is None:
+    if not _cuda_orchestration_enabled() or stop_whisper_worker is None:
         return
     try:
         stop_whisper_worker()
@@ -1039,14 +1041,10 @@ def handle_ptt_start(runtime_file: Path, state_file: Path, capture_dir: Path) ->
         prewarm_kokoro_worker()
 
     # Pre-warm whisper worker for fast STT. In CUDA-orchestration mode we load it
-    # on the GPU; otherwise we keep the legacy resident-CPU behavior.
-    if ensure_whisper_worker is not None:
-        try:
-            if backend.stt_engine == "whisper" and backend.available:
-                model_path = resolve_whisper_model_path()
-                ensure_whisper_worker(model_path, use_gpu=_cuda_orchestration_enabled())
-        except Exception:
-            pass  # Non-fatal: fallback to whisper-cli remains available
+    # on the GPU and set LUCY_VOICE_WHISPER_GPU=1 so transcription uses it;
+    # otherwise we keep the legacy resident-CPU behavior.
+    if backend.stt_engine == "whisper" and backend.available:
+        _ensure_stt_gpu()
 
     return normalize_voice_runtime(result_state or {})
 
