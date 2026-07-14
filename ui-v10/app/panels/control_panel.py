@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -321,15 +322,19 @@ class ControlPanel(QFrame):
 
     def _build_labeled_row(self, label_text: str, selector: QComboBox) -> QFrame:
         row = QFrame()
-        layout = QHBoxLayout(row)
+        layout = QVBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(4)
 
         label = QLabel(label_text)
         label.setObjectName("cardLabel")
+        label.setWordWrap(True)
+
+        selector.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        selector.setMinimumContentsLength(12)
+        selector.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         layout.addWidget(label)
-        layout.addStretch(1)
         layout.addWidget(selector)
         return row
 

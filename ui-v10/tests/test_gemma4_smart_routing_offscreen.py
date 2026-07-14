@@ -21,6 +21,9 @@ def _build_panel():
     os.environ.setdefault("LUCY_RUNTIME_CONTRACT_REQUIRED", "0")
     sys.path.insert(0, str(REPO_UI_ROOT))
 
+    sys.path.insert(0, str(REPO_ROOT))
+    sys.path.insert(0, str(REPO_ROOT / "tools"))
+
     from app.panels.control_panel import ControlPanel
     from PySide6.QtWidgets import QApplication
 
@@ -167,3 +170,51 @@ def test_gemma4_smart_routing_update_does_not_emit_signal():
     assert (
         received == []
     ), f"update_control_state emitted gemma4_smart_routing_change_requested: {received}"
+
+
+def test_engineering_selectors_fit_inside_viewport():
+    """All engineering combo-box selectors must be fully inside the scroll viewport."""
+    from PySide6.QtWidgets import QVBoxLayout, QWidget
+
+    app, panel = _build_panel()
+    panel.set_interface_level("engineering")
+    panel.update_control_state(
+        top_status={
+            "Profile": "lucy-v10",
+            "Mode": "auto",
+            "Conversation": "on",
+            "Memory": "on",
+            "Evidence": "on",
+            "Voice": "off",
+            "Augmented Policy": "fallback_only",
+            "Augmented Provider": "wikipedia",
+            "Learner": "on",
+        },
+        current_state={"model": "gemma4:12b-it-qat", "gemma4_smart_routing": "on"},
+    )
+
+    window = QWidget()
+    layout = QVBoxLayout(window)
+    layout.addWidget(panel)
+    window.resize(320, 600)
+    window.show()
+    app.processEvents()
+
+    viewport = panel._scroll_area.viewport()
+    viewport_width = viewport.width()
+    selectors = [
+        panel._mode_selector,
+        panel._conversation_selector,
+        panel._evidence_selector,
+        panel._augmentation_policy_selector,
+        panel._augmented_provider_selector,
+        panel._learner_selector,
+        panel._model_selector,
+    ]
+    for selector in selectors:
+        assert selector.isVisible()
+        bottom_right = selector.mapTo(viewport, selector.rect().bottomRight())
+        assert bottom_right.x() <= viewport_width, (
+            f"{selector.objectName()} right edge ({bottom_right.x()}) exceeds "
+            f"viewport width ({viewport_width})"
+        )
