@@ -498,6 +498,8 @@ class LocalAnswerConfig:
     augmented_max_tokens: int = 512
     evidence_max_tokens: int = 768
     creative_max_tokens: int = 512
+    self_review_max_tokens: int = 4096
+    self_review_context_chars: int = 100000
     embedding_cache_size: int = 1024
     keep_model_warm: bool = True
     max_context_chars: int = 1200
@@ -568,6 +570,10 @@ class LocalAnswerConfig:
             augmented_max_tokens=int(os.environ.get("LUCY_AUGMENTED_MAX_TOKENS", "512")),
             evidence_max_tokens=int(os.environ.get("LUCY_EVIDENCE_MAX_TOKENS", "768")),
             creative_max_tokens=int(os.environ.get("LUCY_CREATIVE_MAX_TOKENS", "512")),
+            self_review_max_tokens=int(os.environ.get("LUCY_SELF_REVIEW_MAX_TOKENS", "4096")),
+            self_review_context_chars=int(
+                os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "100000")
+            ),
             embedding_cache_size=int(os.environ.get("LUCY_EMBEDDING_CACHE_SIZE", "1024")),
             keep_model_warm=os.environ.get("LUCY_KEEP_MODEL_WARM", "1").lower()
             in ("1", "true", "yes", "on"),
@@ -1432,6 +1438,13 @@ class LocalAnswer:
         output = output_mode.upper()
         q = self._normalize_query(query)
         is_creative = self._is_creative_writing_query(q)
+
+        if route == "SELF_REVIEW":
+            return (
+                "self_review",
+                self.config.self_review_max_tokens,
+                "- Provide a thorough, detailed code review with concrete, minimal improvements.",
+            )
 
         # Phase 7: per-route token budgets from environment/config.
         local_budget = self.config.local_max_tokens

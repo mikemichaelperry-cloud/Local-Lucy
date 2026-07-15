@@ -245,3 +245,18 @@ def test_self_check_payload_includes_self_analysis_mode(tmp_path):
     )
     payload = build_self_check_payload(resolved)
     assert payload["control_state"]["self_analysis_mode"] == "on"
+
+
+def test_self_review_route_gets_large_budget():
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig.from_env()
+    answer = LocalAnswer(config)
+    profile, num_predict, instruction = answer._set_generation_profile(
+        "SELF_REVIEW", "CHAT", "review this file"
+    )
+
+    assert profile == "self_review"
+    assert num_predict == config.self_review_max_tokens
+    assert num_predict >= 4096
+    assert "thorough" in instruction.lower()
