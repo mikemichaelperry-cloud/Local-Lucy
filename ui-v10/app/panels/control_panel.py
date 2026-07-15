@@ -39,6 +39,7 @@ class ControlPanel(QFrame):
     augmented_provider_change_requested = Signal(str)
     model_change_requested = Signal(str)
     gemma4_smart_routing_change_requested = Signal(str)
+    self_analysis_change_requested = Signal(str)
     learner_change_requested = Signal(str)
     ptt_pressed_requested = Signal()
     ptt_released_requested = Signal()
@@ -101,6 +102,7 @@ class ControlPanel(QFrame):
             "augmented_provider": "",
             "model": "",
             "gemma4_smart_routing": "",
+            "self_analysis_mode": "",
             "profile": "",
             "learner": "",
         }
@@ -251,6 +253,13 @@ class ControlPanel(QFrame):
         self._gemma4_vram_warning_label.setObjectName("cardValue")
         self._gemma4_vram_warning_label.setVisible(False)
 
+        self._self_analysis_selector = QCheckBox("Self-Analysis Mode")
+        self._self_analysis_selector.setToolTip(
+            "When on, Lucy can parse her own code and suggest improvements."
+        )
+        self._self_analysis_selector.setEnabled(False)
+        self._self_analysis_selector.stateChanged.connect(self._handle_self_analysis_changed)
+
         self._model_recommendation_label = QLabel("Model recommendation: —")
         self._model_recommendation_label.setObjectName("cardLabel")
         self._model_recommendation_label.setWordWrap(True)
@@ -303,6 +312,7 @@ class ControlPanel(QFrame):
         layout.addWidget(self._build_labeled_row("model", self._model_selector))
         layout.addWidget(self._gemma4_smart_routing_selector)
         layout.addWidget(self._gemma4_vram_warning_label)
+        layout.addWidget(self._self_analysis_selector)
         layout.addWidget(self._model_recommendation_label)
         layout.addWidget(self._eng_selected_route_label)
         layout.addWidget(self._eng_selected_model_label)
@@ -687,6 +697,9 @@ class ControlPanel(QFrame):
             values["gemma4_smart_routing"] = (
                 str(current_state.get("gemma4_smart_routing", "off")).strip().lower()
             )
+            values["self_analysis_mode"] = (
+                str(current_state.get("self_analysis_mode", "off")).strip().lower()
+            )
         self._current_values.update(values)
         if self._profile_value_label is not None:
             profile_text = values["profile"] or "unavailable"
@@ -704,6 +717,9 @@ class ControlPanel(QFrame):
             self._gemma4_smart_routing_selector.setChecked(
                 values.get("gemma4_smart_routing", "off") == "on"
             )
+        if self._self_analysis_selector is not None:
+            self._self_analysis_selector.setChecked(values.get("self_analysis_mode", "off") == "on")
+            self._self_analysis_selector.setEnabled(self._backend_available)
         self._update_gemma4_smart_routing_visibility(values.get("model", ""))
         self._refresh_voice_ptt()
 
@@ -997,6 +1013,14 @@ class ControlPanel(QFrame):
             "gemma4_smart_routing",
             value,
             self.gemma4_smart_routing_change_requested,
+        )
+
+    def _handle_self_analysis_changed(self, state: int) -> None:
+        value = "on" if state == 2 else "off"
+        self._emit_if_changed(
+            "self_analysis_mode",
+            value,
+            self.self_analysis_change_requested,
         )
 
     def _update_gemma4_smart_routing_visibility(self, model: str) -> None:
