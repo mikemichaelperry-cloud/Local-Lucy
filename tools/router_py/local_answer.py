@@ -1949,15 +1949,23 @@ class LocalAnswer:
         return 4 if self._is_thinking_model() else 1
 
     async def _call_ollama(
-        self, prompt: str, num_predict: int, temperature: Optional[float] = None
+        self,
+        prompt: str,
+        num_predict: int,
+        temperature: Optional[float] = None,
+        route_mode: str = "LOCAL",
     ) -> Tuple[str, int]:
         """Call Ollama API with retry for model-load transitions."""
         start_time = time.time()
         # Thinking models need extra token headroom so reasoning does not swallow
         # the visible response. Cap at a sane maximum to protect latency, but do
         # not reduce a deliberately large request (e.g. SELF_REVIEW) below what
-        # the caller asked for.
-        max_num_predict = max(self.config.num_predict_long, num_predict)
+        # the caller asked for. Only SELF_REVIEW is allowed to exceed the usual
+        # num_predict_long cap; normal routes keep the existing ceiling.
+        if route_mode.upper() == "SELF_REVIEW":
+            max_num_predict = max(self.config.num_predict_long, num_predict)
+        else:
+            max_num_predict = self.config.num_predict_long
         effective_num_predict = min(
             num_predict * self._thinking_model_token_multiplier(),
             max_num_predict,
@@ -2060,8 +2068,8 @@ class LocalAnswer:
             else query
         )
         q_norm = self._normalize_query(q_eval)
-        cache_bypass = route_mode.upper() == "SELF_REVIEW"
-        is_self_review = cache_bypass
+        is_self_review = route_mode.upper() == "SELF_REVIEW"
+        cache_bypass = is_self_review
 
         conversation_active = (
             self.config.conversation_mode_active or self.config.conversation_mode_force
@@ -2233,7 +2241,9 @@ class LocalAnswer:
             temp_override = None
             if profile_name in ("detail", "chat_long"):
                 temp_override = 0.7
-            api_text, api_duration_ms = await self._call_ollama(prompt, num_predict, temp_override)
+            api_text, api_duration_ms = await self._call_ollama(
+                prompt, num_predict, temp_override, route_mode=route_mode
+            )
             api_done = self._now_ms()
 
             self._latprof_append("local_answer", "ollama_api_call", api_duration_ms)

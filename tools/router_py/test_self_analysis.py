@@ -328,7 +328,7 @@ def test_self_review_context_chars_must_be_positive():
         SelfAnalysisEngine(project_root=Path("."), self_review_context_chars=-1)
 
 
-def test_self_review_cache_bypass_helper_never_reads_or_writes_cache(tmp_path):
+def test_cache_helpers_no_op_when_disabled(tmp_path):
     from router_py.local_answer import LocalAnswer, LocalAnswerConfig
 
     config = LocalAnswerConfig.from_env()
@@ -363,7 +363,7 @@ async def test_self_review_generate_answer_bypasses_cache(tmp_path, monkeypatch)
     monkeypatch.setattr(answer, "_cache_load", fail_if_called("_cache_load"))
     monkeypatch.setattr(answer, "_cache_store", fail_if_called("_cache_store"))
 
-    async def fake_call_ollama(prompt, num_predict, temp_override=None):
+    async def fake_call_ollama(prompt, num_predict, temp_override=None, route_mode="LOCAL"):
         return "mocked self-review", 1
 
     monkeypatch.setattr(answer, "_call_ollama", fake_call_ollama)
@@ -384,7 +384,7 @@ async def test_self_review_short_circuit_bypass(monkeypatch):
     config.model = "local-lucy-llama31"
     answer = LocalAnswer(config)
 
-    async def fake_call_ollama(prompt, num_predict, temp_override=None):
+    async def fake_call_ollama(prompt, num_predict, temp_override=None, route_mode="LOCAL"):
         return "model generated review text", 1
 
     monkeypatch.setattr(answer, "_call_ollama", fake_call_ollama)
@@ -411,7 +411,7 @@ async def test_self_review_ollama_payload_uses_self_review_budget(monkeypatch):
 
     captured = {}
 
-    async def fake_call_ollama(prompt, num_predict, temp_override=None):
+    async def fake_call_ollama(prompt, num_predict, temp_override=None, route_mode="LOCAL"):
         captured["num_predict"] = num_predict
         return "mocked self-review", 1
 
@@ -420,6 +420,50 @@ async def test_self_review_ollama_payload_uses_self_review_budget(monkeypatch):
     result = await answer.generate_answer(query="review sample.py", route_mode="SELF_REVIEW")
     assert result.text == "mocked self-review"
     assert captured["num_predict"] == config.self_review_max_tokens
+
+
+@pytest.mark.asyncio
+async def test_self_review_ollama_payload_includes_self_review_budget(monkeypatch):
+    """The actual JSON body sent to Ollama uses the SELF_REVIEW token budget."""
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig()
+    config.self_review_max_tokens = 4096
+    config.num_predict_long = 1536
+    config.model = "local-lucy-llama31"
+    answer = LocalAnswer(config)
+
+    captured_payload = {}
+
+    class FakeResponse:
+        async def json(self):
+            return {"response": "mocked payload self-review"}
+
+        def raise_for_status(self):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+    class FakeSession:
+        def post(self, url, json):
+            captured_payload["url"] = url
+            captured_payload["json"] = json
+            return FakeResponse()
+
+    async def fake_get_session():
+        return FakeSession()
+
+    monkeypatch.setattr(answer, "_get_session", fake_get_session)
+
+    result = await answer.generate_answer(query="review sample.py", route_mode="SELF_REVIEW")
+
+    assert result.text == "mocked payload self-review"
+    assert captured_payload["url"] == config.ollama_url
+    assert captured_payload["json"]["options"]["num_predict"] == config.self_review_max_tokens
 
 
 def test_analyze_file_handles_invalid_utf8(tmp_path):
