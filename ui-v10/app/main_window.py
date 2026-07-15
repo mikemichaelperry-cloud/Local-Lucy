@@ -504,6 +504,11 @@ class OperatorConsoleWindow(QMainWindow):
                 "gemma4_smart_routing_toggle", value, "Gemma 4 smart routing change"
             )
         )
+        self.control_panel.self_analysis_change_requested.connect(
+            lambda value: self._execute_backend_action(
+                "self_analysis_mode_toggle", value, "Self-Analysis mode change"
+            )
+        )
         self.control_panel.learner_change_requested.connect(
             lambda value: self._execute_backend_action("learner_toggle", value, "learner toggle")
         )

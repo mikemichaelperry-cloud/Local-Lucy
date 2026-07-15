@@ -400,6 +400,12 @@ class RuntimeBridge:
                 allowed_values=("on", "off"),
                 reason=reason,
             ),
+            "self_analysis_mode_toggle": ActionCapability(
+                name="self_analysis_mode_toggle",
+                available=available,
+                allowed_values=("on", "off"),
+                reason=reason,
+            ),
         }
 
     def _discover_request_capability(self) -> ActionCapability:
@@ -562,6 +568,7 @@ class RuntimeBridge:
         "augmented_provider": ("set-augmented-provider", "augmented_provider"),
         "model_selection": ("set-model", "model"),
         "gemma4_smart_routing_toggle": ("set-gemma4-smart-routing", "gemma4_smart_routing"),
+        "self_analysis_mode_toggle": ("set-self-analysis-mode", "self_analysis_mode"),
         "learner_toggle": ("set-learner", "learner"),
     }
 
@@ -593,6 +600,7 @@ class RuntimeBridge:
         os.environ["LUCY_GEMMA4_SMART_ROUTING"] = _bool_env(
             state.get("gemma4_smart_routing", "off")
         )
+        os.environ["LUCY_SELF_ANALYSIS_MODE"] = _bool_env(state.get("self_analysis_mode", "off"))
 
     def _run_control_action_direct(self, action: str, requested_value: str) -> CommandResult:
         command_name, field = self._CONTROL_ACTION_MAP[action]

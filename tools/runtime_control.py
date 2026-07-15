@@ -36,6 +36,7 @@ KNOWN_FIELDS = {
     "augmented_provider",
     "model",
     "gemma4_smart_routing",
+    "self_analysis_mode",
     "learner",
     "approval_required",
     "status",
@@ -335,6 +336,7 @@ def default_state() -> dict[str, Any]:
         or os.environ.get("LUCY_LOCAL_MODEL")
         or "local-lucy-llama31",
         "gemma4_smart_routing": "off",
+        "self_analysis_mode": "off",
         "learner": _resolve_initial_learner_state(),
         "approval_required": False,
         "status": "ready",
@@ -413,6 +415,7 @@ def update_state_field(state_file: Path, field: str, requested_value: str) -> Up
             "augmented_provider",
             "model",
             "gemma4_smart_routing",
+            "self_analysis_mode",
             "learner",
         }:
             state["status"] = "ready"
@@ -487,6 +490,7 @@ def normalize_state(payload: dict[str, Any] | None) -> dict[str, Any]:
     state["model"] = clean_text(state.get("model")) or default_state()["model"]
     state["active_model"] = state["model"]
     state["gemma4_smart_routing"] = coerce_toggle(state.get("gemma4_smart_routing", "off"))
+    state["self_analysis_mode"] = coerce_toggle(state.get("self_analysis_mode", "off"))
     state["learner"] = coerce_toggle(state.get("learner"))
     state["approval_required"] = bool(state.get("approval_required", False))
     state["status"] = clean_text(state.get("status")) or "ready"
