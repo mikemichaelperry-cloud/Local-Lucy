@@ -93,6 +93,19 @@ def test_analyze_file_rejects_huge_file(tmp_path):
         engine.analyze_file("huge.py")
 
 
+def test_analyze_file_accepts_exact_max_size(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    boundary = project / "boundary.py"
+    boundary.write_text("x" * _MAX_FILE_SIZE_BYTES)
+
+    engine = SelfAnalysisEngine(project_root=project)
+    result = engine.analyze_file("boundary.py")
+
+    assert isinstance(result, FileAnalysis)
+    assert result.path == "boundary.py"
+
+
 def test_suggest_improvements_local_when_import_missing(tmp_path, monkeypatch):
     project = tmp_path / "project"
     project.mkdir()

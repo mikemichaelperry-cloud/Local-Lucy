@@ -2103,7 +2103,7 @@ class LocalAnswer:
             self._diag_append("creative_writing_guard", "active")
 
         policy_response = self._get_policy_response(policy_response_id)
-        if policy_response and not is_creative:
+        if policy_response and not is_creative and not is_self_review:
             duration_ms = int((time.time() - start_time) * 1000)
             return AnswerResult(
                 text=policy_response,
