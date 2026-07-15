@@ -260,3 +260,78 @@ def test_self_review_route_gets_large_budget():
     assert num_predict == config.self_review_max_tokens
     assert num_predict >= 4096
     assert "thorough" in instruction.lower()
+
+
+@pytest.mark.asyncio
+async def test_suggest_improvements_uses_self_review_route_and_disables_cache(
+    tmp_path, monkeypatch
+):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "sample.py").write_text("def foo():\n    pass\n")
+
+    engine = SelfAnalysisEngine(project_root=project)
+
+    class FakeAnswerResult:
+        text = "mocked suggestion"
+
+    created_instances = []
+
+    class FakeLocalAnswer:
+        def __init__(self, config):
+            self.config = config
+            self.last_kwargs = None
+            created_instances.append(self)
+
+        async def generate_answer(self, **kwargs):
+            self.last_kwargs = kwargs
+            return FakeAnswerResult()
+
+        async def close(self):
+            pass
+
+    fake_config = MagicMock()
+    fake_config.model = "local-lucy-llama31"
+    fake_config_class = MagicMock(return_value=fake_config)
+
+    fake_module = types.ModuleType("router_py.local_answer")
+    fake_module.LocalAnswer = FakeLocalAnswer
+    fake_module.LocalAnswerConfig = fake_config_class
+    monkeypatch.setitem(sys.modules, "router_py.local_answer", fake_module)
+
+    result = await engine.suggest_improvements("sample.py")
+    assert "LOCAL analysis" in result
+    assert "mocked suggestion" in result
+    assert len(created_instances) == 1
+    assert created_instances[0].last_kwargs.get("route_mode") == "SELF_REVIEW"
+
+
+def test_analyze_file_truncates_very_long_source(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    project.mkdir()
+    source = "x = 1\n" * 50000  # ~300k chars
+    (project / "long.py").write_text(source)
+
+    engine = SelfAnalysisEngine(project_root=project)
+    # Patch context chars to a small number for deterministic truncation
+    monkeypatch.setattr(engine, "_max_source_chars", 100)
+    result = engine.analyze_file("long.py")
+
+    assert "[truncated" in result.prompt_context
+    assert len(result.prompt_context) < len(source) + 500
+
+
+def test_self_review_cache_bypass_never_reads_or_writes_cache(tmp_path):
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig.from_env()
+    config.cache_dir = tmp_path
+    answer = LocalAnswer(config)
+
+    answer._cache_store("q1", "v1", "cached text", cache_bypass=False)
+    assert answer._cache_load("q1", "v1", cache_bypass=False) is not None
+
+    assert answer._cache_load("q1", "v1", cache_bypass=True) is None
+
+    answer._cache_store("q2", "v2", "bypassed text", cache_bypass=True)
+    assert answer._cache_load("q2", "v2", cache_bypass=False) is None

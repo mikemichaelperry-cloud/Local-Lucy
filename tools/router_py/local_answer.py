@@ -1313,10 +1313,10 @@ class LocalAnswer:
         return hashlib.sha256(key_string.encode()).hexdigest()
 
     def _cache_load(
-        self, query: str, variant: str, fact_revision: str = ""
+        self, query: str, variant: str, fact_revision: str = "", cache_bypass: bool = False
     ) -> Optional[Tuple[str, int]]:
         """Load from cache."""
-        if not self.config.cache_enabled:
+        if not self.config.cache_enabled or cache_bypass:
             return None
         key = self._cache_key(query, variant, fact_revision)
         meta_file = self.config.cache_dir / f"{key}.meta"
@@ -1352,9 +1352,16 @@ class LocalAnswer:
             logger.debug(f"Cache load failed: {e}")
             return None
 
-    def _cache_store(self, query: str, variant: str, text: str, fact_revision: str = "") -> None:
+    def _cache_store(
+        self,
+        query: str,
+        variant: str,
+        text: str,
+        fact_revision: str = "",
+        cache_bypass: bool = False,
+    ) -> None:
         """Store in cache."""
-        if not self.config.cache_enabled or not text.strip():
+        if not self.config.cache_enabled or cache_bypass or not text.strip():
             return
         try:
             self.config.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -2051,6 +2058,7 @@ class LocalAnswer:
             else query
         )
         q_norm = self._normalize_query(q_eval)
+        cache_bypass = route_mode.upper() == "SELF_REVIEW"
 
         conversation_active = (
             self.config.conversation_mode_active or self.config.conversation_mode_force
@@ -2153,7 +2161,7 @@ class LocalAnswer:
                 pass
 
         cache_start = self._now_ms()
-        cached = self._cache_load(q_norm, cache_variant, fact_revision)
+        cached = self._cache_load(q_norm, cache_variant, fact_revision, cache_bypass)
         cache_end = self._now_ms()
         self._latprof_append("local_answer", "cache_lookup", cache_end - cache_start)
 
@@ -2289,7 +2297,7 @@ class LocalAnswer:
         total_ms = int((time.time() - start_time) * 1000)
         self._latprof_append("local_answer", "total", total_ms)
 
-        self._cache_store(q_norm, cache_variant, api_text, fact_revision)
+        self._cache_store(q_norm, cache_variant, api_text, fact_revision, cache_bypass)
 
         return AnswerResult(
             text=api_text, from_cache=False, generation_profile=profile_name, duration_ms=total_ms

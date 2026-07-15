@@ -29,6 +29,7 @@ class SelfAnalysisEngine:
         if project_root is None:
             project_root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10"))
         self.project_root = Path(project_root).expanduser().resolve()
+        self._max_source_chars = int(os.environ.get("LUCY_SELF_ANALYSIS_MAX_SOURCE_CHARS", 100000))
 
     def analyze_file(self, relative_path: str) -> FileAnalysis:
         file_path = self._resolve_file(relative_path)
@@ -70,7 +71,7 @@ class SelfAnalysisEngine:
             config.model = model
         answer = LocalAnswer(config)
         try:
-            result = await answer.generate_answer(query=prompt, route_mode="LOCAL")
+            result = await answer.generate_answer(query=prompt, route_mode="SELF_REVIEW")
             return f"LOCAL analysis:\n{analysis.prompt_context}\n\nAUGMENTED suggestions:\n{result.text}"
         except Exception as exc:
             logger.warning(f"Self-analysis LLM call failed: {exc}")
@@ -194,7 +195,10 @@ class SelfAnalysisEngine:
                 )
         lines.append("Source code:")
         lines.append("```python")
-        lines.append(source)
+        truncated_source = source
+        if len(source) > self._max_source_chars:
+            truncated_source = source[: self._max_source_chars] + "\n[truncated]"
+        lines.append(truncated_source)
         lines.append("```")
         return "\n".join(lines)
 
