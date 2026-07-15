@@ -320,7 +320,7 @@ def test_analyze_file_truncates_very_long_source(tmp_path):
     assert len(result.prompt_context) < len(source) + 500
 
 
-def test_self_review_cache_bypass_never_reads_or_writes_cache(tmp_path):
+def test_self_review_cache_bypass_helper_never_reads_or_writes_cache(tmp_path):
     from router_py.local_answer import LocalAnswer, LocalAnswerConfig
 
     config = LocalAnswerConfig.from_env()
@@ -334,3 +334,32 @@ def test_self_review_cache_bypass_never_reads_or_writes_cache(tmp_path):
 
     answer._cache_store("q2", "v2", "bypassed text", cache_bypass=True)
     assert answer._cache_load("q2", "v2", cache_bypass=False) is None
+
+
+@pytest.mark.asyncio
+async def test_self_review_generate_answer_bypasses_cache(tmp_path, monkeypatch):
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig.from_env()
+    config.cache_dir = tmp_path
+    answer = LocalAnswer(config)
+
+    def fail_if_called(name):
+        def _fail(*args, **kwargs):
+            raise AssertionError(f"{name} should not be called for SELF_REVIEW")
+
+        return _fail
+
+    monkeypatch.setattr(answer, "_cache_load", fail_if_called("_cache_load"))
+    monkeypatch.setattr(answer, "_cache_store", fail_if_called("_cache_store"))
+
+    async def fake_call_ollama(prompt, num_predict, temp_override=None):
+        return "mocked self-review", 1
+
+    monkeypatch.setattr(answer, "_call_ollama", fake_call_ollama)
+
+    result = await answer.generate_answer(query="review sample.py", route_mode="SELF_REVIEW")
+
+    assert result.text == "mocked self-review"
+    assert result.from_cache is False
+    assert not any(tmp_path.iterdir())

@@ -46,7 +46,7 @@ In `tools/router_py/local_answer.py`:
 
 - Add `self_review_max_tokens` and `self_review_context_chars` to `LocalAnswerConfig`.
 - Read them from environment variables `LUCY_SELF_REVIEW_MAX_TOKENS` and `LUCY_SELF_REVIEW_CONTEXT_CHARS` with defaults of `4096` and `100000` respectively.
-- Add a `route == "SELF_REVIEW"` branch in `_set_generation_profile()` that returns a `("self_review", self_review_max_tokens, "- Provide a thorough, detailed code review.")` profile.
+- Add a `route == "SELF_REVIEW"` branch in `_set_generation_profile()` that returns a `("self_review", self_review_max_tokens, "- Provide a thorough, detailed code review with concrete, minimal improvements.")` profile.
 - Disable the local repeat cache when `route_mode == "SELF_REVIEW"` so repeated analysis of a changed file does not return stale output.
 
 ### 3. Safety checks for large files

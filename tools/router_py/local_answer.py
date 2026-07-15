@@ -2161,7 +2161,9 @@ class LocalAnswer:
                 pass
 
         cache_start = self._now_ms()
-        cached = self._cache_load(q_norm, cache_variant, fact_revision, cache_bypass)
+        cached = None
+        if not cache_bypass:
+            cached = self._cache_load(q_norm, cache_variant, fact_revision, cache_bypass)
         cache_end = self._now_ms()
         self._latprof_append("local_answer", "cache_lookup", cache_end - cache_start)
 
@@ -2297,7 +2299,8 @@ class LocalAnswer:
         total_ms = int((time.time() - start_time) * 1000)
         self._latprof_append("local_answer", "total", total_ms)
 
-        self._cache_store(q_norm, cache_variant, api_text, fact_revision, cache_bypass)
+        if not cache_bypass:
+            self._cache_store(q_norm, cache_variant, api_text, fact_revision, cache_bypass)
 
         return AnswerResult(
             text=api_text, from_cache=False, generation_profile=profile_name, duration_ms=total_ms

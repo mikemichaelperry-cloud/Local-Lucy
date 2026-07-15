@@ -38,15 +38,23 @@ class SelfAnalysisEngine:
                 from router_py.local_answer import LocalAnswerConfig
 
                 self_review_context_chars = LocalAnswerConfig.from_env().self_review_context_chars
-            except Exception:
+            except (ImportError, AttributeError):
+                logger.warning(
+                    "LocalAnswerConfig not available; falling back to "
+                    "LUCY_SELF_REVIEW_CONTEXT_CHARS for context limit."
+                )
                 self_review_context_chars = int(
                     os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "100000")
                 )
+        if self_review_context_chars <= 0:
+            raise ValueError(
+                f"self_review_context_chars must be positive, got {self_review_context_chars}"
+            )
         self._self_review_context_chars = self_review_context_chars
 
     def analyze_file(self, relative_path: str) -> FileAnalysis:
         file_path = self._resolve_file(relative_path)
-        source = file_path.read_text(encoding="utf-8")
+        source = self._read_source(file_path, relative_path)
         tree = ast.parse(source)
 
         metrics = self._extract_metrics(tree, source)
@@ -105,12 +113,17 @@ class SelfAnalysisEngine:
             raise ValueError(f"Not a regular file: {relative_path}")
         if candidate.suffix != ".py":
             raise ValueError(f"Not a Python file: {relative_path}")
-        file_size = candidate.stat().st_size
-        if file_size > _MAX_FILE_SIZE_BYTES:
-            raise ValueError(
-                f"File too large for self-analysis ({file_size} bytes): {relative_path}"
-            )
         return candidate
+
+    def _read_source(self, file_path: Path, relative_path: str) -> str:
+        """Read ``file_path`` with a hard byte cap and tolerant decoding."""
+        with file_path.open("rb") as f:
+            data = f.read(_MAX_FILE_SIZE_BYTES + 1)
+        if len(data) > _MAX_FILE_SIZE_BYTES:
+            raise ValueError(
+                f"File too large for self-analysis ({len(data)} bytes): {relative_path}"
+            )
+        return data.decode("utf-8", errors="replace")
 
     def _extract_metrics(self, tree: ast.AST, source: str) -> dict[str, int]:
         lines = source.splitlines()
@@ -222,7 +235,7 @@ class SelfAnalysisEngine:
     def _build_llm_prompt(self, analysis: FileAnalysis) -> str:
         return (
             "You are reviewing Local Lucy's own Python source code. "
-            "Below are static metrics and lint results. "
+            "Below are static metrics, lint results, and the full source code. "
             "Suggest concrete, minimal improvements. Do not rewrite the file.\n\n"
             f"{analysis.prompt_context}"
         )
