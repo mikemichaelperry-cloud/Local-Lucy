@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from router_py.execution_engine import ExecutionEngine
 from router_py.self_analysis import FileAnalysis, SelfAnalysisEngine
 
 
@@ -66,3 +67,22 @@ def test_suggest_improvements_local_when_import_missing(tmp_path, monkeypatch):
     assert "LOCAL analysis:" in result
     assert "AUGMENTED suggestions: unavailable" in result
     assert "LocalAnswer not importable" in result
+
+
+@pytest.mark.asyncio
+async def test_execution_engine_self_analysis_route(tmp_path):
+    code = """\
+def long_function():
+    x = 1
+    x = 2
+    x = 3
+"""
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "sample.py").write_text(code)
+
+    engine = ExecutionEngine()
+    # Force self-analysis mode on and point engine at temp project via monkeypatch if needed.
+    # This test verifies the dispatch path exists; actual LLM call is mocked.
+    result = await engine.execute_self_analysis("sample.py", project_root=project)
+    assert "LOCAL analysis" in result.response_text

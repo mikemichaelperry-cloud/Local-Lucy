@@ -119,6 +119,7 @@ from router_py.classify import ClassificationResult, RoutingDecision
 from router_py.policy import requires_evidence_mode
 from router_py.request_types import ExecutionResult
 from router_py import response_formatter
+from router_py.self_analysis import SelfAnalysisEngine
 from router_py.state_manager import get_state_manager
 from router_py.execution_engine_state import StateWriter
 from router_py.resilience import get_breaker, CircuitBreakerOpen
@@ -820,6 +821,75 @@ class ExecutionEngine:
         self._write_json_state_files(route, result, context)
         return result
 
+    async def execute_self_analysis(
+        self,
+        relative_path: str,
+        project_root: Path | None = None,
+        model: str | None = None,
+    ) -> ExecutionResult:
+        """Run local self-analysis on a project file and return formatted result."""
+        start_time = time.time()
+        try:
+            engine = SelfAnalysisEngine(project_root=project_root)
+            response = await engine.suggest_improvements(relative_path, model=model)
+            execution_time = int((time.time() - start_time) * 1000)
+            return ExecutionResult(
+                status="completed",
+                outcome_code="answered",
+                route="LOCAL",
+                provider="local",
+                provider_usage_class="local",
+                response_text=response,
+                error_message="",
+                execution_time_ms=execution_time,
+                metadata={"self_analysis": True, "file": relative_path},
+            )
+        except Exception as exc:
+            execution_time = int((time.time() - start_time) * 1000)
+            return ExecutionResult(
+                status="failed",
+                outcome_code="self_analysis_error",
+                route="LOCAL",
+                provider="local",
+                provider_usage_class="local",
+                response_text=f"Self-analysis failed: {exc}",
+                error_message=str(exc),
+                execution_time_ms=execution_time,
+                metadata={"self_analysis": True, "file": relative_path},
+            )
+
+    def _load_control_state(self) -> dict[str, Any]:
+        try:
+            from runtime_control import load_or_create_state, resolve_runtime_paths
+
+            state_file = resolve_runtime_paths(None).state_file
+            state = load_or_create_state(state_file, refresh_timestamp=False)
+            return state if isinstance(state, dict) else {}
+        except Exception:
+            return {}
+
+    def _extract_self_analysis_file_reference(self, question: str) -> str | None:
+        """Return a relative path if the query asks to analyze/review/improve a file."""
+        q = question.lower()
+        if not any(k in q for k in ("analyze", "analyse", "review", "improve", "inspect")):
+            return None
+        # Look for quoted or bare file paths ending in .py
+        matches = re.findall(r"[\'\"]?([\w\-/]+\.py)[\'\"]?", question)
+        if matches:
+            candidate = (ROOT_DIR / matches[0]).resolve()
+            if candidate.exists():
+                return str(candidate.relative_to(ROOT_DIR))
+        # Look for module-style dotted paths (e.g. ui_v10.app.panels.control_panel)
+        matches = re.findall(r"([\w]+(?:\.[\w]+)+)", question)
+        for m in matches:
+            converted = m.replace(".", "/") + ".py"
+            if "ui_v10" in converted:
+                converted = converted.replace("ui_v10", "ui-v10")
+            candidate = (ROOT_DIR / converted).resolve()
+            if candidate.exists():
+                return str(candidate.relative_to(ROOT_DIR))
+        return None
+
     def _append_medical_sources(
         self,
         result: ExecutionResult,
@@ -978,6 +1048,16 @@ class ExecutionEngine:
             )
             self._record_request_metrics(context, route, empty_result, execution_time)
             return empty_result
+
+        # Self-analysis mode dispatch
+        control_state = self._load_control_state() or {}
+        if control_state.get("self_analysis_mode", "off").lower() == "on":
+            file_ref = self._extract_self_analysis_file_reference(question)
+            if file_ref:
+                self._logger.info(f"Self-analysis mode dispatch: {file_ref}")
+                result = await self.execute_self_analysis(file_ref)
+                self._record_request_metrics(context, route, result, result.execution_time_ms)
+                return result
 
         # Check for medical context and configure safety constraints
         _, evidence_reason = requires_evidence_mode(question, context)
