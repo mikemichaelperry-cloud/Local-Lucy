@@ -101,7 +101,7 @@ Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
 Commits since tag: 62
-Working tree: modified (Self-Analysis Mode added; pre-existing `models/router/comprehensive_examples.json` change unrelated)
+Working tree: modified (Self-Analysis Mode hardened; pre-existing `models/router/comprehensive_examples.json` change unrelated)
 ```
 
 ### Recent Commits (last 13)
@@ -170,14 +170,22 @@ e3fe120 ci: add experimental AppImage packaging
   - `ui-v10/tests/test_comprehensive_hmi_inspection.py`: 138 checks passed
 - Full `make test` status: 972 passed, 19 skipped, 32 failed. The failures are pre-existing routing/semantic-regression tests unrelated to the persona pipeline; persona-focused tests all pass.
 
-### Self-Analysis Mode — Added
+### Self-Analysis Mode — Hardened
 - New `tools/router_py/self_analysis.py` parses Local Lucy's Python source with stdlib `ast` and existing `ruff`, then uses the configured local LLM via `LocalAnswer` to suggest improvements.
 - `tools/router_py/execution_engine.py` dispatches self-analysis queries when `self_analysis_mode` is `"on"` and the query references a Python file.
+- **Fixes applied:**
+  - Self-analysis results now write state files (`_write_state_files` / `_write_json_state_files`) so the HMI can display them.
+  - Results are reported with route `SELF_REVIEW` (not `LOCAL`) and `policy_reason="self_analysis_mode"`.
+  - Added `"self_analysis_error"` to `OutcomeCodeType` in `tools/router_py/request_types.py`.
+  - `runtime_control.py` gained `set-self-analysis-mode` CLI parity with other toggles.
+  - `runtime_control.py` `render_env` and `build_self_check_payload` now export `self_analysis_mode` / `LUCY_SELF_ANALYSIS_MODE`.
+  - `ui-v10/app/services/runtime_bridge.py` `_build_payload_from_outcome` includes `self_analysis_mode` in `control_state`.
+  - `ui-v10/app/panels/control_panel.py` `_emit_if_changed` now passes `current_state` so the Self-Analysis Mode checkbox is not cleared on a no-op toggle.
 - HMI Engineering panel gained a "Self-Analysis Mode" checkbox; state is persisted in `current_state.json` via `runtime_control.py` and `runtime_bridge.py`.
 - Static facts are labeled **LOCAL**; LLM suggestions are labeled **AUGMENTED**.
 - Tests:
-  - `tools/router_py/test_self_analysis.py`: 4 passed
-  - `ui-v10/tests/test_self_analysis_mode_offscreen.py`: passed
+  - `tools/router_py/test_self_analysis.py`: 7 passed
+  - `ui-v10/tests/test_self_analysis_mode_offscreen.py`: 2 passed
   - `ui-v10/tests/test_comprehensive_hmi_inspection.py`: 138 checks passed
 
 ---
@@ -282,5 +290,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-07-15T07:00:00Z*
+*Last updated: 2026-07-15T15:54:19Z*
 *Session: Added Self-Analysis Mode. Created `tools/router_py/self_analysis.py` for local code review using stdlib `ast` + `ruff` + `LocalAnswer`/Ollama. Wired dispatch into `tools/router_py/execution_engine.py`. Added Engineering-panel checkbox in `ui-v10/app/panels/control_panel.py` and connected it through `runtime_bridge.py` and `runtime_control.py` state persistence. Updated `Architecture.md`, `CHANGELOG.md`, and this file. Tests: `tools/router_py/test_self_analysis.py` 4 passed; `ui-v10/tests/test_self_analysis_mode_offscreen.py` passed; `ui-v10/tests/test_comprehensive_hmi_inspection.py` 138/138 checks passed. Pre-existing unrelated change remains in `models/router/comprehensive_examples.json`.*
