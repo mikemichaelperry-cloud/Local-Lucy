@@ -12,6 +12,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+_MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
+
 
 @dataclass
 class FileAnalysis:
@@ -37,7 +39,9 @@ class SelfAnalysisEngine:
         hotspots = self._find_hotspots(tree, source)
         todos = self._find_todos(source)
         diagnostics = self._run_ruff(file_path)
-        prompt_context = self._build_context(file_path, metrics, hotspots, todos, diagnostics)
+        prompt_context = self._build_context(
+            file_path, metrics, hotspots, todos, diagnostics, source
+        )
 
         return FileAnalysis(
             path=relative_path,
@@ -83,8 +87,14 @@ class SelfAnalysisEngine:
             raise ValueError(f"Path escapes project root: {relative_path}") from exc
         if not candidate.exists():
             raise FileNotFoundError(f"File not found: {relative_path}")
+        if not candidate.is_file():
+            raise ValueError(f"Not a regular file: {relative_path}")
         if candidate.suffix != ".py":
             raise ValueError(f"Not a Python file: {relative_path}")
+        if candidate.stat().st_size > _MAX_FILE_SIZE_BYTES:
+            raise ValueError(
+                f"File too large for self-analysis ({candidate.stat().st_size} bytes): {relative_path}"
+            )
         return candidate
 
     def _extract_metrics(self, tree: ast.AST, source: str) -> dict[str, int]:
@@ -160,6 +170,7 @@ class SelfAnalysisEngine:
         hotspots: list[str],
         todos: list[str],
         diagnostics: list[dict[str, Any]],
+        source: str,
     ) -> str:
         lines = [
             f"File: {file_path.relative_to(self.project_root)}",
@@ -181,6 +192,10 @@ class SelfAnalysisEngine:
                 lines.append(
                     f"  - {d.get('code', 'lint')}: line {d.get('location', {}).get('row', '?')} — {d.get('message', '')}"
                 )
+        lines.append("Source code:")
+        lines.append("```python")
+        lines.append(source)
+        lines.append("```")
         return "\n".join(lines)
 
     def _build_llm_prompt(self, analysis: FileAnalysis) -> str:

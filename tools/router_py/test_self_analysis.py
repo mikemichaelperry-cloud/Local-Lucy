@@ -44,6 +44,18 @@ class Foo:
     assert "TODO" in result.prompt_context
 
 
+def test_analyze_file_includes_source_code_in_prompt(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "sample.py").write_text("def hello():\n    pass\n")
+
+    engine = SelfAnalysisEngine(project_root=project)
+    result = engine.analyze_file("sample.py")
+
+    assert "Source code:" in result.prompt_context
+    assert "def hello():" in result.prompt_context
+
+
 def test_path_traversal_raises(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
@@ -58,6 +70,27 @@ def test_path_traversal_raises(tmp_path):
 
     with pytest.raises(ValueError, match="escapes project root"):
         engine.analyze_file("../etc/passwd")
+
+
+def test_analyze_file_rejects_directory_named_py(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "not_a_dir.py").mkdir()
+
+    engine = SelfAnalysisEngine(project_root=project)
+    with pytest.raises(ValueError, match="Not a regular file"):
+        engine.analyze_file("not_a_dir.py")
+
+
+def test_analyze_file_rejects_huge_file(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    huge = project / "huge.py"
+    huge.write_text("x = 1\n" * (5 * 1024 * 1024))
+
+    engine = SelfAnalysisEngine(project_root=project)
+    with pytest.raises(ValueError, match="File too large"):
+        engine.analyze_file("huge.py")
 
 
 def test_suggest_improvements_local_when_import_missing(tmp_path, monkeypatch):
