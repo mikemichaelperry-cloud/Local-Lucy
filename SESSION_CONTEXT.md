@@ -15,7 +15,7 @@
 | **Model** | `local-lucy-llama31` (llama3.1:8b via Ollama) |
 | **Handoff file** | `~/Desktop/Local_Lucy_v10_Session_Handoff_<date>.md` |
 | **Default branch on origin** | `v10-dev` ✅ |
-| **Working tree** | Modified (persona LoRA pipeline finalized; docs and prompts updated) |
+| **Working tree** | Modified (self-analysis large-file / large-response support implemented; docs and prompts updated) |
 
 ---
 
@@ -101,41 +101,28 @@ Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
 Commits since tag: 62
-Working tree: modified (Self-Analysis Mode hardened; pre-existing `models/router/comprehensive_examples.json` change unrelated)
+Working tree: modified (Self-Analysis large-file / large-response support implemented and reviewed; pre-existing `models/router/comprehensive_examples.json` change unrelated)
 ```
 
-### Recent Commits (last 13)
+### Recent Commits (last 16)
 ```
-Self-Analysis Mode: local code review using ast + ruff + local LLM
+Self-Analysis Large-File / Large-Response Support
+2e2e014 fix(self-review): bypass policy short-circuit for SELF_REVIEW and add exact 5 MB boundary test
+9dc4497 fix(self-analysis): payload-level test, is_self_review derivation, scoped cap relaxation
+2f848de fix(self-analysis): skip 807 short-circuit for SELF_REVIEW and clean cache helpers
+70b9346 Fix third-wave self-analysis large-file review findings
+ec8768e fix(self-analysis): round-2 review fixes
+8ef87a8 fix(self-analysis): address whole-branch review findings
+720cd08 feat(self-analysis): use SELF_REVIEW route and bypass repeat cache
+e6230ee feat(local_answer): add SELF_REVIEW route with large token budget
+aa655d0 feat(self-analysis): include source code and guard large/non-file paths
+9be66cd docs: add self-analysis large-file support implementation plan
+2fd99cb docs: add self-analysis large-file support design spec
 0c2ff66 feat: wire Self-Analysis Mode toggle to state persistence
 b17c30a feat: add Self-Analysis Mode checkbox to Engineering panel
 5038df6 feat: dispatch self-analysis queries in ExecutionEngine
 0451f0d Fix self-analysis review findings: path traversal, async docstring, ruff stderr, tests
 b1818d3 feat: add SelfAnalysisEngine for local code self-review
-1d86a7b docs: add self-analysis mode design and implementation plan
-b01f548 feat(router): add validated FINANCE-route training examples
-b2f6a32 feat(router): augment training data with validated synthetic examples
-da3fc4e feat(hmi): show actually-loaded Ollama model under MODEL
-7318006 feat(execution): automatic LOCAL -> AUGMENTED/EVIDENCE escalation on admission of ignorance
-4d8c6dc feat(router): route public-figure age queries to AUGMENTED
-9e8916d fix(local): only inject persistent facts for personal/family queries
-8c13057 docs: update SESSION_CONTEXT.md after remote-access instructions
-cf2132f docs: add remote-access instructions for the web interface
-3b375eb docs: deprecate legacy transition flags and keyword-router rollback
-40838ce docs: refresh README, CHANGELOG, ARCHITECTURE, TODAY_SUMMARY, and SESSION_CONTEXT
-54ca91a feat(web): add optional web interface adapter
-b6170fa docs: update SESSION_CONTEXT.md after production-readiness fixes
-231a419 test: fix remaining test failures and enforce mypy in lint
-7ce6a2d docs: update SESSION_CONTEXT.md after ruff/lint cleanup
-2b98093 chore: install ruff and make lint pass
-f293952 docs: update SESSION_CONTEXT.md after robustness commits
-687b182 test: further harden regression suite against local LLM variance
-e18ed14 test: robustness fixes from code review
-2e238d2 docs: update SESSION_CONTEXT.md after README refresh
-79136ec docs: update README for v10 — llama3.1 default, FINANCE route, XDG paths, packaging
-63bd4a2 docs: update SESSION_CONTEXT.md — origin/v10-dev is in sync
-09965c5 docs: update SESSION_CONTEXT.md — GitHub default branch is v10-dev
-e3fe120 ci: add experimental AppImage packaging
 ```
 
 ### Persona LoRA Pipeline — Completed Within Hardware Limits
@@ -187,6 +174,31 @@ e3fe120 ci: add experimental AppImage packaging
   - `tools/router_py/test_self_analysis.py`: 7 passed
   - `ui-v10/tests/test_self_analysis_mode_offscreen.py`: 2 passed
   - `ui-v10/tests/test_comprehensive_hmi_inspection.py`: 138 checks passed
+
+### Self-Analysis Large-File / Large-Response Support — Implemented
+- Goal: feed full source code into self-analysis prompts, support large files safely, and generate long detailed reviews via a dedicated `SELF_REVIEW` token budget.
+- **Source-code inclusion and safety (`tools/router_py/self_analysis.py`):**
+  - `analyze_file` now appends the raw file source under a `Source code:` header in the prompt context.
+  - `_resolve_file` rejects path traversal, non-existent paths, directories, non-`.py` files, and files larger than 5 MB.
+  - `_read_source` enforces the 5 MB cap at the read boundary (TOCTOU-safe) and uses `errors="replace"` for non-UTF-8 bytes.
+  - Source longer than `self_review_context_chars` is truncated with a `[truncated at N characters; consider reviewing a smaller module]` notice.
+- **Dedicated `SELF_REVIEW` route (`tools/router_py/local_answer.py`):**
+  - `LocalAnswerConfig` exposes `self_review_max_tokens` (default 4096) and `self_review_context_chars` (default 100000), overridable via `LUCY_SELF_REVIEW_MAX_TOKENS` and `LUCY_SELF_REVIEW_CONTEXT_CHARS`.
+  - `_set_generation_profile("SELF_REVIEW", ...)` returns a `("self_review", self_review_max_tokens, "- Provide a thorough, detailed code review with concrete, minimal improvements.")` profile.
+  - `_call_ollama` raises the `num_predict` ceiling only for `SELF_REVIEW`, so the budget is not capped by `num_predict_long`.
+- **Caller and cache wiring:**
+  - `SelfAnalysisEngine.suggest_improvements` calls `generate_answer(query=prompt, route_mode="SELF_REVIEW")`.
+  - `generate_answer` bypasses the local repeat cache for `SELF_REVIEW`.
+  - General Q&A short-circuits (policy, 807, tube-DB, personal-fact) and the 807 post-processing override are skipped for `SELF_REVIEW`.
+- **Config unification:**
+  - `SelfAnalysisEngine` accepts `self_review_context_chars` and obtains the default from `LocalAnswerConfig.from_env()`; `execution_engine.py` passes the authoritative config value.
+- **Documentation:**
+  - Updated `docs/superpowers/specs/2026-07-15-self-analysis-large-files-design.md` to match implementation wording.
+- **Tests:**
+  - `tools/router_py/test_self_analysis.py`: 21 passed
+  - `tools/router_py/test_local_answer.py`: 58 passed
+  - Combined: 79 passed
+  - `ruff check` and `ruff format --check` clean on all modified files.
 
 ---
 
@@ -290,5 +302,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-07-15T15:54:19Z*
-*Session: Added Self-Analysis Mode. Created `tools/router_py/self_analysis.py` for local code review using stdlib `ast` + `ruff` + `LocalAnswer`/Ollama. Wired dispatch into `tools/router_py/execution_engine.py`. Added Engineering-panel checkbox in `ui-v10/app/panels/control_panel.py` and connected it through `runtime_bridge.py` and `runtime_control.py` state persistence. Updated `Architecture.md`, `CHANGELOG.md`, and this file. Tests: `tools/router_py/test_self_analysis.py` 4 passed; `ui-v10/tests/test_self_analysis_mode_offscreen.py` passed; `ui-v10/tests/test_comprehensive_hmi_inspection.py` 138/138 checks passed. Pre-existing unrelated change remains in `models/router/comprehensive_examples.json`.*
+*Last updated: 2026-07-15T17:54:19Z*
+*Session: Implemented Self-Analysis large-file / large-response support. Added source-code inclusion, 5 MB TOCTOU-safe read cap, non-UTF-8 fallback, dedicated `SELF_REVIEW` route with 4096-token budget, payload-level budget regression test, local-repeat-cache bypass, and Q&A short-circuit bypass in `tools/router_py/self_analysis.py` and `tools/router_py/local_answer.py`. Unified truncation limit with `LocalAnswerConfig.self_review_context_chars`. Updated design spec and this file. Tests: `tools/router_py/test_self_analysis.py` 21 passed; `tools/router_py/test_local_answer.py` 58 passed; 79/79 combined. Pre-existing unrelated change remains in `models/router/comprehensive_examples.json`.*
