@@ -235,7 +235,7 @@ class SelfAnalysisEngine:
     def _build_llm_prompt(self, analysis: FileAnalysis) -> str:
         return (
             "You are reviewing Local Lucy's own Python source code. "
-            "Below are static metrics, lint results, and the full source code. "
+            "Below are static metrics, lint results, and the source code (possibly truncated). "
             "Suggest concrete, minimal improvements. Do not rewrite the file.\n\n"
             f"{analysis.prompt_context}"
         )

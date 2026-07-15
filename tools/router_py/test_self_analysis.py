@@ -363,3 +363,60 @@ async def test_self_review_generate_answer_bypasses_cache(tmp_path, monkeypatch)
     assert result.text == "mocked self-review"
     assert result.from_cache is False
     assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.asyncio
+async def test_self_review_ollama_payload_uses_self_review_budget(monkeypatch):
+    """The SELF_REVIEW budget must reach the Ollama payload unchanged."""
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig()
+    config.self_review_max_tokens = 4096
+    config.num_predict_long = 1536
+    config.model = "local-lucy-llama31"
+    answer = LocalAnswer(config)
+
+    captured = {}
+
+    class FakeResponse:
+        async def json(self):
+            return {"response": "mocked self-review"}
+
+        def raise_for_status(self):
+            return None
+
+    class FakePostContext:
+        async def __aenter__(self):
+            return FakeResponse()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeSession:
+        def post(self, url, json=None, **kwargs):
+            captured["payload"] = json
+            return FakePostContext()
+
+    async def fake_get_session():
+        return FakeSession()
+
+    monkeypatch.setattr(answer, "_get_session", fake_get_session)
+
+    text, _duration = await answer._call_ollama("prompt", config.self_review_max_tokens)
+    assert text == "mocked self-review"
+    assert captured["payload"]["options"]["num_predict"] == config.self_review_max_tokens
+
+
+def test_analyze_file_handles_invalid_utf8(tmp_path):
+    """Invalid UTF-8 bytes are replaced rather than crashing analysis."""
+    project = tmp_path / "project"
+    project.mkdir()
+    file_path = project / "bad.py"
+    file_path.write_bytes(b"# invalid bytes: \xff\xfe\nx = 1\n")
+
+    engine = SelfAnalysisEngine(project_root=project)
+    result = engine.analyze_file("bad.py")
+
+    assert isinstance(result, FileAnalysis)
+    assert "\ufffd" in result.prompt_context
+    assert "x = 1" in result.prompt_context

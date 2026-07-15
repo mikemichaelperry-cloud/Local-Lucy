@@ -1955,10 +1955,13 @@ class LocalAnswer:
         """Call Ollama API with retry for model-load transitions."""
         start_time = time.time()
         # Thinking models need extra token headroom so reasoning does not swallow
-        # the visible response. Cap at a sane maximum to protect latency.
+        # the visible response. Cap at a sane maximum to protect latency, but do
+        # not reduce a deliberately large request (e.g. SELF_REVIEW) below what
+        # the caller asked for.
+        max_num_predict = max(self.config.num_predict_long, num_predict)
         effective_num_predict = min(
             num_predict * self._thinking_model_token_multiplier(),
-            self.config.num_predict_long,
+            max_num_predict,
         )
         payload = {
             "model": self.config.model,
@@ -1993,7 +1996,7 @@ class LocalAnswer:
                             thinking_retry_done = True
                             payload["options"]["num_predict"] = min(
                                 payload["options"]["num_predict"] * 4,
-                                self.config.num_predict_long,
+                                max_num_predict,
                             )
                             logger.warning(
                                 f"Ollama response empty but thinking present for {self.config.model}; "
@@ -2059,6 +2062,7 @@ class LocalAnswer:
         )
         q_norm = self._normalize_query(q_eval)
         cache_bypass = route_mode.upper() == "SELF_REVIEW"
+        is_self_review = cache_bypass
 
         conversation_active = (
             self.config.conversation_mode_active or self.config.conversation_mode_force
@@ -2102,7 +2106,7 @@ class LocalAnswer:
             )
 
         tube_answer = self._check_807_question(q_eval)
-        if tube_answer and not is_creative:
+        if tube_answer and not is_creative and not is_self_review:
             duration_ms = int((time.time() - start_time) * 1000)
             return AnswerResult(
                 text=tube_answer,
@@ -2113,7 +2117,7 @@ class LocalAnswer:
 
         # Tube database lookup: return exact specs for known tubes
         tube_db_answer = self._lookup_tube_database(q_eval)
-        if tube_db_answer and not is_creative:
+        if tube_db_answer and not is_creative and not is_self_review:
             duration_ms = int((time.time() - start_time) * 1000)
             return AnswerResult(
                 text=tube_db_answer,
@@ -2124,7 +2128,7 @@ class LocalAnswer:
 
         # Deterministic personal/family/pet fact resolver
         # for direct factual ownership/identity queries when SQLite facts exist.
-        if not is_creative and route_mode in ("LOCAL", "CHAT"):
+        if not is_creative and not is_self_review and route_mode in ("LOCAL", "CHAT"):
             fact_answer = self._resolve_personal_family_fact(q_eval)
             if fact_answer:
                 duration_ms = int((time.time() - start_time) * 1000)
@@ -2163,7 +2167,7 @@ class LocalAnswer:
         cache_start = self._now_ms()
         cached = None
         if not cache_bypass:
-            cached = self._cache_load(q_norm, cache_variant, fact_revision, cache_bypass)
+            cached = self._cache_load(q_norm, cache_variant, fact_revision)
         cache_end = self._now_ms()
         self._latprof_append("local_answer", "cache_lookup", cache_end - cache_start)
 
@@ -2300,7 +2304,7 @@ class LocalAnswer:
         self._latprof_append("local_answer", "total", total_ms)
 
         if not cache_bypass:
-            self._cache_store(q_norm, cache_variant, api_text, fact_revision, cache_bypass)
+            self._cache_store(q_norm, cache_variant, api_text, fact_revision)
 
         return AnswerResult(
             text=api_text, from_cache=False, generation_profile=profile_name, duration_ms=total_ms
