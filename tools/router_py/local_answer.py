@@ -1313,10 +1313,10 @@ class LocalAnswer:
         return hashlib.sha256(key_string.encode()).hexdigest()
 
     def _cache_load(
-        self, query: str, variant: str, fact_revision: str = "", cache_bypass: bool = False
+        self, query: str, variant: str, fact_revision: str = ""
     ) -> Optional[Tuple[str, int]]:
         """Load from cache."""
-        if not self.config.cache_enabled or cache_bypass:
+        if not self.config.cache_enabled:
             return None
         key = self._cache_key(query, variant, fact_revision)
         meta_file = self.config.cache_dir / f"{key}.meta"
@@ -1358,10 +1358,9 @@ class LocalAnswer:
         variant: str,
         text: str,
         fact_revision: str = "",
-        cache_bypass: bool = False,
     ) -> None:
         """Store in cache."""
-        if not self.config.cache_enabled or cache_bypass or not text.strip():
+        if not self.config.cache_enabled or not text.strip():
             return
         try:
             self.config.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -2259,7 +2258,8 @@ class LocalAnswer:
 
         api_text_lower = api_text.lower()
         if (
-            re.search(r"\b807s?\b", q_norm)
+            not is_self_review
+            and re.search(r"\b807s?\b", q_norm)
             and re.search(r"\b(pair|two|2)\b", q_norm)
             and re.search(r"\b(push[ -]?pull|pp)\b", q_norm)
             and re.search(r"\b(class )?ab1\b", q_norm)

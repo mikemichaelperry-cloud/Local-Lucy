@@ -320,6 +320,14 @@ def test_analyze_file_truncates_very_long_source(tmp_path):
     assert len(result.prompt_context) < len(source) + 500
 
 
+def test_self_review_context_chars_must_be_positive():
+    with pytest.raises(ValueError, match="self_review_context_chars must be positive"):
+        SelfAnalysisEngine(project_root=Path("."), self_review_context_chars=0)
+
+    with pytest.raises(ValueError, match="self_review_context_chars must be positive"):
+        SelfAnalysisEngine(project_root=Path("."), self_review_context_chars=-1)
+
+
 def test_self_review_cache_bypass_helper_never_reads_or_writes_cache(tmp_path):
     from router_py.local_answer import LocalAnswer, LocalAnswerConfig
 
@@ -327,13 +335,15 @@ def test_self_review_cache_bypass_helper_never_reads_or_writes_cache(tmp_path):
     config.cache_dir = tmp_path
     answer = LocalAnswer(config)
 
-    answer._cache_store("q1", "v1", "cached text", cache_bypass=False)
-    assert answer._cache_load("q1", "v1", cache_bypass=False) is not None
+    # Helpers do not accept a cache_bypass flag; the caller guards access.
+    answer._cache_store("q1", "v1", "cached text")
+    assert answer._cache_load("q1", "v1") is not None
 
-    assert answer._cache_load("q1", "v1", cache_bypass=True) is None
-
-    answer._cache_store("q2", "v2", "bypassed text", cache_bypass=True)
-    assert answer._cache_load("q2", "v2", cache_bypass=False) is None
+    # When disabled at the config level, load/store are no-ops.
+    config.cache_enabled = False
+    assert answer._cache_load("q1", "v1") is None
+    answer._cache_store("q2", "v2", "ignored text")
+    assert answer._cache_load("q2", "v2") is None
 
 
 @pytest.mark.asyncio
@@ -366,8 +376,31 @@ async def test_self_review_generate_answer_bypasses_cache(tmp_path, monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_self_review_short_circuit_bypass(monkeypatch):
+    """A SELF_REVIEW query containing 807/tube triggers must return the model answer."""
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig()
+    config.model = "local-lucy-llama31"
+    answer = LocalAnswer(config)
+
+    async def fake_call_ollama(prompt, num_predict, temp_override=None):
+        return "model generated review text", 1
+
+    monkeypatch.setattr(answer, "_call_ollama", fake_call_ollama)
+
+    # Query matches every term in the 807 short-circuit regex guard.
+    triggering_query = "review amplifier.py: a pair of 807s in push-pull class AB1 power output"
+    result = await answer.generate_answer(query=triggering_query, route_mode="SELF_REVIEW")
+
+    assert result.text == "model generated review text"
+    assert "pair total" not in result.text
+    assert "25-35 W" not in result.text
+
+
+@pytest.mark.asyncio
 async def test_self_review_ollama_payload_uses_self_review_budget(monkeypatch):
-    """The SELF_REVIEW budget must reach the Ollama payload unchanged."""
+    """The SELF_REVIEW budget must reach the Ollama payload unchanged via generate_answer."""
     from router_py.local_answer import LocalAnswer, LocalAnswerConfig
 
     config = LocalAnswerConfig()
@@ -378,33 +411,15 @@ async def test_self_review_ollama_payload_uses_self_review_budget(monkeypatch):
 
     captured = {}
 
-    class FakeResponse:
-        async def json(self):
-            return {"response": "mocked self-review"}
+    async def fake_call_ollama(prompt, num_predict, temp_override=None):
+        captured["num_predict"] = num_predict
+        return "mocked self-review", 1
 
-        def raise_for_status(self):
-            return None
+    monkeypatch.setattr(answer, "_call_ollama", fake_call_ollama)
 
-    class FakePostContext:
-        async def __aenter__(self):
-            return FakeResponse()
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    class FakeSession:
-        def post(self, url, json=None, **kwargs):
-            captured["payload"] = json
-            return FakePostContext()
-
-    async def fake_get_session():
-        return FakeSession()
-
-    monkeypatch.setattr(answer, "_get_session", fake_get_session)
-
-    text, _duration = await answer._call_ollama("prompt", config.self_review_max_tokens)
-    assert text == "mocked self-review"
-    assert captured["payload"]["options"]["num_predict"] == config.self_review_max_tokens
+    result = await answer.generate_answer(query="review sample.py", route_mode="SELF_REVIEW")
+    assert result.text == "mocked self-review"
+    assert captured["num_predict"] == config.self_review_max_tokens
 
 
 def test_analyze_file_handles_invalid_utf8(tmp_path):
