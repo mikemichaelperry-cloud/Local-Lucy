@@ -1190,6 +1190,7 @@ class RuntimeBridge:
             "augmented_provider": os.environ.get("LUCY_AUGMENTED_PROVIDER", "auto"),
             "model": os.environ.get("LUCY_MODEL", "local"),
             "profile": os.environ.get("LUCY_PROFILE", "default"),
+            "self_analysis_mode": os.environ.get("LUCY_SELF_ANALYSIS_MODE", "0"),
         }
 
         is_augmented = (outcome.route or "") == "AUGMENTED"

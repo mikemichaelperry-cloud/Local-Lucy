@@ -836,26 +836,28 @@ class ExecutionEngine:
             return ExecutionResult(
                 status="completed",
                 outcome_code="answered",
-                route="LOCAL",
+                route="SELF_REVIEW",
                 provider="local",
                 provider_usage_class="local",
                 response_text=response,
                 error_message="",
                 execution_time_ms=execution_time,
                 metadata={"self_analysis": True, "file": relative_path},
+                policy_reason="self_analysis_mode",
             )
         except Exception as exc:
             execution_time = int((time.time() - start_time) * 1000)
             return ExecutionResult(
                 status="failed",
                 outcome_code="self_analysis_error",
-                route="LOCAL",
+                route="SELF_REVIEW",
                 provider="local",
                 provider_usage_class="local",
                 response_text=f"Self-analysis failed: {exc}",
                 error_message=str(exc),
                 execution_time_ms=execution_time,
                 metadata={"self_analysis": True, "file": relative_path},
+                policy_reason="self_analysis_mode",
             )
 
     def _load_control_state(self) -> dict[str, Any]:
@@ -1056,7 +1058,28 @@ class ExecutionEngine:
             if file_ref:
                 self._logger.info(f"Self-analysis mode dispatch: {file_ref}")
                 result = await self.execute_self_analysis(file_ref)
-                self._record_request_metrics(context, route, result, result.execution_time_ms)
+                self_analysis_route = RoutingDecision(
+                    route="SELF_REVIEW",
+                    mode="FORCED",
+                    intent_family="operational",
+                    confidence=1.0,
+                    provider="local",
+                    provider_usage_class="local",
+                    evidence_mode="",
+                    evidence_reason="",
+                    requires_evidence=False,
+                    policy_reason="self_analysis_mode",
+                    ephemeral=True,
+                    decision_stage="execution_override",
+                    reason_code="self_analysis_mode",
+                    matched_rule="self_analysis_file_reference",
+                    trace={"file_reference": file_ref, "original_route": route.route},
+                )
+                self._write_state_files(self_analysis_route, result, context)
+                self._write_json_state_files(self_analysis_route, result, context)
+                self._record_request_metrics(
+                    context, self_analysis_route, result, result.execution_time_ms
+                )
                 return result
 
         # Check for medical context and configure safety constraints

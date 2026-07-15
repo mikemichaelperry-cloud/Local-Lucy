@@ -57,6 +57,7 @@ OutcomeCodeType = Literal[
     "router_error",
     "timeout",
     "unknown",
+    "self_analysis_error",
 ]
 
 IntentFamily = Literal[

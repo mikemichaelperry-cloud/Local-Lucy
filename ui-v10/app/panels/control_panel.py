@@ -1063,7 +1063,8 @@ class ControlPanel(QFrame):
                     "Augmented Provider": self._current_values["augmented_provider"],
                     "Learner": self._current_values.get("learner", ""),
                     "Model": self._current_values.get("model", ""),
-                }
+                },
+                current_state=self._current_values,
             )
             return
         signal.emit(requested_value)

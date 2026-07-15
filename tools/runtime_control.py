@@ -108,6 +108,8 @@ def main() -> int:
             result = update_state_field(state_file, "model", args.value)
         elif args.command == "set-gemma4-smart-routing":
             result = update_state_field(state_file, "gemma4_smart_routing", args.value)
+        elif args.command == "set-self-analysis-mode":
+            result = update_state_field(state_file, "self_analysis_mode", args.value)
         elif args.command == "set-learner":
             result = update_learner_state(state_file, args.value)
         else:
@@ -146,6 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
         "set-evidence",
         "set-voice",
         "set-gemma4-smart-routing",
+        "set-self-analysis-mode",
         "set-learner",
     ):
         toggle_parser = subparsers.add_parser(name)
@@ -635,6 +638,8 @@ def build_self_check_payload(resolved_paths: ResolvedRuntimePaths) -> dict[str, 
             "profile": state.get("profile", ""),
             "model": state.get("model", ""),
             "learner": state.get("learner", ""),
+            "gemma4_smart_routing": state.get("gemma4_smart_routing", ""),
+            "self_analysis_mode": state.get("self_analysis_mode", ""),
         },
         "augmented_availability": {
             "provider": availability_provider,
@@ -676,6 +681,7 @@ def render_env(state: dict[str, Any]) -> str:
             f"LUCY_AUGMENTED_PROVIDER={state['augmented_provider']}",
             f"LUCY_LOCAL_MODEL={state['model']}",
             f"LUCY_GEMMA4_SMART_ROUTING={toggle_to_flag(state['gemma4_smart_routing'])}",
+            f"LUCY_SELF_ANALYSIS_MODE={toggle_to_flag(state['self_analysis_mode'])}",
         ]
     )
 
