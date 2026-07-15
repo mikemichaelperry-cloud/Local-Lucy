@@ -12,19 +12,6 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_EXCLUDE_DIRS = {
-    ".git",
-    ".venv",
-    "__pycache__",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".pytest_cache",
-    "state",
-    "cache",
-    "models",
-    "data",
-}
-
 
 @dataclass
 class FileAnalysis:
@@ -61,6 +48,11 @@ class SelfAnalysisEngine:
         )
 
     async def suggest_improvements(self, relative_path: str, model: str | None = None) -> str:
+        """Return improvement suggestions for ``relative_path``.
+
+        This method is async because it awaits ``LocalAnswer.generate_answer``.
+        It returns a coroutine that resolves to a formatted ``str``.
+        """
         analysis = self.analyze_file(relative_path)
         prompt = self._build_llm_prompt(analysis)
 
@@ -85,8 +77,10 @@ class SelfAnalysisEngine:
     def _resolve_file(self, relative_path: str) -> Path:
         candidate = self.project_root / relative_path
         candidate = candidate.resolve()
-        if not str(candidate).startswith(str(self.project_root)):
-            raise ValueError(f"Path escapes project root: {relative_path}")
+        try:
+            candidate.relative_to(self.project_root)
+        except ValueError as exc:
+            raise ValueError(f"Path escapes project root: {relative_path}") from exc
         if not candidate.exists():
             raise FileNotFoundError(f"File not found: {relative_path}")
         if candidate.suffix != ".py":
@@ -146,7 +140,10 @@ class SelfAnalysisEngine:
                 timeout=30,
             )
             if result.returncode not in (0, 1):
-                logger.warning(f"ruff check unexpected exit: {result.returncode}")
+                logger.warning(
+                    f"ruff check unexpected exit: {result.returncode} "
+                    f"stderr: {result.stderr.strip()}"
+                )
                 return []
             return json.loads(result.stdout or "[]")
         except FileNotFoundError:
