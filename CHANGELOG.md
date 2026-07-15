@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Basic/Bearer authentication; mandatory for non-loopback binds
 - `docs/web_interface.md` documentation and `web_adapter/test_web_adapter.py` tests.
 - Persona LoRA pipeline documentation: new `docs/runbooks/PERSONAS.md`, README/AGENTS adapter-status tables, and GPU resource notes covering LoRA vs prompt-level fallback and the Qwen3 14B VRAM limitation.
+- Self-Analysis Mode: local code review using `ast` + `ruff` + local LLM, controlled from the Engineering panel.
 
 ### Changed
 - GitHub release workflow no longer builds the experimental AppImage automatically; the build script is retained for manual use.

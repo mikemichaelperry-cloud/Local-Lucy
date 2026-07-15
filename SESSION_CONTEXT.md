@@ -100,13 +100,19 @@ lucy-v10/
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
-Commits since tag: 57
-Working tree: modified (Phase 3 automatic model selection in progress; pre-existing `models/router/comprehensive_examples.json` change unrelated)
+Commits since tag: 62
+Working tree: modified (Self-Analysis Mode added; pre-existing `models/router/comprehensive_examples.json` change unrelated)
 ```
 
 ### Recent Commits (last 13)
 ```
-Phase 3: automatic model selection in shadow mode with Auto HMI option
+Self-Analysis Mode: local code review using ast + ruff + local LLM
+0c2ff66 feat: wire Self-Analysis Mode toggle to state persistence
+b17c30a feat: add Self-Analysis Mode checkbox to Engineering panel
+5038df6 feat: dispatch self-analysis queries in ExecutionEngine
+0451f0d Fix self-analysis review findings: path traversal, async docstring, ruff stderr, tests
+b1818d3 feat: add SelfAnalysisEngine for local code self-review
+1d86a7b docs: add self-analysis mode design and implementation plan
 b01f548 feat(router): add validated FINANCE-route training examples
 b2f6a32 feat(router): augment training data with validated synthetic examples
 da3fc4e feat(hmi): show actually-loaded Ollama model under MODEL
@@ -163,6 +169,16 @@ e3fe120 ci: add experimental AppImage packaging
     - Mistral-Nemo 12B Racheli prompt: 11/12 (91.7%)
   - `ui-v10/tests/test_comprehensive_hmi_inspection.py`: 138 checks passed
 - Full `make test` status: 972 passed, 19 skipped, 32 failed. The failures are pre-existing routing/semantic-regression tests unrelated to the persona pipeline; persona-focused tests all pass.
+
+### Self-Analysis Mode — Added
+- New `tools/router_py/self_analysis.py` parses Local Lucy's Python source with stdlib `ast` and existing `ruff`, then uses the configured local LLM via `LocalAnswer` to suggest improvements.
+- `tools/router_py/execution_engine.py` dispatches self-analysis queries when `self_analysis_mode` is `"on"` and the query references a Python file.
+- HMI Engineering panel gained a "Self-Analysis Mode" checkbox; state is persisted in `current_state.json` via `runtime_control.py` and `runtime_bridge.py`.
+- Static facts are labeled **LOCAL**; LLM suggestions are labeled **AUGMENTED**.
+- Tests:
+  - `tools/router_py/test_self_analysis.py`: 4 passed
+  - `ui-v10/tests/test_self_analysis_mode_offscreen.py`: passed
+  - `ui-v10/tests/test_comprehensive_hmi_inspection.py`: 138 checks passed
 
 ---
 
@@ -247,6 +263,7 @@ Live market-data fetcher with source citations:
 13. ~~Optional web interface~~ ✅ aiohttp adapter added at `web_adapter/`; stateless; request-scoped model selection; Basic/Bearer auth; 13 focused tests
 14. ~~Memory greeting hallucination fix~~ ✅ MiniLM embeddings now primary; `<think>` blocks stripped; greetings forced to shallow context; polluted DB cleaned; `LUCY_OLLAMA_MODEL` propagated
 15. ~~Automatic model selection (Phase 3)~~ ✅ `select_model()` policy, shadow-mode metrics, Auto HMI option, A/B harness
+16. ~~Self-Analysis Mode~~ ✅ `tools/router_py/self_analysis.py`, Engineering-panel toggle, state persistence, tests
 
 ---
 
@@ -265,5 +282,5 @@ cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-07-04T20:32:00Z*
-*Session: Implemented Phase 3 automatic model selection in shadow mode. Added `select_model()` policy in `tools/router_py/model_selector.py`, shadow metrics in `tools/router_py/metrics.py`, Auto default in the HMI model selector with an engineering recommendation read-out, and A/B harness functions. Updated `runtime_bridge.py` to call the selector when Auto is chosen and log recommendations/latency. Tests: `tools/router_py/` 742 passed/34 skipped; HMI inspection 138/138; model selector offscreen passed; consolidated bridge 10/10. Pre-existing unrelated change remains in `models/router/comprehensive_examples.json`.*
+*Last updated: 2026-07-15T07:00:00Z*
+*Session: Added Self-Analysis Mode. Created `tools/router_py/self_analysis.py` for local code review using stdlib `ast` + `ruff` + `LocalAnswer`/Ollama. Wired dispatch into `tools/router_py/execution_engine.py`. Added Engineering-panel checkbox in `ui-v10/app/panels/control_panel.py` and connected it through `runtime_bridge.py` and `runtime_control.py` state persistence. Updated `Architecture.md`, `CHANGELOG.md`, and this file. Tests: `tools/router_py/test_self_analysis.py` 4 passed; `ui-v10/tests/test_self_analysis_mode_offscreen.py` passed; `ui-v10/tests/test_comprehensive_hmi_inspection.py` 138/138 checks passed. Pre-existing unrelated change remains in `models/router/comprehensive_examples.json`.*

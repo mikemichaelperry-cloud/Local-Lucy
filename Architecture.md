@@ -422,4 +422,15 @@ python3 -m pytest test_policy_router.py test_classify.py test_routing_edge_cases
 
 ---
 
+## 15. Self-Analysis Mode
+
+When enabled via the Engineering panel, Local Lucy can parse her own Python source and suggest improvements.
+
+- Analysis is performed by `tools/router_py/self_analysis.py` using stdlib `ast` and the existing `ruff` linter.
+- LLM suggestions are generated through the existing `LocalAnswer`/Ollama path using the configured local model.
+- Static facts are labeled **LOCAL**; LLM suggestions are labeled **AUGMENTED**.
+- The toggle is stored in `current_state.json` under `self_analysis_mode`.
+
+---
+
 *End of architecture document.*
