@@ -830,7 +830,15 @@ class ExecutionEngine:
         """Run local self-analysis on a project file and return formatted result."""
         start_time = time.time()
         try:
-            engine = SelfAnalysisEngine(project_root=project_root)
+            self_review_context_chars = (
+                LocalAnswerConfig.from_env().self_review_context_chars
+                if HAS_LOCAL_ANSWER_PY
+                else None
+            )
+            engine = SelfAnalysisEngine(
+                project_root=project_root,
+                self_review_context_chars=self_review_context_chars,
+            )
             response = await engine.suggest_improvements(relative_path, model=model)
             execution_time = int((time.time() - start_time) * 1000)
             return ExecutionResult(

@@ -25,11 +25,24 @@ class FileAnalysis:
 
 
 class SelfAnalysisEngine:
-    def __init__(self, project_root: Path | None = None) -> None:
+    def __init__(
+        self,
+        project_root: Path | None = None,
+        self_review_context_chars: int | None = None,
+    ) -> None:
         if project_root is None:
             project_root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10"))
         self.project_root = Path(project_root).expanduser().resolve()
-        self._max_source_chars = int(os.environ.get("LUCY_SELF_ANALYSIS_MAX_SOURCE_CHARS", 100000))
+        if self_review_context_chars is None:
+            try:
+                from router_py.local_answer import LocalAnswerConfig
+
+                self_review_context_chars = LocalAnswerConfig.from_env().self_review_context_chars
+            except Exception:
+                self_review_context_chars = int(
+                    os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "100000")
+                )
+        self._self_review_context_chars = self_review_context_chars
 
     def analyze_file(self, relative_path: str) -> FileAnalysis:
         file_path = self._resolve_file(relative_path)
@@ -92,9 +105,10 @@ class SelfAnalysisEngine:
             raise ValueError(f"Not a regular file: {relative_path}")
         if candidate.suffix != ".py":
             raise ValueError(f"Not a Python file: {relative_path}")
-        if candidate.stat().st_size > _MAX_FILE_SIZE_BYTES:
+        file_size = candidate.stat().st_size
+        if file_size > _MAX_FILE_SIZE_BYTES:
             raise ValueError(
-                f"File too large for self-analysis ({candidate.stat().st_size} bytes): {relative_path}"
+                f"File too large for self-analysis ({file_size} bytes): {relative_path}"
             )
         return candidate
 
@@ -194,12 +208,15 @@ class SelfAnalysisEngine:
                     f"  - {d.get('code', 'lint')}: line {d.get('location', {}).get('row', '?')} — {d.get('message', '')}"
                 )
         lines.append("Source code:")
-        lines.append("```python")
+        lines.append("`````python")
         truncated_source = source
-        if len(source) > self._max_source_chars:
-            truncated_source = source[: self._max_source_chars] + "\n[truncated]"
+        if len(source) > self._self_review_context_chars:
+            truncated_source = (
+                source[: self._self_review_context_chars]
+                + f"\n[truncated at {self._self_review_context_chars} characters; consider reviewing a smaller module]"
+            )
         lines.append(truncated_source)
-        lines.append("```")
+        lines.append("`````")
         return "\n".join(lines)
 
     def _build_llm_prompt(self, analysis: FileAnalysis) -> str:

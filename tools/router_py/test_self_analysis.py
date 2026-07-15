@@ -8,7 +8,7 @@ import pytest
 
 from router_py.execution_engine import ExecutionEngine
 from router_py.request_types import ClassificationResult, RoutingDecision
-from router_py.self_analysis import FileAnalysis, SelfAnalysisEngine
+from router_py.self_analysis import FileAnalysis, SelfAnalysisEngine, _MAX_FILE_SIZE_BYTES
 from runtime_control import (
     build_parser,
     build_self_check_payload,
@@ -86,7 +86,7 @@ def test_analyze_file_rejects_huge_file(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
     huge = project / "huge.py"
-    huge.write_text("x = 1\n" * (5 * 1024 * 1024))
+    huge.write_text("x" * (_MAX_FILE_SIZE_BYTES + 1))
 
     engine = SelfAnalysisEngine(project_root=project)
     with pytest.raises(ValueError, match="File too large"):
@@ -263,9 +263,7 @@ def test_self_review_route_gets_large_budget():
 
 
 @pytest.mark.asyncio
-async def test_suggest_improvements_uses_self_review_route_and_disables_cache(
-    tmp_path, monkeypatch
-):
+async def test_suggest_improvements_uses_self_review_route(tmp_path, monkeypatch):
     project = tmp_path / "project"
     project.mkdir()
     (project / "sample.py").write_text("def foo():\n    pass\n")
@@ -306,18 +304,19 @@ async def test_suggest_improvements_uses_self_review_route_and_disables_cache(
     assert created_instances[0].last_kwargs.get("route_mode") == "SELF_REVIEW"
 
 
-def test_analyze_file_truncates_very_long_source(tmp_path, monkeypatch):
+def test_analyze_file_truncates_very_long_source(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
     source = "x = 1\n" * 50000  # ~300k chars
     (project / "long.py").write_text(source)
 
-    engine = SelfAnalysisEngine(project_root=project)
-    # Patch context chars to a small number for deterministic truncation
-    monkeypatch.setattr(engine, "_max_source_chars", 100)
+    engine = SelfAnalysisEngine(project_root=project, self_review_context_chars=100)
     result = engine.analyze_file("long.py")
 
-    assert "[truncated" in result.prompt_context
+    assert (
+        "[truncated at 100 characters; consider reviewing a smaller module]"
+        in result.prompt_context
+    )
     assert len(result.prompt_context) < len(source) + 500
 
 
