@@ -1478,12 +1478,10 @@ class LocalAnswer:
         if route == "SELF_REVIEW":
             return (
                 "self_review",
-                self.config.self_review_max_tokens,
-                "- Provide a thorough, broad, balanced code review covering architecture, "
-                "maintainability, readability, safety, and testability. Address every listed hotspot "
-                "explicitly. Do not fixate on a single issue or function. For each finding, explain "
-                "why it matters and propose the smallest concrete change that fixes it. Do not rewrite "
-                "entire files.",
+                self.config.code_review_max_tokens,
+                "- Provide a thorough, broad, balanced code review. "
+                "Coverage before depth. Identify components, audit broadly, "
+                "then investigate the most consequential findings.",
             )
 
         # Phase 7: per-route token budgets from environment/config.
@@ -2004,18 +2002,23 @@ class LocalAnswer:
             num_predict * self._thinking_model_token_multiplier(),
             max_num_predict,
         )
+        options = {
+            "temperature": temperature if temperature is not None else self.config.temperature,
+            "top_p": self.config.top_p,
+            "seed": self.config.seed,
+            "num_predict": effective_num_predict,
+            "stop": ["\nUser:", "\nAssistant:", "\nUSER QUESTION:", "\nBACKGROUND CONTEXT:"],
+        }
+        if route_mode.upper() == "SELF_REVIEW":
+            options["temperature"] = self.config.code_review_temperature
+            options["top_p"] = self.config.code_review_top_p
+            options["top_k"] = self.config.code_review_top_k
         payload = {
             "model": self.config.model,
             "prompt": prompt,
             "stream": False,
             "keep_alive": self.config.keep_alive,
-            "options": {
-                "temperature": temperature if temperature is not None else self.config.temperature,
-                "top_p": self.config.top_p,
-                "seed": self.config.seed,
-                "num_predict": effective_num_predict,
-                "stop": ["\nUser:", "\nAssistant:", "\nUSER QUESTION:", "\nBACKGROUND CONTEXT:"],
-            },
+            "options": options,
         }
         # Retry with exponential backoff for model-load transitions.
         max_attempts = 3

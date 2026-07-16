@@ -737,3 +737,21 @@ def test_specialist_model_identity_exists():
 
     text = get_self_knowledge("gemma4_code_review_agentic")
     assert "gemma-4-12B-agentic" in text or "12B" in text
+
+
+def test_self_review_uses_code_review_generation_params():
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig.from_env()
+    config.code_review_temperature = 0.9
+    config.code_review_top_p = 0.88
+    config.code_review_top_k = 48
+    config.code_review_max_tokens = 6000
+
+    answer = LocalAnswer(config)
+    profile, num_predict, instruction = answer._set_generation_profile(
+        "SELF_REVIEW", "CHAT", "review this file"
+    )
+    assert profile == "self_review"
+    assert num_predict == 6000
+    assert "thorough" in instruction.lower()
