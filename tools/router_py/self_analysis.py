@@ -25,6 +25,7 @@ class FileAnalysis:
     todos: list[str] = field(default_factory=list)
     source: str = ""
     prompt_context: str = ""
+    truncated: bool = False
 
 
 class SelfAnalysisEngine:
@@ -331,13 +332,21 @@ Begin deep investigation and fix planning.
         lines.append("Source code:")
         lines.append("`````python")
         truncated_source = source
-        if len(source) > self._self_review_context_chars:
-            truncated_source = (
-                source[: self._self_review_context_chars]
-                + f"\n[truncated at {self._self_review_context_chars} characters; consider reviewing a smaller module]"
-            )
+        truncated = False
+        max_chars = self._self_review_context_chars
+        if len(source) > max_chars:
+            truncated_source = source[:max_chars]
+            # Trim to last newline to avoid cutting a line mid-token.
+            last_nl = truncated_source.rfind("\n")
+            if last_nl > max_chars * 0.9:
+                truncated_source = truncated_source[:last_nl]
+            truncated_source += f"\n\n[truncated at {max_chars} characters; source exceeded code-review context limit]"
+            truncated = True
+        analysis.truncated = truncated
         lines.append(truncated_source)
         lines.append("`````")
+        if truncated:
+            lines.append("WARNING: Source code was truncated before review.")
         return "\n".join(lines)
 
     def _build_llm_prompt(self, analysis: FileAnalysis) -> str:

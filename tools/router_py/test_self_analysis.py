@@ -575,6 +575,24 @@ async def test_suggest_improvements_runs_staged_review(tmp_path, monkeypatch):
     assert "## Stage A: Code map" in calls[0]
 
 
+def test_build_context_detects_truncation(tmp_path, monkeypatch):
+    from router_py.local_answer import LocalAnswerConfig
+
+    project = tmp_path / "project"
+    project.mkdir()
+    long_source = "x = 1\n" * 10000
+    (project / "sample.py").write_text(long_source)
+
+    config = LocalAnswerConfig.from_env()
+    config.code_review_context_chars = 100
+
+    engine = SelfAnalysisEngine(project_root=project, self_review_context_chars=100)
+    analysis = engine.analyze_file("sample.py")
+    context = engine._build_context(analysis)
+
+    assert "[truncated at 100 characters" in context
+
+
 def test_analyze_file_truncates_very_long_source(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
@@ -585,9 +603,11 @@ def test_analyze_file_truncates_very_long_source(tmp_path):
     result = engine.analyze_file("long.py")
 
     assert (
-        "[truncated at 100 characters; consider reviewing a smaller module]"
+        "[truncated at 100 characters; source exceeded code-review context limit]"
         in result.prompt_context
     )
+    assert "WARNING: Source code was truncated before review." in result.prompt_context
+    assert result.truncated is True
     assert len(result.prompt_context) < len(source) + 500
 
 
