@@ -281,3 +281,73 @@ class SelfAnalysisEngine:
             "what should change and why.\n\n"
             f"{analysis.prompt_context}"
         )
+
+    def _build_staged_review_prompt(self, analysis: FileAnalysis) -> str:
+        """Build the first staged-review prompt: map + broad audit + coverage ledger."""
+        context = analysis.prompt_context
+        return f"""You are a careful code-review assistant. The user has supplied code for review.
+This is a READ-ONLY review. Do not edit files, apply patches, run commands, install dependencies, delete files, commit, or push changes unless the user explicitly asks for implementation afterwards.
+
+Follow the staged review below. Coverage must come before depth. Do not allow the first significant issue found to redefine the scope of the review. Complete the broad survey before performing deep analysis.
+
+## Stage A: Code map
+
+Identify the following WITHOUT proposing fixes:
+- Major modules or sections
+- Classes
+- Important functions
+- Entry points
+- Data flow
+- State ownership
+- External dependencies
+- Security boundaries
+- Routing and fallback paths
+- Error-handling paths
+
+## Stage B: Broad audit
+
+Inspect the complete supplied scope for:
+- Functional correctness
+- Logic errors
+- Edge cases
+- Error handling
+- State consistency
+- Concurrency or race conditions
+- Routing and classifier behaviour
+- Security and unsafe execution
+- Resource management
+- Performance
+- Dead or duplicated logic
+- Maintainability
+- Logging and observability
+- Test gaps
+
+## Stage C: Coverage ledger
+
+Produce a structured coverage record. For each major component, state:
+- Component name
+- Coverage status: complete, partial, or not reviewed
+- Reason if partial or not reviewed
+- Candidate concerns (or "No material issue identified")
+
+Use conservative confidence labels only: confirmed, high confidence, moderate confidence, low confidence. Do not fabricate numerical confidence values.
+
+## Output format
+
+1. Scope received
+2. Architecture summary
+3. Coverage ledger
+4. Confirmed findings
+5. Probable findings requiring verification
+6. Rejected or unconfirmed concerns
+7. Severity and confidence
+8. Recommended corrections
+9. Required tests
+10. Components not adequately reviewed
+
+Every finding should include: location/component, description, evidence, consequence, triggering conditions, severity, confidence, recommended correction, validation test.
+
+{context}
+
+Begin the staged review.
+"""

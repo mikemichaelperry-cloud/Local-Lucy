@@ -18,6 +18,23 @@ from runtime_control import (
 )
 
 
+def test_build_staged_review_prompt_contains_all_stages(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "sample.py").write_text("def foo():\n    pass\n")
+
+    engine = SelfAnalysisEngine(project_root=project)
+    analysis = engine.analyze_file("sample.py")
+    prompt = engine._build_staged_review_prompt(analysis)
+
+    assert "## Stage A: Code map" in prompt
+    assert "## Stage B: Broad audit" in prompt
+    assert "## Stage C: Coverage ledger" in prompt
+    assert "Do not allow the first significant issue found" in prompt
+    assert "No material issue identified" in prompt
+    assert "Source code:" in prompt
+
+
 def test_analyze_file_extracts_metrics(tmp_path):
     code = """\
 def hello():
