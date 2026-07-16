@@ -675,6 +675,11 @@ class ExecutionEngine:
         register_closeable(self.state_writer)
         self._logger.info(f"StateManager initialized with namespace: {namespace}")
 
+        # Track the last file analyzed in self-analysis mode so follow-up
+        # requests like "analyze it again" or "review that file" can reuse
+        # the path without requiring the user to type it every turn.
+        self._last_self_analysis_file: str | None = None
+
         self._logger.debug(
             f"ExecutionEngine initialized with namespace: {self._execution_namespace}, "
             f"state_dir: {self._state_dir}, sqlite_state: {self.use_sqlite_state}"
@@ -878,11 +883,8 @@ class ExecutionEngine:
         except Exception:
             return {}
 
-    def _extract_self_analysis_file_reference(self, question: str) -> str | None:
-        """Return a relative path if the query asks to analyze/review/improve a file."""
-        q = question.lower()
-        if not any(k in q for k in ("analyze", "analyse", "review", "improve", "inspect")):
-            return None
+    def _extract_explicit_self_analysis_file_reference(self, question: str) -> str | None:
+        """Return a relative path only when the query explicitly names a file."""
         # Look for quoted or bare file paths ending in .py
         matches = re.findall(r"[\'\"]?([\w\-/]+\.py)[\'\"]?", question)
         if matches:
@@ -898,6 +900,37 @@ class ExecutionEngine:
             candidate = (ROOT_DIR / converted).resolve()
             if candidate.exists():
                 return str(candidate.relative_to(ROOT_DIR))
+        return None
+
+    def _extract_self_analysis_file_reference(
+        self, question: str, last_file: str | None = None
+    ) -> str | None:
+        """Return a relative path if the query asks to analyze/review/improve a file.
+
+        If the query does not explicitly name a file but ``last_file`` is set and
+        the query looks like a follow-up ("analyze it", "review that file", etc.),
+        return the previously used file reference.
+        """
+        q = question.lower()
+        if not any(k in q for k in ("analyze", "analyse", "review", "improve", "inspect")):
+            return None
+
+        explicit = self._extract_explicit_self_analysis_file_reference(question)
+        if explicit:
+            return explicit
+
+        if last_file:
+            followup_markers = (
+                " it",
+                "that file",
+                "this file",
+                "the file",
+                "same file",
+                "again",
+            )
+            if any(marker in q for marker in followup_markers):
+                return last_file
+
         return None
 
     def _append_medical_sources(
@@ -1062,10 +1095,13 @@ class ExecutionEngine:
         # Self-analysis mode dispatch
         control_state = self._load_control_state() or {}
         if control_state.get("self_analysis_mode", "off").lower() == "on":
-            file_ref = self._extract_self_analysis_file_reference(question)
+            file_ref = self._extract_self_analysis_file_reference(
+                question, self._last_self_analysis_file
+            )
             if file_ref:
                 self._logger.info(f"Self-analysis mode dispatch: {file_ref}")
                 result = await self.execute_self_analysis(file_ref)
+                self._last_self_analysis_file = file_ref
                 self_analysis_route = RoutingDecision(
                     route="SELF_REVIEW",
                     mode="FORCED",

@@ -140,7 +140,9 @@ def long_function():
     engine = ExecutionEngine()
     monkeypatch.setattr(engine, "_load_control_state", lambda: {"self_analysis_mode": "on"})
     monkeypatch.setattr(
-        engine, "_extract_self_analysis_file_reference", lambda question: "sample.py"
+        engine,
+        "_extract_self_analysis_file_reference",
+        lambda question, last_file=None: "sample.py",
     )
     monkeypatch.setenv("LUCY_ROOT", str(project))
 
@@ -200,6 +202,125 @@ def long_function():
     assert written_state[0][0].route == "SELF_REVIEW"
     assert len(written_json_state) == 1
     assert written_json_state[0][0].route == "SELF_REVIEW"
+
+
+def _make_self_analysis_root(tmp_path, monkeypatch) -> Path:
+    """Create a temporary project root and point execution_engine.ROOT_DIR at it."""
+    root = tmp_path / "lucy_root"
+    root.mkdir()
+    monkeypatch.setattr("router_py.execution_engine.ROOT_DIR", root)
+    return root
+
+
+def test_extract_self_analysis_file_reference_ignores_non_self_analysis_questions(
+    tmp_path, monkeypatch
+):
+    root = _make_self_analysis_root(tmp_path, monkeypatch)
+    (root / "sample.py").write_text("x = 1\n")
+    engine = ExecutionEngine()
+    assert engine._extract_self_analysis_file_reference("what is sample.py") is None
+    assert (
+        engine._extract_self_analysis_file_reference("analyze sample.py", last_file="sample.py")
+        == "sample.py"
+    )
+
+
+def test_extract_self_analysis_followup_reuses_last_file(tmp_path, monkeypatch):
+    root = _make_self_analysis_root(tmp_path, monkeypatch)
+    (root / "first.py").write_text("x = 1\n")
+    (root / "second.py").write_text("y = 2\n")
+    engine = ExecutionEngine()
+
+    # First turn: explicit path is stored mentally by the caller.
+    assert engine._extract_self_analysis_file_reference("analyze first.py") == "first.py"
+
+    # Follow-up without a path reuses the last file.
+    assert (
+        engine._extract_self_analysis_file_reference("analyze it again", last_file="first.py")
+        == "first.py"
+    )
+    assert (
+        engine._extract_self_analysis_file_reference("review that file", last_file="first.py")
+        == "first.py"
+    )
+    assert (
+        engine._extract_self_analysis_file_reference("improve this file", last_file="first.py")
+        == "first.py"
+    )
+    assert (
+        engine._extract_self_analysis_file_reference("inspect the file", last_file="first.py")
+        == "first.py"
+    )
+    assert (
+        engine._extract_self_analysis_file_reference("review same file", last_file="first.py")
+        == "first.py"
+    )
+
+
+def test_extract_self_analysis_explicit_path_overrides_last_file(tmp_path, monkeypatch):
+    root = _make_self_analysis_root(tmp_path, monkeypatch)
+    (root / "first.py").write_text("x = 1\n")
+    (root / "second.py").write_text("y = 2\n")
+    engine = ExecutionEngine()
+
+    assert (
+        engine._extract_self_analysis_file_reference("analyze second.py", last_file="first.py")
+        == "second.py"
+    )
+
+
+@pytest.mark.asyncio
+async def test_execution_engine_remembers_last_self_analysis_file(tmp_path, monkeypatch):
+    """The engine stores the last successfully dispatched self-analysis file."""
+    root = _make_self_analysis_root(tmp_path, monkeypatch)
+    (root / "sample.py").write_text("def foo():\n    pass\n")
+
+    engine = ExecutionEngine()
+    monkeypatch.setattr(engine, "_load_control_state", lambda: {"self_analysis_mode": "on"})
+
+    # Mock execute_self_analysis to avoid real Ollama calls and to capture calls.
+    calls = []
+
+    async def fake_execute_self_analysis(relative_path, project_root=None, model=None):
+        calls.append(relative_path)
+        return MagicMock()
+
+    monkeypatch.setattr(engine, "execute_self_analysis", fake_execute_self_analysis)
+
+    # Mock the state writers so execute_async can complete cleanly.
+    monkeypatch.setattr(engine.state_writer, "write_state", lambda route, result, context: None)
+    monkeypatch.setattr(
+        engine.state_writer, "write_json_state_files", lambda route, result, context: None
+    )
+
+    intent = ClassificationResult(intent="analyze", intent_family="operational")
+    route = RoutingDecision(
+        route="LOCAL",
+        mode="AUTO",
+        intent_family="operational",
+        confidence=0.9,
+        provider="local",
+        provider_usage_class="local",
+        evidence_mode="",
+    )
+
+    # First turn: explicit file path.
+    await engine.execute_async(
+        intent,
+        route,
+        context={"question": "analyze sample.py"},
+    )
+    assert engine._last_self_analysis_file == "sample.py"
+    assert calls == ["sample.py"]
+
+    # Second turn: follow-up without a path reuses the remembered file.
+    await engine.execute_async(
+        intent,
+        route,
+        context={"question": "review it again"},
+    )
+    assert engine._last_self_analysis_file == "sample.py"
+    assert calls == ["sample.py", "sample.py"]
 
 
 def test_runtime_control_cli_supports_set_self_analysis_mode(tmp_path, monkeypatch, capsys):
