@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Default `self_review_max_tokens` = 4096.
-- Default `self_review_context_chars` = 100000.
+- Default `self_review_context_chars` = 200000.
 - File read size cap = 5 MB.
 - Do not change default `num_ctx` in Ollama Modelfiles.
 - Do not modify normal `LOCAL` chat token budgets.

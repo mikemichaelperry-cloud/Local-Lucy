@@ -44,7 +44,7 @@ class SelfAnalysisEngine:
                     "LUCY_SELF_REVIEW_CONTEXT_CHARS for context limit."
                 )
                 self_review_context_chars = int(
-                    os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "100000")
+                    os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "200000")
                 )
         if self_review_context_chars <= 0:
             raise ValueError(

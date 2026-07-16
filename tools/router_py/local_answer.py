@@ -499,7 +499,7 @@ class LocalAnswerConfig:
     evidence_max_tokens: int = 768
     creative_max_tokens: int = 512
     self_review_max_tokens: int = 4096
-    self_review_context_chars: int = 100000
+    self_review_context_chars: int = 200000
     embedding_cache_size: int = 1024
     keep_model_warm: bool = True
     max_context_chars: int = 1200
@@ -572,7 +572,7 @@ class LocalAnswerConfig:
             creative_max_tokens=int(os.environ.get("LUCY_CREATIVE_MAX_TOKENS", "512")),
             self_review_max_tokens=int(os.environ.get("LUCY_SELF_REVIEW_MAX_TOKENS", "4096")),
             self_review_context_chars=int(
-                os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "100000")
+                os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "200000")
             ),
             embedding_cache_size=int(os.environ.get("LUCY_EMBEDDING_CACHE_SIZE", "1024")),
             keep_model_warm=os.environ.get("LUCY_KEEP_MODEL_WARM", "1").lower()

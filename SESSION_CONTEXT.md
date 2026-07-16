@@ -183,7 +183,7 @@ b1818d3 feat: add SelfAnalysisEngine for local code self-review
   - `_read_source` enforces the 5 MB cap at the read boundary (TOCTOU-safe) and uses `errors="replace"` for non-UTF-8 bytes.
   - Source longer than `self_review_context_chars` is truncated with a `[truncated at N characters; consider reviewing a smaller module]` notice.
 - **Dedicated `SELF_REVIEW` route (`tools/router_py/local_answer.py`):**
-  - `LocalAnswerConfig` exposes `self_review_max_tokens` (default 4096) and `self_review_context_chars` (default 100000), overridable via `LUCY_SELF_REVIEW_MAX_TOKENS` and `LUCY_SELF_REVIEW_CONTEXT_CHARS`.
+  - `LocalAnswerConfig` exposes `self_review_max_tokens` (default 4096) and `self_review_context_chars` (default 200000), overridable via `LUCY_SELF_REVIEW_MAX_TOKENS` and `LUCY_SELF_REVIEW_CONTEXT_CHARS`.
   - `_set_generation_profile("SELF_REVIEW", ...)` returns a `("self_review", self_review_max_tokens, "- Provide a thorough, detailed code review with concrete, minimal improvements.")` profile.
   - `_call_ollama` raises the `num_predict` ceiling only for `SELF_REVIEW`, so the budget is not capped by `num_predict_long`.
 - **Caller and cache wiring:**

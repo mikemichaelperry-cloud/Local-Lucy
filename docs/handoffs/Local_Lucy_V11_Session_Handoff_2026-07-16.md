@@ -188,7 +188,7 @@ Result: **All checks passed**, **4 files already formatted**.
 ## 8. Known Residual Risk / Notes
 
 - The 5 MB cap is a hard safety limit; files above it must be split or reviewed manually.
-- The default `self_review_context_chars=100000` can exceed the context window of `local-lucy-llama31` (8192). The design relies on the user selecting Gemma 4 for very large files.
+- The default `self_review_context_chars=200000` can exceed the context window of `local-lucy-llama31` (8192). The design relies on the user selecting Gemma 4 for very large files.
 - Thinking models receive no extra reasoning headroom beyond `self_review_max_tokens` for `SELF_REVIEW`; raise `LUCY_SELF_REVIEW_MAX_TOKENS` if more visible output is needed.
 - The oversized-file error message reports the number of bytes read (`_MAX_FILE_SIZE_BYTES + 1`) rather than the true file size — a Minor polish item deferred.
 - Tests for policy/tube-DB/personal-fact SELF_REVIEW bypass exist for the 807 path; dedicated tests for the other three guards are Minor polish and deferred.
