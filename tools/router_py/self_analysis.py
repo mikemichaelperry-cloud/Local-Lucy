@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -170,9 +171,13 @@ class SelfAnalysisEngine:
         return todos
 
     def _run_ruff(self, file_path: Path) -> list[dict[str, Any]]:
+        ruff_exe = self._resolve_ruff_executable()
+        if ruff_exe is None:
+            logger.warning("ruff not found; skipping lint diagnostics")
+            return []
         try:
             result = subprocess.run(
-                ["ruff", "check", "--output-format=json", str(file_path)],
+                [str(ruff_exe), "check", "--output-format=json", str(file_path)],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -184,12 +189,36 @@ class SelfAnalysisEngine:
                 )
                 return []
             return json.loads(result.stdout or "[]")
-        except FileNotFoundError:
-            logger.warning("ruff not found; skipping lint diagnostics")
-            return []
         except Exception as exc:
             logger.warning(f"ruff check failed: {exc}")
             return []
+
+    def _resolve_ruff_executable(self) -> Path | None:
+        """Find the ruff executable.
+
+        Search order:
+        1. Project venv: ``<project_root>/ui-v10/.venv/bin/ruff``
+        2. Running Python's environment: ``<sys.executable parent>/ruff``
+        3. PATH via ``shutil.which("ruff")``
+        """
+        candidates: list[Path] = []
+        # Project venv (where Local Lucy installs its dev tools).
+        candidates.append(self.project_root / "ui-v10" / ".venv" / "bin" / "ruff")
+        # The Python interpreter currently running this code.
+        candidates.append(Path(sys.executable).parent / "ruff")
+        # Windows venv layout, in case this code is ever run there.
+        candidates.append(self.project_root / "ui-v10" / ".venv" / "Scripts" / "ruff.exe")
+
+        for candidate in candidates:
+            if candidate.exists() and candidate.is_file():
+                return candidate
+
+        from shutil import which
+
+        ruff_on_path = which("ruff")
+        if ruff_on_path:
+            return Path(ruff_on_path)
+        return None
 
     def _build_context(
         self,
