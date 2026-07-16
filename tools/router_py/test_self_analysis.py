@@ -365,6 +365,31 @@ def test_render_env_exports_self_analysis_mode():
     assert "LUCY_SELF_ANALYSIS_MODE=1" in env
 
 
+def test_render_env_exports_code_review_fields():
+    from runtime_control import render_env
+
+    state = {
+        "mode": "offline",
+        "conversation": "off",
+        "memory": "on",
+        "evidence": "off",
+        "voice": "off",
+        "augmentation_policy": "fallback_only",
+        "augmented_provider": "wikipedia",
+        "status": "ready",
+        "profile": "default",
+        "model": "local-lucy-llama31",
+        "learner": "off",
+        "gemma4_smart_routing": "off",
+        "self_analysis_mode": "off",
+        "code_review_model": "gemma4_code_review_agentic",
+        "code_review_specialist_enabled": "on",
+    }
+    env = render_env(state)
+    assert "LUCY_CODE_REVIEW_MODEL=gemma4_code_review_agentic" in env
+    assert "LUCY_CODE_REVIEW_SPECIALIST_ENABLED=1" in env
+
+
 def test_self_check_payload_includes_self_analysis_mode(tmp_path):
     state_file = tmp_path / "state.json"
     state_file.write_text('{"self_analysis_mode": "on"}')

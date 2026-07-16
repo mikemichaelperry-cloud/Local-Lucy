@@ -37,6 +37,8 @@ KNOWN_FIELDS = {
     "model",
     "gemma4_smart_routing",
     "self_analysis_mode",
+    "code_review_model",
+    "code_review_specialist_enabled",
     "learner",
     "approval_required",
     "status",
@@ -110,6 +112,12 @@ def main() -> int:
             result = update_state_field(state_file, "gemma4_smart_routing", args.value)
         elif args.command == "set-self-analysis-mode":
             result = update_state_field(state_file, "self_analysis_mode", args.value)
+        elif args.command == "set-code-review-model":
+            result = update_state_field(state_file, "code_review_model", args.value)
+        elif args.command == "set-code-review-specialist-enabled":
+            result = update_state_field(
+                state_file, "code_review_specialist_enabled", coerce_toggle(args.value)
+            )
         elif args.command == "set-learner":
             result = update_learner_state(state_file, args.value)
         else:
@@ -174,6 +182,19 @@ def build_parser() -> argparse.ArgumentParser:
             "local-lucy-llama31",
             "gemma4:12b-it-qat",
         ),
+    )
+
+    set_code_review_model = subparsers.add_parser(
+        "set-code-review-model", help="Set the code-review specialist model alias"
+    )
+    set_code_review_model.add_argument("--value", required=True)
+
+    set_code_review_specialist_enabled = subparsers.add_parser(
+        "set-code-review-specialist-enabled",
+        help="Enable/disable the code-review specialist model",
+    )
+    set_code_review_specialist_enabled.add_argument(
+        "--value", required=True, choices=["on", "off", "1", "0", "true", "false"]
     )
 
     return parser
@@ -340,6 +361,8 @@ def default_state() -> dict[str, Any]:
         or "local-lucy-llama31",
         "gemma4_smart_routing": "off",
         "self_analysis_mode": "off",
+        "code_review_model": "gemma4_code_review_agentic",
+        "code_review_specialist_enabled": "on",
         "learner": _resolve_initial_learner_state(),
         "approval_required": False,
         "status": "ready",
@@ -419,6 +442,8 @@ def update_state_field(state_file: Path, field: str, requested_value: str) -> Up
             "model",
             "gemma4_smart_routing",
             "self_analysis_mode",
+            "code_review_model",
+            "code_review_specialist_enabled",
             "learner",
         }:
             state["status"] = "ready"
@@ -494,6 +519,12 @@ def normalize_state(payload: dict[str, Any] | None) -> dict[str, Any]:
     state["active_model"] = state["model"]
     state["gemma4_smart_routing"] = coerce_toggle(state.get("gemma4_smart_routing", "off"))
     state["self_analysis_mode"] = coerce_toggle(state.get("self_analysis_mode", "off"))
+    state["code_review_model"] = (
+        clean_text(state.get("code_review_model")) or "gemma4_code_review_agentic"
+    )
+    state["code_review_specialist_enabled"] = coerce_toggle(
+        state.get("code_review_specialist_enabled", "on")
+    )
     state["learner"] = coerce_toggle(state.get("learner"))
     state["approval_required"] = bool(state.get("approval_required", False))
     state["status"] = clean_text(state.get("status")) or "ready"
@@ -640,6 +671,8 @@ def build_self_check_payload(resolved_paths: ResolvedRuntimePaths) -> dict[str, 
             "learner": state.get("learner", ""),
             "gemma4_smart_routing": state.get("gemma4_smart_routing", ""),
             "self_analysis_mode": state.get("self_analysis_mode", ""),
+            "code_review_model": state.get("code_review_model", "gemma4_code_review_agentic"),
+            "code_review_specialist_enabled": state.get("code_review_specialist_enabled", "on"),
         },
         "augmented_availability": {
             "provider": availability_provider,
@@ -682,6 +715,8 @@ def render_env(state: dict[str, Any]) -> str:
             f"LUCY_LOCAL_MODEL={state['model']}",
             f"LUCY_GEMMA4_SMART_ROUTING={toggle_to_flag(state['gemma4_smart_routing'])}",
             f"LUCY_SELF_ANALYSIS_MODE={toggle_to_flag(state['self_analysis_mode'])}",
+            f"LUCY_CODE_REVIEW_MODEL={state.get('code_review_model', 'gemma4_code_review_agentic')}",
+            f"LUCY_CODE_REVIEW_SPECIALIST_ENABLED={toggle_to_flag(state.get('code_review_specialist_enabled', 'on'))}",
         ]
     )
 
