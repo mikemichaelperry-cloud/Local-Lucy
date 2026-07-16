@@ -110,7 +110,7 @@ def test_self_analysis_checkbox_exists_and_emits_signal():
 
     checkbox = panel._self_analysis_selector
     assert checkbox is not None
-    assert checkbox.text() == "Self-Analysis Mode"
+    assert checkbox.text() == "Engineering mode"
 
     checkbox.blockSignals(False)
     checkbox.setChecked(True)
@@ -141,3 +141,11 @@ def test_self_analysis_checkbox_state_preserved_on_noop_toggle():
 
     assert not received  # no signal emitted because value did not change
     assert checkbox.isChecked()
+
+
+def test_engineering_mode_checkbox_label():
+    app = QApplication.instance() or QApplication([])
+    from app.panels.control_panel import ControlPanel
+
+    panel = ControlPanel(current_state={"self_analysis_mode": "off"})
+    assert panel._self_analysis_selector.text() == "Engineering mode"

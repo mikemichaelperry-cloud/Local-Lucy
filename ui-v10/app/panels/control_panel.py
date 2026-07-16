@@ -53,7 +53,7 @@ class ControlPanel(QFrame):
         "gemma4:12b-it-qat": "gemma4:12b-it-qat (gemma4 12B reasoning/multimodal)",
     }
 
-    def __init__(self) -> None:
+    def __init__(self, current_state: dict[str, Any] | None = None) -> None:
         super().__init__()
         self.setObjectName("shellCard")
         self.setMinimumWidth(280)
@@ -157,6 +157,9 @@ class ControlPanel(QFrame):
         layout.addWidget(self._build_safe_actions_group())
         layout.addStretch(1)
 
+        if current_state is not None:
+            self.update_control_state({}, current_state=current_state)
+
     def _build_operator_group(self) -> QGroupBox:
         group = QGroupBox("Controls")
         self._operator_group = group
@@ -253,9 +256,9 @@ class ControlPanel(QFrame):
         self._gemma4_vram_warning_label.setObjectName("cardValue")
         self._gemma4_vram_warning_label.setVisible(False)
 
-        self._self_analysis_selector = QCheckBox("Self-Analysis Mode")
+        self._self_analysis_selector = QCheckBox("Engineering mode")
         self._self_analysis_selector.setToolTip(
-            "When on, Lucy can parse her own code and suggest improvements."
+            "Enable code review and analysis mode with specialist model support."
         )
         self._self_analysis_selector.setEnabled(False)
         self._self_analysis_selector.stateChanged.connect(self._handle_self_analysis_changed)
