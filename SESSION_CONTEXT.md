@@ -101,12 +101,18 @@ Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
 Latest tag: v10.0.0-beta.1
 Commits since tag: 62
-Working tree: modified (Self-Analysis large-file / large-response support implemented and reviewed; pre-existing `models/router/comprehensive_examples.json` change unrelated)
+Working tree: clean
 ```
 
 ### Recent Commits (last 16)
 ```
-Self-Analysis Large-File / Large-Response Support
+Task 10 Fix: explicit code-review resolver fallback/error coverage
+09cf2f9 test(router): make code-review resolver fallback/error cases explicit
+b8934c6 test(router): add code-review model fallback and error cases
+5a3cfc7 fix(tests): restore ControlPanel self-analysis tests alongside TTS suppression tests
+ea7d87c feat(hmi): suppress Kokoro TTS output for SELF_REVIEW responses
+4cdc0cd feat(self_analysis): detect and report source truncation before review
+0cc1f62 feat(self_analysis): implement two-call staged review with optional deep dive
 2e2e014 fix(self-review): bypass policy short-circuit for SELF_REVIEW and add exact 5 MB boundary test
 9dc4497 fix(self-analysis): payload-level test, is_self_review derivation, scoped cap relaxation
 2f848de fix(self-analysis): skip 807 short-circuit for SELF_REVIEW and clean cache helpers
@@ -117,12 +123,6 @@ ec8768e fix(self-analysis): round-2 review fixes
 e6230ee feat(local_answer): add SELF_REVIEW route with large token budget
 aa655d0 feat(self-analysis): include source code and guard large/non-file paths
 9be66cd docs: add self-analysis large-file support implementation plan
-2fd99cb docs: add self-analysis large-file support design spec
-0c2ff66 feat: wire Self-Analysis Mode toggle to state persistence
-b17c30a feat: add Self-Analysis Mode checkbox to Engineering panel
-5038df6 feat: dispatch self-analysis queries in ExecutionEngine
-0451f0d Fix self-analysis review findings: path traversal, async docstring, ruff stderr, tests
-b1818d3 feat: add SelfAnalysisEngine for local code self-review
 ```
 
 ### Persona LoRA Pipeline — Completed Within Hardware Limits
@@ -195,9 +195,10 @@ b1818d3 feat: add SelfAnalysisEngine for local code self-review
 - **Documentation:**
   - Updated `docs/superpowers/specs/2026-07-15-self-analysis-large-files-design.md` to match implementation wording.
 - **Tests:**
-  - `tools/router_py/test_self_analysis.py`: 21 passed
+  - `tools/router_py/test_self_analysis.py`: 40 passed
+  - `tools/router_py/test_code_review_model_resolver.py`: 7 passed
   - `tools/router_py/test_local_answer.py`: 58 passed
-  - Combined: 79 passed
+  - Combined target run: 47 passed
   - `ruff check` and `ruff format --check` clean on all modified files.
 
 ---
