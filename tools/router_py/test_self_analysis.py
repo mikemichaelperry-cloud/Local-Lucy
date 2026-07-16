@@ -613,3 +613,46 @@ def test_analyze_file_handles_invalid_utf8(tmp_path):
     assert isinstance(result, FileAnalysis)
     assert "\ufffd" in result.prompt_context
     assert "x = 1" in result.prompt_context
+
+
+def test_code_review_config_fields_have_defaults():
+    from router_py.local_answer import LocalAnswerConfig
+
+    config = LocalAnswerConfig()
+    assert config.code_review_model == "gemma4_code_review_agentic"
+    assert config.code_review_specialist_enabled is True
+    assert config.code_review_temperature == 1.0
+    assert config.code_review_top_p == 0.95
+    assert config.code_review_top_k == 64
+    assert config.code_review_context_target == 16384
+    assert config.code_review_max_tokens == 4096
+    assert config.code_review_context_chars == 200000
+
+
+def test_code_review_config_fields_read_from_env(monkeypatch):
+    from router_py.local_answer import LocalAnswerConfig
+
+    monkeypatch.setenv("LUCY_CODE_REVIEW_MODEL", "custom_model")
+    monkeypatch.setenv("LUCY_CODE_REVIEW_SPECIALIST_ENABLED", "0")
+    monkeypatch.setenv("LUCY_CODE_REVIEW_TEMPERATURE", "0.7")
+    monkeypatch.setenv("LUCY_CODE_REVIEW_TOP_P", "0.9")
+    monkeypatch.setenv("LUCY_CODE_REVIEW_TOP_K", "32")
+    monkeypatch.setenv("LUCY_CODE_REVIEW_CONTEXT_TARGET", "24576")
+    monkeypatch.setenv("LUCY_CODE_REVIEW_MAX_TOKENS", "8192")
+    monkeypatch.setenv("LUCY_CODE_REVIEW_CONTEXT_CHARS", "150000")
+    config = LocalAnswerConfig.from_env()
+    assert config.code_review_model == "custom_model"
+    assert config.code_review_specialist_enabled is False
+    assert config.code_review_temperature == 0.7
+    assert config.code_review_top_p == 0.9
+    assert config.code_review_top_k == 32
+    assert config.code_review_context_target == 24576
+    assert config.code_review_max_tokens == 8192
+    assert config.code_review_context_chars == 150000
+
+
+def test_specialist_model_identity_exists():
+    from router_py.local_answer import get_self_knowledge
+
+    text = get_self_knowledge("gemma4_code_review_agentic")
+    assert "gemma-4-12B-agentic" in text or "12B" in text

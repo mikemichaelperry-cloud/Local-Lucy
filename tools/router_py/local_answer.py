@@ -307,6 +307,10 @@ _MODEL_IDENTITIES: dict[str, tuple[str, str]] = {
     "local-lucy-llama31": ("llama3.1:8b", "~8B parameters, 4096-token context"),
     "local-lucy-llama31:latest": ("llama3.1:8b", "~8B parameters, 4096-token context"),
     "gemma4:12b-it-qat": ("gemma4:12b-it-qat", "~12B parameters, 128k-token context"),
+    "gemma4_code_review_agentic": (
+        "hf.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q4_K_M",
+        "~12B parameters, 128k-token context, code-review specialist",
+    ),
 }
 
 
@@ -500,6 +504,15 @@ class LocalAnswerConfig:
     creative_max_tokens: int = 512
     self_review_max_tokens: int = 4096
     self_review_context_chars: int = 200000
+    # Code-review specialist model settings
+    code_review_model: str = "gemma4_code_review_agentic"
+    code_review_specialist_enabled: bool = True
+    code_review_temperature: float = 1.0
+    code_review_top_p: float = 0.95
+    code_review_top_k: int = 64
+    code_review_context_target: int = 16384
+    code_review_max_tokens: int = 4096
+    code_review_context_chars: int = 200000
     embedding_cache_size: int = 1024
     keep_model_warm: bool = True
     max_context_chars: int = 1200
@@ -573,6 +586,23 @@ class LocalAnswerConfig:
             self_review_max_tokens=int(os.environ.get("LUCY_SELF_REVIEW_MAX_TOKENS", "4096")),
             self_review_context_chars=int(
                 os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "200000")
+            ),
+            code_review_model=os.environ.get(
+                "LUCY_CODE_REVIEW_MODEL", "gemma4_code_review_agentic"
+            ),
+            code_review_specialist_enabled=os.environ.get(
+                "LUCY_CODE_REVIEW_SPECIALIST_ENABLED", "1"
+            ).lower()
+            in ("1", "true", "yes", "on"),
+            code_review_temperature=float(os.environ.get("LUCY_CODE_REVIEW_TEMPERATURE", "1.0")),
+            code_review_top_p=float(os.environ.get("LUCY_CODE_REVIEW_TOP_P", "0.95")),
+            code_review_top_k=int(os.environ.get("LUCY_CODE_REVIEW_TOP_K", "64")),
+            code_review_context_target=int(
+                os.environ.get("LUCY_CODE_REVIEW_CONTEXT_TARGET", "16384")
+            ),
+            code_review_max_tokens=int(os.environ.get("LUCY_CODE_REVIEW_MAX_TOKENS", "4096")),
+            code_review_context_chars=int(
+                os.environ.get("LUCY_CODE_REVIEW_CONTEXT_CHARS", "200000")
             ),
             embedding_cache_size=int(os.environ.get("LUCY_EMBEDDING_CACHE_SIZE", "1024")),
             keep_model_warm=os.environ.get("LUCY_KEEP_MODEL_WARM", "1").lower()
