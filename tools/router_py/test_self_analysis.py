@@ -229,6 +229,48 @@ def _make_self_analysis_root(tmp_path, monkeypatch) -> Path:
     return root
 
 
+@pytest.mark.asyncio
+async def test_execution_engine_returns_error_when_no_code_review_model_available(
+    tmp_path, monkeypatch
+):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "sample.py").write_text("def foo():\n    pass\n")
+
+    engine = ExecutionEngine()
+    monkeypatch.setattr(engine, "_load_control_state", lambda: {"self_analysis_mode": "on"})
+    monkeypatch.setenv("LUCY_ROOT", str(project))
+    monkeypatch.setattr(
+        engine,
+        "_extract_self_analysis_file_reference",
+        lambda question, last_file=None: "sample.py",
+    )
+    monkeypatch.setattr(
+        engine,
+        "_resolve_code_review_model",
+        lambda: (_ for _ in ()).throw(RuntimeError("No model")),
+    )
+
+    intent = ClassificationResult(intent="analyze", intent_family="operational")
+    route = RoutingDecision(
+        route="LOCAL",
+        mode="AUTO",
+        intent_family="operational",
+        confidence=0.9,
+        provider="local",
+        provider_usage_class="local",
+        evidence_mode="",
+    )
+
+    result = await engine.execute_async(
+        intent,
+        route,
+        context={"question": "analyze sample.py"},
+    )
+    assert result.status == "failed"
+    assert result.outcome_code == "code_review_model_unavailable"
+
+
 def test_extract_self_analysis_file_reference_ignores_non_self_analysis_questions(
     tmp_path, monkeypatch
 ):
