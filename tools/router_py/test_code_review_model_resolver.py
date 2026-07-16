@@ -41,6 +41,21 @@ def test_resolver_falls_back_to_stock_gemma4_when_specialist_missing():
     assert reason == "specialist_model_not_installed"
 
 
+def test_resolver_falls_back_to_default_when_specialist_and_stock_missing():
+    """Specialist is enabled but missing, stock Gemma 4 is missing, default is installed → fall back to default model."""
+    config = MagicMock()
+    config.code_review_model = "gemma4_code_review_agentic"
+    config.code_review_specialist_enabled = True
+    config.model = "local-lucy-llama31"
+
+    resolver = CodeReviewModelResolver(config)
+    resolver._list_installed_models = MagicMock(return_value=["local-lucy-llama31"])
+
+    model, reason = resolver.resolve()
+    assert model == "local-lucy-llama31"
+    assert reason == "stock_gemma4_not_installed"
+
+
 def test_resolver_disabled_skips_specialist_and_uses_stock_when_available():
     """Specialist is disabled and stock Gemma 4 is installed → use stock model."""
     config = MagicMock()
