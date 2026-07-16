@@ -536,6 +536,45 @@ async def test_suggest_improvements_uses_self_review_route(tmp_path, monkeypatch
     assert created_instances[0].last_kwargs.get("route_mode") == "SELF_REVIEW"
 
 
+@pytest.mark.asyncio
+async def test_suggest_improvements_runs_staged_review(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "sample.py").write_text("def foo():\n    pass\n")
+
+    engine = SelfAnalysisEngine(project_root=project)
+
+    class FakeAnswerResult:
+        text = "STAGE 1 REPORT\n\nCoverage ledger:\n- foo: complete\n\nConfirmed findings: none"
+
+    calls = []
+
+    class FakeLocalAnswer:
+        def __init__(self, config):
+            self.config = config
+
+        async def generate_answer(self, **kwargs):
+            calls.append(kwargs.get("query", ""))
+            return FakeAnswerResult()
+
+        async def close(self):
+            pass
+
+    fake_config = MagicMock()
+    fake_config.model = "gemma4_code_review_agentic"
+    fake_config_class = MagicMock(return_value=fake_config)
+
+    fake_module = types.ModuleType("router_py.local_answer")
+    fake_module.LocalAnswer = FakeLocalAnswer
+    fake_module.LocalAnswerConfig = fake_config_class
+    monkeypatch.setitem(sys.modules, "router_py.local_answer", fake_module)
+
+    result = await engine.suggest_improvements("sample.py")
+    assert "STAGE 1 REPORT" in result
+    assert len(calls) == 1  # no deep dive when no findings
+    assert "## Stage A: Code map" in calls[0]
+
+
 def test_analyze_file_truncates_very_long_source(tmp_path):
     project = tmp_path / "project"
     project.mkdir()

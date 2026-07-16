@@ -22,6 +22,8 @@ class FileAnalysis:
     metrics: dict[str, int] = field(default_factory=dict)
     lint_diagnostics: list[dict[str, Any]] = field(default_factory=list)
     hotspots: list[str] = field(default_factory=list)
+    todos: list[str] = field(default_factory=list)
+    source: str = ""
     prompt_context: str = ""
 
 
@@ -62,44 +64,123 @@ class SelfAnalysisEngine:
         hotspots = self._find_hotspots(tree, source)
         todos = self._find_todos(source)
         diagnostics = self._run_ruff(file_path)
-        prompt_context = self._build_context(
-            file_path, metrics, hotspots, todos, diagnostics, source
-        )
 
-        return FileAnalysis(
+        analysis = FileAnalysis(
             path=relative_path,
             metrics=metrics,
             lint_diagnostics=diagnostics,
             hotspots=hotspots,
-            prompt_context=prompt_context,
+            todos=todos,
+            source=source,
         )
+        analysis.prompt_context = self._build_context(analysis)
+        return analysis
 
     async def suggest_improvements(self, relative_path: str, model: str | None = None) -> str:
-        """Return improvement suggestions for ``relative_path``.
-
-        This method is async because it awaits ``LocalAnswer.generate_answer``.
-        It returns a coroutine that resolves to a formatted ``str``.
-        """
+        """Generate staged code-review suggestions for the given file."""
         analysis = self.analyze_file(relative_path)
-        prompt = self._build_llm_prompt(analysis)
+        local_analysis = self._local_analysis_summary(analysis)
 
+        # Stage 1: code map + broad audit + coverage ledger
+        stage1_prompt = self._build_staged_review_prompt(analysis)
+        stage1_result = await self._run_llm(
+            stage1_prompt,
+            route_mode="SELF_REVIEW",
+            model=model,
+        )
+
+        # Stage 2: deep investigation only if warranted
+        if self._should_run_deep_dive(stage1_result):
+            stage2_prompt = self._build_deep_dive_prompt(analysis, stage1_result)
+            stage2_result = await self._run_llm(
+                stage2_prompt,
+                route_mode="SELF_REVIEW",
+                model=model,
+            )
+            return f"LOCAL analysis:\n{local_analysis}\n\nAUGMENTED suggestions:\n{stage1_result}\n\nDEEP INVESTIGATION:\n{stage2_result}"
+
+        return f"LOCAL analysis:\n{local_analysis}\n\nAUGMENTED suggestions:\n{stage1_result}"
+
+    async def _run_llm(
+        self,
+        prompt: str,
+        route_mode: str = "SELF_REVIEW",
+        model: str | None = None,
+    ) -> str:
+        """Call LocalAnswer and return raw text."""
         try:
             from router_py.local_answer import LocalAnswer, LocalAnswerConfig
-        except ImportError:
-            return f"LOCAL analysis:\n{analysis.prompt_context}\n\nAUGMENTED suggestions: unavailable (LocalAnswer not importable)."
 
-        config = LocalAnswerConfig.from_env()
-        if model:
-            config.model = model
-        answer = LocalAnswer(config)
-        try:
-            result = await answer.generate_answer(query=prompt, route_mode="SELF_REVIEW")
-            return f"LOCAL analysis:\n{analysis.prompt_context}\n\nAUGMENTED suggestions:\n{result.text}"
-        except Exception as exc:
-            logger.warning(f"Self-analysis LLM call failed: {exc}")
-            return f"LOCAL analysis:\n{analysis.prompt_context}\n\nAUGMENTED suggestions: unavailable ({exc})."
-        finally:
+            config = LocalAnswerConfig.from_env()
+            if model:
+                config.model = model
+            answer = LocalAnswer(config)
+            result = await answer.generate_answer(
+                query=prompt,
+                route_mode=route_mode,
+                output_mode="CHAT",
+            )
             await answer.close()
+            return result.text
+        except ImportError:
+            return "AUGMENTED suggestions: unavailable (LocalAnswer not importable)"
+
+    def _should_run_deep_dive(self, stage1_result: str) -> bool:
+        """Run deep dive if the first stage reported candidate findings."""
+        text = stage1_result.lower()
+        # Simple heuristic: presence of confirmed or moderate+ confidence findings.
+        confidence_markers = [
+            "confidence: confirmed",
+            "confidence: high confidence",
+            "confidence: moderate confidence",
+        ]
+        return any(marker in text for marker in confidence_markers)
+
+    def _build_deep_dive_prompt(self, analysis: FileAnalysis, stage1_result: str) -> str:
+        context = self._build_context(analysis)
+        return f"""You previously reviewed the following code and produced a coverage ledger with candidate findings. Now perform deep investigation and fix planning.
+
+This remains READ-ONLY. Do not edit files or run commands.
+
+## Stage D: Deep investigation
+
+For each candidate finding in the previous report:
+- Trace the finding through the relevant call path.
+- Identify supporting evidence.
+- Distinguish confirmed defects from suspicions.
+- Check whether another component already prevents the apparent defect.
+- Consider interactions between findings.
+- Reject false positives before recommending changes.
+
+## Stage E: Fix planning
+
+For validated findings:
+- Rank by severity and likelihood.
+- Explain the smallest safe correction.
+- Identify possible regressions.
+- Recommend targeted tests.
+- Do not modify code unless explicitly asked.
+
+{context}
+
+Previous findings:
+{stage1_result}
+
+Begin deep investigation and fix planning.
+"""
+
+    def _local_analysis_summary(self, analysis: FileAnalysis) -> str:
+        parts = [
+            f"File: {analysis.path}",
+            f"Lines: {analysis.metrics.get('lines', 0)}",
+            f"Functions: {analysis.metrics.get('functions', 0)}",
+            f"Classes: {analysis.metrics.get('classes', 0)}",
+        ]
+        if analysis.hotspots:
+            parts.append("Hotspots: " + ", ".join(analysis.hotspots))
+        if analysis.todos:
+            parts.append("TODOs: " + ", ".join(analysis.todos))
+        return "\n".join(parts)
 
     def _resolve_file(self, relative_path: str) -> Path:
         candidate = self.project_root / relative_path
@@ -220,15 +301,13 @@ class SelfAnalysisEngine:
             return Path(ruff_on_path)
         return None
 
-    def _build_context(
-        self,
-        file_path: Path,
-        metrics: dict[str, int],
-        hotspots: list[str],
-        todos: list[str],
-        diagnostics: list[dict[str, Any]],
-        source: str,
-    ) -> str:
+    def _build_context(self, analysis: FileAnalysis) -> str:
+        file_path = self._resolve_file(analysis.path)
+        metrics = analysis.metrics
+        hotspots = analysis.hotspots
+        todos = analysis.todos
+        diagnostics = analysis.lint_diagnostics
+        source = analysis.source
         lines = [
             f"File: {file_path.relative_to(self.project_root)}",
             f"Lines: {metrics['lines']}",
