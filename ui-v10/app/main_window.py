@@ -948,7 +948,8 @@ class OperatorConsoleWindow(QMainWindow):
                 self.statusBar().showMessage("Request completed. State refresh complete.", 3000)
             self._append_request_metadata_events(payload)
             self._append_ui_event("[info] post-request refresh complete")
-            # Trigger TTS for voice-enabled sessions
+            # Trigger TTS for voice-enabled sessions, except for self-review reports
+            # which are intentionally read-only and can be lengthy.
             response_text = self._payload_text(payload, "response_text") or result.stdout
             if response_text:
                 # Use voice-optimized text (e.g., condensed news headlines) if available
@@ -957,7 +958,9 @@ class OperatorConsoleWindow(QMainWindow):
                     metadata = payload.get("metadata")
                     if isinstance(metadata, dict):
                         voice_text = str(metadata.get("voice_text", "")).strip()
-                self._speak_response_text(voice_text or response_text)
+                is_self_review = self._payload_route_mode(payload) == "SELF_REVIEW"
+                if not is_self_review:
+                    self._speak_response_text(voice_text or response_text)
             # Cache live (non-persisted) entries such as NEWS so they display in the HMI.
             # Clear any previous live entry for non-NEWS routes so they don't linger.
             route_mode = self._payload_route_mode(payload)
