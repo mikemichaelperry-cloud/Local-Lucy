@@ -46,7 +46,9 @@ class CodeReviewModelResolver:
             if default and default in installed:
                 return default, "stock_gemma4_not_installed"
         else:
-            if default:
+            if stock in installed:
+                return stock, "specialist_disabled"
+            if default and default in installed:
                 return default, "specialist_disabled"
 
         logger.error(

@@ -39,18 +39,47 @@ def test_resolver_falls_back_to_stock_gemma4_when_specialist_missing():
     assert reason == "specialist_model_not_installed"
 
 
-def test_resolver_falls_back_to_default_when_specialist_disabled():
+def test_resolver_disabled_skips_specialist_and_uses_stock_when_available():
     config = MagicMock()
     config.code_review_model = "gemma4_code_review_agentic"
     config.code_review_specialist_enabled = False
     config.model = "local-lucy-llama31"
 
     resolver = CodeReviewModelResolver(config)
-    resolver._list_installed_models = MagicMock(return_value=["gemma4_code_review_agentic"])
+    resolver._list_installed_models = MagicMock(
+        return_value=["gemma4:12b-it-qat", "local-lucy-llama31"]
+    )
+
+    model, reason = resolver.resolve()
+    assert model == "gemma4:12b-it-qat"
+    assert reason == "specialist_disabled"
+
+
+def test_resolver_disabled_falls_back_to_default_when_stock_missing():
+    config = MagicMock()
+    config.code_review_model = "gemma4_code_review_agentic"
+    config.code_review_specialist_enabled = False
+    config.model = "local-lucy-llama31"
+
+    resolver = CodeReviewModelResolver(config)
+    resolver._list_installed_models = MagicMock(return_value=["local-lucy-llama31"])
 
     model, reason = resolver.resolve()
     assert model == "local-lucy-llama31"
     assert reason == "specialist_disabled"
+
+
+def test_resolver_disabled_errors_when_nothing_available():
+    config = MagicMock()
+    config.code_review_model = "gemma4_code_review_agentic"
+    config.code_review_specialist_enabled = False
+    config.model = "local-lucy-llama31"
+
+    resolver = CodeReviewModelResolver(config)
+    resolver._list_installed_models = MagicMock(return_value=[])
+
+    with pytest.raises(RuntimeError, match="No code-review model available"):
+        resolver.resolve()
 
 
 def test_resolver_errors_when_nothing_available():

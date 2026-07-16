@@ -323,6 +323,62 @@ async def test_execution_engine_remembers_last_self_analysis_file(tmp_path, monk
     assert calls == ["sample.py", "sample.py"]
 
 
+@pytest.mark.asyncio
+async def test_execution_engine_selects_specialist_model_when_available(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "sample.py").write_text("def foo():\n    pass\n")
+
+    engine = ExecutionEngine()
+    monkeypatch.setattr(engine, "_load_control_state", lambda: {"self_analysis_mode": "on"})
+    monkeypatch.setenv("LUCY_ROOT", str(project))
+    monkeypatch.setattr("router_py.execution_engine.ROOT_DIR", project)
+
+    # Mock resolver to return specialist.
+    from router_py.code_review_model_resolver import CodeReviewModelResolver
+
+    original_resolver = CodeReviewModelResolver
+
+    class FakeResolver:
+        def __init__(self, config):
+            pass
+
+        def resolve(self):
+            return "gemma4_code_review_agentic", None
+
+    monkeypatch.setattr("router_py.execution_engine.CodeReviewModelResolver", FakeResolver)
+
+    captured_model = []
+
+    async def fake_execute_self_analysis(relative_path, project_root=None, model=None):
+        captured_model.append(model)
+        return MagicMock()
+
+    monkeypatch.setattr(engine, "execute_self_analysis", fake_execute_self_analysis)
+    monkeypatch.setattr(engine.state_writer, "write_state", lambda route, result, context: None)
+    monkeypatch.setattr(
+        engine.state_writer, "write_json_state_files", lambda route, result, context: None
+    )
+
+    intent = ClassificationResult(intent="analyze", intent_family="operational")
+    route = RoutingDecision(
+        route="LOCAL",
+        mode="AUTO",
+        intent_family="operational",
+        confidence=0.9,
+        provider="local",
+        provider_usage_class="local",
+        evidence_mode="",
+    )
+
+    await engine.execute_async(
+        intent,
+        route,
+        context={"question": "analyze sample.py"},
+    )
+    assert captured_model == ["gemma4_code_review_agentic"]
+
+
 def test_runtime_control_cli_supports_set_self_analysis_mode(tmp_path, monkeypatch, capsys):
     state_file = tmp_path / "state.json"
     state_file.write_text('{"self_analysis_mode": "off"}')

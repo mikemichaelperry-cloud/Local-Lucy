@@ -126,6 +126,8 @@ from router_py.resilience import get_breaker, CircuitBreakerOpen
 from router_py.shutdown_handler import register_closeable
 from router_py.structured_logging import get_structured_logger, ContextualLogger
 from router_py.context_guard import is_evidence_relevant, filter_memory_context
+from router_py.code_review_model_resolver import CodeReviewModelResolver
+from router_py.local_answer import LocalAnswerConfig
 
 try:
     from router_py import metrics as _router_metrics
@@ -855,7 +857,11 @@ class ExecutionEngine:
                 response_text=response,
                 error_message="",
                 execution_time_ms=execution_time,
-                metadata={"self_analysis": True, "file": relative_path},
+                metadata={
+                    "self_review_model": model,
+                    "self_analysis": True,
+                    "file": relative_path,
+                },
                 policy_reason="self_analysis_mode",
             )
         except Exception as exc:
@@ -932,6 +938,15 @@ class ExecutionEngine:
                 return last_file
 
         return None
+
+    def _resolve_code_review_model(self) -> tuple[str, str | None]:
+        """Resolve effective Ollama model for SELF_REVIEW mode.
+
+        Returns (model_name, fallback_reason).
+        """
+        config = LocalAnswerConfig.from_env()
+        resolver = CodeReviewModelResolver(config)
+        return resolver.resolve()
 
     def _append_medical_sources(
         self,
@@ -1100,7 +1115,22 @@ class ExecutionEngine:
             )
             if file_ref:
                 self._logger.info(f"Self-analysis mode dispatch: {file_ref}")
-                result = await self.execute_self_analysis(file_ref)
+                try:
+                    review_model, fallback_reason = self._resolve_code_review_model()
+                except RuntimeError as e:
+                    execution_time = int((time.time() - start_time) * 1000)
+                    return ExecutionResult(
+                        status="failed",
+                        outcome_code="code_review_model_unavailable",
+                        route="SELF_REVIEW",
+                        provider="local",
+                        provider_usage_class="local",
+                        response_text=str(e),
+                        error_message=str(e),
+                        execution_time_ms=execution_time,
+                        metadata={"reason": "code_review_model_unavailable"},
+                    )
+                result = await self.execute_self_analysis(file_ref, model=review_model)
                 self._last_self_analysis_file = file_ref
                 self_analysis_route = RoutingDecision(
                     route="SELF_REVIEW",
