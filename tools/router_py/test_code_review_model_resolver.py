@@ -8,6 +8,7 @@ from router_py.code_review_model_resolver import CodeReviewModelResolver
 
 
 def test_resolver_uses_specialist_when_available_and_enabled():
+    """Specialist model is installed and enabled → it is selected with no fallback reason."""
     config = MagicMock()
     config.code_review_model = "gemma4_code_review_agentic"
     config.code_review_specialist_enabled = True
@@ -24,6 +25,7 @@ def test_resolver_uses_specialist_when_available_and_enabled():
 
 
 def test_resolver_falls_back_to_stock_gemma4_when_specialist_missing():
+    """Specialist is enabled but not installed → fall back to stock Gemma 4."""
     config = MagicMock()
     config.code_review_model = "gemma4_code_review_agentic"
     config.code_review_specialist_enabled = True
@@ -40,6 +42,7 @@ def test_resolver_falls_back_to_stock_gemma4_when_specialist_missing():
 
 
 def test_resolver_disabled_skips_specialist_and_uses_stock_when_available():
+    """Specialist is disabled and stock Gemma 4 is installed → use stock model."""
     config = MagicMock()
     config.code_review_model = "gemma4_code_review_agentic"
     config.code_review_specialist_enabled = False
@@ -56,6 +59,7 @@ def test_resolver_disabled_skips_specialist_and_uses_stock_when_available():
 
 
 def test_resolver_disabled_falls_back_to_default_when_stock_missing():
+    """Specialist is disabled and stock Gemma 4 is missing → fall back to default model."""
     config = MagicMock()
     config.code_review_model = "gemma4_code_review_agentic"
     config.code_review_specialist_enabled = False
@@ -70,6 +74,7 @@ def test_resolver_disabled_falls_back_to_default_when_stock_missing():
 
 
 def test_resolver_disabled_errors_when_nothing_available():
+    """Specialist disabled and no stock/default model installed → clear RuntimeError."""
     config = MagicMock()
     config.code_review_model = "gemma4_code_review_agentic"
     config.code_review_specialist_enabled = False
@@ -83,6 +88,7 @@ def test_resolver_disabled_errors_when_nothing_available():
 
 
 def test_resolver_errors_when_nothing_available():
+    """Specialist enabled but neither specialist, stock, nor default model installed → RuntimeError."""
     config = MagicMock()
     config.code_review_model = "gemma4_code_review_agentic"
     config.code_review_specialist_enabled = True
@@ -95,7 +101,21 @@ def test_resolver_errors_when_nothing_available():
         resolver.resolve()
 
 
+def test_resolver_errors_when_ollama_unreachable():
+    """Ollama is unreachable → installed list is empty → resolve() raises RuntimeError."""
+    config = MagicMock()
+    config.code_review_model = "gemma4_code_review_agentic"
+    config.code_review_specialist_enabled = True
+    config.model = "local-lucy-llama31"
+
+    resolver = CodeReviewModelResolver(config)
+    with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("connection refused")):
+        with pytest.raises(RuntimeError, match="No code-review model available"):
+            resolver.resolve()
+
+
 def test_list_installed_models_returns_names_and_tag_aliases():
+    """Ollama tag response is parsed and expanded with tag aliases."""
     payload = json.dumps(
         {"models": [{"name": "gemma4:12b-it-qat"}, {"name": "local-lucy-llama31"}]}
     ).encode("utf-8")
@@ -116,6 +136,7 @@ def test_list_installed_models_returns_names_and_tag_aliases():
 
 
 def test_list_installed_models_returns_empty_when_ollama_unreachable():
+    """Ollama network failure is swallowed and returns an empty model list."""
     config = MagicMock()
     resolver = CodeReviewModelResolver(config)
     with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("connection refused")):
