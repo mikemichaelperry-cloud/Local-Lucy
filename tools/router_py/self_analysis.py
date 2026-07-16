@@ -235,7 +235,20 @@ class SelfAnalysisEngine:
     def _build_llm_prompt(self, analysis: FileAnalysis) -> str:
         return (
             "You are reviewing Local Lucy's own Python source code. "
-            "Below are static metrics, lint results, and the source code (possibly truncated). "
-            "Suggest concrete, minimal improvements. Do not rewrite the file.\n\n"
+            "Below are static metrics, lint results, hotspots, and the source code (possibly truncated). "
+            "Your review must be broad and balanced: cover architecture, maintainability, "
+            "readability, safety, and testability. Do not fixate on a single function, class, "
+            "or issue. Survey the whole file and address the listed hotspots explicitly.\n\n"
+            "Requirements:\n"
+            "1. Start with the highest-impact structural issues (e.g., oversized classes/functions, "
+            "mixed responsibilities, duplicated logic).\n"
+            "2. Address each listed hotspot with a concrete, minimal improvement.\n"
+            "3. Include at least one readability or maintainability observation.\n"
+            "4. Include at least one safety, error-handling, or edge-case observation.\n"
+            "5. If tests are present or missing, include one testing observation.\n"
+            "6. For every finding, explain briefly why it matters and propose the smallest change "
+            "that fixes it. Do not rewrite entire functions or classes.\n"
+            "7. Do not spend more than one sentence describing what the code already does; focus on "
+            "what should change and why.\n\n"
             f"{analysis.prompt_context}"
         )

@@ -1449,7 +1449,11 @@ class LocalAnswer:
             return (
                 "self_review",
                 self.config.self_review_max_tokens,
-                "- Provide a thorough, detailed code review with concrete, minimal improvements.",
+                "- Provide a thorough, broad, balanced code review covering architecture, "
+                "maintainability, readability, safety, and testability. Address every listed hotspot "
+                "explicitly. Do not fixate on a single issue or function. For each finding, explain "
+                "why it matters and propose the smallest concrete change that fixes it. Do not rewrite "
+                "entire files.",
             )
 
         # Phase 7: per-route token budgets from environment/config.
