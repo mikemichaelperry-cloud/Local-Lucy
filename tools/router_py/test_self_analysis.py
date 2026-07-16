@@ -755,3 +755,146 @@ def test_self_review_uses_code_review_generation_params():
     assert profile == "self_review"
     assert num_predict == 6000
     assert "thorough" in instruction.lower()
+
+
+@pytest.mark.asyncio
+async def test_self_review_payload_uses_code_review_generation_params(monkeypatch):
+    """The Ollama payload for SELF_REVIEW uses the configurable code-review params."""
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig()
+    config.model = "local-lucy-llama31"
+    config.code_review_temperature = 0.85
+    config.code_review_top_p = 0.91
+    config.code_review_top_k = 55
+    config.self_review_max_tokens = 4096
+
+    answer = LocalAnswer(config)
+    captured_payload = {}
+
+    class FakeResponse:
+        async def json(self):
+            return {"response": "mocked self-review"}
+
+        def raise_for_status(self):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+    class FakeSession:
+        def post(self, url, json):
+            captured_payload["url"] = url
+            captured_payload["json"] = json
+            return FakeResponse()
+
+    async def fake_get_session():
+        return FakeSession()
+
+    monkeypatch.setattr(answer, "_get_session", fake_get_session)
+
+    result = await answer.generate_answer(query="review sample.py", route_mode="SELF_REVIEW")
+
+    assert result.text == "mocked self-review"
+    options = captured_payload["json"]["options"]
+    assert options["temperature"] == config.code_review_temperature
+    assert options["top_p"] == config.code_review_top_p
+    assert options["top_k"] == config.code_review_top_k
+
+
+@pytest.mark.asyncio
+async def test_self_review_payload_defaults_to_exact_code_review_params(monkeypatch):
+    """Default code-review generation params reach the Ollama payload unchanged."""
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig()
+    config.model = "local-lucy-llama31"
+
+    answer = LocalAnswer(config)
+    captured_payload = {}
+
+    class FakeResponse:
+        async def json(self):
+            return {"response": "mocked self-review"}
+
+        def raise_for_status(self):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+    class FakeSession:
+        def post(self, url, json):
+            captured_payload["url"] = url
+            captured_payload["json"] = json
+            return FakeResponse()
+
+    async def fake_get_session():
+        return FakeSession()
+
+    monkeypatch.setattr(answer, "_get_session", fake_get_session)
+
+    result = await answer.generate_answer(query="review sample.py", route_mode="SELF_REVIEW")
+
+    assert result.text == "mocked self-review"
+    options = captured_payload["json"]["options"]
+    assert options["temperature"] == 1.0
+    assert options["top_p"] == 0.95
+    assert options["top_k"] == 64
+
+
+@pytest.mark.asyncio
+async def test_non_self_review_payload_does_not_use_code_review_params(monkeypatch):
+    """Non-SELF_REVIEW payloads use the standard params and do not include top_k."""
+    from router_py.local_answer import LocalAnswer, LocalAnswerConfig
+
+    config = LocalAnswerConfig()
+    config.model = "local-lucy-llama31"
+    config.temperature = 0.25
+    config.top_p = 0.75
+    config.code_review_temperature = 0.85
+    config.code_review_top_p = 0.91
+    config.code_review_top_k = 55
+    # Disable caching so this test always exercises _call_ollama.
+    config.cache_enabled = False
+
+    answer = LocalAnswer(config)
+    captured_payload = {}
+
+    class FakeResponse:
+        async def json(self):
+            return {"response": "mocked local answer"}
+
+        def raise_for_status(self):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+    class FakeSession:
+        def post(self, url, json):
+            captured_payload["url"] = url
+            captured_payload["json"] = json
+            return FakeResponse()
+
+    async def fake_get_session():
+        return FakeSession()
+
+    monkeypatch.setattr(answer, "_get_session", fake_get_session)
+
+    result = await answer.generate_answer(query="hello world", route_mode="LOCAL")
+
+    assert result.text == "mocked local answer"
+    options = captured_payload["json"]["options"]
+    assert options["temperature"] == config.temperature
+    assert options["top_p"] == config.top_p
+    assert "top_k" not in options
