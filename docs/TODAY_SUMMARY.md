@@ -1,4 +1,4 @@
-# Local Lucy V10 — Current State Summary (2026-06-16)
+# Local Lucy V10 — Current State Summary (2026-07-16)
 
 ## Architecture
 
@@ -28,6 +28,7 @@ Auto-feedback and router logs are telemetry-only and never mutate the model unsu
 | Auto-Feedback | `models/router/auto_feedback.py` | TELEMETRY ONLY |
 | Execution Engine | `tools/router_py/execution_engine.py` | STABLE — Python-native path |
 | Local LLM | `local-lucy-llama31` (llama3.1:8b) via Ollama | DEFAULT |
+| Self-Analysis Engine | `tools/router_py/self_analysis.py` | ACTIVE — large-file / large-response support added |
 | Web Adapter | `web_adapter/server.py` | OPTIONAL — disabled by default |
 
 ---
@@ -35,7 +36,7 @@ Auto-feedback and router logs are telemetry-only and never mutate the model unsu
 ## Test Suite
 
 ```
-942 passed, 19 skipped, 4 warnings, 177 subtests passed
+79 passed (tools/router_py/test_self_analysis.py + tools/router_py/test_local_answer.py)
 ```
 
 `make lint` passes (`ruff` + `mypy`).
@@ -48,6 +49,7 @@ Auto-feedback and router logs are telemetry-only and never mutate the model unsu
 - **Router:** MiniLM-L6-v2 embedding k-NN
 - **System:** Python 3.10.12, PySide6 HMI
 - **State:** XDG-compliant runtime under `~/.local/share/local-lucy`
+- **Self-review env vars:** `LUCY_SELF_REVIEW_MAX_TOKENS` (default 4096), `LUCY_SELF_REVIEW_CONTEXT_CHARS` (default 100000)
 
 ---
 
@@ -59,6 +61,7 @@ Auto-feedback and router logs are telemetry-only and never mutate the model unsu
 | High-stakes review | Medical/vet/finance/legal/conflicting feedback → `models/router/pending_review.jsonl` |
 | Evidence policy | `tools/router_py/policy.py` forces evidence routes for high-risk queries |
 | Web security | Loopback-only by default; auth required for LAN/Tailscale binds |
+| Self-analysis file safety | 5 MB read cap, directory rejection, path-traversal guard, TOCTOU-safe bounded read |
 
 ---
 
@@ -76,3 +79,4 @@ python3 background_learner.py --process
 - **GitHub:** `mikemichaelperry-cloud/Local-Lucy`
 - **Branch:** `v10-dev` (default)
 - **Latest tag:** `v10.0.0-beta.1`
+- **Latest commit:** `b3c84b5 docs: update SESSION_CONTEXT.md after self-analysis large-file support`
