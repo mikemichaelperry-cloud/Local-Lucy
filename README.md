@@ -39,14 +39,14 @@ The frozen V9 baseline is archived under the `local-lucy-v9-frozen-2026-05-28` r
 - Async state machine with timeout guards
 
 ### 🔒 Privacy & Local-First
-- **Primary LLM runs locally** via Ollama (`local-lucy-llama31`, llama3.1:8b, 8192-token context)
+- **Primary LLM runs locally** via Ollama (`local-lucy-llama31` backed by llama3.1:8b, 8192-token context; optional `local-lucy-gemma4` backed by gemma4:12b-it-qat)
 - **Optional cloud augmentation** (Kimi/OpenAI) for complex queries
 - **SQLite state management** with versioned schema migrations and `0o600` permissions
 - **XDG-compliant runtime paths** (`~/.local/share/local-lucy`) with legacy fallback
 - **Session memory** persists across restarts
 
 ### 📡 Live Data Integration
-- **LOCAL** — Default local LLM inference via Ollama
+- **LOCAL** — Default local LLM inference via Ollama (`local-lucy-llama31`; optional `local-lucy-gemma4`)
 - **AUGMENTED** — Wikipedia evidence + OpenAI/Kimi synthesis with evidence-backed answers
 - **EVIDENCE** — Medical/vet/finance/legal queries with trusted-source citations
 - **FINANCE** — Live FX, crypto, stock/index, and net-worth lookups with source citations
@@ -140,16 +140,17 @@ source ui-v10/.venv/bin/activate
 # Install dependencies
 pip install -r ui-v10/requirements.txt
 
-# Download the base models and create the custom variants
+# Download the base models and create the custom persona variants
 # Default: llama3.1:8b (~8.5 GB VRAM, 8192-token context, follows system prompts)
 ollama pull llama3.1:8b
 ollama create local-lucy-llama31 -f config/Modelfile.local-lucy-llama31
 
 # Optional: Gemma 4 reasoning/multimodal model
 ollama pull gemma4:12b-it-qat
+ollama create local-lucy-gemma4 -f config/Modelfile.local-lucy-gemma4
 
 # Optional: code-review specialist model for Engineering mode
-# (falls back to gemma4:12b-it-qat or the default local model if not installed)
+# (falls back to local-lucy-gemma4, then gemma4:12b-it-qat, then the default local model if not installed)
 
 # (Optional) Copy and configure API keys for cloud providers
 cp .env.example .env

@@ -26,7 +26,7 @@ _CAPABILITY_DEFAULTS: dict[str, str] = {
     "fast": "local-lucy-llama31",
     "memory": "local-lucy-llama31",
     "reasoning": "local-lucy-llama31",
-    "deep_thought": "gemma4:12b-it-qat",
+    "deep_thought": "local-lucy-gemma4",
     "coding": "local-lucy-llama31",
     "creative": "local-lucy-llama31",
 }
@@ -144,7 +144,7 @@ def _resolve_installed_tag(candidate: str, installed: set[str]) -> str | None:
     return None
 
 
-_ALLOWED_PERSONA_BASES: frozenset[str] = frozenset({"local-lucy-llama31", "gemma4:12b-it-qat"})
+_ALLOWED_PERSONA_BASES: frozenset[str] = frozenset({"local-lucy-llama31", "local-lucy-gemma4"})
 
 
 def _resolve_persona_model(base_model: str, persona: str, available: set[str]) -> str:
@@ -199,7 +199,7 @@ def _available_models(preferred: list[str] | None = None) -> set[str]:
     # Fallback static list for environments where ollama is not reachable.
     return {
         "local-lucy-llama31",
-        "gemma4:12b-it-qat",
+        "local-lucy-gemma4",
     }
 
 
@@ -305,7 +305,7 @@ _CREATIVE_RE = re.compile(
 # estimates, not hard timeouts.
 _LATENCY_BUDGETS_MS: dict[str, int] = {
     "local-lucy-llama31": 5000,
-    "gemma4:12b-it-qat": 12000,
+    "local-lucy-gemma4": 12000,
 }
 
 
@@ -368,10 +368,10 @@ def _competing_model(recommended: str, installed: set[str]) -> str:
     """Pick a sensible competing model for shadow A/B comparisons."""
     base = _base_name(recommended)
     candidates: list[str]
-    if base == "gemma4:12b-it-qat":
+    if base == "local-lucy-gemma4":
         candidates = ["local-lucy-llama31"]
     else:
-        candidates = ["gemma4:12b-it-qat"]
+        candidates = ["local-lucy-gemma4"]
 
     for cand in candidates:
         resolved = _resolve_installed_tag(cand, installed)
@@ -423,7 +423,7 @@ def select_model(
     reason: str
 
     if bucket == "deep_thought":
-        recommended = _resolve_installed_tag("gemma4:12b-it-qat", installed) or "gemma4:12b-it-qat"
+        recommended = _resolve_installed_tag("local-lucy-gemma4", installed) or "local-lucy-gemma4"
         reason = "Deep-thought pattern; using Gemma 4"
     elif route_name in _FACTUAL_ROUTES:
         recommended = (

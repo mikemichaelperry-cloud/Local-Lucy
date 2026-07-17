@@ -28,7 +28,9 @@ class CodeReviewModelResolver:
         installed = self._list_installed_models()
         specialist = self.config.code_review_model
         default = self.config.model
-        stock = "gemma4:12b-it-qat"
+        # Prefer the persona-tuned Gemma 4 model; fall back to the raw base tag
+        # so code review still works if only the base model has been pulled.
+        stock_candidates = ["local-lucy-gemma4", "gemma4:12b-it-qat"]
 
         if self.config.code_review_specialist_enabled:
             if specialist and specialist in installed:
@@ -40,13 +42,15 @@ class CodeReviewModelResolver:
                     "falling back to stock Gemma 4"
                 )
 
-            if stock in installed:
+            stock = next((m for m in stock_candidates if m in installed), None)
+            if stock:
                 return stock, "specialist_model_not_installed"
 
             if default and default in installed:
                 return default, "stock_gemma4_not_installed"
         else:
-            if stock in installed:
+            stock = next((m for m in stock_candidates if m in installed), None)
+            if stock:
                 return stock, "specialist_disabled"
             if default and default in installed:
                 return default, "specialist_disabled"
@@ -58,7 +62,7 @@ class CodeReviewModelResolver:
                     None,
                     [
                         specialist if self.config.code_review_specialist_enabled else None,
-                        stock,
+                        *stock_candidates,
                         default,
                     ],
                 )
@@ -66,7 +70,7 @@ class CodeReviewModelResolver:
         )
         raise RuntimeError(
             "No code-review model available. Install one of: "
-            f"{specialist or ''}, {stock}, {default or ''}"
+            f"{specialist or ''}, {', '.join(stock_candidates)}, {default or ''}"
         )
 
     def _list_installed_models(self) -> list[str]:

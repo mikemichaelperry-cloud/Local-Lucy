@@ -1,43 +1,36 @@
-# Local Lucy Supported Entry Surfaces
+# Local Lucy V11 — Supported Entry Surfaces
 
-This file declares the operator-facing entry surfaces for the active `opt-experimental-v7-dev` snapshot.
+This file declares the operator-facing entry surfaces for the active V11 runtime.
 
 ## Supported Current Surfaces
 
-### HMI
-- Path: `/home/mike/lucy/ui-v7/app/main.py`
-- Preferred launcher: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/start_local_lucy_hmi_opt_experimental_v7_dev.sh`
-- Desktop surface: `/home/mike/Desktop/Local Lucy HMI v7.desktop`
+### Desktop HMI (primary)
+- Source: `ui-v10/`
+- Main entry: `ui-v10/app/main.py`
+- Desktop shortcut: `START_LUCY.sh`
+- Runtime bridge: `ui-v10/app/services/runtime_bridge.py`
 
-### Terminal Authority
-- Path: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/start_local_lucy_opt_experimental_v7_dev.sh`
-- Use this as the terminal authority path for current v7 workflows.
+### Terminal / CLI
+- Main entry: `lucy_chat.sh`
+- Runtime control: `tools/runtime_control.py`
+- Runtime request: `tools/runtime_request.py`
 
-### Codex Preprocess Wrapper
-- Path: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/start_local_lucy_opt_experimental_v7_dev_codex_preprocess.sh`
-- Specialized wrapper for local preprocessing before Codex work.
-- Not the default operator path.
+### Web Adapter (optional)
+- Source: `web_adapter/`
+- Enable with: `LUCY_WEB_ENABLED=1 python -m web_adapter`
+- Default bind: `127.0.0.1:8765`
 
 ### Voice / PTT
-- Path: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/lucy_voice_ptt.sh`
+- Source: `tools/voice/`
+- Workers: `tools/voice/whisper_worker.py`, `tools/voice/kokoro_session_worker.py`
 
-### Handoff Write / Resume
-- Write: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/write_local_lucy_handoff.sh`
-- Resume: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/resume_local_lucy_from_handoff.sh`
-
-## Backend / Authority Review
+## Backend / Authority
 
 - Active authority chain:
-  - Terminal launcher: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/start_local_lucy_opt_experimental_v7_dev.sh`
-  - HMI bridge: `/home/mike/lucy/ui-v7/app/services/runtime_bridge.py`
-  - Submit endpoint: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/runtime_request.py`
-  - Backend executable: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/lucy_chat.sh`
-  - Governed manifest source: `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/router/core/route_manifest.py`
-  - Manifest is consumed through `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/router/plan_to_pipeline.py` and enforced by `/home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/router/execute_plan.sh`
-- Default runtime authority is snapshot-local.
-- Default runtime namespace is version-local: `~/.codex-api-home/lucy/runtime-v7`
-- Explicit non-default authority override for launcher/request/voice test seams: `LUCY_RUNTIME_AUTHORITY_ROOT=/abs/path`
-- Operator inspection command:
-```bash
-python3 /home/mike/lucy/snapshots/opt-experimental-v7-dev/tools/diag/print_runtime_authority_chain.py
-```
+  - Launcher: `START_LUCY.sh` / `lucy_chat.sh`
+  - Core pipeline: `tools/router_py/main.py::run(...)`
+  - Router: `tools/router_py/classify.py`, `tools/router_py/policy_router.py`
+  - Execution engine: `tools/router_py/execution_engine.py`
+  - State/runtime control: `tools/runtime_control.py`
+- Default runtime namespace: `~/.codex-api-home/lucy/runtime-v10`
+- Authority override: `LUCY_RUNTIME_AUTHORITY_ROOT=/abs/path`

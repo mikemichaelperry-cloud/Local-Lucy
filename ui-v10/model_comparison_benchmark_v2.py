@@ -8,7 +8,7 @@ performance.
 
 Models tested:
   - local-lucy-llama31 (llama3.1 8B, default)
-  - gemma4:12b-it-qat  (gemma4 12B reasoning/multimodal)
+  - local-lucy-gemma4  (gemma4 12B reasoning)
 """
 
 import argparse
@@ -42,7 +42,7 @@ REPORT_FILE = (
 MODELS = [
     ("auto", "automatic selector (Llama/Gemma per query)"),
     ("local-lucy-llama31", "llama3.1 8B default"),
-    ("gemma4:12b-it-qat", "gemma4 12B reasoning/multimodal"),
+    ("local-lucy-gemma4", "gemma4 12B reasoning"),
 ]
 
 PROMPTS = [

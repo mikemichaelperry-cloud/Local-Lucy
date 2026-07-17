@@ -23,12 +23,6 @@ from router_py.logging_config import get_logger
 from router_py.request_types import ClassificationResult, RoutingDecision
 from router_py.policy_router import PolicyDecision, PolicyRouter
 
-# Add router/core to path for intent_classifier
-ROOT_DIR = Path(__file__).resolve().parent.parent
-CORE_DIR = ROOT_DIR / "router" / "core"
-if str(CORE_DIR) not in sys.path:
-    sys.path.insert(0, str(CORE_DIR))
-
 # Feedback-buffer cache for short-query guard (Phase 3D)
 _FEEDBACK_BUF_CACHE: dict | None = None
 _FEEDBACK_BUF_MTIME: float = 0.0
@@ -129,9 +123,9 @@ def _load_feedback_buffer(path: Path) -> dict:
         return {}
 
 
-# Import from existing classifier
+# Import canonical classifier from the router_py core package.
 try:
-    from intent_classifier import classify_question
+    from router_py.core.intent_classifier import classify_question
 except ImportError:
     # Fallback for testing without full classifier
     classify_question = None

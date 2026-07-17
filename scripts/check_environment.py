@@ -78,7 +78,7 @@ def check_ollama() -> bool:
 def check_models() -> bool:
     print("[4/8] Required models")
     required = ["local-lucy-llama31"]
-    recommended = ["gemma4:12b-it-qat"]
+    recommended = ["local-lucy-gemma4"]
     ok = True
 
     try:
@@ -114,7 +114,11 @@ def check_models() -> bool:
         if model in installed_set:
             _ok(f"optional model '{model}' installed")
         else:
-            _warn(f"optional model '{model}' not found", f"Pull it:  ollama pull {model}")
+            if model.startswith("local-lucy-"):
+                hint = f"Create it:  ollama create {model} -f config/Modelfile.{model}"
+            else:
+                hint = f"Pull it:  ollama pull {model}"
+            _warn(f"optional model '{model}' not found", hint)
 
     return ok
 

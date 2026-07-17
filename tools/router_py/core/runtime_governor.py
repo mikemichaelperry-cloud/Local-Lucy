@@ -12,7 +12,7 @@ EVIDENCE/NEWS and is limited to unverified-context execution tools.
 
 from typing import Any, Dict, List, Optional
 
-from local_policy import match_local_response_id
+from .local_policy import match_local_response_id
 
 CONTRACT_VERSION = "current"
 

@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REAL_ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
+export PYTHONPATH="${REAL_ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 BUILD_PACK="${REAL_ROOT}/tools/build_evidence_pack.sh"
 
 ok(){ echo "OK: $*"; }
@@ -20,7 +21,6 @@ OUT_DIR="${TMPD}/out"
 PROFILE_FILE="${TMPD}/latency.tsv"
 
 mkdir -p "${FAKE_ROOT}/tools/router" "${STATE_DIR}" "${CACHE_DIR}"
-cp "${REAL_ROOT}/tools/router/latency_profile.sh" "${FAKE_ROOT}/tools/router/latency_profile.sh"
 
 cat > "${STATE_DIR}/evidence_session_parallel.json" <<'EOF'
 {"session_id":"parallel","keys":["alpha","beta","gamma"]}

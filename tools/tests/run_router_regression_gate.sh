@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export PYTHONPATH="${REAL_ROOT:-${LUCY_ROOT:-.}}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 # DEPRECATED: This regression gate validates the legacy shell-based router
 # pipeline's manifest output (tools/router/execute_plan.sh), which is no
 # longer the authoritative routing path. The Python-native router

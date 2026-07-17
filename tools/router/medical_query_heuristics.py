@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 import argparse
+import sys
+from pathlib import Path
 
-from core.medical_query_heuristics import (
+TOOLS_DIR = Path(__file__).resolve().parent.parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from router_py.core.medical_query_heuristics import (
     detect_human_medication_query,
     has_human_medication_topic_query,
     is_human_medication_high_risk_query,

@@ -2,9 +2,12 @@
 import re
 from typing import Dict, List, Optional
 
-from input_normalizer import normalize_input
-from medical_query_heuristics import detect_human_medication_query, has_human_medication_topic_query
-from routing_signals import (
+from .input_normalizer import normalize_input
+from .medical_query_heuristics import (
+    detect_human_medication_query,
+    has_human_medication_topic_query,
+)
+from .routing_signals import (
     build_common_signal_flags,
     has_conflict_term,
     has_news_term,

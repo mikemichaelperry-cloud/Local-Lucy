@@ -5,7 +5,7 @@ import shlex
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
-from medical_query_heuristics import detect_human_medication_query, normalize_for_medical_match
+from .medical_query_heuristics import detect_human_medication_query, normalize_for_medical_match
 
 TRUSTED_MEDICAL_DOMAINS = {
     "medlineplus.gov",

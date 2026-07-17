@@ -383,8 +383,8 @@ class RuntimeBridge:
                 available=available,
                 allowed_values=(
                     "auto",
-                    "gemma4:12b-it-qat",
                     "local-lucy-llama31",
+                    "local-lucy-gemma4",
                 ),
                 reason=reason,
             ),

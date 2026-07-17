@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REAL_ROOT="${LUCY_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)}"
+export PYTHONPATH="${REAL_ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 LUCY_CHAT="${REAL_ROOT}/lucy_chat.sh"
 
 ok(){ echo "OK: $*"; }
@@ -15,7 +16,7 @@ TMPD="$(mktemp -d)"
 trap 'rm -rf "${TMPD}"' EXIT
 FAKE_ROOT="${TMPD}/root"
 mkdir -p \
-  "${FAKE_ROOT}/tools/router/core" \
+  "${FAKE_ROOT}/tools/router_py/core" \
   "${FAKE_ROOT}/config/trust/generated" \
   "${FAKE_ROOT}/state" \
   "${FAKE_ROOT}/evidence" \
@@ -36,8 +37,8 @@ cp "${REAL_ROOT}/tools/build_evidence_pack.sh" "${FAKE_ROOT}/tools/build_evidenc
 cp "${REAL_ROOT}/tools/fetch_key.sh" "${FAKE_ROOT}/tools/fetch_key.sh"
 cp "${REAL_ROOT}/tools/router/medical_query_heuristics.py" "${FAKE_ROOT}/tools/router/medical_query_heuristics.py"
 cp "${REAL_ROOT}/tools/router/extract_medical_fact.py" "${FAKE_ROOT}/tools/router/extract_medical_fact.py"
-cp "${REAL_ROOT}/tools/router/core/medical_query_heuristics.py" "${FAKE_ROOT}/tools/router/core/medical_query_heuristics.py"
-cp "${REAL_ROOT}/tools/router/core/medical_fact_extractor.py" "${FAKE_ROOT}/tools/router/core/medical_fact_extractor.py"
+cp "${REAL_ROOT}/tools/router_py/core/medical_query_heuristics.py" "${FAKE_ROOT}/tools/router_py/core/medical_query_heuristics.py"
+cp "${REAL_ROOT}/tools/router_py/core/medical_fact_extractor.py" "${FAKE_ROOT}/tools/router_py/core/medical_fact_extractor.py"
 
 cat > "${FAKE_ROOT}/tools/fetch_url_allowlisted.sh" <<'SH'
 #!/usr/bin/env bash

@@ -4,7 +4,10 @@ import re
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-from medical_query_heuristics import detect_human_medication_query, has_human_medication_topic_query
+from .medical_query_heuristics import (
+    detect_human_medication_query,
+    has_human_medication_topic_query,
+)
 
 
 def _norm_text(value: str) -> str:

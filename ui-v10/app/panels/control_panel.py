@@ -50,7 +50,7 @@ class ControlPanel(QFrame):
     _MODEL_LABELS: dict[str, str] = {
         "auto": "Auto (Lucy chooses per query)",
         "local-lucy-llama31": "local-lucy-llama31 (llama3.1 8B)",
-        "gemma4:12b-it-qat": "gemma4:12b-it-qat (gemma4 12B reasoning/multimodal)",
+        "local-lucy-gemma4": "local-lucy-gemma4 (gemma4 12B reasoning)",
     }
 
     def __init__(self, current_state: dict[str, Any] | None = None) -> None:
@@ -1031,7 +1031,10 @@ class ControlPanel(QFrame):
         )
 
     def _update_gemma4_smart_routing_visibility(self, model: str) -> None:
-        is_gemma = bool(model) and model.lower().startswith("gemma4")
+        name = model.lower() if model else ""
+        is_gemma = bool(name) and (
+            name.startswith("gemma4") or name.startswith("local-lucy-gemma4")
+        )
         self._gemma4_smart_routing_selector.setEnabled(is_gemma)
         if not is_gemma:
             self._gemma4_vram_warning_label.setText("")

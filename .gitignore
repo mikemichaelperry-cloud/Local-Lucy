@@ -54,6 +54,7 @@ models/router/*.processed
 models/router/*.log
 models/router/v2_evaluation.txt
 models/router/.learner_lock
+models/router/.learner_disable
 models/router/checkpoints/
 models/router/data/
 models/router/__pycache__/

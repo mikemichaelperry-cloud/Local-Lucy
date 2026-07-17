@@ -118,9 +118,9 @@ def test_query_bucket_classification():
 def test_deep_thought_query_selects_heavy_model():
     model = select_local_model(
         "Provide a deep analysis of the philosophical implications of free will.",
-        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
+        available=["local-lucy-llama31", "local-lucy-gemma4"],
     )
-    assert model == "gemma4:12b-it-qat"
+    assert model == "local-lucy-gemma4"
 
 
 def test_deep_thought_bucket_classification():
@@ -154,10 +154,10 @@ def test_coding_base_name_matches_latest_tag():
 def test_select_model_general_defaults_to_llama31():
     rec = select_model(
         "What is the capital of France?",
-        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
+        available=["local-lucy-llama31", "local-lucy-gemma4"],
     )
     assert rec["recommended"] == "local-lucy-llama31"
-    assert rec["competing"] == "gemma4:12b-it-qat"
+    assert rec["competing"] == "local-lucy-gemma4"
     assert rec["confidence"] > 0.7
     assert "latency_budget_ms" in rec
 
@@ -176,10 +176,10 @@ def test_select_model_factual_route_uses_llama31():
 def test_select_model_coding_uses_llama31():
     rec = select_model(
         "Write a Python function to reverse a string.",
-        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
+        available=["local-lucy-llama31", "local-lucy-gemma4"],
     )
     assert rec["recommended"] == "local-lucy-llama31"
-    assert rec["competing"] == "gemma4:12b-it-qat"
+    assert rec["competing"] == "local-lucy-gemma4"
 
 
 def test_select_model_coding_falls_back_without_gemma4():
@@ -194,9 +194,9 @@ def test_select_model_coding_falls_back_without_gemma4():
 def test_select_model_deep_thought_prefers_gemma4():
     rec = select_model(
         "Provide a deep analysis of free will.",
-        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
+        available=["local-lucy-llama31", "local-lucy-gemma4"],
     )
-    assert rec["recommended"] == "gemma4:12b-it-qat"
+    assert rec["recommended"] == "local-lucy-gemma4"
 
 
 def test_select_model_deep_thought_recommends_gemma4_regardless_of_available():
@@ -204,7 +204,7 @@ def test_select_model_deep_thought_recommends_gemma4_regardless_of_available():
         "Provide a deep analysis of free will.",
         available=["local-lucy-llama31"],
     )
-    assert rec["recommended"] == "gemma4:12b-it-qat"
+    assert rec["recommended"] == "local-lucy-gemma4"
 
 
 def test_select_model_memory_uses_llama31():
@@ -251,8 +251,8 @@ def test_is_auto_model_detects_auto():
 def test_generate_ab_pair_returns_recommended_and_competing():
     model_a, model_b = generate_ab_pair(
         "What is the capital of France?",
-        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
+        available=["local-lucy-llama31", "local-lucy-gemma4"],
     )
     assert model_a == "local-lucy-llama31"
-    assert model_b == "gemma4:12b-it-qat"
+    assert model_b == "local-lucy-gemma4"
     assert model_a != model_b

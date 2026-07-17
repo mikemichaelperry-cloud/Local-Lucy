@@ -19,6 +19,7 @@ exit 0
 : <<'PRESERVED'
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
+export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 CLASSIFIER="${ROOT}/tools/router/classify_intent.py"
 MAPPER="${ROOT}/tools/router/plan_to_pipeline.py"
 

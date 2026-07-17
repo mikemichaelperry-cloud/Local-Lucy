@@ -4,7 +4,7 @@ Model Comparison Benchmark: Llama 3.1 vs Gemma 4
 
 Tests LOCAL-route text latency across the allowed model configurations:
   - local-lucy-llama31 (llama3.1 8B, default)
-  - gemma4:12b-it-qat  (gemma4 12B reasoning/multimodal)
+  - local-lucy-gemma4  (gemma4 12B reasoning)
 
 Measures:
   - Time-to-completion (TTC) per prompt
@@ -47,7 +47,7 @@ REPORT_FILE = (
 MODELS = [
     ("auto", "automatic selector (Llama/Gemma per query)"),
     ("local-lucy-llama31", "llama3.1 8B default"),
-    ("gemma4:12b-it-qat", "gemma4 12B reasoning/multimodal"),
+    ("local-lucy-gemma4", "gemma4 12B reasoning"),
 ]
 
 PROMPTS = [

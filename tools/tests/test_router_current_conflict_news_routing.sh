@@ -3,8 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
+export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 CLASSIFIER="${ROOT}/tools/router/classify_intent.py"
-CONTEXTUAL="${ROOT}/tools/router/core/contextual_policy.py"
+CONTEXTUAL="${ROOT}/tools/router_py/core/contextual_policy.py"
 
 ok(){ echo "OK: $*"; }
 die(){ echo "FAIL: $*" >&2; exit 1; }

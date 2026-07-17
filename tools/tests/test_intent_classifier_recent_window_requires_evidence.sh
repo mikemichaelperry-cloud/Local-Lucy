@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${LUCY_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)}"
+export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 CLASSIFIER="${ROOT}/tools/router/classify_intent.py"
 
 ok(){ echo "OK: $*"; }

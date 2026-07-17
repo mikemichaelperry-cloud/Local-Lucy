@@ -22,6 +22,7 @@ from router_py.request_pipeline import (
 def test_is_gemma4_smart_routing_enabled_only_for_gemma4():
     with patch.dict(os.environ, {"LUCY_GEMMA4_SMART_ROUTING": "on"}, clear=False):
         assert _is_gemma4_smart_routing_enabled("gemma4:12b-it-qat") is True
+        assert _is_gemma4_smart_routing_enabled("local-lucy-gemma4") is True
         assert _is_gemma4_smart_routing_enabled("local-lucy-llama31") is False
         assert _is_gemma4_smart_routing_enabled("") is False
 
@@ -29,6 +30,7 @@ def test_is_gemma4_smart_routing_enabled_only_for_gemma4():
 def test_is_gemma4_smart_routing_disabled_by_default():
     with patch.dict(os.environ, {}, clear=True):
         assert _is_gemma4_smart_routing_enabled("gemma4:12b-it-qat") is False
+        assert _is_gemma4_smart_routing_enabled("local-lucy-gemma4") is False
 
 
 def test_gemma4_bypass_decision_is_local():

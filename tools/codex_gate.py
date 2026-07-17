@@ -569,7 +569,7 @@ def infer_patch_surface(
         # No old version references - v8 is self-contained
     ]
     if "router" not in lower_task:
-        avoid_files.append("tools/router/")
+        avoid_files.append("tools/router_py/")
     if "governor" not in lower_task:
         avoid_files.append("tools/governor/")
 
@@ -604,10 +604,10 @@ def infer_validation_plan(patch_surface: dict[str, object]) -> list[str]:
     ]
     commands: list[str] = []
     if any(
-        item.startswith("tools/router/") or "route_manifest" in item or "execute_plan" in item
+        item.startswith("tools/router_py/") or "route_manifest" in item or "execute_plan" in item
         for item in files
     ):
-        commands.append("bash tools/router_regression.sh")
+        commands.append("bash tools/tests/run_router_regression_gate.sh")
     if any(
         item.endswith("tools/codex_gate.py") or item.endswith("tools/codex_gate.sh")
         for item in files

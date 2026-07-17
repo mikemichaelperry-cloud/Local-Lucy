@@ -12,7 +12,7 @@ usage() {
 Usage: tools/sha_manifest.sh [--ui-v10] [regen|check|list]
 
   --ui-v10  Target ui-v10/SHA256SUMS.clean instead of the root manifest
-  regen    Regenerate SHA256SUMS.clean for clean source/config/runtime files
+  regen    Regenerate SHA256SUMS.clean for clean source/config files
   check    Verify SHA256SUMS.clean
   list     Print tracked file list
 EOF
@@ -29,30 +29,24 @@ collect_files() {
 _collect_root_files() {
   (
     cd "$ROOT"
+    # Source, configuration, and project-metadata directories.
     find \
       ./config \
       ./tools \
-      ./runtime \
-      ./lucy_chat.sh \
+      ./scripts \
+      ./data \
+      ./models \
+      ./web_adapter \
+      ./tests \
+      ./.github \
       -type f \
-      ! -path "./logs/*" \
-      ! -path "./out/*" \
-      ! -path "./dev_notes/*" \
-      ! -path "./build/*" \
       ! -path "./tools/tmp/*" \
       ! -path "./tools/tests/governor_migration/artifacts/*" \
-      ! -path "./vendor/*" \
-      ! -path "./runtime/voice/piper-venv/*" \
-      ! -path "./runtime/voice/models/*" \
-      ! -path "./runtime/voice/whisper.cpp/models/*" \
-      ! -path "./config/trusted_domains_tests.yaml" \
-      ! -path "./config/url_map_tests_tmp.yaml" \
-      ! -path "./runtime/state.json" \
-      ! -path "./runtime/Modelfile.local-lucy-mem.generated" \
+      ! -path "./models/router/.venv/*" \
+      ! -path "./models/router/__pycache__/*" \
       ! -path "*/build/*" \
       ! -path "*/vendor/*" \
       ! -path "*/.git/*" \
-      ! -path "*/.github/*" \
       ! -path "*/.devops/*" \
       ! -path "*/.idea/*" \
       ! -path "*/.venv/*" \
@@ -69,11 +63,15 @@ _collect_root_files() {
       ! -name "SHA256SUMS" \
       ! -name "SHA256SUMS.txt" \
       ! -name "CHECKSUMS_SHA256.txt" \
-      -print0 \
-      | sort -z \
-      | xargs -0 -n1 printf '%s\n' \
-      | sed 's#^\.\/##'
-  )
+      -print0
+    # Top-level project files.
+    find . -maxdepth 1 -type f \
+      \( -name "lucy_chat.sh" -o -name "README.md" -o -name "ARCHITECTURE.md" -o -name "pyproject.toml" -o -name "Makefile" -o -name "CONTRIBUTING.md" -o -name "LICENSE" \) \
+      -print0
+  ) \
+    | sort -z \
+    | xargs -0 -n1 printf '%s\n' \
+    | sed 's#^\.\/##'
 }
 
 _collect_ui_v10_files() {

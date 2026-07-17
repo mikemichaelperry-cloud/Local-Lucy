@@ -5,8 +5,16 @@ import json
 import os
 import socket
 import sys
+import warnings
 from pathlib import Path
 from typing import Any, Mapping
+
+# Suppress noisy torch/cuda packaging warnings that Kokoro cannot control.
+warnings.filterwarnings(
+    "ignore",
+    message="The pynvml package is deprecated",
+    category=FutureWarning,
+)
 
 # Maximise PyTorch CPU parallelism on multi-core systems (e.g. Ryzen 5600X 12T).
 # Kokoro synthesis is CPU-bound; using all threads cuts latency ~35%.

@@ -5,11 +5,12 @@ import sys
 from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
-CORE_DIR = THIS_DIR / "core"
-if str(CORE_DIR) not in sys.path:
-    sys.path.insert(0, str(CORE_DIR))
+# Import canonical router core from router_py (single source of truth)
+TOOLS_DIR = THIS_DIR.parent.parent / "tools"
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
 
-from intent_classifier import classify_question
+from router_py.core.intent_classifier import classify_question
 
 
 def main() -> int:

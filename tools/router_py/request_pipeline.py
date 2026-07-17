@@ -72,7 +72,10 @@ _EVIDENCE_RE = re.compile(r"\b(research|study|evidence|paper|source|according to
 
 def _is_gemma4_smart_routing_enabled(model: str) -> bool:
     """Return True if Gemma 4 smart routing is enabled for the given model."""
-    if not model or not model.lower().startswith("gemma4"):
+    if not model:
+        return False
+    name = model.lower()
+    if not (name.startswith("gemma4") or name.startswith("local-lucy-gemma4")):
         return False
     return os.environ.get("LUCY_GEMMA4_SMART_ROUTING", "").lower() in ("1", "true", "on")
 

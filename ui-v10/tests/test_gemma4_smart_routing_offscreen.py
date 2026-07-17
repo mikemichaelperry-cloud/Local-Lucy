@@ -52,7 +52,7 @@ def test_gemma4_smart_routing_checkbox_enabled_for_gemma4():
             "Augmented Provider": "wikipedia",
             "Learner": "on",
         },
-        current_state={"model": "gemma4:12b-it-qat", "gemma4_smart_routing": "off"},
+        current_state={"model": "local-lucy-gemma4", "gemma4_smart_routing": "off"},
     )
     app.processEvents()
     assert panel._gemma4_smart_routing_selector.isEnabled()
@@ -95,7 +95,7 @@ def test_gemma4_smart_routing_toggle_emits_signal():
             "Augmented Provider": "wikipedia",
             "Learner": "on",
         },
-        current_state={"model": "gemma4:12b-it-qat", "gemma4_smart_routing": "off"},
+        current_state={"model": "local-lucy-gemma4", "gemma4_smart_routing": "off"},
     )
     app.processEvents()
 
@@ -124,7 +124,7 @@ def test_engineering_panel_uses_vertical_scroll_only():
             "Augmented Provider": "wikipedia",
             "Learner": "on",
         },
-        current_state={"model": "gemma4:12b-it-qat", "gemma4_smart_routing": "on"},
+        current_state={"model": "local-lucy-gemma4", "gemma4_smart_routing": "on"},
     )
     panel.resize(320, 600)
     app.processEvents()
@@ -146,7 +146,7 @@ def test_gemma4_smart_routing_update_does_not_emit_signal():
             "Augmented Provider": "wikipedia",
             "Learner": "on",
         },
-        current_state={"model": "gemma4:12b-it-qat", "gemma4_smart_routing": "on"},
+        current_state={"model": "local-lucy-gemma4", "gemma4_smart_routing": "on"},
     )
     app.processEvents()
 
@@ -190,7 +190,7 @@ def test_engineering_selectors_fit_inside_viewport():
             "Augmented Provider": "wikipedia",
             "Learner": "on",
         },
-        current_state={"model": "gemma4:12b-it-qat", "gemma4_smart_routing": "on"},
+        current_state={"model": "local-lucy-gemma4", "gemma4_smart_routing": "on"},
     )
 
     window = QWidget()

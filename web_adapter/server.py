@@ -56,7 +56,7 @@ DEFAULT_MAX_QUESTION = 4000
 SUPPORTED_MODELS = frozenset(
     {
         "local-lucy-llama31",
-        "gemma4:12b-it-qat",
+        "local-lucy-gemma4",
     }
 )
 

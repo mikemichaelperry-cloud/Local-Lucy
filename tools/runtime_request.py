@@ -83,11 +83,9 @@ SELF_REVIEW_STOPWORDS = {
 }
 SELF_REVIEW_DEFAULT_BASENAMES = (
     "runtime_request.py",
-    "execute_plan.sh",
     "main_window.py",
     "runtime_bridge.py",
     "conversation_panel.py",
-    "policy_engine.py",
     "route_manifest.py",
     "runtime_governor.py",
 )
@@ -99,8 +97,6 @@ SELF_REVIEW_TOPIC_BASENAMES = (
     (
         {"route", "router", "routing", "manifest", "governor", "provider", "augmented", "evidence"},
         (
-            "execute_plan.sh",
-            "policy_engine.py",
             "route_manifest.py",
             "runtime_governor.py",
             "runtime_request.py",

@@ -20,23 +20,21 @@ MODULE_IMPORT_START = time.perf_counter()
 
 THIS_DIR = Path(__file__).resolve().parent
 AUTHORITY_ROOT_ENV = "LUCY_RUNTIME_AUTHORITY_ROOT"
-CORE_DIR = THIS_DIR / "core"
-if str(CORE_DIR) not in sys.path:
-    sys.path.insert(0, str(CORE_DIR))
-if str(THIS_DIR) not in sys.path:
-    sys.path.insert(0, str(THIS_DIR))
+TOOLS_DIR = THIS_DIR.parent.parent / "tools"
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
 
-from contextual_policy import resolve_contextual_followup
-from intent_classifier import _legacy_plan_from_classification, classify_question
-from local_context_policy import resolve_local_context_response
-from local_policy import match_local_response_id
-from medical_query_heuristics import detect_human_medication_query
-from pet_food_policy import resolve_pet_food_policy
-from policy_router import route_intent
-from route_manifest import build_route_manifest
-from routing_signals import should_use_israel_news_region
-from runtime_governor import build_execution_contract
-from semantic_interpreter import maybe_interpret_question
+from router_py.core.contextual_policy import resolve_contextual_followup
+from router_py.core.intent_classifier import _legacy_plan_from_classification, classify_question
+from router_py.core.local_context_policy import resolve_local_context_response
+from router_py.core.local_policy import match_local_response_id
+from router_py.core.medical_query_heuristics import detect_human_medication_query
+from router_py.core.pet_food_policy import resolve_pet_food_policy
+from router_py.core.policy_router import route_intent
+from router_py.core.route_manifest import build_route_manifest
+from router_py.core.routing_signals import should_use_israel_news_region
+from router_py.core.runtime_governor import build_execution_contract
+from router_py.core.semantic_interpreter import maybe_interpret_question
 
 
 def _append_latency(stage: str, ms: int, component: str = "plan_to_pipeline") -> None:

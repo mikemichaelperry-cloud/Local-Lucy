@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
+export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 EXTRACTOR="${ROOT}/tools/router/extract_validated.py"
 
 ok(){ echo "OK: $*"; }

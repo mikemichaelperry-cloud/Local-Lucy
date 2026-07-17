@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REAL_ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
+export PYTHONPATH="${REAL_ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 LUCY_CHAT="${REAL_ROOT}/lucy_chat.sh"
 
 ok(){ echo "OK: $*"; }
@@ -13,12 +14,11 @@ die(){ echo "FAIL: $*" >&2; exit 1; }
 TMPD="$(mktemp -d)"
 trap 'rm -rf "${TMPD}"' EXIT
 FAKE_ROOT="${TMPD}/root"
-mkdir -p "${FAKE_ROOT}/tools" "${FAKE_ROOT}/tools/router/core" "${FAKE_ROOT}/config" "${FAKE_ROOT}/state" "${FAKE_ROOT}/evidence" "${FAKE_ROOT}/cache/evidence"
+mkdir -p "${FAKE_ROOT}/tools" "${FAKE_ROOT}/tools/router_py/core" "${FAKE_ROOT}/config" "${FAKE_ROOT}/state" "${FAKE_ROOT}/evidence" "${FAKE_ROOT}/cache/evidence"
 
 cp "${REAL_ROOT}/tools/router/classify_intent.py" "${FAKE_ROOT}/tools/router/classify_intent.py"
 cp "${REAL_ROOT}/tools/router/plan_to_pipeline.py" "${FAKE_ROOT}/tools/router/plan_to_pipeline.py"
-cp "${REAL_ROOT}/tools/router/policy_engine.py" "${FAKE_ROOT}/tools/router/policy_engine.py"
-cp "${REAL_ROOT}/tools/router/core/"*.py "${FAKE_ROOT}/tools/router/core/"
+cp "${REAL_ROOT}/tools/router_py/core/"*.py "${FAKE_ROOT}/tools/router_py/core/"
 
 cat > "${FAKE_ROOT}/config/evidence_keys_allowlist.txt" <<'EOF'
 news_israel_1

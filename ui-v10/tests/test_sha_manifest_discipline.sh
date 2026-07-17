@@ -21,7 +21,7 @@ ok "SHA256SUMS mirror is byte-identical to SHA256SUMS.clean"
 ok "sha manifest check passes"
 
 tracked_files="$("${COLLECTOR}" list)"
-manifest_files="$(cut -d' ' -f3- "${MANIFEST_CLEAN}" | python3 -c 'import sys; [print(line.rstrip("\n").lstrip("\\").lstrip("./")) for line in sys.stdin]')"
+manifest_files="$(cut -d' ' -f3- "${MANIFEST_CLEAN}" | python3 -c 'import sys; [print(line.rstrip("\n").removeprefix("\\").removeprefix("./")) for line in sys.stdin]')"
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT

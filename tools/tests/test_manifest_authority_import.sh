@@ -3,8 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
+export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 PLAN_TO_PIPELINE="${ROOT}/tools/router/plan_to_pipeline.py"
-EXPECTED_MANIFEST="${ROOT}/tools/router/core/route_manifest.py"
+EXPECTED_MANIFEST="${ROOT}/tools/router_py/core/route_manifest.py"
 
 ok(){ echo "OK: $*"; }
 die(){ echo "FAIL: $*" >&2; exit 1; }

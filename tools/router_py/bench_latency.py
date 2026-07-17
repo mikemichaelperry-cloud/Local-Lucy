@@ -37,7 +37,7 @@ QUERIES = [
 
 MODELS = [
     "local-lucy-llama31",
-    "gemma4:12b-it-qat",
+    "local-lucy-gemma4",
 ]
 
 

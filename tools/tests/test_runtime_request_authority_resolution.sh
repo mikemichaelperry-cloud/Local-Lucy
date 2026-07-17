@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
+export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 REQUEST_TOOL="${ROOT}/tools/runtime_request.py"
 
 ok(){ echo "OK: $*"; }
@@ -13,7 +14,7 @@ die(){ echo "FAIL: $*" >&2; exit 1; }
 TMPD="$(mktemp -d)"
 trap 'rm -rf "${TMPD}"' EXIT
 OVERRIDE_ROOT="${TMPD}/override_root"
-mkdir -p "${OVERRIDE_ROOT}/state" "${OVERRIDE_ROOT}/tools/router/core"
+mkdir -p "${OVERRIDE_ROOT}/state" "${OVERRIDE_ROOT}/tools/router_py/core"
 touch "${OVERRIDE_ROOT}/lucy_chat.sh"
 
 python3 - <<'PY' "${REQUEST_TOOL}" "${ROOT}" "${OVERRIDE_ROOT}"

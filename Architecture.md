@@ -1,13 +1,13 @@
 # Local Lucy V11 — Architecture
 
-**Date:** 2026-07-16
+**Date:** 2026-07-17
 **Version:** v11
 **Branch:** main
 **Scope:** English-only primary runtime
 
 > This document describes **v11 as implemented**. Hebrew / Racheli support has been removed from the primary runtime; the standalone Hebrew assistant was archived separately on 2026-07-10.
 >
-> Latest commits on `main`: session-handoff docs + spring-cleanup TODO (`8bdde64`), HMI self-analysis toggle relabeled as **Engineering mode** (`5165ea0`), and code-review specialist fallback chain coverage (`3c37aa5`, `09cf2f9`).
+> Latest commit on `main`: see `git log`.
 
 ---
 
@@ -64,6 +64,7 @@ Local Lucy V11 is a privacy-first, locally-hosted AI assistant. The primary runt
 lucy-v10/
 ├── config/                    # Modelfiles, system prompts, policy configs
 │   ├── Modelfile.local-lucy-llama31
+│   ├── Modelfile.local-lucy-gemma4
 │   ├── evidence_policy.yaml
 │   ├── trusted_domains.yaml
 │   ├── url_map.yaml
@@ -86,9 +87,15 @@ lucy-v10/
 │   ├── model_selector.py
 │   ├── context_guard.py
 │   ├── feedback_buffer.py
-│   └── providers/
-├── tools/router/core/         # Semantic interpreter / intent classifier
-│   └── intent_classifier.py
+│   ├── providers/
+│   └── core/                  # Semantic interpreter / intent classifier
+│       ├── intent_classifier.py
+│       ├── semantic_interpreter.py
+│       └── policy_router.py
+├── tools/router/              # Thin backward-compat wrapper scripts (no core logic)
+│   ├── classify_intent.py
+│   ├── extract_medical_fact.py
+│   └── plan_to_pipeline.py
 ├── tools/memory/              # SQLite memory service
 │   └── memory_service.py
 ├── tools/voice/               # Whisper STT, Kokoro/Piper/Edge TTS
@@ -111,7 +118,7 @@ lucy-v10/
 
 1. **Ingest** — `main.run(query, attachments, session_id, overrides)`
 2. **Feedback detection** — Corrections and thumbs-up/down short-circuit to the feedback buffer / background learner.
-3. **Gemma 4 smart-routing bypass (optional)** — If `gemma4_smart_routing` is enabled and the active model is a `gemma4:*` tag, ordinary queries short-circuit to `LOCAL` without running `classify_intent()` or `select_route()`. Explicit route prefixes and existing news/evidence pattern fast paths still win.
+3. **Gemma 4 smart-routing bypass (optional)** — If `gemma4_smart_routing` is enabled and the active model is `local-lucy-gemma4` (or any `gemma4:*` tag), ordinary queries short-circuit to `LOCAL` without running `classify_intent()` or `select_route()`. Explicit route prefixes and existing news/evidence pattern fast paths still win.
 4. **Classify & route** — `classify.classify_intent()` + `select_route()` produce a `RoutingDecision`.
 5. **Resolve provider** — `provider_resolver` maps the route to a concrete provider plan.
 6. **Execute** — `execution_engine` runs the plan in a sandboxed Python namespace.
@@ -127,7 +134,7 @@ Routing is **deterministic-first, semantic-second**.
 
 ### 5.0 Gemma 4 Smart-Routing Bypass
 
-When the HMI toggle `gemma4_smart_routing` is on and the selected model is `gemma4:*`, `tools/router_py/request_pipeline.py` constructs a minimal `LOCAL` `RoutingDecision` directly. This skips the policy router, embedding router, and intent classifier for ordinary queries. It preserves:
+When the HMI toggle `gemma4_smart_routing` is on and the selected model is `local-lucy-gemma4` (or any `gemma4:*` tag), `tools/router_py/request_pipeline.py` constructs a minimal `LOCAL` `RoutingDecision` directly. This skips the policy router, embedding router, and intent classifier for ordinary queries. It preserves:
 
 - Explicit route prefixes (`news:`, `evidence:`, `augmented:`).
 - Existing news/evidence pattern fast paths (`latest news about ...`, `evidence for ...`).
@@ -243,9 +250,9 @@ The file shrank from ~3,900 lines to ~2,216 lines after the shell removal, reduc
 
 ### 8.2 Model Selector (`tools/router_py/model_selector.py`)
 
-The UI exposes an **Auto** default. In shadow mode, the selector automatically chooses the most appropriate local model by query bucket. Manual overrides remain available for power users. `gemma4:12b-it-qat` is available as an optional reasoning/multimodal model.
+The UI exposes an **Auto** default. In shadow mode, the selector automatically chooses the most appropriate local model by query bucket. Manual overrides remain available for power users. `local-lucy-gemma4` (backed by `gemma4:12b-it-qat`) is available as an optional reasoning/multimodal model with the same runtime persona injection as the Llama variant.
 
-**Code-review specialist:** SELF_REVIEW mode can use the optional alias `gemma4_code_review_agentic` (resolved by `tools/router_py/code_review_model_resolver.py`). The resolver fallback chain is: configured specialist model if enabled and installed → stock `gemma4:12b-it-qat` → normally configured local model. If nothing in the chain is installed, the request fails with `code_review_model_unavailable`.
+**Code-review specialist:** SELF_REVIEW mode can use the optional alias `gemma4_code_review_agentic` (resolved by `tools/router_py/code_review_model_resolver.py`). The resolver fallback chain is: configured specialist model if enabled and installed → `local-lucy-gemma4` → raw `gemma4:12b-it-qat` → normally configured local model. If nothing in the chain is installed, the request fails with `code_review_model_unavailable`.
 
 **Benchmarking:** `ui-v10/model_comparison_benchmark_v2.py` measures clean-slate cold-start and warm-run latency for every selectable mode (`auto`, `local-lucy-llama31`, `gemma4:12b-it-qat`). It unloads Ollama between modes, disables the repeat cache, and writes a JSON report plus a Markdown summary to the Desktop.
 
@@ -367,7 +374,7 @@ The Engineering panel enables a read-only code-review mode for analyzing Local L
 
 **Model resolution (`tools/router_py/code_review_model_resolver.py`)**
 - Configured specialist alias: `gemma4_code_review_agentic`.
-- Fallback chain: `gemma4_code_review_agentic` (if enabled and installed) → `gemma4:12b-it-qat` → normally configured local model.
+- Fallback chain: `gemma4_code_review_agentic` (if enabled and installed) → `local-lucy-gemma4` → raw `gemma4:12b-it-qat` → normally configured local model.
 - `LUCY_CODE_REVIEW_MODEL` overrides the specialist alias; `LUCY_CODE_REVIEW_SPECIALIST_ENABLED=0` disables it.
 - If no model in the chain is installed, the request returns `code_review_model_unavailable`.
 

@@ -351,6 +351,8 @@ _MODEL_IDENTITIES: dict[str, tuple[str, str]] = {
     # backend_name -> (ollama_model_name, parameter_description)
     "local-lucy-llama31": ("llama3.1:8b", "~8B parameters, 4096-token context"),
     "local-lucy-llama31:latest": ("llama3.1:8b", "~8B parameters, 4096-token context"),
+    "local-lucy-gemma4": ("gemma4:12b-it-qat", "~12B parameters, 128k-token context"),
+    "local-lucy-gemma4:latest": ("gemma4:12b-it-qat", "~12B parameters, 128k-token context"),
     "gemma4:12b-it-qat": ("gemma4:12b-it-qat", "~12B parameters, 128k-token context"),
     "gemma4_code_review_agentic": (
         "hf.co/yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q4_K_M",

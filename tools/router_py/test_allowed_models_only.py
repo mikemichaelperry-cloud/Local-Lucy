@@ -32,7 +32,7 @@ def test_hmi_model_labels_limited_to_allowed_set():
     sys.path.insert(0, str(ui_root))
     from app.panels.control_panel import ControlPanel
 
-    allowed = {"auto", "gemma4:12b-it-qat", "local-lucy-llama31"}
+    allowed = {"auto", "local-lucy-gemma4", "local-lucy-llama31"}
     assert set(ControlPanel._MODEL_LABELS.keys()) == allowed
 
 
@@ -54,7 +54,7 @@ def test_runtime_control_model_choices_limited_to_allowed_set():
         a for a in set_model_parser._actions if hasattr(a, "choices") and a.dest == "value"
     ][0]
     choices = value_action.choices
-    allowed = {"auto", "gemma4:12b-it-qat", "local-lucy-llama31"}
+    allowed = {"auto", "local-lucy-gemma4", "local-lucy-llama31"}
     assert set(choices) == allowed
 
 
@@ -86,9 +86,9 @@ def test_select_model_never_recommends_removed_tag(query, route_name, intent_fam
     result = model_selector.select_model(
         query,
         route=route,
-        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
+        available=["local-lucy-llama31", "local-lucy-gemma4"],
     )
-    allowed = {"auto", "gemma4:12b-it-qat", "local-lucy-llama31"}
+    allowed = {"auto", "local-lucy-gemma4", "local-lucy-llama31"}
     assert result["recommended"] in allowed
     assert result["competing"] in allowed
 
@@ -96,7 +96,7 @@ def test_select_model_never_recommends_removed_tag(query, route_name, intent_fam
 def test_select_local_model_respects_pinned_allowed_model():
     result = model_selector.select_local_model(
         "hello",
-        context={"local_model": "gemma4:12b-it-qat"},
-        available=["local-lucy-llama31", "gemma4:12b-it-qat"],
+        context={"local_model": "local-lucy-gemma4"},
+        available=["local-lucy-llama31", "local-lucy-gemma4"],
     )
-    assert result == "gemma4:12b-it-qat"
+    assert result == "local-lucy-gemma4"

@@ -77,7 +77,7 @@ async def test_models_endpoint(app_no_auth):
         data = await resp.json()
         assert data["ok"] is True
         assert "local-lucy-llama31" in data["models"]
-        assert "gemma4:12b-it-qat" in data["models"]
+        assert "local-lucy-gemma4" in data["models"]
         assert data["active_model"] in data["models"] or data["active_model"] == "unknown"
 
 
