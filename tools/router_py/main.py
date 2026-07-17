@@ -460,6 +460,47 @@ def execute_plan_python(
                 exc_info=True,
             )
 
+        # --- Persona identity detection: "I am Michael" etc. ---
+        try:
+            from memory.memory_service import (
+                detect_user_identity,
+                set_current_user_identity,
+            )
+
+            detected = detect_user_identity(question)
+            if detected:
+                row_id = set_current_user_identity(detected)
+                logger.info(
+                    "persona_identity_detected",
+                    extra={"persona": detected, "row_id": row_id},
+                )
+        except ImportError:
+            try:
+                from tools.memory.memory_service import (
+                    detect_user_identity,
+                    set_current_user_identity,
+                )
+
+                detected = detect_user_identity(question)
+                if detected:
+                    row_id = set_current_user_identity(detected)
+                    logger.info(
+                        "persona_identity_detected",
+                        extra={"persona": detected, "row_id": row_id},
+                    )
+            except Exception as e:
+                logger.warning(
+                    "persona_detection_failed",
+                    extra={"error": str(e)},
+                    exc_info=True,
+                )
+        except Exception as e:
+            logger.warning(
+                "persona_detection_failed",
+                extra={"error": str(e)},
+                exc_info=True,
+            )
+
         # --- Delegate to unified pipeline ---
         pipeline_context = dict(context or {})
         pipeline_context["_logger"] = logger

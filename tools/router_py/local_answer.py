@@ -181,32 +181,28 @@ def stop_ollama_heartbeat() -> None:
     _heartbeat_stop.set()
 
 
-# Import persistent facts from SQL memory service (with fallback for standalone use)
+# Import persistent facts and active identity from SQL memory service (with fallback for standalone use)
 try:
     from memory.memory_service import (
+        get_current_user_identity as _get_current_user_identity,
         get_persistent_facts_revision as _get_persistent_facts_revision,
-    )
-    from memory.memory_service import (
         get_relevant_persistent_facts as _get_relevant_persistent_facts,
     )
 
-    logger.info("[FACTS] Imported get_relevant_persistent_facts from memory.memory_service")
+    logger.info("[FACTS] Imported memory service helpers from memory.memory.service")
 except ImportError as _e1:
     logger.warning(f"[FACTS] Failed to import from memory.memory_service: {_e1}")
     try:
         from tools.memory.memory_service import (
+            get_current_user_identity as _get_current_user_identity,
             get_persistent_facts_revision as _get_persistent_facts_revision,
-        )
-        from tools.memory.memory_service import (
             get_relevant_persistent_facts as _get_relevant_persistent_facts,
         )
 
-        logger.info(
-            "[FACTS] Imported get_relevant_persistent_facts from tools.memory.memory_service"
-        )
+        logger.info("[FACTS] Imported memory service helpers from tools.memory.memory_service")
     except ImportError as _e2:
         logger.error(
-            f"[FACTS] Failed to import from tools.memory.memory_service: {_e2}. Using fallback no-op."
+            f"[FACTS] Failed to import memory service helpers: {_e2}. Using fallback no-ops."
         )
 
         def _get_relevant_persistent_facts(query, category=None, limit=3, threshold=0.35):
@@ -214,6 +210,9 @@ except ImportError as _e1:
 
         def _get_persistent_facts_revision(category=None):
             return ""
+
+        def _get_current_user_identity() -> str | None:
+            return None
 
 
 def _load_family_facts_direct() -> list[str]:
@@ -241,6 +240,52 @@ def _load_family_facts_direct() -> list[str]:
     except Exception as e:
         logger.warning(f"[FACTS] Direct SQLite fallback failed: {e}")
         return []
+
+
+# ---------------------------------------------------------------------------
+# Persona fragments: loaded from config/personas/<name>.txt and injected
+# into the local prompt when that identity is active. This applies to any
+# local model (Llama, Gemma, etc.) because it is added at prompt-build time.
+# ---------------------------------------------------------------------------
+_PERSONA_FRAGMENTS: dict[str, str] | None = None
+
+
+def _load_persona_fragments() -> dict[str, str]:
+    """Load persona prompt fragments from config/personas/*.txt.
+
+    The basename (lower-cased) is the canonical persona key. Missing or
+    unreadable files are skipped gracefully.
+    """
+    global _PERSONA_FRAGMENTS
+    if _PERSONA_FRAGMENTS is not None:
+        return _PERSONA_FRAGMENTS
+    fragments: dict[str, str] = {}
+    personas_dir = Path(__file__).resolve().parents[2] / "config" / "personas"
+    try:
+        for path in sorted(personas_dir.glob("*.txt")):
+            name = path.stem.lower()
+            try:
+                fragments[name] = path.read_text(encoding="utf-8").strip()
+                logger.info(f"[PERSONA] Loaded fragment for '{name}' from {path}")
+            except Exception as exc:
+                logger.warning(f"[PERSONA] Failed to read {path}: {exc}")
+    except Exception as exc:
+        logger.warning(f"[PERSONA] Failed to load persona fragments: {exc}")
+    _PERSONA_FRAGMENTS = fragments
+    return fragments
+
+
+def _get_active_persona_fragment() -> str | None:
+    """Return the prompt fragment for the currently active user identity, if any."""
+    identity = _get_current_user_identity()
+    if not identity:
+        return None
+    name = identity.strip().lower()
+    fragment = _load_persona_fragments().get(name)
+    if fragment:
+        return f"[PERSONA: {identity}]\n{fragment}"
+    logger.debug(f"[PERSONA] No fragment found for active identity '{identity}'")
+    return None
 
 
 # Keywords that indicate the user is asking about themselves, their family,
@@ -1332,12 +1377,15 @@ class LocalAnswer:
         """Generate cache key. Includes SELF_KNOWLEDGE hash so prompt
         changes automatically invalidate old cached entries.
         For personal/family/pet queries, also includes a fact revision
-        so adding/editing/deleting facts busts the cache."""
+        so adding/editing/deleting facts busts the cache.
+        For persona queries, includes the active identity so switching
+        personas does not reuse a differently-styled cached response."""
         # Hash the self-knowledge text so any prompt-template change
         # busts the cache without manual cleanup.
         sk_text = get_self_knowledge(self.config.model)
         sk_hash = hashlib.sha256(sk_text.encode()).hexdigest()[:16]
-        key_string = f"{self.config.model}|{sk_hash}|{variant}|{query}"
+        active_identity = _get_current_user_identity() or ""
+        key_string = f"{self.config.model}|{sk_hash}|{active_identity}|{variant}|{query}"
         if fact_revision:
             key_string += f"|{fact_revision}"
         return hashlib.sha256(key_string.encode()).hexdigest()
@@ -1816,6 +1864,14 @@ class LocalAnswer:
         # Self-knowledge (always injected for LOCAL mode so the model knows
         # its own architecture, capabilities, limitations, and guards)
         parts.append(get_self_knowledge(self.config.model))
+
+        # Active persona injection. This applies to every local model (Llama,
+        # Gemma, etc.) because it is added at prompt-build time. It is NOT
+        # injected for SELF_REVIEW, which bypasses local_answer entirely and
+        # uses SelfAnalysisEngine directly.
+        persona_fragment = _get_active_persona_fragment()
+        if persona_fragment:
+            parts.append(persona_fragment)
 
         # Current date/time/location context (for age calculations, relative time,
         # location-aware queries, and holiday references)

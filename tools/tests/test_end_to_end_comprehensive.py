@@ -571,26 +571,22 @@ async def test_provider_failures():
         policy_reason="test",
     )
 
+    # Current V11 execution path: unknown providers fall back to the local model
+    # while preserving the original route/provider metadata.
     result = await loop.run_in_executor(
         None,
-        engine._call_augmented_provider,
-        "What is photosynthesis?",
+        engine.execute,
         intent,
         route,
         {"augmented_provider": "nonexistent"},
     )
     check(
         "Fallback from nonexistent provider",
-        result.status == "completed",
+        result.status == "completed" and bool(result.response_text.strip()),
         f"status={result.status}, provider={result.provider}",
     )
     if result.status == "completed":
-        check(
-            "Fallback found working provider",
-            result.provider in ("wikipedia", "kimi", "openai"),
-            f"provider={result.provider}",
-        )
-        print(f"     Provider used: {result.provider}")
+        print(f"     Provider preserved: {result.provider}")
         print(f"     Response: {result.response_text[:80]}...")
 
 

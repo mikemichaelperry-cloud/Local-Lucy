@@ -215,6 +215,14 @@ class TestCache(unittest.TestCase):
         self.assertEqual(key1, key2)
         self.assertNotEqual(key1, key3)
 
+    def test_cache_key_changes_with_active_persona(self):
+        """Switching the active persona must bust the cache."""
+        with patch("local_answer._get_current_user_identity", return_value=None):
+            key_no_persona = self.answer._cache_key("test query", "variant1")
+        with patch("local_answer._get_current_user_identity", return_value="Michael"):
+            key_with_persona = self.answer._cache_key("test query", "variant1")
+        self.assertNotEqual(key_no_persona, key_with_persona)
+
     def test_cache_store_and_load(self):
         """Test cache store and load."""
         query = "test query"
@@ -407,6 +415,59 @@ class TestPromptBuilding(unittest.TestCase):
         self.assertNotIn("Mike is 66 years old.", prompt)
         self.assertNotIn("[PERSISTENT FACTS", prompt)
         self.assertIn("Answer from your own knowledge", prompt)
+
+
+class TestPersonaInjection(unittest.TestCase):
+    """Test active persona prompt injection for local models."""
+
+    def setUp(self):
+        self.answer = LocalAnswer()
+
+    def tearDown(self):
+        """Clean up resources."""
+        if hasattr(self, "answer") and self.answer:
+            import asyncio
+
+            try:
+                asyncio.run(self.answer.close())
+            except Exception:
+                pass
+
+    def test_build_prompt_injects_active_persona(self):
+        """When an identity is active, its persona fragment is injected."""
+        test_fragment = "You are answering Michael. Be direct and pragmatic."
+        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
+            with patch("local_answer._get_current_user_identity", return_value="Michael"):
+                with patch(
+                    "local_answer._load_persona_fragments",
+                    return_value={"michael": test_fragment},
+                ):
+                    prompt = self.answer._build_prompt(
+                        "what is Python", "", "chat", "- Be concise.", False, False
+                    )
+        self.assertIn("[PERSONA: Michael]", prompt)
+        self.assertIn(test_fragment, prompt)
+
+    def test_build_prompt_skips_missing_persona(self):
+        """When no matching persona fragment exists, the prompt is unchanged."""
+        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
+            with patch("local_answer._get_current_user_identity", return_value="Unknown"):
+                with patch("local_answer._load_persona_fragments", return_value={}):
+                    prompt = self.answer._build_prompt(
+                        "what is Python", "", "chat", "- Be concise.", False, False
+                    )
+        self.assertNotIn("[PERSONA:", prompt)
+        self.assertIn("Answer from your own knowledge", prompt)
+
+    def test_build_prompt_no_identity_no_persona(self):
+        """When no identity is active, no persona fragment is injected."""
+        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
+            with patch("local_answer._get_current_user_identity", return_value=None):
+                with patch("local_answer._load_persona_fragments", return_value={"michael": "..."}):
+                    prompt = self.answer._build_prompt(
+                        "what is Python", "", "chat", "- Be concise.", False, False
+                    )
+        self.assertNotIn("[PERSONA:", prompt)
 
 
 class TestCompletionGuards(unittest.TestCase):
@@ -829,6 +890,7 @@ def run_tests():
     # not present in this file; they may exist in other test files.
     suite.addTests(loader.loadTestsFromTestCase(TestAugmentedMode))
     suite.addTests(loader.loadTestsFromTestCase(TestPromptBuilding))
+    suite.addTests(loader.loadTestsFromTestCase(TestPersonaInjection))
     suite.addTests(loader.loadTestsFromTestCase(TestCompletionGuards))
     suite.addTests(loader.loadTestsFromTestCase(TestWarmup))
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))

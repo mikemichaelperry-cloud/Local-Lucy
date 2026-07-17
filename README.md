@@ -7,7 +7,7 @@
 [![CI](https://github.com/mikemichaelperry-cloud/Local-Lucy/actions/workflows/ci.yml/badge.svg)](https://github.com/mikemichaelperry-cloud/Local-Lucy/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-900%2B%20passing-brightgreen)](tools/router_py/)
+[![Tests](https://img.shields.io/badge/tests-1%2C100%2B%20passing-brightgreen)](tools/router_py/)
 
 [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Contributing](CONTRIBUTING.md)
 
@@ -17,7 +17,7 @@
 
 ## Overview
 
-Local Lucy V11 is a **privacy-first, self-learning desktop AI assistant** built with PySide6. The v11 runtime is English-only; Hebrew / Racheli support lives in a separate isolation layer. It runs entirely on your local machine with optional cloud augmentation, giving you full control over your data while providing intelligent conversation, voice interaction, and real-time information retrieval.
+Local Lucy V11 is a **privacy-first, self-learning desktop AI assistant** built with PySide6. The v11 runtime is English-only. It runs entirely on your local machine with optional cloud augmentation, giving you full control over your data while providing intelligent conversation, voice interaction, and real-time information retrieval.
 
 Unlike cloud-only assistants, Lucy learns from your explicit corrections in natural language — tell her "that should have been LOCAL" and, after a safety gate, she updates her routing model. Auto-detected signals and router logs are telemetry only; they never mutate the model unsupervised.
 
@@ -26,7 +26,7 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 ## Features
 
 ### 🧠 Intelligent Routing
-- **MiniLM-L6-v2 embedding router** (384-dim, ~1,019 examples) with k-NN similarity and semantic disambiguation
+- **MiniLM-L6-v2 embedding router** (384-dim, ~1,374 examples) with k-NN similarity and semantic disambiguation
 - **Four-stage pipeline**: structural safety → embedding k-NN → safety keyword guards → calibrated confidence fallback
 - **Self-learning feedback loop** — explicit user corrections rebuild the embedding index after a safety gate
 - **High-stakes review queue** — medical, veterinary, finance, legal, and EVIDENCE feedback goes to `pending_review.jsonl` for human review
@@ -39,7 +39,7 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 - Async state machine with timeout guards
 
 ### 🔒 Privacy & Local-First
-- **Primary LLM runs locally** via Ollama (`local-lucy-llama31`, llama3.1:8b, 4096-token context)
+- **Primary LLM runs locally** via Ollama (`local-lucy-llama31`, llama3.1:8b, 8192-token context)
 - **Optional cloud augmentation** (Kimi/OpenAI) for complex queries
 - **SQLite state management** with versioned schema migrations and `0o600` permissions
 - **XDG-compliant runtime paths** (`~/.local/share/local-lucy`) with legacy fallback
@@ -47,7 +47,7 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 
 ### 📡 Live Data Integration
 - **LOCAL** — Default local LLM inference via Ollama
-- **AUGMENTED** — Web search → OpenAI → Kimi chain with evidence-backed answers
+- **AUGMENTED** — Wikipedia evidence + OpenAI/Kimi synthesis with evidence-backed answers
 - **EVIDENCE** — Medical/vet/finance/legal queries with trusted-source citations
 - **FINANCE** — Live FX, crypto, stock/index, and net-worth lookups with source citations
 - **TIME** — Current time, timezone conversions, date queries
@@ -63,8 +63,8 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 
 ### 👤 User Persona
 - **Michael** user-specific persona
-- **LoRA adapter** for the default Llama 3.1 8B model
-- **Prompt-level fallback** for models where LoRA adapters cannot fit in VRAM
+- **Prompt-level injection** is the active path: `config/personas/michael.txt` is loaded at runtime and injected into the local prompt for Llama, Gemma, or any other local model
+- The original LoRA adapter and its wrapper Modelfiles are archived in `config/quarantined/` for restoration if needed
 - Active persona displayed in the HMI with one-click clear
 
 ### 🌐 Optional Web Interface
@@ -77,9 +77,9 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 
 ### 🎭 User Persona (Michael)
 - **Michael** persona with a distinct response style: dry, precise, pragmatic
-- Triggered by saying "I am Michael" in chat or voice
-- **LoRA adapter path**: `local-lucy-llama31-michael` uses a trained LoRA adapter on top of llama3.1:8b
-- **Active wrappers**: `local-lucy-llama31` (llama3.1:8b). Removed Qwen3/Mistral wrappers live in `config/quarantined/` for restoration if needed.
+- Triggered by saying "I am Michael" in chat or voice; identity detection is wired in `tools/router_py/main.py`
+- **Prompt-level path**: `config/personas/michael.txt` is loaded at runtime and injected into the local prompt for any local model (Llama, Gemma, etc.)
+- **LoRA adapter path**: the original `local-lucy-llama31-michael` adapter and wrapper Modelfiles are archived in `config/quarantined/` for restoration if needed
 - The HMI shows the active persona in the Control Panel and Runtime Summary status cards
 
 ## Architecture
@@ -106,7 +106,7 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 ┌──────────────────────▼──────────────────────────────────────┐
 │  Providers                                                  │
 │  ├─ LOCAL — Ollama (llama3.1:8b default)                    │
-│  ├─ AUGMENTED — Web search → OpenAI → Kimi                  │
+│  ├─ AUGMENTED — Wikipedia evidence + OpenAI/Kimi synthesis  │
 │  ├─ EVIDENCE — Trusted sources + citations                  │
 │  ├─ FINANCE — Live FX / crypto / stocks / net worth         │
 │  ├─ TIME — TimeAPI.io                                       │
@@ -126,7 +126,7 @@ See [Architecture.md](Architecture.md) for the complete v11 technical specificat
 - **Qt6 platform plugins** (for Linux: `qt6-base-dev` or equivalent)
 - **GPU recommended** — RTX 3060 12GB or better for local LLM + Whisper GPU coexistence
 
-> **Note:** On first run, the embedding router will auto-build its index from the bundled training examples (~1,019 queries). This takes 5–10 seconds and is saved to `models/router/comprehensive_embeddings.npy` for subsequent runs.
+> **Note:** On first run, the embedding router will auto-build its index from the bundled training examples (~1,374 queries). This takes 5–10 seconds and is saved to `models/router/comprehensive_embeddings.npy` for subsequent runs.
 >
 > **Disk space:** ~8–10 GB for the Ollama model + ~2 GB for PyTorch/Transformers pip packages.
 
@@ -145,12 +145,15 @@ source ui-v10/.venv/bin/activate
 pip install -r ui-v10/requirements.txt
 
 # Download the base models and create the custom variants
-# Default: llama3.1:8b (~8.5 GB VRAM, 4096-token context, follows system prompts)
+# Default: llama3.1:8b (~8.5 GB VRAM, 8192-token context, follows system prompts)
 ollama pull llama3.1:8b
 ollama create local-lucy-llama31 -f config/Modelfile.local-lucy-llama31
 
 # Optional: Gemma 4 reasoning/multimodal model
 ollama pull gemma4:12b-it-qat
+
+# Optional: code-review specialist model for Engineering mode
+# (falls back to gemma4:12b-it-qat or the default local model if not installed)
 
 # (Optional) Copy and configure API keys for cloud providers
 cp .env.example .env
@@ -232,14 +235,14 @@ The background learner automatically rebuilds the embedding index from correctio
 
 ### Personas
 
-Local Lucy supports a single user-specific persona, **Michael**. When you say "I am Michael", Lucy stores the active identity and routes LOCAL answers through the matching persona behavior.
+Local Lucy supports a single user-specific persona, **Michael**. When you say "I am Michael", Lucy stores the active identity and injects the prompt-level persona into LOCAL answers for any local model.
 
-- **Llama 3.1 8B** (`local-lucy-llama31-michael`) uses a trained LoRA adapter.
-- **Qwen3 14B** and **Mistral-Nemo 12B** selectable models fall back to prompt-level persona because LoRA training OOMs on the RTX 3060 12 GB.
+- **Prompt-level path** (active): `config/personas/michael.txt` is loaded at runtime and injected into the local prompt for Llama, Gemma, or any other local model.
+- **LoRA adapter path** (archived): the original `local-lucy-llama31-michael` adapter and its wrapper Modelfiles are backed up in `config/quarantined/` for restoration if needed.
 - The HMI Control Panel has a **persona selector** that forces the active identity for all models, independent of voice-declared identity.
 - The active persona is shown in the Control Panel and Runtime Summary status cards, with a one-click **Clear** button to return to auto-detection.
 
-See [docs/runbooks/PERSONAS.md](docs/runbooks/PERSONAS.md) for the full adapter status, training instructions, and hardware limitations.
+See [docs/runbooks/PERSONAS.md](docs/runbooks/PERSONAS.md) for the historical adapter status, training instructions, and hardware limitations.
 
 ### Environment Variables
 
@@ -257,12 +260,12 @@ See [docs/runbooks/PERSONAS.md](docs/runbooks/PERSONAS.md) for the full adapter 
 
 ### Deprecated / Legacy Options
 
-These options are preserved for backward compatibility but are no longer needed in V10. They will be removed in a future release.
+These options are preserved for backward compatibility but are no longer needed in V11. They will be removed in a future release.
 
 | Variable | Status | Notes |
 |----------|--------|-------|
-| `LUCY_ROUTER_PY` | **Deprecated** | Python router is the only supported router in V10. |
-| `LUCY_EXEC_PY` | **Deprecated** | Python execution engine is the only supported engine in V10. |
+| `LUCY_ROUTER_PY` | **Deprecated** | Python router is the only supported router in V11. Still set in some smoke tests, but the Python path is authoritative. |
+| `LUCY_EXEC_PY` | **Deprecated** | Python execution engine is the only supported engine in V11. Still set in some smoke tests, but the Python path is authoritative. |
 | `LUCY_ROUTER_LEGACY_PRIMARY=1` | **Deprecated / non-functional** | Keyword-router rollback is no longer supported; the embedding router is the sole authority. |
 
 ## Development

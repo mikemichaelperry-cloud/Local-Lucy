@@ -717,11 +717,15 @@ class ControlPanel(QFrame):
         self._set_selector_value(self._learner_selector, values.get("learner", ""))
         self._set_selector_value(self._model_selector, values.get("model", ""))
         if self._gemma4_smart_routing_selector is not None:
+            self._gemma4_smart_routing_selector.blockSignals(True)
             self._gemma4_smart_routing_selector.setChecked(
                 values.get("gemma4_smart_routing", "off") == "on"
             )
+            self._gemma4_smart_routing_selector.blockSignals(False)
         if self._self_analysis_selector is not None:
+            self._self_analysis_selector.blockSignals(True)
             self._self_analysis_selector.setChecked(values.get("self_analysis_mode", "off") == "on")
+            self._self_analysis_selector.blockSignals(False)
             self._self_analysis_selector.setEnabled(self._backend_available)
         self._update_gemma4_smart_routing_visibility(values.get("model", ""))
         self._refresh_voice_ptt()
