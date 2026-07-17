@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """End-to-end voice latency benchmark: transcription + response + TTS."""
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 WHISPER_BIN = ROOT / "runtime" / "voice" / "bin" / "whisper"
-MODEL_PATH = ROOT / "runtime" / "voice" / "models" / f"ggml-{os.environ.get('LUCY_VOICE_MODEL', 'large-v3-turbo').strip()}.bin"
+MODEL_PATH = (
+    ROOT
+    / "runtime"
+    / "voice"
+    / "models"
+    / f"ggml-{os.environ.get('LUCY_VOICE_MODEL', 'large-v3-turbo').strip()}.bin"
+)
 
 
 def generate_test_wav(path: Path, duration_sec: float = 3.0) -> None:
@@ -47,7 +54,9 @@ def benchmark_iteration(wav_path: Path, iteration: int) -> dict:
     cmd = [str(WHISPER_BIN), "-m", str(MODEL_PATH), "-f", str(wav_path), "-otxt", "-of", "-"]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)
 
-    if proc.returncode != 0 and any(k in proc.stderr.lower() for k in ("cuda", "cublas", "gpu", "oom")):
+    if proc.returncode != 0 and any(
+        k in proc.stderr.lower() for k in ("cuda", "cublas", "gpu", "oom")
+    ):
         cmd_cpu = cmd + ["--no-gpu"]
         proc = subprocess.run(cmd_cpu, capture_output=True, text=True, timeout=120, env=env)
         stages["stt_backend"] = "cpu"
@@ -58,7 +67,6 @@ def benchmark_iteration(wav_path: Path, iteration: int) -> dict:
 
     t1 = time.time()
     stages["transcription_ms"] = int((t1 - t0) * 1000)
-    transcript = proc.stdout.strip() if proc.returncode == 0 else ""
     print(f"  STT ({stages['stt_backend']}): {stages['transcription_ms']}ms")
 
     # Stage 2: Mock query processing (simulates Lucy router latency)
@@ -77,9 +85,13 @@ def benchmark_iteration(wav_path: Path, iteration: int) -> dict:
         tts_adapter = ROOT / "tools" / "voice" / "tts_adapter.py"
         if tts_adapter.exists():
             tts_cmd = [
-                sys.executable, str(tts_adapter),
-                "synthesize", "--text", response_text,
-                "--output-dir", str(wav_path.parent),
+                sys.executable,
+                str(tts_adapter),
+                "synthesize",
+                "--text",
+                response_text,
+                "--output-dir",
+                str(wav_path.parent),
             ]
             tts_proc = subprocess.run(tts_cmd, capture_output=True, text=True, timeout=60)
             if tts_proc.returncode == 0:

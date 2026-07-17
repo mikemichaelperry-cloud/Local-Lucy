@@ -1796,7 +1796,7 @@ async def main():
     if args.test == "all":
         print("Running all tests...")
         for name, test_func in tests.items():
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"Running: {name}")
             print("=" * 60)
             try:

@@ -52,9 +52,9 @@ with open(prefix + ".txt", "w") as f:
 
             result = transcribe_with_whisper(str(whisper_bin), capture)
             assert isinstance(result, TranscriptionResult)
-            assert (
-                result.text == "cpu fallback transcript"
-            ), f"Expected 'cpu fallback transcript', got {result.text!r}"
+            assert result.text == "cpu fallback transcript", (
+                f"Expected 'cpu fallback transcript', got {result.text!r}"
+            )
             assert result.backend == "cpu"
             assert result.fallback_used is True
             assert "cuda" in result.fallback_reason.lower()

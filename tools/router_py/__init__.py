@@ -17,24 +17,24 @@ LUCY_ROOT = Path(__file__).resolve().parent.parent.parent
 Usage:
     # Direct Python API (Phase 4)
     from router_py import execute_plan_python, classify_intent, select_route
-    
+
     result = execute_plan_python("Who was Ada Lovelace?")
     print(result.route)  # "AUGMENTED"
     print(result.provider)  # "wikipedia"
-    
+
     # Or use individual components
     classification = classify_intent("What is 2+2?")
     decision = select_route(classification, policy="fallback_only")
-    
+
     # Tool Wrappers (Phase 5)
     from router_py import RequestTool, ToolConfig
-    
+
     tool = RequestTool(ToolConfig(timeout=30.0))
     result = await tool.generate("What is 2+2?")
-    
+
     # Voice Pipeline (Phase 5)
     from router_py import VoicePipeline, quick_voice_interaction
-    
+
     result = await quick_voice_interaction()
     print(f"You said: {result.transcript}")
     print(f"Lucy said: {result.response_text}")
@@ -97,13 +97,16 @@ try:
         SynthesisError,
         PlaybackError,
     )
+
     _voice_available = True
 except ImportError as _voice_import_err:
     _voice_available = False
+
     # Define placeholder classes for type hints when voice deps are missing
     class VoicePipeline:  # type: ignore
         def __init__(self, *args, **kwargs):
             raise ImportError(f"Voice pipeline not available: {_voice_import_err}")
+
 
 __version__ = "0.6.0"
 __all__ = [

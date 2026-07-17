@@ -1,7 +1,7 @@
 # Local Lucy v10 — Task Runner
 # ============================================
 
-.PHONY: help install test lint run clean check-env
+.PHONY: help install test lint run clean check-env sha
 
 PYTHON := ui-v10/.venv/bin/python3
 PIP := ui-v10/.venv/bin/pip
@@ -10,7 +10,8 @@ help:
 	@echo "Local Lucy v10 — Available targets:"
 	@echo "  make install      Create venv and install dependencies"
 	@echo "  make test         Run full pytest suite"
-	@echo "  make lint         Run ruff (and mypy if installed)"
+	@echo "  make lint         Run ruff check and format validation"
+	@echo "  make sha          Regenerate and verify SHA256SUMS manifests"
 	@echo "  make run          Launch desktop app"
 	@echo "  make clean        Remove generated artifacts"
 	@echo "  make check-env    Validate environment (Ollama, models, CUDA)"
@@ -26,17 +27,25 @@ install:
 
 test:
 	@echo "[test] Running pytest suite..."
-	OLLAMA_KEEP_ALIVE=0 QT_QPA_PLATFORM=offscreen $(PYTHON) -m pytest -q \
+	OLLAMA_KEEP_ALIVE=0 QT_QPA_PLATFORM=offscreen $(PYTHON) -m pytest \
+		-q \
 		--ignore=tools/router_py/test_synthetic_adversarial.py \
+		--ignore=tools/router_py/test_real_router_burn_in.py \
 		--ignore=tools/tests/test_end_to_end_comprehensive.py \
 		--deselect web_adapter/test_web_adapter.py::test_ask_integration_local \
-		--timeout=300 --timeout-method=thread
+		-W error::pytest.PytestReturnNotNoneWarning
 
 lint:
 	@echo "[lint] Running ruff..."
-	ruff check tools/router_py/ models/router/ ui-v10/app/ web_adapter/
-	@echo "[lint] Running mypy..."
-	mypy tools/router_py/ --ignore-missing-imports
+	ruff check .
+	ruff format --check .
+
+sha:
+	@echo "[sha] Regenerating SHA256SUMS manifests..."
+	bash tools/sha_manifest.sh regen
+	cd ui-v10 && bash tools/sha_manifest.sh regen
+	bash tools/tests/test_sha_manifest_discipline.sh
+	bash ui-v10/tests/test_sha_manifest_discipline.sh
 
 check-env:
 	@echo "[check-env] Validating Local Lucy environment..."

@@ -1,4 +1,5 @@
 """Memory Manager Dialog — Qt UI for persistent_facts CRUD."""
+
 from __future__ import annotations
 
 import sys
@@ -181,6 +182,7 @@ class MemoryManagerDialog(QDialog):
                 # Find the id by querying all facts with ids
                 import sqlite3
                 from memory.memory_service import _get_connection
+
                 conn = _get_connection()
                 cur = conn.execute("SELECT id FROM persistent_facts ORDER BY id")
                 ids = [r[0] for r in cur.fetchall()]

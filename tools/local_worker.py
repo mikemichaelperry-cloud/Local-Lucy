@@ -63,27 +63,41 @@ def _run_dir(root: Path) -> Path:
 
 
 def _socket_path(root: Path) -> Path:
-    return Path(os.environ.get("LUCY_LOCAL_WORKER_SOCKET") or (_run_dir(root) / "local_worker.sock"))
+    return Path(
+        os.environ.get("LUCY_LOCAL_WORKER_SOCKET") or (_run_dir(root) / "local_worker.sock")
+    )
 
 
 def _request_fifo_path(root: Path) -> Path:
-    return Path(os.environ.get("LUCY_LOCAL_WORKER_REQUEST_FIFO") or (_run_dir(root) / "local_worker.request.fifo"))
+    return Path(
+        os.environ.get("LUCY_LOCAL_WORKER_REQUEST_FIFO")
+        or (_run_dir(root) / "local_worker.request.fifo")
+    )
 
 
 def _pid_path(root: Path) -> Path:
-    return Path(os.environ.get("LUCY_LOCAL_WORKER_PID_FILE") or (_run_dir(root) / "local_worker.pid"))
+    return Path(
+        os.environ.get("LUCY_LOCAL_WORKER_PID_FILE") or (_run_dir(root) / "local_worker.pid")
+    )
 
 
 def _lock_path(root: Path) -> Path:
-    return Path(os.environ.get("LUCY_LOCAL_WORKER_LOCK_FILE") or (_run_dir(root) / "local_worker.lock"))
+    return Path(
+        os.environ.get("LUCY_LOCAL_WORKER_LOCK_FILE") or (_run_dir(root) / "local_worker.lock")
+    )
 
 
 def _log_path(root: Path) -> Path:
-    return Path(os.environ.get("LUCY_LOCAL_WORKER_LOG_FILE") or (_run_dir(root) / "local_worker.log"))
+    return Path(
+        os.environ.get("LUCY_LOCAL_WORKER_LOG_FILE") or (_run_dir(root) / "local_worker.log")
+    )
 
 
 def _code_stamp_path(root: Path) -> Path:
-    return Path(os.environ.get("LUCY_LOCAL_WORKER_CODE_STAMP_FILE") or (_run_dir(root) / "local_worker.code_stamp"))
+    return Path(
+        os.environ.get("LUCY_LOCAL_WORKER_CODE_STAMP_FILE")
+        or (_run_dir(root) / "local_worker.code_stamp")
+    )
 
 
 def _local_answer_path(root: Path) -> Path:
@@ -131,7 +145,9 @@ def _transport() -> str:
     return "unix"
 
 
-def _append_latency_from_env(stage: str, ms: int, env: Optional[Dict[str, str]] = None, component: str = "local_worker") -> None:
+def _append_latency_from_env(
+    stage: str, ms: int, env: Optional[Dict[str, str]] = None, component: str = "local_worker"
+) -> None:
     source_env = env or os.environ
     if (source_env.get("LUCY_LATENCY_PROFILE_ACTIVE") or "0") != "1":
         return
@@ -208,7 +224,9 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
-def _send_json_unix_line(sock_path: Path, payload: Dict[str, object], timeout_s: float = 2.0) -> Dict[str, object]:
+def _send_json_unix_line(
+    sock_path: Path, payload: Dict[str, object], timeout_s: float = 2.0
+) -> Dict[str, object]:
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
         client.settimeout(timeout_s)
         client.connect(str(sock_path))
@@ -225,7 +243,9 @@ def _send_json_unix_line(sock_path: Path, payload: Dict[str, object], timeout_s:
     raise RuntimeError("worker returned no response")
 
 
-def _send_json_fifo(root: Path, payload: Dict[str, object], timeout_s: float = 2.0) -> Dict[str, object]:
+def _send_json_fifo(
+    root: Path, payload: Dict[str, object], timeout_s: float = 2.0
+) -> Dict[str, object]:
     run_dir = _run_dir(root)
     run_dir.mkdir(parents=True, exist_ok=True)
     request_fifo = _request_fifo_path(root)
@@ -242,10 +262,14 @@ def _send_json_fifo(root: Path, payload: Dict[str, object], timeout_s: float = 2
         f"COMMAND\t{str(payload.get('command') or 'request')}",
     ]
     if "question" in payload:
-        question_b64 = base64.b64encode(str(payload.get("question") or "").encode("utf-8")).decode("ascii")
+        question_b64 = base64.b64encode(str(payload.get("question") or "").encode("utf-8")).decode(
+            "ascii"
+        )
         lines.append(f"QUESTION\t{question_b64}")
     if payload.get("env_shell"):
-        env_shell_b64 = base64.b64encode(str(payload.get("env_shell") or "").encode("utf-8")).decode("ascii")
+        env_shell_b64 = base64.b64encode(
+            str(payload.get("env_shell") or "").encode("utf-8")
+        ).decode("ascii")
         lines.append(f"ENV_SHELL\t{env_shell_b64}")
     for key in sorted(env_payload):
         value_b64 = base64.b64encode(str(env_payload[key]).encode("utf-8")).decode("ascii")
@@ -292,9 +316,13 @@ def _send_json_fifo(root: Path, payload: Dict[str, object], timeout_s: float = 2
                     elif line.startswith("REQUEST_FIFO\t"):
                         parsed["request_fifo"] = line.split("\t", 1)[1]
                     elif line.startswith("OUTPUT\t"):
-                        parsed["output"] = base64.b64decode(line.split("\t", 1)[1].encode("ascii")).decode("utf-8")
+                        parsed["output"] = base64.b64decode(
+                            line.split("\t", 1)[1].encode("ascii")
+                        ).decode("utf-8")
                     elif line.startswith("ERROR\t"):
-                        parsed["error"] = base64.b64decode(line.split("\t", 1)[1].encode("ascii")).decode("utf-8")
+                        parsed["error"] = base64.b64decode(
+                            line.split("\t", 1)[1].encode("ascii")
+                        ).decode("utf-8")
                 return parsed
         except OSError:
             pass
@@ -411,12 +439,18 @@ class ShellWorker:
             encoded_shell = base64.b64encode(env_shell_script.encode("utf-8")).decode("ascii")
             message_lines.append(f"ENV_SHELL\t{encoded_shell}")
         else:
-            valid_keys = sorted(key for key in env_overrides if key and key.replace("_", "").isalnum() and key.upper() == key)
+            valid_keys = sorted(
+                key
+                for key in env_overrides
+                if key and key.replace("_", "").isalnum() and key.upper() == key
+            )
             if valid_keys:
                 shell_lines = [f"LOCAL_ANSWER_WORKER_ENV_KEYS={shlex.quote(' '.join(valid_keys))}"]
                 for key in valid_keys:
                     shell_lines.append(f"export {key}={shlex.quote(env_overrides[key])}")
-                encoded_shell = base64.b64encode("\n".join(shell_lines).encode("utf-8")).decode("ascii")
+                encoded_shell = base64.b64encode("\n".join(shell_lines).encode("utf-8")).decode(
+                    "ascii"
+                )
                 message_lines.append(f"ENV_SHELL\t{encoded_shell}")
         question_b64 = base64.b64encode(question.encode("utf-8")).decode("ascii")
         message_lines.append(f"QUESTION\t{question_b64}")
@@ -424,7 +458,11 @@ class ShellWorker:
         dispatch_started = time.monotonic()
         self.proc.stdin.write("\n".join(message_lines) + "\n")
         self.proc.stdin.flush()
-        _append_latency_from_env("worker_dispatch_write", max(1, int(round((time.monotonic() - dispatch_started) * 1000))), env=request_env)
+        _append_latency_from_env(
+            "worker_dispatch_write",
+            max(1, int(round((time.monotonic() - dispatch_started) * 1000))),
+            env=request_env,
+        )
 
         rc = 1
         output = ""
@@ -440,8 +478,16 @@ class ShellWorker:
                 continue
             if line == "END_RESPONSE":
                 if in_response:
-                    _append_latency_from_env("worker_response_wait", max(1, int(round((time.monotonic() - wait_started) * 1000))), env=request_env)
-                    _append_latency_from_env("worker_request_total", max(1, int(round((time.monotonic() - request_started) * 1000))), env=request_env)
+                    _append_latency_from_env(
+                        "worker_response_wait",
+                        max(1, int(round((time.monotonic() - wait_started) * 1000))),
+                        env=request_env,
+                    )
+                    _append_latency_from_env(
+                        "worker_request_total",
+                        max(1, int(round((time.monotonic() - request_started) * 1000))),
+                        env=request_env,
+                    )
                     return {"rc": rc, "output": output}
                 continue
             if not in_response:
@@ -504,7 +550,9 @@ def _serve(root: Path) -> int:
             env_shell_script = str(payload.get("env_shell") or "")
             handle_started = time.monotonic()
             try:
-                worker_reply = worker.request(question, normalized_env, env_shell_script=env_shell_script)
+                worker_reply = worker.request(
+                    question, normalized_env, env_shell_script=env_shell_script
+                )
                 _append_latency_from_env(
                     "server_handle_total",
                     max(1, int(round((time.monotonic() - handle_started) * 1000))),
@@ -523,7 +571,11 @@ def _serve(root: Path) -> int:
                     max(1, int(round((time.monotonic() - handle_started) * 1000))),
                     env=normalized_env,
                 )
-                return {"ok": False, "error": f"worker_request_failed:{exc}", "transport": transport}
+                return {
+                    "ok": False,
+                    "error": f"worker_request_failed:{exc}",
+                    "transport": transport,
+                }
         return {"ok": False, "error": "unsupported_command", "transport": transport}
 
     if transport == "fifo":
@@ -560,15 +612,21 @@ def _serve(root: Path) -> int:
                             payload["command"] = line.split("\t", 1)[1]
                         elif line.startswith("QUESTION\t"):
                             encoded = line.split("\t", 1)[1]
-                            payload["question"] = base64.b64decode(encoded.encode("ascii")).decode("utf-8")
+                            payload["question"] = base64.b64decode(encoded.encode("ascii")).decode(
+                                "utf-8"
+                            )
                         elif line.startswith("ENV_SHELL\t"):
                             encoded = line.split("\t", 1)[1]
-                            payload["env_shell"] = base64.b64decode(encoded.encode("ascii")).decode("utf-8")
+                            payload["env_shell"] = base64.b64decode(encoded.encode("ascii")).decode(
+                                "utf-8"
+                            )
                         elif line.startswith("ENV\t"):
                             _prefix, key, encoded = line.split("\t", 2)
                             env_map = payload.setdefault("env", {})
                             if isinstance(env_map, dict):
-                                env_map[key] = base64.b64decode(encoded.encode("ascii")).decode("utf-8")
+                                env_map[key] = base64.b64decode(encoded.encode("ascii")).decode(
+                                    "utf-8"
+                                )
                     last_activity = time.monotonic()
                     reply = build_reply(payload)
                     response_path = str(payload.get("response_path") or "")
@@ -585,10 +643,14 @@ def _serve(root: Path) -> int:
                         if reply.get("request_fifo") is not None:
                             response_lines.append(f"REQUEST_FIFO\t{reply.get('request_fifo')}")
                         if "output" in reply:
-                            encoded_out = base64.b64encode(str(reply.get("output") or "").encode("utf-8")).decode("ascii")
+                            encoded_out = base64.b64encode(
+                                str(reply.get("output") or "").encode("utf-8")
+                            ).decode("ascii")
                             response_lines.append(f"OUTPUT\t{encoded_out}")
                         if "error" in reply:
-                            encoded_err = base64.b64encode(str(reply.get("error") or "").encode("utf-8")).decode("ascii")
+                            encoded_err = base64.b64encode(
+                                str(reply.get("error") or "").encode("utf-8")
+                            ).decode("ascii")
                             response_lines.append(f"ERROR\t{encoded_err}")
                         response_lines.append("END_RESPONSE")
                         with open(response_path, "w", encoding="utf-8") as handle:

@@ -8,6 +8,7 @@ Validates that:
 3. Finance provider helpers correctly parse query types
 4. ExecutionEngine handles FINANCE route with source labeling
 """
+
 from __future__ import annotations
 
 import sys

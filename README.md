@@ -21,20 +21,20 @@ Local Lucy V11 is a **privacy-first, self-learning desktop AI assistant** built 
 
 Unlike cloud-only assistants, Lucy learns from your explicit corrections in natural language — tell her "that should have been LOCAL" and, after a safety gate, she updates her routing model. Auto-detected signals and router logs are telemetry only; they never mutate the model unsupervised.
 
-> **Looking for the frozen V9 baseline?** Check out the [`local-lucy-v9-frozen-2026-05-28`](https://github.com/mikemichaelperry-cloud/Local-Lucy/releases/tag/local-lucy-v9-frozen-2026-05-28) tag.
+The frozen V9 baseline is archived under the `local-lucy-v9-frozen-2026-05-28` release tag; see CHANGELOG.md for the V9→V11 history.
 
 ## Features
 
 ### 🧠 Intelligent Routing
 - **MiniLM-L6-v2 embedding router** (384-dim, ~1,374 examples) with k-NN similarity and semantic disambiguation
-- **Four-stage pipeline**: structural safety → embedding k-NN → safety keyword guards → calibrated confidence fallback
+- **Four-stage pipeline**: structural safety → deterministic policy gates → embedding k-NN → post-guard fallback
 - **Self-learning feedback loop** — explicit user corrections rebuild the embedding index after a safety gate
 - **High-stakes review queue** — medical, veterinary, finance, legal, and EVIDENCE feedback goes to `pending_review.jsonl` for human review
 - **V1 purge complete** — legacy broad keyword fortress removed; embedding router is the authority, with keyword guards retained only for safety-critical categories
 
 ### 🎙️ Voice Interaction
 - **Push-to-Talk (PTT)** with hold and tap modes
-- **Whisper large-v3-turbo** for fast, accurate speech-to-text
+- **Whisper STT** with default `base.en`/`small.en` and optional `large-v3-turbo`
 - **Kokoro TTS** for natural-sounding voice output
 - Async state machine with timeout guards
 
@@ -61,11 +61,14 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 - Configurable voice, provider, and model settings
 - Cross-platform (Linux primary, extensible)
 
-### 👤 User Persona
-- **Michael** user-specific persona
-- **Prompt-level injection** is the active path: `config/personas/michael.txt` is loaded at runtime and injected into the local prompt for Llama, Gemma, or any other local model
-- The original LoRA adapter and its wrapper Modelfiles are archived in `config/quarantined/` for restoration if needed
-- Active persona displayed in the HMI with one-click clear
+### 👤 User Persona (Michael)
+
+Local Lucy supports a single user-specific persona, **Michael**. The persona is injected at the prompt level at runtime for any local model (Llama, Gemma, etc.) by loading `config/personas/michael.txt`.
+
+- **Trigger:** saying "I am Michael" or "I am Mike" in chat or voice; identity detection is wired in `tools/router_py/main.py`.
+- **Scope:** the active persona is intentionally **not** injected into `SELF_REVIEW` prompts.
+- **Archived path:** the original LoRA adapter wrapper Modelfiles are archived in `config/quarantined/` for restoration if needed; adapter weights are not stored in this repo.
+- **HMI:** the active persona is shown in the Control Panel and Runtime Summary status cards, with a one-click **Clear** button to return to auto-detection.
 
 ### 🌐 Optional Web Interface
 - Lightweight aioHTTP adapter for remote text access
@@ -74,13 +77,6 @@ Unlike cloud-only assistants, Lucy learns from your explicit corrections in natu
 - Request-scoped model selection, validated against configured models
 - Basic/Bearer authentication; loopback-only by default
 - Mobile-friendly single-page UI
-
-### 🎭 User Persona (Michael)
-- **Michael** persona with a distinct response style: dry, precise, pragmatic
-- Triggered by saying "I am Michael" in chat or voice; identity detection is wired in `tools/router_py/main.py`
-- **Prompt-level path**: `config/personas/michael.txt` is loaded at runtime and injected into the local prompt for any local model (Llama, Gemma, etc.)
-- **LoRA adapter path**: the original `local-lucy-llama31-michael` adapter and wrapper Modelfiles are archived in `config/quarantined/` for restoration if needed
-- The HMI shows the active persona in the Control Panel and Runtime Summary status cards
 
 ## Architecture
 
@@ -291,11 +287,11 @@ The end-to-end script trains, converts, and registers adapters for the models th
 Evaluate either path against `tests/golden_persona_cases.jsonl`:
 
 ```bash
-# LoRA adapter path
-python3 tools/lora/evaluate_persona.py --model local-lucy-llama31-michael --persona michael
+# Prompt-level persona path (active in V11)
+python3 tools/lora/evaluate_persona.py --model local-lucy-llama31 --prompt-persona michael --persona michael
+python3 tools/lora/evaluate_persona.py --model gemma4:12b-it-qat --prompt-persona michael --persona michael
 
-# Prompt-level fallback path
-python3 tools/lora/evaluate_persona.py --model local-lucy --prompt-persona michael --persona michael
+# Note: the original LoRA adapter tags are archived in config/quarantined/ and are not runnable from this repo.
 ```
 
 ### Running Tests

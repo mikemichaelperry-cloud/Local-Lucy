@@ -5,6 +5,7 @@ SIMPLE:     Calm, focused assistant surface (default)
 POWER:      Practical operator controls without engineering detail
 ENGINEERING: Full inspectability and low-level access
 """
+
 from __future__ import annotations
 
 # New 3-level HMI structure

@@ -43,8 +43,10 @@ def _check_whisper() -> dict[str, Any]:
         sys_path = str(ROOT_DIR / "tools")
         if sys_path not in os.sys.path:
             import sys
+
             sys.path.insert(0, sys_path)
         from voice.whisper_worker import resolve_whisper_worker_pid_file
+
         pid_file = resolve_whisper_worker_pid_file()
         if not pid_file.exists():
             return {"status": "unhealthy", "detail": "Whisper PID file not found"}

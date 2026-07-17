@@ -385,7 +385,7 @@ def main() -> int:
     for route in sorted(set(before) | set(after)):
         b = before.get(route, 0)
         a = after.get(route, 0)
-        print(f"{route:<15} {b:>8} {a:>8} {a-b:>+8}")
+        print(f"{route:<15} {b:>8} {a:>8} {a - b:>+8}")
     print(f"\nTotal: {len(existing)} -> {len(merged)} (+{len(accepted)})")
 
     print(f"\nBacking up original to {BACKUP_PATH}...")

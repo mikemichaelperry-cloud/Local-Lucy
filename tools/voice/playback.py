@@ -42,7 +42,9 @@ def run_player_command(command: list[str], *, timeout_seconds: int) -> None:
         shell=False,
     )
     if completed.returncode != 0:
-        stderr_text = completed.stderr.decode("utf-8", errors="replace").strip() if completed.stderr else ""
+        stderr_text = (
+            completed.stderr.decode("utf-8", errors="replace").strip() if completed.stderr else ""
+        )
         raise PlaybackError(
             f"audio playback failed (cmd: {command!r})"
             + (f": {stderr_text}" if stderr_text else "")
@@ -74,7 +76,10 @@ def play_wav_file(
             prime_path = create_silence_copy(playback_path, prime_ms)
             try:
                 try:
-                    run_player_command(player_command(selected_player, prime_path), timeout_seconds=max(5, min(timeout_seconds, 15)))
+                    run_player_command(
+                        player_command(selected_player, prime_path),
+                        timeout_seconds=max(5, min(timeout_seconds, 15)),
+                    )
                 except PlaybackError:
                     pass
             finally:
@@ -83,7 +88,9 @@ def play_wav_file(
                 except OSError:
                     pass
 
-        run_player_command(player_command(selected_player, playback_path), timeout_seconds=timeout_seconds)
+        run_player_command(
+            player_command(selected_player, playback_path), timeout_seconds=timeout_seconds
+        )
         return selected_player
     except subprocess.TimeoutExpired as exc:
         raise PlaybackError(f"audio playback timed out: {exc}") from exc
@@ -185,11 +192,17 @@ def create_silence_copy(wav_path: Path, duration_ms: int) -> Path:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Play a synthesized wav file with the Local Lucy audio backend.")
+    parser = argparse.ArgumentParser(
+        description="Play a synthesized wav file with the Local Lucy audio backend."
+    )
     parser.add_argument("--wav", required=True, help="Path to the wav file to play.")
     parser.add_argument("--player", default="", help="Override the audio player (aplay or paplay).")
-    parser.add_argument("--prepad-ms", default="0", help="Optional leading silence to prepend before playback.")
-    parser.add_argument("--prime-ms", default="0", help="Optional silent priming playback before the real wav.")
+    parser.add_argument(
+        "--prepad-ms", default="0", help="Optional leading silence to prepend before playback."
+    )
+    parser.add_argument(
+        "--prime-ms", default="0", help="Optional silent priming playback before the real wav."
+    )
     return parser.parse_args(argv)
 
 

@@ -135,5 +135,14 @@ ignore = ["E501"]
 "tools/router_py/providers/*.py" = ["E402", "F401", "F841", "I001"]
 "models/router/*.py" = ["E402", "E722", "E741", "F821", "F841", "I001"]
 "ui-v10/app/**/*.py" = ["E402", "F401", "F841", "I001"]
+# Standalone scripts that mutate sys.path before project imports.
+"scripts/rebuild_embeddings.py" = ["E402"]
+# Legacy router shim scripts still imported at runtime; import order is intentional.
+"tools/router/*.py" = ["E402", "I001"]
+"tools/router/core/*.py" = ["E402", "E741", "I001"]
+# Voice tests import without package installation via sys.path hacks.
+"tools/voice/tests/test_kokoro_backend.py" = ["E402"]
+"tools/voice/tests/test_kokoro_session_worker.py" = ["E402"]
+"tools/voice/tests/test_playback_priming.py" = ["E402"]
 # tools/tests scripts use sys.path hacks and deliberate local variables.
 "tools/tests/test_*.py" = ["E402", "F841", "I001"]

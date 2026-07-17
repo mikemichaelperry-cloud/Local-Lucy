@@ -49,7 +49,7 @@ if str(TOOLS_PATH) not in sys.path:
 try:
     # Import the router_py package
     import router_py
-    
+
     # Main entry points
     from router_py.main import (
         execute_plan_python,
@@ -57,7 +57,7 @@ try:
         RouterOutcome,
         DEFAULT_TIMEOUT,
     )
-    
+
     # Classification
     from router_py.classify import (
         classify_intent,
@@ -65,7 +65,7 @@ try:
         ClassificationResult,
         RoutingDecision,
     )
-    
+
     # Execution
     from router_py.execution_engine import (
         ExecutionEngine,
@@ -73,17 +73,17 @@ try:
         _load_session_memory_context,
         DEFAULT_CHAT_MEMORY_FILE,
     )
-    
+
     # Local answer
     from router_py.local_answer import LocalAnswer, LocalAnswerConfig
-    
+
     # Policy
     from router_py.policy import (
         normalize_augmentation_policy,
         requires_evidence_mode,
         provider_usage_class_for,
     )
-    
+
     # Voice tools
     from router_py.voice_tool import (
         VoicePipeline,
@@ -91,12 +91,12 @@ try:
         VADConfig,
         AudioBuffer,
     )
-    
+
     # Utilities
     from router_py.utils import sha256_text
-    
+
     BACKEND_AVAILABLE = True
-    
+
 except ImportError as e:
     print(f"[Backend] CRITICAL ERROR: Failed to import from local v8 backend: {e}", file=sys.stderr)
     print(f"[Backend] Path attempted: {ROUTER_PY_PATH}", file=sys.stderr)
@@ -113,40 +113,32 @@ __all__ = [
     "ensure_control_env",
     "RouterOutcome",
     "DEFAULT_TIMEOUT",
-    
     # Classification
     "classify_intent",
     "select_route",
     "ClassificationResult",
     "RoutingDecision",
-    
     # Execution
     "ExecutionEngine",
     "ExecutionResult",
     "_load_session_memory_context",
     "DEFAULT_CHAT_MEMORY_FILE",
-    
     # Local answer
     "LocalAnswer",
     "LocalAnswerConfig",
-    
     # Policy
     "normalize_augmentation_policy",
     "requires_evidence_mode",
     "provider_usage_class_for",
-    
     # Voice
     "VoicePipeline",
     "VoiceResult",
     "VADConfig",
     "AudioBuffer",
-    
     # Utilities
     "sha256_text",
-    
     # Backend availability
     "BACKEND_AVAILABLE",
-    
     # Path info
     "SNAPSHOT_ROOT",
     "ROUTER_PY_PATH",

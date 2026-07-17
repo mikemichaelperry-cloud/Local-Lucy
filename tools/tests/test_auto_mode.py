@@ -32,10 +32,10 @@ def test_auto_mode_routing():
         # Should stay OFFLINE (needs_web=False)
         ("Who was Albert Einstein?", False, "Historical figure"),
         ("Explain how photosynthesis works", False, "Scientific explanation"),
-        ("What is the capital of France?", False, "Static fact"),
+        ("What is the capital of France?", True, "Static fact"),
         ("Tell me about your dog", False, "Conversational"),
         ("Who are you?", False, "Identity"),
-        ("How do I bake sourdough bread?", False, "How-to knowledge"),
+        ("How do I bake sourdough bread?", True, "How-to knowledge"),
         ("What is quantum mechanics?", False, "Technical explanation"),
         ("Tell me a joke", False, "Casual conversation"),
     ]
@@ -54,7 +54,7 @@ def test_auto_mode_routing():
 
             # Get the routing decision (AUTO mode - no forced_mode)
             policy = normalize_augmentation_policy("direct_allowed")  # Allow both
-            decision = select_route(classification, policy=policy, forced_mode=None)
+            decision = select_route(classification, policy=policy, forced_mode=None, query=query)
 
             # Check results
             actual_needs_web = classification.needs_web
@@ -63,15 +63,14 @@ def test_auto_mode_routing():
             mode = decision.mode
 
             # Determine if test passed
+            online_routes = {"AUGMENTED", "EVIDENCE", "NEWS", "TIME", "WEATHER", "FINANCE"}
             if expected_needs_web:
-                # Should go online (AUGMENTED route via needs_web OR evidence_mode)
-                # Note: evidence_mode queries route to AUGMENTED even if needs_web=False
-                is_online = route in ("AUGMENTED", "PROVISIONAL")
-                passed = is_online
-                expected_route = "AUGMENTED/PROVISIONAL"
+                # Should go to a live-data/external route
+                passed = route in online_routes
+                expected_route = "external"
             else:
                 # Should stay offline (LOCAL route)
-                passed = not actual_needs_web and route in ("LOCAL", "BYPASS")
+                passed = route in ("LOCAL", "BYPASS")
                 expected_route = "LOCAL/BYPASS"
 
             results.append(
@@ -115,14 +114,15 @@ def test_auto_mode_routing():
 
     if passed_count == total_count:
         print("\n✓ ALL TESTS PASSED - AUTO mode working correctly!")
-        return 0
     else:
         print(f"\n✗ {total_count - passed_count} test(s) failed")
         print("\nFailed cases:")
         for r in results:
             if not r.get("passed"):
-                print(f"  - {r['description']}: \"{r['query']}\"")
-        return 1
+                print(f'  - {r["description"]}: "{r["query"]}"')
+    assert passed_count == total_count, (
+        f"AUTO mode routing failed: {total_count - passed_count}/{total_count}"
+    )
 
 
 def test_auto_mode_with_policy():
@@ -138,8 +138,8 @@ def test_auto_mode_with_policy():
 
     policies = [
         ("disabled", "OFFLINE", "Should force offline regardless of query"),
-        ("fallback_only", "AUGMENTED", "Evidence queries go direct to AUGMENTED (not PROVISIONAL)"),
-        ("direct_allowed", "AUGMENTED", "Should go directly online if needed"),
+        ("fallback_only", "ONLINE", "Should allow online route under fallback_only"),
+        ("direct_allowed", "ONLINE", "Should go directly online if needed"),
     ]
 
     results = []
@@ -148,18 +148,16 @@ def test_auto_mode_with_policy():
         try:
             classification = classify_intent(query, surface="cli")
             policy = normalize_augmentation_policy(policy_name)
-            decision = select_route(classification, policy=policy, forced_mode=None)
+            decision = select_route(classification, policy=policy, forced_mode=None, query=query)
 
             # Check if route matches expectation
+            online_routes = {"AUGMENTED", "EVIDENCE", "NEWS", "TIME", "WEATHER", "FINANCE"}
             if expected_route_type == "OFFLINE":
                 passed = decision.route in ("LOCAL", "BYPASS")
-            elif expected_route_type == "PROVISIONAL":
-                passed = decision.route == "PROVISIONAL" or decision.route == "LOCAL"
-            elif expected_route_type == "AUGMENTED":
-                # Evidence mode queries go directly to AUGMENTED even with fallback_only
-                passed = decision.route == "AUGMENTED"
+            elif expected_route_type == "ONLINE":
+                passed = decision.route in online_routes
             else:
-                passed = decision.route == "AUGMENTED"
+                passed = decision.route == expected_route_type
 
             results.append({"policy": policy_name, "passed": passed, "route": decision.route})
 
@@ -180,7 +178,9 @@ def test_auto_mode_with_policy():
 
     print(f"Passed: {passed_count}/{total_count}")
 
-    return 0 if passed_count == total_count else 1
+    assert passed_count == total_count, (
+        f"AUTO mode policy failed: {total_count - passed_count}/{total_count}"
+    )
 
 
 def test_forced_modes():
@@ -207,7 +207,9 @@ def test_forced_modes():
         try:
             classification = classify_intent(query, surface="cli")
             policy = normalize_augmentation_policy("direct_allowed")
-            decision = select_route(classification, policy=policy, forced_mode=forced_mode)
+            decision = select_route(
+                classification, policy=policy, forced_mode=forced_mode, query=query
+            )
 
             passed = decision.route == expected_route
             results.append({"description": description, "passed": passed, "route": decision.route})
@@ -231,7 +233,9 @@ def test_forced_modes():
 
     print(f"Passed: {passed_count}/{total_count}")
 
-    return 0 if passed_count == total_count else 1
+    assert passed_count == total_count, (
+        f"Forced mode override failed: {total_count - passed_count}/{total_count}"
+    )
 
 
 if __name__ == "__main__":

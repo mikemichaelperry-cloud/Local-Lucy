@@ -167,9 +167,9 @@ def test_gemma4_smart_routing_update_does_not_emit_signal():
         }
     )
     app.processEvents()
-    assert (
-        received == []
-    ), f"update_control_state emitted gemma4_smart_routing_change_requested: {received}"
+    assert received == [], (
+        f"update_control_state emitted gemma4_smart_routing_change_requested: {received}"
+    )
 
 
 def test_engineering_selectors_fit_inside_viewport():

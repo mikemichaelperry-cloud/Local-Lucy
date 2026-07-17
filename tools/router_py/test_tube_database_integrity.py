@@ -29,11 +29,33 @@ DB_PATH = tube_database.get_db_path()
 
 # Tubes that MUST be present for the audio-amplifier use-case
 tube_database.CRITICAL_TUBES = [
-    "6V6GT", "6V6", "6L6GC", "EL34", "KT88", "6550", "KT66",
-    "300B", "2A3", "845", "211",
-    "12AX7", "12AT7", "12AU7", "6SN7GT", "6SL7GT", "6DJ8", "6922",
-    "5U4G", "5AR4", "GZ34", "5Y3GT",
-    "807", "5881", "7591", "EL84", "6BQ5",
+    "6V6GT",
+    "6V6",
+    "6L6GC",
+    "EL34",
+    "KT88",
+    "6550",
+    "KT66",
+    "300B",
+    "2A3",
+    "845",
+    "211",
+    "12AX7",
+    "12AT7",
+    "12AU7",
+    "6SN7GT",
+    "6SL7GT",
+    "6DJ8",
+    "6922",
+    "5U4G",
+    "5AR4",
+    "GZ34",
+    "5Y3GT",
+    "807",
+    "5881",
+    "7591",
+    "EL84",
+    "6BQ5",
 ]
 
 
@@ -54,9 +76,18 @@ class TestDatabaseFileIntegrity(unittest.TestCase):
         columns = {row["name"] for row in cur.fetchall()}
         conn.close()
         required = {
-            "id", "type", "construction", "vplate_max", "vscreen_max",
-            "pplate_max", "transconductance_ma_v", "typical_push_pull_watts",
-            "recommended_load_ohms", "heater_volts", "heater_amps", "notes",
+            "id",
+            "type",
+            "construction",
+            "vplate_max",
+            "vscreen_max",
+            "pplate_max",
+            "transconductance_ma_v",
+            "typical_push_pull_watts",
+            "recommended_load_ohms",
+            "heater_volts",
+            "heater_amps",
+            "notes",
         }
         self.assertTrue(required.issubset(columns), f"Missing columns: {required - columns}")
 
@@ -87,6 +118,7 @@ class TestDataQuality(unittest.TestCase):
 
     def test_no_duplicate_types(self):
         from collections import Counter
+
         c = Counter(self.types)
         dups = {k: v for k, v in c.items() if v > 1}
         self.assertEqual(dups, {}, f"Duplicate tube types found: {dups}")
@@ -172,6 +204,7 @@ class TestLocalAnswerIntegration(unittest.TestCase):
     def tearDown(self):
         if hasattr(self, "answer") and self.answer:
             import asyncio
+
             try:
                 asyncio.run(self.answer.close())
             except Exception:

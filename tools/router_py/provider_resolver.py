@@ -129,6 +129,7 @@ def apply_provider(
 
     logger.info(f"Provider resolution: {decision.provider} → {provider}")
     import dataclasses
+
     return dataclasses.replace(
         decision,
         provider=provider,

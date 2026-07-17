@@ -1,13 +1,13 @@
 # Local Lucy V11 — Architecture
 
-**Date:** 2026-07-10
+**Date:** 2026-07-17
 **Version:** v11
-**Branch:** v10-dev
+**Branch:** main
 **Scope:** English-only primary runtime
 
 > This document describes **v11 as implemented**. Hebrew / Racheli support has been removed from the primary runtime; the standalone Hebrew assistant was archived separately on 2026-07-10.
 >
-> Latest commits on `v10-dev`: Racheli/Hebrew artifact purge (`87208d0`) and bulk pre-commit cleanup (`dd82304`).
+> Latest commit on `main`: `3fec71b`.
 
 ---
 
@@ -164,7 +164,7 @@ After the policy router / embedding router, `classify.py` applies additional saf
 
 ### 5.4 Route Labels
 
-`LOCAL`, `AUGMENTED`, `EVIDENCE`, `NEWS`, `WEATHER`, `TIME`, `FINANCE`, `CLARIFY`, `MEMORY_FOLLOWUP`, `TRAVEL_TOURISM`, `LOCAL_REASONING`, `EPHEMERAL`.
+`LOCAL`, `AUGMENTED`, `CLARIFY`, `SELF_REVIEW`, `NEWS`, `WEATHER`, `TIME`, `FINANCE`, `EVIDENCE`, `MEMORY_RECALL`.
 
 ---
 
@@ -339,7 +339,7 @@ The HMI has been simplified to two views:
 |----------|----------|
 | `tests/` | Golden responses, regression cases, specific entity fact gate |
 | `tools/router_py/test_*.py` | Routing, policy, classification, finance, medical, news, edge cases, evidence provider |
-| `tools/tests/` | Memory service, end-to-end comprehensive tests |
+| `tools/tests/` | Shell SHA manifest discipline test, router contract/regression shell tests, memory service tests, voice runtime/integration tests, and additional contract/regression coverage |
 | `tools/voice/tests/` | TTS fallback, voice utilities |
 | `ui-v10/tests/` | Off-screen HMI tests |
 | `web_adapter/test_web_adapter.py` | HTTP adapter tests |

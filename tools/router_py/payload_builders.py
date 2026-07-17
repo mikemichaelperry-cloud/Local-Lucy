@@ -7,6 +7,7 @@ Extracted in Stream 5 to eliminate duplication between:
 
 These functions are pure (no side effects) and operate only on dict inputs.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -18,7 +19,10 @@ def build_route_snapshot_payload(payload: dict[str, Any]) -> dict[str, Any]:
     outcome = payload.get("outcome") if isinstance(payload.get("outcome"), dict) else {}
     authority = payload.get("authority") if isinstance(payload.get("authority"), dict) else {}
     current_route = _stringify(
-        route.get("selected_route") or route.get("mode") or route.get("final_mode") or route.get("requested_mode")
+        route.get("selected_route")
+        or route.get("mode")
+        or route.get("final_mode")
+        or route.get("requested_mode")
     )
     provider_used = _stringify(
         outcome.get("augmented_provider_used")
@@ -75,7 +79,9 @@ def build_history_entry(payload: dict[str, Any]) -> dict[str, Any]:
     """Build a history entry from a full request payload."""
     control_state = payload.get("control_state")
     return {
-        "authority": payload.get("authority", {}) if isinstance(payload.get("authority"), dict) else {},
+        "authority": payload.get("authority", {})
+        if isinstance(payload.get("authority"), dict)
+        else {},
         "completed_at": payload.get("completed_at", ""),
         "control_state": control_state if isinstance(control_state, dict) else {},
         "error": payload.get("error", ""),

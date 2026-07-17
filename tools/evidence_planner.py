@@ -20,27 +20,46 @@ def title_place(text: str) -> str:
 
 def is_compound_policy_query(text: str) -> bool:
     qn = (text or "").lower()
-    has_climate = re.search(r"\b(climate policy|climate regulation|emissions policy|carbon policy)\b", qn) is not None
-    has_ai = re.search(
-        r"\b(ai safety|ai regulation|ai governance|technology regulation|technology governance|tech governance)\b",
-        qn,
-    ) is not None
-    has_recent = re.search(r"\b(past week|this week|latest|recent|most significant developments?)\b", qn) is not None
-    has_evidence = re.search(r"\b(with evidence|cite|citing|authoritative news sources?|trusted sources?)\b", qn) is not None
-    has_synthesis = re.search(r"\b(interact|interaction|implications?|going forward|how .* interact)\b", qn) is not None
+    has_climate = (
+        re.search(r"\b(climate policy|climate regulation|emissions policy|carbon policy)\b", qn)
+        is not None
+    )
+    has_ai = (
+        re.search(
+            r"\b(ai safety|ai regulation|ai governance|technology regulation|technology governance|tech governance)\b",
+            qn,
+        )
+        is not None
+    )
+    has_recent = (
+        re.search(r"\b(past week|this week|latest|recent|most significant developments?)\b", qn)
+        is not None
+    )
+    has_evidence = (
+        re.search(
+            r"\b(with evidence|cite|citing|authoritative news sources?|trusted sources?)\b", qn
+        )
+        is not None
+    )
+    has_synthesis = (
+        re.search(r"\b(interact|interaction|implications?|going forward|how .* interact)\b", qn)
+        is not None
+    )
     return has_climate and has_ai and has_recent and has_evidence and has_synthesis
 
 
 def build_candidates(query: str, mode: str) -> list[dict]:
     original = normalize_space(query)
     qn = original.lower()
-    candidates = [{
-        "adapter": "original",
-        "strategy": "original",
-        "confidence": "baseline",
-        "confidence_score": 0.0,
-        "planned_query": original,
-    }]
+    candidates = [
+        {
+            "adapter": "original",
+            "strategy": "original",
+            "confidence": "baseline",
+            "confidence_score": 0.0,
+            "planned_query": original,
+        }
+    ]
 
     travel_match = re.search(
         r"\btravel advisory check for ([a-z][a-z .'-]{1,40}?)(?:\s+(?:today|now|at the moment))?\??$",
@@ -49,13 +68,15 @@ def build_candidates(query: str, mode: str) -> list[dict]:
     )
     if travel_match and mode == "EVIDENCE":
         place = title_place(travel_match.group(1))
-        candidates.append({
-            "adapter": "travel",
-            "strategy": "travel_advisory_check",
-            "confidence": "high",
-            "confidence_score": 0.92,
-            "planned_query": f"Is it safe now to travel to {place}?",
-        })
+        candidates.append(
+            {
+                "adapter": "travel",
+                "strategy": "travel_advisory_check",
+                "confidence": "high",
+                "confidence_score": 0.92,
+                "planned_query": f"Is it safe now to travel to {place}?",
+            }
+        )
 
     combo_match = re.search(
         r"\b(?:best\s+combination\s+of|combine|combination\s+of)\s+([a-z0-9][a-z0-9 /()-]{0,40}?)\s*(?:\+|and|with|vs\.?|versus)\s*([a-z0-9][a-z0-9 /()-]{0,40}?)(?:\?|$)",
@@ -63,60 +84,67 @@ def build_candidates(query: str, mode: str) -> list[dict]:
         flags=re.IGNORECASE,
     )
     if not combo_match:
-      combo_match = re.search(
-          r"\b([a-z0-9][a-z0-9 /()-]{0,30}?)\s*\+\s*([a-z0-9][a-z0-9 /()-]{0,30}?)(?:\?|$)",
-          qn,
-          flags=re.IGNORECASE,
-      )
+        combo_match = re.search(
+            r"\b([a-z0-9][a-z0-9 /()-]{0,30}?)\s*\+\s*([a-z0-9][a-z0-9 /()-]{0,30}?)(?:\?|$)",
+            qn,
+            flags=re.IGNORECASE,
+        )
     if combo_match and mode == "EVIDENCE":
         left = normalize_space(combo_match.group(1))
         right = normalize_space(combo_match.group(2))
         if left and right:
-            candidates.extend([
-                {
-                    "adapter": "combination",
-                    "strategy": "interaction_check",
-                    "confidence": "medium",
-                    "confidence_score": 0.78,
-                    "planned_query": f"{left} {right} interaction",
-                },
-                {
-                    "adapter": "combination",
-                    "strategy": "safety_with",
-                    "confidence": "medium",
-                    "confidence_score": 0.74,
-                    "planned_query": f"is {left} safe with {right}",
-                },
-            ])
+            candidates.extend(
+                [
+                    {
+                        "adapter": "combination",
+                        "strategy": "interaction_check",
+                        "confidence": "medium",
+                        "confidence_score": 0.78,
+                        "planned_query": f"{left} {right} interaction",
+                    },
+                    {
+                        "adapter": "combination",
+                        "strategy": "safety_with",
+                        "confidence": "medium",
+                        "confidence_score": 0.74,
+                        "planned_query": f"is {left} safe with {right}",
+                    },
+                ]
+            )
 
     if mode == "EVIDENCE" and is_compound_policy_query(qn):
-        candidates.extend([
-            {
-                "adapter": "compound_policy",
-                "strategy": "climate_recent_global_policy",
-                "confidence": "high",
-                "confidence_score": 0.89,
-                "planned_query": "recent global climate policy developments in past week",
-            },
-            {
-                "adapter": "compound_policy",
-                "strategy": "ai_recent_governance",
-                "confidence": "high",
-                "confidence_score": 0.87,
-                "planned_query": "recent ai safety and ai regulation developments in past week",
-            },
-            {
-                "adapter": "compound_policy",
-                "strategy": "technology_regulation_overlap",
-                "confidence": "medium",
-                "confidence_score": 0.83,
-                "planned_query": "technology regulation implications across climate policy and ai safety",
-            },
-        ])
+        candidates.extend(
+            [
+                {
+                    "adapter": "compound_policy",
+                    "strategy": "climate_recent_global_policy",
+                    "confidence": "high",
+                    "confidence_score": 0.89,
+                    "planned_query": "recent global climate policy developments in past week",
+                },
+                {
+                    "adapter": "compound_policy",
+                    "strategy": "ai_recent_governance",
+                    "confidence": "high",
+                    "confidence_score": 0.87,
+                    "planned_query": "recent ai safety and ai regulation developments in past week",
+                },
+                {
+                    "adapter": "compound_policy",
+                    "strategy": "technology_regulation_overlap",
+                    "confidence": "medium",
+                    "confidence_score": 0.83,
+                    "planned_query": "technology regulation implications across climate policy and ai safety",
+                },
+            ]
+        )
 
     deduped = []
     seen = set()
-    for candidate in sorted(candidates, key=lambda item: (-item["confidence_score"], item["adapter"], item["planned_query"])):
+    for candidate in sorted(
+        candidates,
+        key=lambda item: (-item["confidence_score"], item["adapter"], item["planned_query"]),
+    ):
         key = candidate["planned_query"].lower()
         if key in seen:
             continue
@@ -143,14 +171,18 @@ def write_env(path: Path, payload: dict) -> None:
 def write_candidates(path: Path, payload: dict) -> None:
     lines = []
     for idx, candidate in enumerate(payload.get("candidates", []), start=1):
-        lines.append("\t".join([
-            str(idx),
-            candidate.get("adapter", ""),
-            candidate.get("strategy", ""),
-            candidate.get("confidence", ""),
-            str(candidate.get("confidence_score", 0.0)),
-            candidate.get("planned_query", ""),
-        ]))
+        lines.append(
+            "\t".join(
+                [
+                    str(idx),
+                    candidate.get("adapter", ""),
+                    candidate.get("strategy", ""),
+                    candidate.get("confidence", ""),
+                    str(candidate.get("confidence_score", 0.0)),
+                    candidate.get("planned_query", ""),
+                ]
+            )
+        )
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
@@ -164,7 +196,10 @@ def main() -> int:
     args = parser.parse_args()
 
     candidates = build_candidates(args.query, (args.mode or "").upper())
-    best = next((candidate for candidate in candidates if candidate["adapter"] != "original"), candidates[0] if candidates else None)
+    best = next(
+        (candidate for candidate in candidates if candidate["adapter"] != "original"),
+        candidates[0] if candidates else None,
+    )
     payload = {
         "original_query": normalize_space(args.query),
         "planner_fired": any(candidate["adapter"] != "original" for candidate in candidates),
@@ -176,7 +211,9 @@ def main() -> int:
     if args.candidates_out:
         write_candidates(Path(args.candidates_out), payload)
     if args.json_out:
-        Path(args.json_out).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        Path(args.json_out).write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 

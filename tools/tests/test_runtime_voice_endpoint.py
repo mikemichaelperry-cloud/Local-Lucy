@@ -164,41 +164,86 @@ def main() -> int:
         )
         runtime_voice = tools_dir / "runtime_voice.py"
 
-        status_result = run_voice(runtime_voice, "status", state_file, runtime_file, capture_dir, env)
+        status_result = run_voice(
+            runtime_voice, "status", state_file, runtime_file, capture_dir, env
+        )
         assert_ok(status_result.returncode == 0, f"status failed: {status_result.stderr}")
         status_payload = json.loads(status_result.stdout)
         assert_ok(status_payload["status"] == "idle", f"unexpected idle status: {status_payload}")
         assert_ok(runtime_file.exists(), "status did not materialize voice_runtime.json")
 
         run_control(tools_dir / "runtime_control.py", state_file, "set-voice", "off", env)
-        disabled_start = run_voice(runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, env)
-        assert_ok(disabled_start.returncode == 2, f"expected disabled rc=2, got {disabled_start.returncode}")
+        disabled_start = run_voice(
+            runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, env
+        )
+        assert_ok(
+            disabled_start.returncode == 2,
+            f"expected disabled rc=2, got {disabled_start.returncode}",
+        )
         disabled_runtime = load_json(runtime_file)
-        assert_ok(disabled_runtime["status"] == "disabled", f"expected disabled runtime, got {disabled_runtime}")
+        assert_ok(
+            disabled_runtime["status"] == "disabled",
+            f"expected disabled runtime, got {disabled_runtime}",
+        )
 
         run_control(tools_dir / "runtime_control.py", state_file, "set-voice", "on", env)
-        stop_not_listening = run_voice(runtime_voice, "ptt-stop", state_file, runtime_file, capture_dir, env)
-        assert_ok(stop_not_listening.returncode == 7, f"expected not-listening rc=7, got {stop_not_listening.returncode}")
+        stop_not_listening = run_voice(
+            runtime_voice, "ptt-stop", state_file, runtime_file, capture_dir, env
+        )
+        assert_ok(
+            stop_not_listening.returncode == 7,
+            f"expected not-listening rc=7, got {stop_not_listening.returncode}",
+        )
 
-        first_start = run_voice(runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, env)
+        first_start = run_voice(
+            runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, env
+        )
         assert_ok(first_start.returncode == 0, f"start failed: {first_start.stderr}")
         listening_runtime = load_json(runtime_file)
-        assert_ok(listening_runtime["listening"] is True, f"expected listening=true, got {listening_runtime}")
-        assert_ok(listening_runtime["status"] == "listening", f"expected listening status, got {listening_runtime}")
+        assert_ok(
+            listening_runtime["listening"] is True,
+            f"expected listening=true, got {listening_runtime}",
+        )
+        assert_ok(
+            listening_runtime["status"] == "listening",
+            f"expected listening status, got {listening_runtime}",
+        )
 
-        second_start = run_voice(runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, env)
-        assert_ok(second_start.returncode == 4, f"expected already-listening rc=4, got {second_start.returncode}")
+        second_start = run_voice(
+            runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, env
+        )
+        assert_ok(
+            second_start.returncode == 4,
+            f"expected already-listening rc=4, got {second_start.returncode}",
+        )
 
-        successful_stop = run_voice(runtime_voice, "ptt-stop", state_file, runtime_file, capture_dir, env)
+        successful_stop = run_voice(
+            runtime_voice, "ptt-stop", state_file, runtime_file, capture_dir, env
+        )
         assert_ok(successful_stop.returncode == 0, f"stop failed: {successful_stop.stderr}")
         stop_payload = json.loads(successful_stop.stdout)
         assert_ok(stop_payload["status"] == "completed", f"unexpected stop payload: {stop_payload}")
         final_runtime = load_json(runtime_file)
-        assert_ok(final_runtime["status"] == "idle", f"expected idle after stop, got {final_runtime}")
-        assert_ok(final_runtime["last_transcript"] == "hello from endpoint test", f"unexpected transcript: {final_runtime}")
-        assert_ok(load_json(request_result)["request_text"] == "hello from endpoint test", "last_request_result mismatch")
-        history_lines = [json.loads(line) for line in request_history.read_text(encoding="utf-8").splitlines() if line.strip()]
-        assert_ok(history_lines[-1]["request_text"] == "hello from endpoint test", "request_history mismatch")
+        assert_ok(
+            final_runtime["status"] == "idle", f"expected idle after stop, got {final_runtime}"
+        )
+        assert_ok(
+            final_runtime["last_transcript"] == "hello from endpoint test",
+            f"unexpected transcript: {final_runtime}",
+        )
+        assert_ok(
+            load_json(request_result)["request_text"] == "hello from endpoint test",
+            "last_request_result mismatch",
+        )
+        history_lines = [
+            json.loads(line)
+            for line in request_history.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        assert_ok(
+            history_lines[-1]["request_text"] == "hello from endpoint test",
+            "request_history mismatch",
+        )
 
         unavailable_env = build_env(
             home=home,
@@ -208,14 +253,36 @@ def main() -> int:
             ui_root=ui_root,
             runtime_namespace_root=runtime_namespace_root,
         )
-        unavailable_status = run_voice(runtime_voice, "status", state_file, runtime_file, capture_dir, unavailable_env)
-        assert_ok(unavailable_status.returncode == 0, f"status with missing request tool failed: {unavailable_status.stderr}")
+        unavailable_status = run_voice(
+            runtime_voice, "status", state_file, runtime_file, capture_dir, unavailable_env
+        )
+        assert_ok(
+            unavailable_status.returncode == 0,
+            f"status with missing request tool failed: {unavailable_status.stderr}",
+        )
         unavailable_payload = json.loads(unavailable_status.stdout)
-        assert_ok(unavailable_payload["status"] == "unavailable", f"expected unavailable backend: {unavailable_payload}")
-        unavailable_start = run_voice(runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, unavailable_env)
-        assert_ok(unavailable_start.returncode == 3, f"expected unavailable rc=3, got {unavailable_start.returncode}")
+        assert_ok(
+            unavailable_payload["status"] == "unavailable",
+            f"expected unavailable backend: {unavailable_payload}",
+        )
+        unavailable_start = run_voice(
+            runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, unavailable_env
+        )
+        assert_ok(
+            unavailable_start.returncode == 3,
+            f"expected unavailable rc=3, got {unavailable_start.returncode}",
+        )
 
-        piper_model = home / "lucy" / "runtime" / "voice" / "models" / "piper" / "test-voice" / "test-voice.onnx"
+        piper_model = (
+            home
+            / "lucy"
+            / "runtime"
+            / "voice"
+            / "models"
+            / "piper"
+            / "test-voice"
+            / "test-voice.onnx"
+        )
         piper_model.parent.mkdir(parents=True, exist_ok=True)
         piper_model.write_bytes(b"stub-model")
         aplay_log = root / "aplay_log.json"
@@ -288,20 +355,41 @@ def main() -> int:
         piper_env["LUCY_VOICE_PIPER_PREPAD_MS"] = "160"
         piper_env["LUCY_VOICE_APLAY_LOG"] = str(aplay_log)
 
-        piper_start = run_voice(runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, piper_env)
+        piper_start = run_voice(
+            runtime_voice, "ptt-start", state_file, runtime_file, capture_dir, piper_env
+        )
         assert_ok(piper_start.returncode == 0, f"piper start failed: {piper_start.stderr}")
         piper_runtime = load_json(runtime_file)
-        assert_ok(piper_runtime["tts"] == "none", f"ptt-start should defer tts detection, got {piper_runtime}")
-        assert_ok(piper_runtime["tts_device"] == "none", f"ptt-start should defer tts device detection, got {piper_runtime}")
-        piper_stop = run_voice(runtime_voice, "ptt-stop", state_file, runtime_file, capture_dir, piper_env)
+        assert_ok(
+            piper_runtime["tts"] == "none",
+            f"ptt-start should defer tts detection, got {piper_runtime}",
+        )
+        assert_ok(
+            piper_runtime["tts_device"] == "none",
+            f"ptt-start should defer tts device detection, got {piper_runtime}",
+        )
+        piper_stop = run_voice(
+            runtime_voice, "ptt-stop", state_file, runtime_file, capture_dir, piper_env
+        )
         assert_ok(piper_stop.returncode == 0, f"piper stop failed: {piper_stop.stderr}")
         piper_stop_payload = json.loads(piper_stop.stdout)
-        assert_ok(piper_stop_payload["tts_status"] == "completed", f"unexpected piper tts status: {piper_stop_payload}")
+        assert_ok(
+            piper_stop_payload["tts_status"] == "completed",
+            f"unexpected piper tts status: {piper_stop_payload}",
+        )
         piper_runtime_after_stop = load_json(runtime_file)
-        assert_ok(piper_runtime_after_stop["tts"] == "piper", f"expected piper runtime engine after stop, got {piper_runtime_after_stop}")
-        assert_ok(piper_runtime_after_stop["tts_device"] == "cpu", f"expected cpu tts device after stop, got {piper_runtime_after_stop}")
+        assert_ok(
+            piper_runtime_after_stop["tts"] == "piper",
+            f"expected piper runtime engine after stop, got {piper_runtime_after_stop}",
+        )
+        assert_ok(
+            piper_runtime_after_stop["tts_device"] == "cpu",
+            f"expected cpu tts device after stop, got {piper_runtime_after_stop}",
+        )
         playback_log = load_json(aplay_log)
-        assert_ok(playback_log["frame_rate"] == 22050, f"unexpected playback frame rate: {playback_log}")
+        assert_ok(
+            playback_log["frame_rate"] == 22050, f"unexpected playback frame rate: {playback_log}"
+        )
         assert_ok(
             int(playback_log["first_nonzero_frame"]) >= 3528,
             f"expected leading silence before piper speech, got {playback_log}",
@@ -346,16 +434,44 @@ def main() -> int:
                 """
             ).strip()
         )
-        assert_ok("2026-03-21T17:30:33Z" not in spoken_text, f"iso timestamp leaked into spoken text: {spoken_text}")
-        assert_ok("Sat, 21 Mar 2026 16:30:18 +0000" not in spoken_text, f"article timestamp leaked into spoken text: {spoken_text}")
-        assert_ok("18:16:10 GMT" not in spoken_text, f"clock time leaked into spoken text: {spoken_text}")
-        assert_ok("From current sources" not in spoken_text, f"evidence header leaked into spoken text: {spoken_text}")
-        assert_ok("Key items" not in spoken_text, f"evidence section label leaked into spoken text: {spoken_text}")
-        assert_ok("Sources" not in spoken_text, f"sources label leaked into spoken text: {spoken_text}")
-        assert_ok("timesofisrael.com:" not in spoken_text, f"source domain label leaked into spoken text: {spoken_text}")
-        assert_ok("jpost.com:" not in spoken_text, f"source domain label leaked into spoken text: {spoken_text}")
-        assert_ok("US said to strike Iran's Natanz enrichment site" in spoken_text, f"expected article content missing: {spoken_text}")
-        assert_ok("Israel's Mossad calls on Iranians to share information" in spoken_text, f"expected second article content missing: {spoken_text}")
+        assert_ok(
+            "2026-03-21T17:30:33Z" not in spoken_text,
+            f"iso timestamp leaked into spoken text: {spoken_text}",
+        )
+        assert_ok(
+            "Sat, 21 Mar 2026 16:30:18 +0000" not in spoken_text,
+            f"article timestamp leaked into spoken text: {spoken_text}",
+        )
+        assert_ok(
+            "18:16:10 GMT" not in spoken_text, f"clock time leaked into spoken text: {spoken_text}"
+        )
+        assert_ok(
+            "From current sources" not in spoken_text,
+            f"evidence header leaked into spoken text: {spoken_text}",
+        )
+        assert_ok(
+            "Key items" not in spoken_text,
+            f"evidence section label leaked into spoken text: {spoken_text}",
+        )
+        assert_ok(
+            "Sources" not in spoken_text, f"sources label leaked into spoken text: {spoken_text}"
+        )
+        assert_ok(
+            "timesofisrael.com:" not in spoken_text,
+            f"source domain label leaked into spoken text: {spoken_text}",
+        )
+        assert_ok(
+            "jpost.com:" not in spoken_text,
+            f"source domain label leaked into spoken text: {spoken_text}",
+        )
+        assert_ok(
+            "US said to strike Iran's Natanz enrichment site" in spoken_text,
+            f"expected article content missing: {spoken_text}",
+        )
+        assert_ok(
+            "Israel's Mossad calls on Iranians to share information" in spoken_text,
+            f"expected second article content missing: {spoken_text}",
+        )
         assert_ok(
             "sites..." in spoken_text,
             f"spoken news items should use the longer separator pause for TTS: {spoken_text}",
@@ -387,11 +503,13 @@ def main() -> int:
             f"regular paragraphs should stay in one TTS chunk when they fit the prose cap: {longer_chunks}",
         )
         assert_ok(
-            runtime_voice_module.resolve_kokoro_prepad_ms() > runtime_voice_module.resolve_piper_prepad_ms(),
+            runtime_voice_module.resolve_kokoro_prepad_ms()
+            > runtime_voice_module.resolve_piper_prepad_ms(),
             "kokoro should keep a slightly larger startup prepad than piper to avoid clipping first phonemes",
         )
         assert_ok(
-            runtime_voice_module.resolve_kokoro_first_chunk_prepad_ms() > runtime_voice_module.resolve_kokoro_prepad_ms(),
+            runtime_voice_module.resolve_kokoro_first_chunk_prepad_ms()
+            > runtime_voice_module.resolve_kokoro_prepad_ms(),
             "kokoro first chunk should keep a slightly larger startup prepad than later chunks",
         )
         assert_ok(
@@ -460,7 +578,10 @@ def build_env(
 
 def load_runtime_voice_module(runtime_voice: Path):
     spec = importlib.util.spec_from_file_location("runtime_voice_test_module", runtime_voice)
-    assert_ok(spec is not None and spec.loader is not None, f"unable to load module spec for {runtime_voice}")
+    assert_ok(
+        spec is not None and spec.loader is not None,
+        f"unable to load module spec for {runtime_voice}",
+    )
     module = importlib.util.module_from_spec(spec)
     sys.path.insert(0, str(runtime_voice.parent))
     sys.modules[spec.name] = module
@@ -471,7 +592,9 @@ def load_runtime_voice_module(runtime_voice: Path):
     return module
 
 
-def run_control(control_tool: Path, state_file: Path, command: str, value: str, env: dict[str, str]) -> None:
+def run_control(
+    control_tool: Path, state_file: Path, command: str, value: str, env: dict[str, str]
+) -> None:
     completed = subprocess.run(
         [
             "python3",
@@ -487,7 +610,9 @@ def run_control(control_tool: Path, state_file: Path, command: str, value: str, 
         text=True,
         env=env,
     )
-    assert_ok(completed.returncode == 0, f"runtime_control failed: {completed.stderr or completed.stdout}")
+    assert_ok(
+        completed.returncode == 0, f"runtime_control failed: {completed.stderr or completed.stdout}"
+    )
 
 
 def run_voice(

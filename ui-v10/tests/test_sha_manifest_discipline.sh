@@ -21,9 +21,24 @@ ok "SHA256SUMS mirror is byte-identical to SHA256SUMS.clean"
 ok "sha manifest check passes"
 
 tracked_files="$("${COLLECTOR}" list)"
+manifest_files="$(cut -d' ' -f3- "${MANIFEST_CLEAN}" | python3 -c 'import sys; [print(line.rstrip("\n").lstrip("\\").lstrip("./")) for line in sys.stdin]')"
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+tracked_sorted="${tmpdir}/tracked.txt"
+manifest_sorted="${tmpdir}/manifest.txt"
+printf '%s\n' "${tracked_files}" | sort >"${tracked_sorted}"
+printf '%s\n' "${manifest_files}" >"${manifest_sorted}"
+
+if ! diff -q "${tracked_sorted}" "${manifest_sorted}" >/dev/null; then
+    echo "FAIL: collector file list does not match manifest entries" >&2
+    diff "${tracked_sorted}" "${manifest_sorted}" >&2 || true
+    exit 1
+fi
+ok "collector file list matches manifest exactly"
 
 printf '%s\n' "${tracked_files}" | grep -qx 'app/main.py' || die "expected app/main.py in tracked scope"
-printf '%s\n' "${tracked_files}" | grep -qx 'tests/test_voice_ptt_offscreen.py' || die "expected UI tests in tracked scope"
+printf '%s\n' "${tracked_files}" | grep -qx 'tests/test_voice_ptt_pause_removed_offscreen.py' || die "expected UI tests in tracked scope"
 printf '%s\n' "${tracked_files}" | grep -qx 'tools/sha_manifest.sh' || die "expected collector to self-track"
 printf '%s\n' "${tracked_files}" | grep -q '^SHA256SUMS' && die "manifest files should not self-track"
 printf '%s\n' "${tracked_files}" | grep -q '__pycache__' && die "__pycache__ should be excluded"

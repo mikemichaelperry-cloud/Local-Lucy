@@ -6,6 +6,7 @@ an augmented provider. The retriever is intentionally lightweight: it reuses
 the existing MiniLM-backed persistent-fact store and uses simple keyword overlap
 for approved memory notes, so it adds no new embedding infrastructure.
 """
+
 from __future__ import annotations
 
 import os
@@ -16,7 +17,9 @@ from typing import Any
 # Persistent facts lookup. Mirror the import fallback used by local_answer.py
 # so this module stays usable in standalone/router tests.
 try:
-    from memory.memory_service import get_relevant_persistent_facts as _get_relevant_persistent_facts
+    from memory.memory_service import (
+        get_relevant_persistent_facts as _get_relevant_persistent_facts,
+    )
 except ImportError:
     try:
         from tools.memory.memory_service import (

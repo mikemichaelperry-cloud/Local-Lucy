@@ -255,10 +255,10 @@ def main():
     print(f"  Total cases evaluated:              {len(cases)}")
     print(f"  Cases with expected_route:          {total_with_expected}")
     print(
-        f"  Hybrid correct (incl. forbidden):   {total_correct_hybrid} / {len(cases)} ({100*total_correct_hybrid/len(cases):.1f}%)"
+        f"  Hybrid correct (incl. forbidden):   {total_correct_hybrid} / {len(cases)} ({100 * total_correct_hybrid / len(cases):.1f}%)"
     )
     print(
-        f"  Keyword correct (incl. forbidden):  {total_correct_keyword} / {len(cases)} ({100*total_correct_keyword/len(cases):.1f}%)"
+        f"  Keyword correct (incl. forbidden):  {total_correct_keyword} / {len(cases)} ({100 * total_correct_keyword / len(cases):.1f}%)"
     )
     print(f"  Routes that differed:               {len(diffs)}")
     print()

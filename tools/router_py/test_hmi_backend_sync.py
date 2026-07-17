@@ -71,14 +71,10 @@ class TestHMIBackendSync:
     def test_route_probes_agree(self, query, expected_route):
         """Canonical and backend paths must agree on route for acceptance probes."""
         cls_canonical = canonical_classify_intent(query)
-        dec_canonical = canonical_select_route(
-            cls_canonical, query=query, policy="fallback_only"
-        )
+        dec_canonical = canonical_select_route(cls_canonical, query=query, policy="fallback_only")
 
         cls_backend = backend_classify_intent(query)
-        dec_backend = backend_select_route(
-            cls_backend, query=query, policy="fallback_only"
-        )
+        dec_backend = backend_select_route(cls_backend, query=query, policy="fallback_only")
 
         assert dec_canonical.route == dec_backend.route, (
             f"Route mismatch for {query!r}: "

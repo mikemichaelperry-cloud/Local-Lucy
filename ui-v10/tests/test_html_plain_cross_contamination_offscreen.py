@@ -37,7 +37,7 @@ def main() -> int:
         history = panel._history
 
         # Phase 1 — set HTML with URLs (NEWS path)
-        news_text = "Sources:\n" "- https://nytimes.com/article-1\n" "- https://bbc.co.uk/article-2"
+        news_text = "Sources:\n- https://nytimes.com/article-1\n- https://bbc.co.uk/article-2"
         panel._set_plain_text(history, news_text, reset_scroll=False)
         app.processEvents()
         assert "<a" in history.toHtml(), "NEWS text should render as HTML with <a> tags"
@@ -52,7 +52,7 @@ def main() -> int:
 
         history.clear = spied_clear  # type: ignore[method-assign]
         try:
-            local_text = "Latest Request\n" "What is 2+2?\n\n" "Latest Answer\n" "The sum is 4."
+            local_text = "Latest Request\nWhat is 2+2?\n\nLatest Answer\nThe sum is 4."
             panel._set_plain_text(history, local_text, reset_scroll=False)
             app.processEvents()
         finally:

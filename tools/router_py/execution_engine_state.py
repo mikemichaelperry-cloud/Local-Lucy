@@ -95,9 +95,7 @@ class StateWriter:
                     if attempt < max_retries:
                         import random
 
-                        backoff_ms = (
-                            backoff_base_ms * (2 ** attempt) * (2.5 if attempt > 0 else 1)
-                        )
+                        backoff_ms = backoff_base_ms * (2**attempt) * (2.5 if attempt > 0 else 1)
                         jitter_ms = random.uniform(0, 5)
                         sleep_time = (backoff_ms + jitter_ms) / 1000.0
                         self._logger.debug(
@@ -251,7 +249,9 @@ class StateWriter:
             return Path(raw).expanduser()
         # Fallback: same default as runtime_request.py
         home = Path.home()
-        workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
+        workspace_home = (
+            home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
+        )
         return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10" / "state"
 
     # -- Payload builder --
@@ -333,7 +333,9 @@ class StateWriter:
             "augmented_allowed": "",
             "augmented_provider": "",
             "augmented_provider_selected": "",
-            "augmented_provider_used": result.provider if result.route in {"AUGMENTED", "EVIDENCE"} else "none",
+            "augmented_provider_used": result.provider
+            if result.route in {"AUGMENTED", "EVIDENCE"}
+            else "none",
             "augmented_provider_usage_class": result.provider_usage_class or "local",
             "augmented_provider_call_reason": metadata.get("augmented_provider_call_reason", ""),
             "augmented_provider_status": metadata.get("augmented_provider_status", ""),
@@ -346,7 +348,9 @@ class StateWriter:
             "augmented_provider_selection_query": "",
             "augmented_provider_selection_rule": "",
             "augmented_provider_cost_notice": "",
-            "augmented_paid_provider_invoked": "true" if result.provider_usage_class == "paid" and result.route == "AUGMENTED" else "false",
+            "augmented_paid_provider_invoked": "true"
+            if result.provider_usage_class == "paid" and result.route == "AUGMENTED"
+            else "false",
             "augmentation_policy": control_state.get("augmentation_policy", ""),
             "augmented_direct_request": metadata.get("augmented_direct_request", ""),
             "unverified_context_used": "",
@@ -391,6 +395,7 @@ class StateWriter:
 
     def _build_control_state(self, context: dict[str, Any]) -> dict[str, str]:
         """Build control_state dict from context + environment fallbacks."""
+
         # Map boolean flags to on/off strings
         def _toggle(val: Any) -> str:
             if val in (True, "1", "on", "yes"):
@@ -399,9 +404,13 @@ class StateWriter:
                 return "off"
             return str(val) if val else "off"
 
-        mode = str(context.get("mode", "") or os.environ.get("LUCY_ROUTE_CONTROL_MODE", "auto")).strip()
+        mode = str(
+            context.get("mode", "") or os.environ.get("LUCY_ROUTE_CONTROL_MODE", "auto")
+        ).strip()
         memory = _toggle(context.get("memory_enabled", os.environ.get("LUCY_SESSION_MEMORY", "0")))
-        evidence = _toggle(context.get("evidence_enabled", os.environ.get("LUCY_EVIDENCE_ENABLED", "0")))
+        evidence = _toggle(
+            context.get("evidence_enabled", os.environ.get("LUCY_EVIDENCE_ENABLED", "0"))
+        )
         voice = _toggle(os.environ.get("LUCY_VOICE_ENABLED", "0"))
         augmentation_policy = str(
             context.get("augmentation_policy", "")
@@ -411,10 +420,7 @@ class StateWriter:
             context.get("augmented_provider", "")
             or os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
         ).strip()
-        model = str(
-            context.get("model", "")
-            or os.environ.get("LUCY_MODEL", "local-lucy")
-        ).strip()
+        model = str(context.get("model", "") or os.environ.get("LUCY_MODEL", "local-lucy")).strip()
         profile = str(os.environ.get("LUCY_RUNTIME_PROFILE", "lucy-v10")).strip()
 
         return {
@@ -432,8 +438,12 @@ class StateWriter:
         """Build authority block matching runtime_request.py schema."""
         # Resolve paths using same logic as runtime_request.py
         home = Path.home()
-        workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-        authority_root = Path(os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path(__file__).resolve().parents[2]))).expanduser()
+        workspace_home = (
+            home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
+        )
+        authority_root = Path(
+            os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path(__file__).resolve().parents[2]))
+        ).expanduser()
         runtime_namespace = workspace_home / ".codex-api-home" / "lucy" / "runtime-v10"
         legacy_root = workspace_home / "lucy" / "runtime-v10"
         return {
@@ -443,8 +453,10 @@ class StateWriter:
             "legacy_runtime_namespace_root": str(legacy_root),
             "legacy_runtime_namespace_present": legacy_root.exists(),
             "legacy_runtime_namespace_status": (
-                "same" if runtime_namespace.resolve() == legacy_root.resolve()
-                else "stale_parallel_tree_present" if legacy_root.exists()
+                "same"
+                if runtime_namespace.resolve() == legacy_root.resolve()
+                else "stale_parallel_tree_present"
+                if legacy_root.exists()
                 else "absent"
             ),
         }
@@ -538,7 +550,10 @@ class StateWriter:
                     parsed = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if isinstance(parsed, dict) and str(parsed.get("request_id", "")).strip() == request_id:
+                if (
+                    isinstance(parsed, dict)
+                    and str(parsed.get("request_id", "")).strip() == request_id
+                ):
                     # Populate cache so next check is instant
                     self._history_id_cache.add(request_id)
                     return True
@@ -606,12 +621,14 @@ class StateWriter:
     ) -> None:
         if self.use_sqlite_state:
             try:
-                self.state_manager.write_outcome({
-                    "success": outcome_code != "execution_error",
-                    "duration_ms": execution_time_ms,
-                    "result": {"outcome_code": outcome_code, "mode": mode},
-                    "error_message": error_msg or "",
-                })
+                self.state_manager.write_outcome(
+                    {
+                        "success": outcome_code != "execution_error",
+                        "duration_ms": execution_time_ms,
+                        "result": {"outcome_code": outcome_code, "mode": mode},
+                        "error_message": error_msg or "",
+                    }
+                )
                 self._logger.debug("Terminal outcome recorded in SQLite")
             except Exception as e:
                 self._logger.error(f"Failed to record terminal outcome in SQLite: {e}")

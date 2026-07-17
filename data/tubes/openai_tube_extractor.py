@@ -92,7 +92,6 @@ def extract_tube(client, tube_type: str, model: str = "gpt-4o-mini") -> Extracti
     """Call OpenAI to extract tube parameters."""
     prompt = EXTRACTION_PROMPT.format(tube_type=tube_type)
 
-    start = time.time()
     try:
         response = client.chat.completions.create(
             model=model,
@@ -116,7 +115,6 @@ def extract_tube(client, tube_type: str, model: str = "gpt-4o-mini") -> Extracti
             cost_estimate_usd=0.0,
         )
 
-    elapsed = time.time() - start
     raw = response.choices[0].message.content or ""
 
     # Cost estimate: gpt-4o-mini ~ $0.15 / 1M input tokens, $0.60 / 1M output
@@ -289,7 +287,7 @@ def main() -> int:
 
     conn.close()
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Total tubes: {len(tube_list)}")
     print(f"Inserted:    {success}")
     print(f"Skipped:     {skip}")

@@ -742,7 +742,7 @@ class StreamingVoicePipeline:
                 else:
                     phrases_failed += 1
                     print(
-                        f"[TTS Debug] Phrase {i+1} failed ({len(phrase)} chars): {phrase[:80]}..."
+                        f"[TTS Debug] Phrase {i + 1} failed ({len(phrase)} chars): {phrase[:80]}..."
                     )
 
                 if on_response_chunk:

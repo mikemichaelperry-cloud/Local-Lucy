@@ -10,7 +10,7 @@ def _collapse_ws(text: str) -> str:
 
 
 def normalize_text(text: str) -> str:
-    text = (text or "")
+    text = text or ""
     text = (
         text.replace("\u2019", "'")
         .replace("\u2018", "'")
@@ -103,9 +103,15 @@ def normalize_input(raw_text: str, surface: str = "cli") -> Dict[str, object]:
         "has_url": bool(re.search(r"https?://", question_text, flags=re.IGNORECASE)),
         "has_news_terms": bool(re.search(r"\b(news|headline|headlines|breaking)\b", lowered)),
         "has_current_terms": bool(
-            re.search(r"\b(latest|today|current|recent|right now|at the moment|now|this week|as of)\b", lowered)
+            re.search(
+                r"\b(latest|today|current|recent|right now|at the moment|now|this week|as of)\b",
+                lowered,
+            )
         ),
         "has_source_terms": bool(
-            re.search(r"\b(source|sources|citation|citations|cite|verify|evidence|url|link|wikipedia|wiki)\b", lowered)
+            re.search(
+                r"\b(source|sources|citation|citations|cite|verify|evidence|url|link|wikipedia|wiki)\b",
+                lowered,
+            )
         ),
     }

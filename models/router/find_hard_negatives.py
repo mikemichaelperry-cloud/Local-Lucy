@@ -103,7 +103,7 @@ def main():
     print(f"Low-confidence correct: {len(low_conf_correct)}")
     print("Per-route accuracy:")
     for route, (c, t) in sorted(per_route_correct.items()):
-        print(f"  {route}: {c}/{t} = {c/t:.3f}")
+        print(f"  {route}: {c}/{t} = {c / t:.3f}")
 
 
 if __name__ == "__main__":

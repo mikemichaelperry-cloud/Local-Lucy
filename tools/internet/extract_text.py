@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 
 SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style)\b.*?>.*?</\1>")
 
+
 class TextExtractor(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -13,6 +14,7 @@ class TextExtractor(HTMLParser):
         s = data.strip()
         if s:
             self.parts.append(s)
+
 
 def html_to_text(html: str) -> str:
     html = SCRIPT_STYLE_RE.sub(" ", html)

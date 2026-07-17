@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Add evaluation queries to the comprehensive embedding index."""
+
 import json
 from pathlib import Path
 
@@ -15,10 +16,13 @@ EVAL_QUERIES = [
     ("wats teh symtom of hart atak?", "AUGMENTED", "medical_typos"),
     ("Can I sue my doctor for malpractice?", "AUGMENTED", "medical_legal"),
     ("Explain how insulin works in the body", "AUGMENTED", "medical_educational"),
-    ("Write a story about a nurse who discovers a cure for cancer", "AUGMENTED", "medical_compound"),
+    (
+        "Write a story about a nurse who discovers a cure for cancer",
+        "AUGMENTED",
+        "medical_compound",
+    ),
     ("My 2-year-old has a fever of 40 degrees", "AUGMENTED", "medical_pediatric"),
     ("What are the side effects of tadalafil?", "AUGMENTED", "medical_drug"),
-
     # Financial (AUGMENTED)
     ("What is Tesla's stock price right now?", "AUGMENTED", "financial_stock"),
     ("Should I buy Bitcoin today?", "AUGMENTED", "financial_crypto"),
@@ -30,7 +34,6 @@ EVAL_QUERIES = [
     ("How do I file taxes as a freelancer in Israel?", "AUGMENTED", "financial_tax"),
     ("Should I refinance my mortgage at 6.5%?", "AUGMENTED", "financial_mortgage"),
     ("Write a poem about the stock market crash of 2008", "AUGMENTED", "financial_compound"),
-
     # Legal (AUGMENTED)
     ("What does the Israeli Basic Law say about freedom of speech?", "AUGMENTED", "legal_statute"),
     ("Do I need a business license to sell food online?", "AUGMENTED", "legal_compliance"),
@@ -42,7 +45,6 @@ EVAL_QUERIES = [
     ("is it ilegal to park on teh sidewalk?", "AUGMENTED", "legal_typos"),
     ("Tell me a story about a lawyer who wins a big case", "AUGMENTED", "legal_compound"),
     ("Explain the concept of habeas corpus", "AUGMENTED", "legal_educational"),
-
     # News (NEWS)
     ("What is the latest news about the war in Gaza?", "NEWS", "news_explicit"),
     ("Breaking news: earthquake in Japan", "NEWS", "news_breaking"),
@@ -54,14 +56,12 @@ EVAL_QUERIES = [
     ("Write a 500-word story about a journalist covering the war", "NEWS", "news_compound"),
     ("Any new developments in the Russia-Ukraine conflict?", "NEWS", "news_conflict"),
     ("New scientific discovery in quantum computing this week", "NEWS", "news_science"),
-
     # Time (TIME)
     ("What time is it in Tokyo right now?", "TIME", "time_explicit"),
     ("What is today's date?", "TIME", "time_date"),
     ("What time is it?", "TIME", "time_vague"),
     ("wat tyme is it in new york?", "TIME", "time_typos"),
     ("Tell me a story about a clock that stopped at midnight", "LOCAL", "time_compound"),
-
     # Creative (LOCAL)
     ("Tell me a 500-word story about a dog named Oscar", "LOCAL", "creative_story"),
     ("Write me a poem about autumn leaves", "LOCAL", "creative_poem"),
@@ -78,13 +78,11 @@ EVAL_QUERIES = [
     ("What do you mean by that?", "LOCAL", "creative_clarify"),
     ("Tell me a joke about programmers", "LOCAL", "creative_joke"),
     ("I speak without a mouth and hear without ears. What am I?", "LOCAL", "creative_riddle"),
-
     # Evidence (AUGMENTED)
     ("Can you cite peer-reviewed sources for that claim?", "AUGMENTED", "evidence_cite"),
     ("Show me clinical trial data on mRNA vaccines", "AUGMENTED", "evidence_clinical"),
     ("What is the official unemployment rate in Israel?", "AUGMENTED", "evidence_statistic"),
     ("Do you have any evidence for that?", "AUGMENTED", "evidence_vague"),
-
     # Edge cases
     ("Write a horror story about a hospital", "LOCAL", "edge_medical_story"),
     ("Write a thriller about a stock trader", "LOCAL", "edge_financial_story"),
@@ -101,16 +99,46 @@ EVAL_QUERIES = [
 
 def route_to_labels(route: str) -> dict:
     if route == "LOCAL":
-        return {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}
+        return {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        }
     if route == "AUGMENTED":
-        return {"intent_family": "current_evidence", "evidence_mode": "required", "route": "AUGMENTED", "policy_override": "none"}
+        return {
+            "intent_family": "current_evidence",
+            "evidence_mode": "required",
+            "route": "AUGMENTED",
+            "policy_override": "none",
+        }
     if route == "NEWS":
-        return {"intent_family": "news_request", "evidence_mode": "not_required", "route": "NEWS", "policy_override": "none"}
+        return {
+            "intent_family": "news_request",
+            "evidence_mode": "not_required",
+            "route": "NEWS",
+            "policy_override": "none",
+        }
     if route == "TIME":
-        return {"intent_family": "time_query", "evidence_mode": "not_required", "route": "TIME", "policy_override": "none"}
+        return {
+            "intent_family": "time_query",
+            "evidence_mode": "not_required",
+            "route": "TIME",
+            "policy_override": "none",
+        }
     if route == "CLARIFY":
-        return {"intent_family": "clarification", "evidence_mode": "not_required", "route": "CLARIFY", "policy_override": "none"}
-    return {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}
+        return {
+            "intent_family": "clarification",
+            "evidence_mode": "not_required",
+            "route": "CLARIFY",
+            "policy_override": "none",
+        }
+    return {
+        "intent_family": "local_answer",
+        "evidence_mode": "not_required",
+        "route": "LOCAL",
+        "policy_override": "none",
+    }
 
 
 def main():

@@ -62,7 +62,10 @@ def is_high_risk_medical(text: str) -> bool:
 
 
 def has_pet_food_intent(text: str) -> bool:
-    if not has_re(text, r"\b(can|could|should|safe|unsafe|healthy|good|bad|okay|ok|eat|feed|give|best|main|regular)\b"):
+    if not has_re(
+        text,
+        r"\b(can|could|should|safe|unsafe|healthy|good|bad|okay|ok|eat|feed|give|best|main|regular)\b",
+    ):
         return False
     if has_re(text, r"\b(eat|feed|give|food|treat|snack|meal|diet)\b"):
         return True
@@ -85,53 +88,79 @@ def build_answer(qn: str, pet: str, category: str, tuna_pack: str) -> str:
         if tuna_pack == "brine":
             lines.append("Avoid tuna in brine because high sodium can be harmful.")
         elif tuna_pack == "oil":
-            lines.append("Avoid tuna packed in oil (including olive oil) because extra fat can trigger stomach upset or pancreatitis risk.")
+            lines.append(
+                "Avoid tuna packed in oil (including olive oil) because extra fat can trigger stomach upset or pancreatitis risk."
+            )
         elif tuna_pack == "water":
-            lines.append("If given at all, use only plain tuna in water without added salt and keep it as a tiny occasional treat.")
+            lines.append(
+                "If given at all, use only plain tuna in water without added salt and keep it as a tiny occasional treat."
+            )
         else:
-            lines.append("If offered at all, keep portions tiny and occasional, and avoid salted or oily variants.")
+            lines.append(
+                "If offered at all, keep portions tiny and occasional, and avoid salted or oily variants."
+            )
         lines.append("Use complete dog/cat-formulated food for regular meals.")
         lines.append("Conservative sources: vcahospitals.com, akc.org, petmd.com.")
         return "\n".join(lines)
 
     if category == "diet_advice":
-        lines.append(f"The best regular food for your {subject} is a complete and balanced pet food made for their species and life stage.")
-        lines.append("Choose food labeled for growth, adult maintenance, or senior needs as appropriate, and use your vet's advice if your pet has allergies or medical conditions.")
+        lines.append(
+            f"The best regular food for your {subject} is a complete and balanced pet food made for their species and life stage."
+        )
+        lines.append(
+            "Choose food labeled for growth, adult maintenance, or senior needs as appropriate, and use your vet's advice if your pet has allergies or medical conditions."
+        )
         lines.append("Avoid making fatty, salty, or heavily seasoned human food the main diet.")
         lines.append("Conservative sources: vcahospitals.com, akc.org, petmd.com.")
         return "\n".join(lines)
 
     if category == "burger":
         lines.append(f"A double cheeseburger is not a good meal choice for your {subject}.")
-        lines.append("It is typically too high in fat and salt, and common toppings/seasonings (like onion or garlic) can be unsafe.")
-        lines.append("If a bite was already eaten, monitor for vomiting, diarrhea, or lethargy and call your vet if symptoms appear.")
+        lines.append(
+            "It is typically too high in fat and salt, and common toppings/seasonings (like onion or garlic) can be unsafe."
+        )
+        lines.append(
+            "If a bite was already eaten, monitor for vomiting, diarrhea, or lethargy and call your vet if symptoms appear."
+        )
         lines.append("Use plain, unseasoned pet-safe food instead.")
         lines.append("Conservative sources: vcahospitals.com, akc.org, petmd.com.")
         return "\n".join(lines)
 
     if category == "processed_human_food":
         lines.append(f"Processed human food is generally a poor choice for your {subject}.")
-        lines.append("These foods are often high in fat, salt, and seasoning that can upset digestion.")
-        lines.append("Prefer plain pet-formulated food and reserve human food for rare tiny treats.")
+        lines.append(
+            "These foods are often high in fat, salt, and seasoning that can upset digestion."
+        )
+        lines.append(
+            "Prefer plain pet-formulated food and reserve human food for rare tiny treats."
+        )
         lines.append("Conservative sources: vcahospitals.com, akc.org, petmd.com.")
         return "\n".join(lines)
 
     if category == "dairy":
         lines.append(f"Most {subject}s can have trouble with dairy.")
-        lines.append("Small amounts may be tolerated by some pets, but dairy can cause stomach upset.")
+        lines.append(
+            "Small amounts may be tolerated by some pets, but dairy can cause stomach upset."
+        )
         lines.append("If you try any dairy, keep it tiny and stop if GI symptoms appear.")
         lines.append("Conservative sources: vcahospitals.com, petmd.com.")
         return "\n".join(lines)
 
     if category == "plain_food":
         lines.append(f"Some plain foods can be okay for your {subject} in small amounts.")
-        lines.append("Keep food plain, unseasoned, and treat-sized; avoid salt, oils, sauces, onion, and garlic.")
+        lines.append(
+            "Keep food plain, unseasoned, and treat-sized; avoid salt, oils, sauces, onion, and garlic."
+        )
         lines.append("Pet-formulated complete food should remain the main diet.")
         lines.append("Conservative sources: vcahospitals.com, petmd.com.")
         return "\n".join(lines)
 
-    lines.append(f"I cannot verify that food as safe for your {subject} from this quick classifier.")
-    lines.append("Use plain pet-formulated food by default and avoid seasoned/fatty/salty human foods.")
+    lines.append(
+        f"I cannot verify that food as safe for your {subject} from this quick classifier."
+    )
+    lines.append(
+        "Use plain pet-formulated food by default and avoid seasoned/fatty/salty human foods."
+    )
     lines.append("If any unusual symptoms appear, contact your veterinarian.")
     lines.append("Conservative sources: vcahospitals.com, akc.org, petmd.com.")
     return "\n".join(lines)

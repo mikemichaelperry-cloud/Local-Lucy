@@ -102,9 +102,9 @@ def check_first_person(text: str) -> bool:
 
 def run_test(model_key: str, model_name: str, warm: bool = False):
     label = "warm" if warm else "cold"
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Testing {model_key} ({label}) — {model_name}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     results = []
     for tag, query, refusal_keywords in QUERIES:
         text, elapsed = ollama_generate(model_name, query)
@@ -138,9 +138,9 @@ def main():
         unload_model(name)
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     for key in MODELS:
         cold = all_results[f"{key}_cold"]
         warm = all_results[f"{key}_warm"]

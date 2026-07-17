@@ -1867,10 +1867,10 @@ class LocalAnswer:
 
         # Active persona injection. This applies to every local model (Llama,
         # Gemma, etc.) because it is added at prompt-build time. It is NOT
-        # injected for SELF_REVIEW, which bypasses local_answer entirely and
-        # uses SelfAnalysisEngine directly.
+        # injected for SELF_REVIEW, which must remain neutral and focused on
+        # code quality rather than user persona style.
         persona_fragment = _get_active_persona_fragment()
-        if persona_fragment:
+        if persona_fragment and generation_profile != "self_review":
             parts.append(persona_fragment)
 
         # Current date/time/location context (for age calculations, relative time,

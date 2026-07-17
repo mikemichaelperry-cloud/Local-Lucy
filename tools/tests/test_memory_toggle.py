@@ -118,9 +118,9 @@ def test_memory_env_var():
     )
     env_output = result.stdout
 
-    assert (
-        "LUCY_SESSION_MEMORY=1" in env_output
-    ), f"Expected LUCY_SESSION_MEMORY=1, got: {env_output}"
+    assert "LUCY_SESSION_MEMORY=1" in env_output, (
+        f"Expected LUCY_SESSION_MEMORY=1, got: {env_output}"
+    )
     print("✓ LUCY_SESSION_MEMORY=1 when memory=on")
 
     # Test OFF
@@ -139,9 +139,9 @@ def test_memory_env_var():
     )
     env_output = result.stdout
 
-    assert (
-        "LUCY_SESSION_MEMORY=0" in env_output
-    ), f"Expected LUCY_SESSION_MEMORY=0, got: {env_output}"
+    assert "LUCY_SESSION_MEMORY=0" in env_output, (
+        f"Expected LUCY_SESSION_MEMORY=0, got: {env_output}"
+    )
     print("✓ LUCY_SESSION_MEMORY=0 when memory=off")
 
     # Restore original
@@ -230,9 +230,9 @@ def test_memory_context_in_prompt():
     # the memory toggle and may still contain "Oscar" — that's by design.
     # We check for the specific session-memory block header, not the
     # words "session memory" which also appear in the self-knowledge block.
-    assert (
-        "The user has enabled session memory" not in prompt_no_memory
-    ), "Session memory block included when disabled"
+    assert "The user has enabled session memory" not in prompt_no_memory, (
+        "Session memory block included when disabled"
+    )
     print("✓ Session memory block NOT included when disabled")
 
     # Restore original state

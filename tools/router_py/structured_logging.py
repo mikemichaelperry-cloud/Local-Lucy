@@ -34,6 +34,7 @@ from typing import Any
 # StructuredFormatter
 # ---------------------------------------------------------------------------
 
+
 class StructuredFormatter(logging.Formatter):
     """
     JSON formatter for log records.
@@ -63,11 +64,32 @@ class StructuredFormatter(logging.Formatter):
         # Merge any extra fields set via logging.info(..., extra={...})
         for key, value in record.__dict__.items():
             if key not in (
-                "name", "msg", "args", "levelname", "levelno", "pathname",
-                "filename", "module", "lineno", "funcName", "created", "msecs",
-                "relativeCreated", "thread", "threadName", "processName",
-                "process", "getMessage", "exc_info", "exc_text", "stack_info",
-                "timestamp", "message", "level", "logger", "asctime",
+                "name",
+                "msg",
+                "args",
+                "levelname",
+                "levelno",
+                "pathname",
+                "filename",
+                "module",
+                "lineno",
+                "funcName",
+                "created",
+                "msecs",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "processName",
+                "process",
+                "getMessage",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "timestamp",
+                "message",
+                "level",
+                "logger",
+                "asctime",
             ):
                 payload[key] = value
 
@@ -80,6 +102,7 @@ class StructuredFormatter(logging.Formatter):
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         from datetime import datetime, timezone
+
         dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
         return dt.isoformat(timespec="milliseconds")
 
@@ -98,6 +121,7 @@ class StructuredFormatter(logging.Formatter):
 # ---------------------------------------------------------------------------
 # ContextualLogger
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class ContextualLogger:

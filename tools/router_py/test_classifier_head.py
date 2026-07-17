@@ -90,8 +90,13 @@ class TestClassifierHeadFallback:
         tmp_dir = Path(tempfile.mkdtemp())
         try:
             # Copy examples and embeddings, but not the head files
-            shutil.copy(router_dir / "comprehensive_examples.json", tmp_dir / "comprehensive_examples.json")
-            shutil.copy(router_dir / "comprehensive_embeddings.npy", tmp_dir / "comprehensive_embeddings.npy")
+            shutil.copy(
+                router_dir / "comprehensive_examples.json", tmp_dir / "comprehensive_examples.json"
+            )
+            shutil.copy(
+                router_dir / "comprehensive_embeddings.npy",
+                tmp_dir / "comprehensive_embeddings.npy",
+            )
 
             router = HybridRouterV2(
                 embeddings_path=str(tmp_dir / "comprehensive_embeddings.npy"),

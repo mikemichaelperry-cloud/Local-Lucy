@@ -23,6 +23,7 @@ Usage:
     )
     metadata = merge(existing_metadata, telemetry)
 """
+
 from __future__ import annotations
 
 from typing import Any

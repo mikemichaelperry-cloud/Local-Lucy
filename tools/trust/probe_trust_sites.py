@@ -704,7 +704,7 @@ def write_markdown(
                 f.write(f"  - `{k}`: {counts[k]}\n")
             for r in gate_fail:
                 f.write(
-                    f"- `{r['domain']}` tier {r['tier']}: expected `{r['gate_expected']}`, got `{r['gate_status']}` (class=`{r.get('gate_failure_class','UNKNOWN')}`, rc={r['gate_rc']}, reason={r['gate_reason_bucket']})\n"
+                    f"- `{r['domain']}` tier {r['tier']}: expected `{r['gate_expected']}`, got `{r['gate_status']}` (class=`{r.get('gate_failure_class', 'UNKNOWN')}`, rc={r['gate_rc']}, reason={r['gate_reason_bucket']})\n"
                 )
 
         f.write("\n## Probe Expectation Failures\n")

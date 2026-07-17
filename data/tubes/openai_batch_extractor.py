@@ -216,7 +216,6 @@ def main() -> int:
         return 0
 
     client = get_openai_client()
-    total_cost = 0.0
     success = 0
     fail = 0
     skip = 0
@@ -256,7 +255,7 @@ def main() -> int:
         time.sleep(args.delay)
 
     conn.close()
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Total processed: {len(missing)}")
     print(f"Inserted: {success}")
     print(f"Skipped: {skip}")

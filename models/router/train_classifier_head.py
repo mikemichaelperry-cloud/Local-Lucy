@@ -117,11 +117,19 @@ def evaluate(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train a route classifier head on frozen embeddings.")
-    parser.add_argument("--examples", default="comprehensive_examples.json", help="Examples JSON file")
-    parser.add_argument("--embeddings", default="comprehensive_embeddings.npy", help="Embeddings .npy file")
+    parser = argparse.ArgumentParser(
+        description="Train a route classifier head on frozen embeddings."
+    )
+    parser.add_argument(
+        "--examples", default="comprehensive_examples.json", help="Examples JSON file"
+    )
+    parser.add_argument(
+        "--embeddings", default="comprehensive_embeddings.npy", help="Embeddings .npy file"
+    )
     parser.add_argument("--output-dir", default=".", help="Directory to save head artifacts")
-    parser.add_argument("--hidden-dim", type=int, default=0, help="If >0, use a one-hidden-layer MLP")
+    parser.add_argument(
+        "--hidden-dim", type=int, default=0, help="If >0, use a one-hidden-layer MLP"
+    )
     parser.add_argument("--epochs", type=int, default=200, help="Max training epochs")
     parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
@@ -144,8 +152,12 @@ def main() -> None:
 
     # Resolve paths relative to the script directory if not absolute
     here = Path(__file__).resolve().parent
-    examples_path = here / args.examples if not Path(args.examples).is_absolute() else Path(args.examples)
-    embeddings_path = here / args.embeddings if not Path(args.embeddings).is_absolute() else Path(args.embeddings)
+    examples_path = (
+        here / args.examples if not Path(args.examples).is_absolute() else Path(args.examples)
+    )
+    embeddings_path = (
+        here / args.embeddings if not Path(args.embeddings).is_absolute() else Path(args.embeddings)
+    )
 
     examples = json.loads(examples_path.read_text())
     embeddings = np.load(embeddings_path)
@@ -160,7 +172,9 @@ def main() -> None:
     print(f"Loaded {len(examples)} examples, {embeddings.shape[1]}D embeddings")
     print(f"Routes ({len(routes)}): {routes}")
     print("Route distribution:")
-    for route, count in sorted(Counter(ex["labels"]["route"] for ex in examples).items(), key=lambda x: -x[1]):
+    for route, count in sorted(
+        Counter(ex["labels"]["route"] for ex in examples).items(), key=lambda x: -x[1]
+    ):
         print(f"  {route}: {count}")
 
     # Stratified split
@@ -218,7 +232,9 @@ def main() -> None:
             patience_counter += 1
 
         if epoch % 10 == 0 or patience_counter == 0:
-            print(f"Epoch {epoch:3d} | loss={train_loss:.4f} | val_acc={val_acc:.4f} | best={best_val_acc:.4f}")
+            print(
+                f"Epoch {epoch:3d} | loss={train_loss:.4f} | val_acc={val_acc:.4f} | best={best_val_acc:.4f}"
+            )
 
         if patience_counter >= args.patience:
             print(f"Early stopping at epoch {epoch}")
@@ -271,7 +287,9 @@ def main() -> None:
             best_threshold = float(thr)
         print(f"  thr={thr:.2f} -> combined acc={acc:.4f}")
 
-    print(f"\nBest combined validation accuracy: {best_combined_acc:.4f} at threshold {best_threshold:.2f}")
+    print(
+        f"\nBest combined validation accuracy: {best_combined_acc:.4f} at threshold {best_threshold:.2f}"
+    )
 
     # Save artifacts.
     # Always save the inner network state dict so the router can load it directly

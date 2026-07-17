@@ -79,9 +79,9 @@ def test_ptt_released_signal_fires_after_listening_state_update():
         current_state={"model": "local-lucy-llama31", "gemma4_smart_routing": "off"},
     )
     app.processEvents()
-    assert (
-        panel._voice_ptt_button.text() == "Hold to Talk"
-    ), f"initial button text unexpected: {panel._voice_ptt_button.text()!r}"
+    assert panel._voice_ptt_button.text() == "Hold to Talk", (
+        f"initial button text unexpected: {panel._voice_ptt_button.text()!r}"
+    )
 
     # Simulate press
     panel._voice_ptt_button.setDown(True)
@@ -103,9 +103,9 @@ def test_ptt_released_signal_fires_after_listening_state_update():
     app.processEvents()
 
     # The button text should NOT have changed while it is down.
-    assert (
-        panel._voice_ptt_button.text() == "Hold to Talk"
-    ), f"button text changed while pressed: {panel._voice_ptt_button.text()!r}"
+    assert panel._voice_ptt_button.text() == "Hold to Talk", (
+        f"button text changed while pressed: {panel._voice_ptt_button.text()!r}"
+    )
 
     # Simulate release
     panel._voice_ptt_button.setDown(False)

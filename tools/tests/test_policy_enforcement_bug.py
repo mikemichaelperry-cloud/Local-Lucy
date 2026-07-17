@@ -67,11 +67,10 @@ def test_policy_disabled_overrides_evidence_required():
     decision = select_route(classification, policy="disabled")
 
     assert decision.route == "LOCAL", (
-        f"BUG: policy=disabled should force LOCAL route, " f"but got route={decision.route}"
+        f"BUG: policy=disabled should force LOCAL route, but got route={decision.route}"
     )
     assert decision.provider == "local", (
-        f"BUG: policy=disabled should force local provider, "
-        f"but got provider={decision.provider}"
+        f"BUG: policy=disabled should force local provider, but got provider={decision.provider}"
     )
     print("✓ PASS: policy=disabled correctly overrides evidence_mode=required")
 
@@ -90,7 +89,7 @@ def test_policy_disabled_overrides_news_query():
     decision = select_route(classification, policy="disabled")
 
     assert decision.route == "LOCAL", (
-        f"News query with policy=disabled should stay LOCAL, " f"but got route={decision.route}"
+        f"News query with policy=disabled should stay LOCAL, but got route={decision.route}"
     )
     print("✓ PASS: News queries respect policy=disabled")
 
@@ -131,8 +130,7 @@ def test_policy_direct_allows_evidence():
 
     # Should go directly to augmented
     assert decision.route == "AUGMENTED", (
-        f"policy=direct_allowed with evidence should go AUGMENTED, "
-        f"but got route={decision.route}"
+        f"policy=direct_allowed with evidence should go AUGMENTED, but got route={decision.route}"
     )
     print("✓ PASS: policy=direct_allowed correctly routes to AUGMENTED")
 
@@ -152,9 +150,11 @@ def test_evidence_mode_required_without_policy():
     decision = select_route(classification, policy="fallback_only")
 
     # Should route appropriately (local with fallback for current_evidence)
-    assert decision.route in ("LOCAL", "LOCAL_WITH_FALLBACK", "AUGMENTED"), (
-        f"evidence_mode=required should route appropriately, " f"but got route={decision.route}"
-    )
+    assert decision.route in (
+        "LOCAL",
+        "LOCAL_WITH_FALLBACK",
+        "AUGMENTED",
+    ), f"evidence_mode=required should route appropriately, but got route={decision.route}"
     print("✓ PASS: evidence_mode=required routes correctly with default policy")
 
 
@@ -171,8 +171,7 @@ def test_non_evidence_query_with_disabled_policy():
     decision = select_route(classification, policy="disabled")
 
     assert decision.route == "LOCAL", (
-        f"Non-evidence query with policy=disabled should stay LOCAL, "
-        f"but got route={decision.route}"
+        f"Non-evidence query with policy=disabled should stay LOCAL, but got route={decision.route}"
     )
     print("✓ PASS: Non-evidence queries respect policy=disabled")
 

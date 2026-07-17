@@ -33,17 +33,11 @@ CURRENT_TOPIC_PATTERN = (
     r"price|prices|weather|temperature|schedule|availability|advisory|travel|stock market|market|inflation|"
     r"war|conflict|military action|ceasefire|talks?|hostilities|fighting|strikes?|offensive|standoff)\b"
 )
-CURRENT_PUBLIC_OFFICE_PATTERN = (
-    r"\b(president|prime minister|chancellor|premier|mayor|governor|leader|head of state|head of government)\b"
-)
+CURRENT_PUBLIC_OFFICE_PATTERN = r"\b(president|prime minister|chancellor|premier|mayor|governor|leader|head of state|head of government)\b"
 NEWS_TERM_PATTERN = r"\b(news|headline|headlines|breaking|update|updates)\b"
-CONFLICT_TERM_PATTERN = (
-    r"\b(war|conflict|military action|ceasefire|talks?|hostilities|fighting|strikes?|offensive|tensions?|standoff)\b"
-)
+CONFLICT_TERM_PATTERN = r"\b(war|conflict|military action|ceasefire|talks?|hostilities|fighting|strikes?|offensive|tensions?|standoff)\b"
 SOURCE_REQUEST_PATTERN = r"\b(source|sources|citation|citations|cite|verify|proof|evidence|url|link|wikipedia|wiki|http)\b"
-MEDIA_RELIABILITY_TOPIC_PATTERN = (
-    r"\b(bias|biased|unbiased|neutral|objective|balanced|fair|trustworthy|credible|reliable|factual|accuracy|propaganda|slant|partisan)\b"
-)
+MEDIA_RELIABILITY_TOPIC_PATTERN = r"\b(bias|biased|unbiased|neutral|objective|balanced|fair|trustworthy|credible|reliable|factual|accuracy|propaganda|slant|partisan)\b"
 MEDIA_PUBLICATION_PATTERN = (
     r"\b(bbc|fox news|reuters|cnn|guardian|new york times|nytimes|nyt|washington post|wall street journal|wsj|"
     r"al jazeera|abc news|nbc news|cbs news|news network|newspaper|publication|broadcaster|outlet)\b"
@@ -52,12 +46,14 @@ GEOPOLITICS_PATTERN = (
     r"\b(israel|israeli|gaza|hamas|hezbollah|iran|lebanon|ukraine|russia|syria|tehran|middle east|"
     r"idf|knesset|west bank|south china sea|taiwan|china|un|eu)\b"
 )
-ISRAEL_REGION_PATTERN = r"\b(israel|israeli|gaza|hamas|hezbollah|iran|lebanon|idf|knesset|west bank)\b"
+ISRAEL_REGION_PATTERN = (
+    r"\b(israel|israeli|gaza|hamas|hezbollah|iran|lebanon|idf|knesset|west bank)\b"
+)
 # Time-of-day queries that need real-time data (e.g., "What time is it in London?")
 # Matches: "what time is it", "what's the time", "current time in", "time in Paris"
 # Excludes: "what time does", "what time is the meeting"
 TIME_QUERY_PATTERN = (
-    r"\b(what time|what's the time|what is the time|current time)\b" 
+    r"\b(what time|what's the time|what is the time|current time)\b"
     r"|\btime\s+is\s+it\b"
     r"|\btime\s+in\s+[a-z]"  # "time in London", "time in Tokyo"
 )
@@ -70,7 +66,10 @@ def _has_re(text: str, pattern: str) -> bool:
 def is_probable_culinary_source_misrecognition(text: str) -> bool:
     if not _has_re(text, r"\bsource\b"):
         return False
-    if _has_re(text, r"\b(sources|citation|citations|cite|verify|proof|evidence|url|link|wikipedia|wiki|http)\b"):
+    if _has_re(
+        text,
+        r"\b(sources|citation|citations|cite|verify|proof|evidence|url|link|wikipedia|wiki|http)\b",
+    ):
         return False
     if _has_re(text, r"\b(source code|primary source|data source|news source|open source)\b"):
         return False
@@ -109,13 +108,13 @@ def has_temporal_signal(text: str) -> bool:
 
 def is_time_query(text: str) -> bool:
     """Detect time-of-day queries that need real-time data.
-    
+
     Examples:
         - "What time is it in London?"
         - "What's the time in Tokyo?"
         - "Current time in New York"
         - "Time in California"
-    
+
     Excludes:
         - "What time does the store open?"
         - "What time is the meeting?"
@@ -123,7 +122,7 @@ def is_time_query(text: str) -> bool:
     # First check if it matches the time query pattern
     if not _has_re(text, TIME_QUERY_PATTERN):
         return False
-    
+
     # Exclude scheduling questions (what time + verb/noun)
     # "what time does" - scheduling question
     if _has_re(text, r"\bwhat time\s+(does|do|did|will|can|should|would)\b"):
@@ -131,7 +130,7 @@ def is_time_query(text: str) -> bool:
     # "what time is the" - scheduling question (but NOT "what time is it")
     if _has_re(text, r"\bwhat time\s+is\s+(the|a|an|this|that|my|your|his|her)\b"):
         return False
-    
+
     return True
 
 

@@ -574,7 +574,7 @@ def _run_direct():
                     session_memory = case.get("session_memory", "")
                     checks = case.get("checks", {})
 
-                    print(f"\n{'='*60}")
+                    print(f"\n{'=' * 60}")
                     print(f"Case: {case_id}")
                     print(f"Query: {query!r}")
 
@@ -667,7 +667,7 @@ def _run_direct():
     asyncio.run(_run_all())
 
     if not RECORD_MODE:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         if all_passed:
             print("All semantic regression tests PASSED.")
             sys.exit(0)

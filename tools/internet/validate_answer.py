@@ -8,9 +8,11 @@ from pathlib import Path
 
 CITE_RE = re.compile(r"\[src:([a-z0-9\.\-]+)\s+sha:([0-9a-f]{64})\]", re.IGNORECASE)
 
+
 def die(msg: str, code: int = 2) -> None:
     print(f"ERR: {msg}")
     raise SystemExit(code)
+
 
 def load_meta_index(evidence_root: Path) -> dict:
     """
@@ -41,10 +43,12 @@ def load_meta_index(evidence_root: Path) -> dict:
         idx.setdefault(sha, set()).add(dom)
     return idx
 
+
 def split_paragraphs(text: str) -> list[str]:
     # Paragraphs separated by one or more blank lines
     parts = re.split(r"\n\s*\n", text.strip(), flags=re.MULTILINE)
     return [p.strip() for p in parts if p.strip()]
+
 
 def is_text_paragraph(p: str) -> bool:
     # Ignore pure markdown dividers/headings if they have no real words.
@@ -56,7 +60,11 @@ def policy_bounded_validation_allowed(text: str) -> bool:
     profile = os.environ.get("LUCY_POLICY_VALIDATION_PROFILE", "").strip()
     if profile != "policy_global_recent":
         return False
-    if os.environ.get("LUCY_POLICY_VALIDATION_ALLOW_BOUNDED", "0").strip() not in {"1", "true", "TRUE"}:
+    if os.environ.get("LUCY_POLICY_VALIDATION_ALLOW_BOUNDED", "0").strip() not in {
+        "1",
+        "true",
+        "TRUE",
+    }:
         return False
     shape = os.environ.get("LUCY_POLICY_VALIDATION_SHAPE", "").strip()
     if shape not in {"single_ai", "single_climate", "compound_climate_ai"}:
@@ -82,13 +90,19 @@ def policy_bounded_validation_allowed(text: str) -> bool:
         return False
     return True
 
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["single", "news"], default="single",
-                    help="single=1 domain acceptable; news=2 independent domains required")
+    ap.add_argument(
+        "--mode",
+        choices=["single", "news"],
+        default="single",
+        help="single=1 domain acceptable; news=2 independent domains required",
+    )
     ap.add_argument("--evidence-root", default=str(Path.home() / "lucy" / "evidence"))
-    ap.add_argument("--min-domains", type=int, default=None,
-                    help="override domain requirement (optional)")
+    ap.add_argument(
+        "--min-domains", type=int, default=None, help="override domain requirement (optional)"
+    )
     args = ap.parse_args()
 
     evidence_root = Path(args.evidence_root)
@@ -147,6 +161,7 @@ def main() -> int:
 
     print("OK")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

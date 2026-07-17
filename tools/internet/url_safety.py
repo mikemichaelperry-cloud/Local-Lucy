@@ -9,8 +9,10 @@ METADATA_HOSTS = {"169.254.169.254"}
 LOCALHOST_NAMES = {"localhost"}
 IP_LITERAL_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
 
+
 def is_ip_literal(host: str) -> bool:
     return bool(IP_LITERAL_RE.match(host or ""))
+
 
 def _ip_is_forbidden(ip: ipaddress._BaseAddress) -> bool:
     if ip.is_private:
@@ -26,6 +28,7 @@ def _ip_is_forbidden(ip: ipaddress._BaseAddress) -> bool:
     if getattr(ip, "is_reserved", False):
         return True
     return False
+
 
 def resolve_and_validate_host(host: str) -> str | None:
     h = host.strip().lower()
@@ -57,6 +60,7 @@ def resolve_and_validate_host(host: str) -> str | None:
 
     return None
 
+
 def forbid_host(host: str) -> str | None:
     if not host:
         return "empty host"
@@ -80,6 +84,7 @@ def forbid_host(host: str) -> str | None:
 
     return None
 
+
 def parse_and_validate_url(url: str) -> tuple[str, str, int, str | None]:
     p = urlparse(url)
     if p.scheme != "https":
@@ -98,6 +103,7 @@ def parse_and_validate_url(url: str) -> tuple[str, str, int, str | None]:
 
     return p.geturl(), host, port, None
 
+
 def _cli_validate_url(url: str) -> int:
     norm_url, host, port, reason = parse_and_validate_url(url)
     if reason:
@@ -106,11 +112,13 @@ def _cli_validate_url(url: str) -> int:
     print(f"OK url={norm_url} host={host} port={port}")
     return 0
 
+
 def main(argv: list[str]) -> int:
     if len(argv) != 3 or argv[1] != "validate-url":
         print("usage: url_safety.py validate-url <url>", file=sys.stderr)
         return 2
     return _cli_validate_url(argv[2])
+
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))

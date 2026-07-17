@@ -12,38 +12,326 @@ EXAMPLES_PATH = Path(__file__).parent / "models" / "router" / "comprehensive_exa
 
 NEW_EXAMPLES = [
     # Personal / family queries — all should route LOCAL
-    {"query": "Who is my dog?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "What is my dog's name?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My dog is hungry", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "Where is my cat?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "Tell me about my cat", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "What is my son's name?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "How old is my daughter?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My wife is coming home", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "What does my husband do?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My mom called me", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "Where does my dad live?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My brother is visiting", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "What is my sister doing?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My family is here", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "Who is my best friend?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "What is my name?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "Do I have any pets?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "When is my birthday?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "How am I doing today?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My grandmother is ill", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "What did my uncle say?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My aunt is visiting tomorrow", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "Where is my pet?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My partner is late", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "What does my child want?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My parents are coming over", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "Who are my neighbors?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My roommate is noisy", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "What is my address?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "Where do I live?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "My car is broken", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
-    {"query": "What is my phone number?", "labels": {"intent_family": "local_answer", "evidence_mode": "not_required", "route": "LOCAL", "policy_override": "none"}, "metadata": {"source": "personal_family_vocabulary"}},
+    {
+        "query": "Who is my dog?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "What is my dog's name?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My dog is hungry",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "Where is my cat?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "Tell me about my cat",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "What is my son's name?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "How old is my daughter?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My wife is coming home",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "What does my husband do?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My mom called me",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "Where does my dad live?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My brother is visiting",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "What is my sister doing?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My family is here",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "Who is my best friend?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "What is my name?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "Do I have any pets?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "When is my birthday?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "How am I doing today?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My grandmother is ill",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "What did my uncle say?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My aunt is visiting tomorrow",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "Where is my pet?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My partner is late",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "What does my child want?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My parents are coming over",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "Who are my neighbors?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My roommate is noisy",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "What is my address?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "Where do I live?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "My car is broken",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
+    {
+        "query": "What is my phone number?",
+        "labels": {
+            "intent_family": "local_answer",
+            "evidence_mode": "not_required",
+            "route": "LOCAL",
+            "policy_override": "none",
+        },
+        "metadata": {"source": "personal_family_vocabulary"},
+    },
 ]
 
 
@@ -69,6 +357,7 @@ def main():
 
     # Also update the JSONL index (background_learner uses this)
     from background_learner import save_index
+
     save_index(examples)
 
     print("\nRebuilding embeddings...")

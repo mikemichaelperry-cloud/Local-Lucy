@@ -59,7 +59,6 @@ def main() -> int:
     # Atom: <entry>...
     entries = root.findall(".//{http://www.w3.org/2005/Atom}entry")
     if entries:
-        ns = {"a": "http://www.w3.org/2005/Atom"}
         for en in entries:
             title = clean_text(first_text(en, ["a:title", "{http://www.w3.org/2005/Atom}title"]))
             upd = clean_text(first_text(en, ["a:updated", "{http://www.w3.org/2005/Atom}updated"]))

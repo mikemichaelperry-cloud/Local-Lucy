@@ -25,6 +25,7 @@ from PySide6.QtWidgets import QSizePolicy, QWidget
 #  Mouth viseme definitions (QPainterPath, normalised to 0..1 unit space)
 # ---------------------------------------------------------------------------
 
+
 class _Viseme:
     """Pre-built mouth shape as a QPainterPath."""
 
@@ -86,6 +87,7 @@ def _build_visemes() -> list[_Viseme]:
 # ---------------------------------------------------------------------------
 #  Avatar widget
 # ---------------------------------------------------------------------------
+
 
 class LucyAvatar(QWidget):
     """Minimal animated talking head for Local Lucy.
@@ -243,7 +245,9 @@ class LucyAvatar(QWidget):
         # Dark interior
         painter.setBrush(QColor("#0a0a14"))
         painter.setPen(Qt.NoPen)
-        painter.drawEllipse(int(mouth_cx - mouth_w / 2), int(mouth_cy - mouth_h / 2), int(mouth_w), int(mouth_h))
+        painter.drawEllipse(
+            int(mouth_cx - mouth_w / 2), int(mouth_cy - mouth_h / 2), int(mouth_w), int(mouth_h)
+        )
 
         # Bright lip outline
         lip_pen = painter.pen()
@@ -251,7 +255,9 @@ class LucyAvatar(QWidget):
         lip_pen.setWidthF(2.5)
         painter.setPen(lip_pen)
         painter.setBrush(Qt.NoBrush)
-        painter.drawEllipse(int(mouth_cx - mouth_w / 2), int(mouth_cy - mouth_h / 2), int(mouth_w), int(mouth_h))
+        painter.drawEllipse(
+            int(mouth_cx - mouth_w / 2), int(mouth_cy - mouth_h / 2), int(mouth_w), int(mouth_h)
+        )
 
     def _draw_eye(self, painter: QPainter, cx: float, cy: float, rx: float, ry: float) -> None:
         """Draw one eye (white sclera + dark pupil), with blink."""

@@ -1587,7 +1587,7 @@ def test():
             f"  {status} {q:50s} -> {actual:12s} (expected {expected:12s}) conf={result['confidence']:.3f} guards={result['guards_fired']}"
         )
 
-    print(f"\nAccuracy: {correct}/{len(test_queries)} ({100*correct/len(test_queries):.0f}%)")
+    print(f"\nAccuracy: {correct}/{len(test_queries)} ({100 * correct / len(test_queries):.0f}%)")
 
 
 if __name__ == "__main__":

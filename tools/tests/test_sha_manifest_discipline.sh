@@ -8,30 +8,38 @@ MANIFEST_MIRROR="${ROOT}/SHA256SUMS"
 COLLECTOR="${ROOT}/tools/sha_manifest.sh"
 
 ok(){ echo "OK: $*"; }
-die(){ echo "ERR: $*" >&2; exit 1; }
+die(){ echo "FAIL: $*" >&2; exit 1; }
 
 [[ -f "${MANIFEST_CLEAN}" ]] || die "missing manifest: ${MANIFEST_CLEAN}"
 [[ -f "${MANIFEST_MIRROR}" ]] || die "missing manifest mirror: ${MANIFEST_MIRROR}"
-ok "both SHA manifest files exist"
+[[ -x "${COLLECTOR}" ]] || die "missing collector: ${COLLECTOR}"
 
 cmp -s "${MANIFEST_CLEAN}" "${MANIFEST_MIRROR}" || die "SHA manifest mirror drifted from SHA256SUMS.clean"
 ok "SHA256SUMS mirror is byte-identical to SHA256SUMS.clean"
 
-[[ -f "${COLLECTOR}" ]] || die "missing collector: ${COLLECTOR}"
+"${COLLECTOR}" check >/dev/null
+ok "sha manifest check passes"
 
-assert_pattern() {
-  local needle="$1"
-  grep -Fq -- "${needle}" "${COLLECTOR}" || die "collector missing exclusion pattern: ${needle}"
-  ok "collector excludes ${needle}"
-}
+tracked_files="$("${COLLECTOR}" list)"
+manifest_files="$(cut -d' ' -f3- "${MANIFEST_CLEAN}" | python3 -c 'import sys; [print(line.rstrip("\n").lstrip("\\").lstrip("./")) for line in sys.stdin]')"
 
-assert_pattern '! -path "./tools/tmp/*"'
-assert_pattern '! -path "./tools/tests/governor_migration/artifacts/*"'
-assert_pattern '! -path "*/.venv/*"'
-assert_pattern '! -path "*/.pytest_cache/*"'
-assert_pattern '! -path "*/__pycache__/*"'
-assert_pattern '! -name "*.pyc"'
-assert_pattern '! -name "*.BROKEN.*"'
-assert_pattern '! -name "*.fixbak.*"'
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+tracked_sorted="${tmpdir}/tracked.txt"
+manifest_sorted="${tmpdir}/manifest.txt"
+printf '%s\n' "${tracked_files}" | sort >"${tracked_sorted}"
+printf '%s\n' "${manifest_files}" >"${manifest_sorted}"
+
+if ! diff -q "${tracked_sorted}" "${manifest_sorted}" >/dev/null; then
+    echo "FAIL: collector file list does not match manifest entries" >&2
+    diff "${tracked_sorted}" "${manifest_sorted}" >&2 || true
+    exit 1
+fi
+ok "collector file list matches manifest exactly"
+
+printf '%s\n' "${tracked_files}" | grep -q '__pycache__' && die "__pycache__ should be excluded"
+printf '%s\n' "${tracked_files}" | grep -q '\.venv/' && die ".venv should be excluded"
+printf '%s\n' "${tracked_files}" | grep -q '^SHA256SUMS' && die "manifest files should not self-track"
+ok "tracked scope excludes generated/runtime noise"
 
 echo "PASS: test_sha_manifest_discipline"

@@ -8,6 +8,7 @@ Output:
     A JSONL file where each line is a candidate example ready for human review
     and possible inclusion in comprehensive_examples.json.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -55,7 +56,9 @@ VALID_ROUTES = {
     "CLARIFY",
 }
 
-_ROUTE_RE = re.compile(r"\b(local|augmented|news|weather|time|finance|evidence|ephemeral|clarify)\b", re.I)
+_ROUTE_RE = re.compile(
+    r"\b(local|augmented|news|weather|time|finance|evidence|ephemeral|clarify)\b", re.I
+)
 
 
 def _normalise_query(query: str) -> str:
@@ -227,8 +230,7 @@ def _build_candidate(
             if current_prediction != route:
                 review = True
                 review_reason = (
-                    f"current router predicts {current_prediction}; "
-                    f"logged route was {route}"
+                    f"current router predicts {current_prediction}; logged route was {route}"
                 )
         except Exception as exc:
             review = True

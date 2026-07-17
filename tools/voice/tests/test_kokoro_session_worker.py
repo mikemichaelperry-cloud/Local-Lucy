@@ -42,8 +42,8 @@ def main() -> int:
         worker.kokoro_backend.resolve_lang_code = lambda env, voice: "a"
         worker.kokoro_backend.resolve_repo_id = lambda env: "hexgrad/Kokoro-82M"
         worker.kokoro_backend.resolve_device = lambda env: "cpu"
-        worker.kokoro_backend.get_pipeline = (
-            lambda **kwargs: calls.setdefault("pipeline", kwargs) or object()
+        worker.kokoro_backend.get_pipeline = lambda **kwargs: (
+            calls.setdefault("pipeline", kwargs) or object()
         )
 
         prewarm = worker.handle_request({"cmd": "prewarm"}, env={"LUCY_VOICE_TTS_ENGINE": "auto"})

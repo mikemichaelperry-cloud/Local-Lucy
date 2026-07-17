@@ -1,6 +1,7 @@
 """
 Pytest configuration for unified architecture tests.
 """
+
 from __future__ import annotations
 
 import os
@@ -11,9 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Set test environment
-os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(
-    Path.home() / "lucy-v10"
-)
+os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(Path.home() / "lucy-v10")
 os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(
     Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"
 )
@@ -28,9 +27,5 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
-    config.addinivalue_line(
-        "markers", "e2e: marks tests as end-to-end tests"
-    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+    config.addinivalue_line("markers", "e2e: marks tests as end-to-end tests")

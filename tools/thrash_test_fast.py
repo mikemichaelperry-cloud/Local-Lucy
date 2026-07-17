@@ -341,9 +341,9 @@ for i in range(10):
         engine = ExecutionEngine(config={"timeout": 30, "model": "local-lucy"})
         engine.close()
         if i == 0:
-            log("Engine", f"Instantiate #{i+1}", True, "ok")
+            log("Engine", f"Instantiate #{i + 1}", True, "ok")
     except Exception as e:
-        log("Engine", f"Instantiate #{i+1}", False, str(e)[:40])
+        log("Engine", f"Instantiate #{i + 1}", False, str(e)[:40])
 
 log("Engine", "10 instantiations", True, "all ok")
 

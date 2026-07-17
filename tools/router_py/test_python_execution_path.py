@@ -175,16 +175,16 @@ def test_async_execution_flow() -> None:
     # Verify the async execute method exists and is a coroutine
     import inspect
 
-    assert inspect.iscoroutinefunction(
-        engine.execute_async
-    ), "execute_async should be a coroutine function"
+    assert inspect.iscoroutinefunction(engine.execute_async), (
+        "execute_async should be a coroutine function"
+    )
 
     print("✓ execute_async is a coroutine function")
 
     # Check that _execute_full_route_python is also async
-    assert inspect.iscoroutinefunction(
-        engine._execute_full_route_python
-    ), "_execute_full_route_python should be a coroutine function"
+    assert inspect.iscoroutinefunction(engine._execute_full_route_python), (
+        "_execute_full_route_python should be a coroutine function"
+    )
 
     print("✓ _execute_full_route_python is a coroutine function")
 

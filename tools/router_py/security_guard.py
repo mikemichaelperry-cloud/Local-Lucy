@@ -39,7 +39,10 @@ SURFACE_LIMITS: dict[str, int] = {
 # ---------------------------------------------------------------------------
 
 JAILBREAK_PATTERNS: list[tuple[re.Pattern, str]] = [
-    (re.compile(r"ignore\s+(all\s+)?(previous|prior)\s+instructions", re.IGNORECASE), "ignore_previous_instructions"),
+    (
+        re.compile(r"ignore\s+(all\s+)?(previous|prior)\s+instructions", re.IGNORECASE),
+        "ignore_previous_instructions",
+    ),
     (re.compile(r"disregard\s+your\s+instructions", re.IGNORECASE), "disregard_instructions"),
     (re.compile(r"you\s+are\s+now\s+.*ignore", re.IGNORECASE), "role_injection_ignore"),
     (re.compile(r"\bDAN\b.*\b(do\s+anything\s+now)\b", re.IGNORECASE), "dan_jailbreak"),
@@ -49,13 +52,19 @@ JAILBREAK_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\bjailbreak\b", re.IGNORECASE), "jailbreak_keyword"),
     (re.compile(r"\bsudo\b.*\bmode\b", re.IGNORECASE), "sudo_mode"),
     (re.compile(r"^\s*:\s*(system|assistant|user)\b", re.IGNORECASE), "role_prefix_injection"),
-    (re.compile(r"^\s*<\|(?:im_start|system|assistant|user)\|>", re.IGNORECASE), "chatml_tag_injection"),
+    (
+        re.compile(r"^\s*<\|(?:im_start|system|assistant|user)\|>", re.IGNORECASE),
+        "chatml_tag_injection",
+    ),
     (re.compile(r"\[\s*(system|assistant|user)\s*\]", re.IGNORECASE), "bracket_role_injection"),
     (re.compile(r"from\s+now\s+on\s+you\s+are", re.IGNORECASE), "role_override"),
     (re.compile(r"pretend\s+to\s+be", re.IGNORECASE), "pretend_role"),
     (re.compile(r"act\s+as\s+(?:if\s+you\s+(?:are|were)\s+)?", re.IGNORECASE), "act_as_role"),
     (re.compile(r"ignore\s+everything\s+before", re.IGNORECASE), "ignore_history"),
-    (re.compile(r"forget\s+all\s+(previous|prior)\s+instructions", re.IGNORECASE), "forget_instructions"),
+    (
+        re.compile(r"forget\s+all\s+(previous|prior)\s+instructions", re.IGNORECASE),
+        "forget_instructions",
+    ),
     (re.compile(r"new\s+instructions?:", re.IGNORECASE), "new_instructions"),
     (re.compile(r"override\s+(?:your\s+)?settings", re.IGNORECASE), "override_settings"),
 ]
@@ -69,6 +78,7 @@ OBFUSCATION_PATTERNS: list[tuple[re.Pattern, str]] = [
 # ---------------------------------------------------------------------------
 # Dataclasses
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class ValidationResult:
@@ -88,6 +98,7 @@ class ValidationResult:
 # ---------------------------------------------------------------------------
 # InputValidator
 # ---------------------------------------------------------------------------
+
 
 class InputValidator:
     """Sanitizes and validates raw user input."""
@@ -134,6 +145,7 @@ class InputValidator:
 # PromptInjectionDetector
 # ---------------------------------------------------------------------------
 
+
 class PromptInjectionDetector:
     """Detects known prompt injection and jailbreak attempts."""
 
@@ -172,6 +184,7 @@ class PromptInjectionDetector:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def validate_input(question: str, surface: str = "cli") -> ValidationResult:
     """

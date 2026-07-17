@@ -185,7 +185,13 @@ class TestMemorySemantic(unittest.TestCase):
         ms.store_turn("user", "What transformer?", session_id="current")
 
         with patch.object(ms, "_get_embedding", return_value=[0.95, 0.05, 0.0]):
-            ctx = ms.assemble_context(current_session_id="current", query="tube amp transformer", max_chars=500, depth="deep", mode="augmented")
+            ctx = ms.assemble_context(
+                current_session_id="current",
+                query="tube amp transformer",
+                max_chars=500,
+                depth="deep",
+                mode="augmented",
+            )
 
         self.assertIn("Related session: Tube amplifier design decisions.", ctx)
         self.assertIn("User: What transformer?", ctx)

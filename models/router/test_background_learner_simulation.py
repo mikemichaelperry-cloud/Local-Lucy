@@ -490,9 +490,9 @@ class TestTimestampStripping:
         with open(bl.EXAMPLES_PATH) as f:
             saved = json.load(f)
         for ex in saved:
-            assert "timestamp" not in ex.get(
-                "metadata", {}
-            ), f"timestamp leaked into tracked file for: {ex['query']}"
+            assert "timestamp" not in ex.get("metadata", {}), (
+                f"timestamp leaked into tracked file for: {ex['query']}"
+            )
 
         # Metadata file MUST contain the runtime timestamp
         assert bl.EXAMPLES_METADATA_PATH.exists()

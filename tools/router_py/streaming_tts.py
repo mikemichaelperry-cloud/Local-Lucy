@@ -21,10 +21,10 @@ async def stream_kokoro_tts(
     device: str = "cuda",
 ) -> None:
     """Stream Kokoro TTS audio chunks as they're generated.
-    
+
     This starts playback immediately when the first audio chunk is ready,
     rather than waiting for the full synthesis to complete.
-    
+
     Args:
         text: Text to synthesize
         voice: Voice identifier
@@ -33,8 +33,14 @@ async def stream_kokoro_tts(
         device: Device (cuda/cpu)
     """
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent.parent / "voice" / "backends"))
-    from kokoro_backend import get_pipeline, load_runtime_dependencies, DEFAULT_SAMPLE_RATE, resolve_device
+    from kokoro_backend import (
+        get_pipeline,
+        load_runtime_dependencies,
+        DEFAULT_SAMPLE_RATE,
+        resolve_device,
+    )
 
     # Load dependencies
     _, np_module, _ = load_runtime_dependencies()
@@ -47,58 +53,60 @@ async def stream_kokoro_tts(
         repo_id="hexgrad/Kokoro-82M",
         device=effective_device,
     )
-    
+
     # Start aplay process with stdin input for streaming
     aplay_proc = await asyncio.create_subprocess_exec(
-        "aplay", "-q", "-",
+        "aplay",
+        "-q",
+        "-",
         stdin=subprocess.PIPE,
     )
-    
+
     # Write WAV header first
     wav_buffer = io.BytesIO()
-    with wave.open(wav_buffer, 'wb') as wav:
+    with wave.open(wav_buffer, "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)  # 16-bit
         wav.setframerate(DEFAULT_SAMPLE_RATE)
-    
+
     # Send WAV header to aplay
     header = wav_buffer.getvalue()
     aplay_proc.stdin.write(header)
     await aplay_proc.stdin.drain()
-    
+
     # Stream audio chunks as they're generated
     chunk_count = 0
-    for result in pipeline(text, voice=voice, speed=speed, split_pattern=r'\n+'):
+    for result in pipeline(text, voice=voice, speed=speed, split_pattern=r"\n+"):
         audio = getattr(result, "audio", None)
         if audio is not None:
             # Handle both numpy arrays and torch tensors
             try:
                 audio_size = audio.size() if callable(audio.size) else audio.size
                 # Convert torch.Size or numpy array size to int
-                if hasattr(audio_size, '__len__'):
+                if hasattr(audio_size, "__len__"):
                     audio_size = int(audio_size[0]) if len(audio_size) > 0 else 0
                 else:
                     audio_size = int(audio_size)
             except (TypeError, IndexError):
                 audio_size = 0
-            
+
             if audio_size > 0:
                 # Convert to numpy if it's a torch tensor
-                if hasattr(audio, 'numpy'):
+                if hasattr(audio, "numpy"):
                     audio = audio.numpy()
-                elif hasattr(audio, 'cpu'):
+                elif hasattr(audio, "cpu"):
                     audio = audio.cpu().numpy()
-                
+
                 # Convert float audio [-1, 1] to 16-bit PCM
                 pcm_data = (audio * 32767).astype(np_module.int16).tobytes()
                 aplay_proc.stdin.write(pcm_data)
                 await aplay_proc.stdin.drain()
                 chunk_count += 1
-    
+
     # Close stdin to signal end of audio
     aplay_proc.stdin.close()
     await aplay_proc.wait()
-    
+
     return chunk_count
 
 
@@ -108,17 +116,18 @@ async def prewarm_kokoro(
     device: str = "cuda",
 ) -> bool:
     """Pre-warm Kokoro pipeline to avoid first-use latency.
-    
+
     Call this at startup or when voice is enabled.
-    
+
     Returns:
         True if pre-warming succeeded
     """
     try:
         import sys
+
         sys.path.insert(0, str(Path(__file__).parent.parent / "voice" / "backends"))
         from kokoro_backend import get_pipeline
-        
+
         # Initialize pipeline (cached)
         _ = get_pipeline(
             lang_code=lang_code,
@@ -133,6 +142,7 @@ async def prewarm_kokoro(
 
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) > 1 and sys.argv[1] == "prewarm":
         result = asyncio.run(prewarm_kokoro())
         print(f"Prewarm: {'OK' if result else 'FAILED'}")

@@ -700,7 +700,7 @@ class ParityTestRunner:
             "passed": passed,
             "failed": failed,
             "skipped": skipped,
-            "pass_rate": f"{passed/max(total-skipped, 1)*100:.1f}%",
+            "pass_rate": f"{passed / max(total - skipped, 1) * 100:.1f}%",
             "categories_tested": list(set(r.category for r in self.results)),
         }
 

@@ -17,6 +17,7 @@ Usage:
     if result:
         print(result.type, result.corrected_route, result.target_query)
 """
+
 from __future__ import annotations
 
 import json
@@ -35,7 +36,9 @@ except ImportError:
 
 # Where to write user feedback for background_learner.py
 RUNTIME_NS = Path(
-    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
+    os.environ.get(
+        "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+    )
 )
 # feedback_parser.py lives in tools/router_py/ → go up two levels to project root → models/router
 ROUTER_DIR = Path(__file__).resolve().parent.parent.parent / "models" / "router"
@@ -244,86 +247,214 @@ def parse_feedback(text: str) -> Optional[FeedbackResult]:
 
 # Patterns for inferring correct route from failed responses
 _AUGMENTED_FAILURE_PATTERNS = [
-    "i don't know", "i don't have", "i'm not sure",
-    "i don't have access to", "i cannot provide",
-    "i don't have real-time", "i don't have current",
-    "i don't have the ability", "i don't have information",
-    "i don't have up-to-date", "error", "failed to",
-    "unable to", "could not", "connection refused",
-    "timeout", "503", "502", "404",
+    "i don't know",
+    "i don't have",
+    "i'm not sure",
+    "i don't have access to",
+    "i cannot provide",
+    "i don't have real-time",
+    "i don't have current",
+    "i don't have the ability",
+    "i don't have information",
+    "i don't have up-to-date",
+    "error",
+    "failed to",
+    "unable to",
+    "could not",
+    "connection refused",
+    "timeout",
+    "503",
+    "502",
+    "404",
 ]
 
 _LOCAL_MEDICAL_DISCLAIMER_PATTERNS = [
-    "i'm not a medical professional", "i'm not a doctor",
-    "consult a doctor", "seek medical advice",
-    "this is not medical advice", "not a substitute for professional medical",
-    "i'm not qualified to give medical", "please consult a healthcare",
+    "i'm not a medical professional",
+    "i'm not a doctor",
+    "consult a doctor",
+    "seek medical advice",
+    "this is not medical advice",
+    "not a substitute for professional medical",
+    "i'm not qualified to give medical",
+    "please consult a healthcare",
     "i cannot provide medical",
 ]
 
 _LOCAL_FINANCIAL_DISCLAIMER_PATTERNS = [
-    "i'm not a financial advisor", "this is not financial advice",
-    "consult a financial advisor", "not investment advice",
+    "i'm not a financial advisor",
+    "this is not financial advice",
+    "consult a financial advisor",
+    "not investment advice",
 ]
 
 _LOCAL_LEGAL_DISCLAIMER_PATTERNS = [
-    "i'm not a lawyer", "this is not legal advice",
-    "consult an attorney", "seek legal counsel",
+    "i'm not a lawyer",
+    "this is not legal advice",
+    "consult an attorney",
+    "seek legal counsel",
 ]
 
 _MEDICAL_KEYWORDS = [
-    "symptom", "symptoms", "pain", "fever", "chest", "headache",
-    "doctor", "medical", "treatment", "diagnosis", "prescription",
-    "medication", "dosage", "side effect", "disease", "condition",
-    "blood pressure", "diabetes", "cancer", "flu", "infection",
-    "virus", "vaccine", "pregnancy", "mental health", "therapy",
-    "surgery", "operation", "hospital", "medicine", "patient",
+    "symptom",
+    "symptoms",
+    "pain",
+    "fever",
+    "chest",
+    "headache",
+    "doctor",
+    "medical",
+    "treatment",
+    "diagnosis",
+    "prescription",
+    "medication",
+    "dosage",
+    "side effect",
+    "disease",
+    "condition",
+    "blood pressure",
+    "diabetes",
+    "cancer",
+    "flu",
+    "infection",
+    "virus",
+    "vaccine",
+    "pregnancy",
+    "mental health",
+    "therapy",
+    "surgery",
+    "operation",
+    "hospital",
+    "medicine",
+    "patient",
 ]
 
 _FINANCIAL_KEYWORDS = [
-    "stock", "price", "bitcoin", "ethereum", "crypto", "invest",
-    "investing", "money", "market", "financial", "tax", "taxes",
-    "mortgage", "loan", "credit", "debt", "budget", "salary",
-    "income", "expense", "valuation", "worth", "insurance",
-    "premium", "dividend", "portfolio", "retirement", "pension",
+    "stock",
+    "price",
+    "bitcoin",
+    "ethereum",
+    "crypto",
+    "invest",
+    "investing",
+    "money",
+    "market",
+    "financial",
+    "tax",
+    "taxes",
+    "mortgage",
+    "loan",
+    "credit",
+    "debt",
+    "budget",
+    "salary",
+    "income",
+    "expense",
+    "valuation",
+    "worth",
+    "insurance",
+    "premium",
+    "dividend",
+    "portfolio",
+    "retirement",
+    "pension",
 ]
 
 _LEGAL_KEYWORDS = [
-    "legal", "law", "lawyer", "attorney", "court", "sue", "suing",
-    "contract", "license", "illegal", "lawsuit", "settlement",
-    "damages", "injunction", "felony", "misdemeanor", "warrant",
+    "legal",
+    "law",
+    "lawyer",
+    "attorney",
+    "court",
+    "sue",
+    "suing",
+    "contract",
+    "license",
+    "illegal",
+    "lawsuit",
+    "settlement",
+    "damages",
+    "injunction",
+    "felony",
+    "misdemeanor",
+    "warrant",
 ]
 
 _TIME_FAILURE_PATTERNS = [
-    "could not determine timezone", "couldn't find the time",
-    "unknown location", "sorry, i couldn't find the time",
+    "could not determine timezone",
+    "couldn't find the time",
+    "unknown location",
+    "sorry, i couldn't find the time",
 ]
 
 _NEWS_FAILURE_PATTERNS = [
-    "unable to fetch live news", "news provider returned no articles",
-    "failed to fetch news from all sources", "no articles found",
+    "unable to fetch live news",
+    "news provider returned no articles",
+    "failed to fetch news from all sources",
+    "no articles found",
     "no rss feeds configured",
 ]
 
 _WEATHER_FAILURE_PATTERNS = [
-    "could not fetch weather", "please specify a city",
-    "could not parse weather data", "no location found",
+    "could not fetch weather",
+    "please specify a city",
+    "could not parse weather data",
+    "no location found",
 ]
 
 # Keywords used to detect semantic misroutes (query routed to live-data
 # route but lacks any keywords for that route)
 _TIME_KEYWORDS = [
-    "time", "date", "day", "clock", "hour", "minute", "schedule",
-    "timezone", "gmt", "pst", "est", "cet", "utc", "o'clock", "am", "pm",
+    "time",
+    "date",
+    "day",
+    "clock",
+    "hour",
+    "minute",
+    "schedule",
+    "timezone",
+    "gmt",
+    "pst",
+    "est",
+    "cet",
+    "utc",
+    "o'clock",
+    "am",
+    "pm",
 ]
 _NEWS_KEYWORDS = [
-    "news", "headlines", "breaking", "current events", "update", "latest",
-    "report", "article", "happening", "developments", "trending",
+    "news",
+    "headlines",
+    "breaking",
+    "current events",
+    "update",
+    "latest",
+    "report",
+    "article",
+    "happening",
+    "developments",
+    "trending",
 ]
 _WEATHER_KEYWORDS = [
-    "weather", "forecast", "temperature", "rain", "snow", "sunny",
-    "cloudy", "windy", "storm", "humidity", "precipitation", "hot", "cold",
-    "warm", "freezing", "chilly", "outside", "umbrella", "jacket", "coat",
+    "weather",
+    "forecast",
+    "temperature",
+    "rain",
+    "snow",
+    "sunny",
+    "cloudy",
+    "windy",
+    "storm",
+    "humidity",
+    "precipitation",
+    "hot",
+    "cold",
+    "warm",
+    "freezing",
+    "chilly",
+    "outside",
+    "umbrella",
+    "jacket",
+    "coat",
 ]
 
 
@@ -370,11 +501,17 @@ def _infer_corrected_route(result: FeedbackResult) -> Optional[str]:
     # 2. LOCAL → AUGMENTED: medical/financial/legal disclaimers
     if original_route == "LOCAL":
         query_lower = query.lower()
-        if any(kw in query_lower for kw in _MEDICAL_KEYWORDS) and _has_pattern(response, _LOCAL_MEDICAL_DISCLAIMER_PATTERNS):
+        if any(kw in query_lower for kw in _MEDICAL_KEYWORDS) and _has_pattern(
+            response, _LOCAL_MEDICAL_DISCLAIMER_PATTERNS
+        ):
             return "AUGMENTED"
-        if any(kw in query_lower for kw in _FINANCIAL_KEYWORDS) and _has_pattern(response, _LOCAL_FINANCIAL_DISCLAIMER_PATTERNS):
+        if any(kw in query_lower for kw in _FINANCIAL_KEYWORDS) and _has_pattern(
+            response, _LOCAL_FINANCIAL_DISCLAIMER_PATTERNS
+        ):
             return "AUGMENTED"
-        if any(kw in query_lower for kw in _LEGAL_KEYWORDS) and _has_pattern(response, _LOCAL_LEGAL_DISCLAIMER_PATTERNS):
+        if any(kw in query_lower for kw in _LEGAL_KEYWORDS) and _has_pattern(
+            response, _LOCAL_LEGAL_DISCLAIMER_PATTERNS
+        ):
             return "AUGMENTED"
 
     # 3. TIME → LOCAL: timezone API failed OR semantic misroute
@@ -487,6 +624,7 @@ def trigger_background_learning() -> bool:
     """
     try:
         import sys as _sys
+
         router_dir = str(Path(__file__).parent.parent.parent / "models" / "router")
         inserted = False
         if router_dir not in _sys.path:
@@ -494,6 +632,7 @@ def trigger_background_learning() -> bool:
             inserted = True
 
         from background_learner import maybe_auto_learn
+
         triggered = maybe_auto_learn(min_entries=1)
 
         if inserted and router_dir in _sys.path:
@@ -549,6 +688,7 @@ def apply_feedback(
 if __name__ == "__main__":
     # Quick self-test — seed buffer with a prior exchange
     from feedback_buffer import get_buffer
+
     buf = get_buffer()
     buf.append("What is the weather in London?", "WEATHER", "ephemeral_query", "Sunny, 22C", 0.95)
 

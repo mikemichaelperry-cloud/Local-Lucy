@@ -2,7 +2,8 @@
 """Test time query detection and routing."""
 
 import sys
-sys.path.insert(0, str(__file__).replace('/tools/tests/test_time_queries.py', '/tools'))
+
+sys.path.insert(0, str(__file__).replace("/tools/tests/test_time_queries.py", "/tools"))
 
 from router_py.classify import classify_intent, select_route
 
@@ -21,43 +22,43 @@ def test_time_queries():
         ("Time management tips", False),
         ("Tell me about time travel", False),
     ]
-    
+
     print("=" * 70)
     print("TIME QUERY DETECTION TEST")
     print("=" * 70)
     print()
-    
+
     passed = 0
     failed = 0
-    
+
     for query, should_be_time_query in time_queries:
         classification = classify_intent(query, surface="cli")
-        decision = select_route(classification, policy="direct_allowed")
-        
+        decision = select_route(classification, policy="direct_allowed", query=query)
+
         subcategory = classification.raw_plan.get("subcategory", "")
         is_time = subcategory == "time_query"
-        is_augmented = decision.route == "AUGMENTED"
-        
+        is_time_route = decision.route == "TIME"
+
         if should_be_time_query:
-            test_passed = is_time and is_augmented
+            test_passed = is_time and is_time_route
         else:
             test_passed = not is_time
-        
+
         status = "✓" if test_passed else "✗"
         print(f'{status} "{query}"')
-        print(f'   subcategory={subcategory}, route={decision.route}')
-        
+        print(f"   subcategory={subcategory}, route={decision.route}")
+
         if test_passed:
             passed += 1
         else:
             failed += 1
-    
+
     print()
     print("=" * 70)
     print(f"Results: {passed} passed, {failed} failed")
     print("=" * 70)
-    
-    return failed == 0
+
+    assert failed == 0, f"Time query routing failed: {failed}/{passed + failed}"
 
 
 if __name__ == "__main__":

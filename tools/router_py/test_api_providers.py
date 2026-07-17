@@ -236,8 +236,7 @@ LIVE_APIS_ENABLED = os.environ.get("LUCY_TEST_LIVE_APIS", "").lower() in (
 
 @unittest.skipUnless(
     LIVE_APIS_ENABLED,
-    "Set LUCY_TEST_LIVE_APIS=1 to run live API tests"
-    " (requires OPENAI_API_KEY / MOONSHOT_API_KEY)",
+    "Set LUCY_TEST_LIVE_APIS=1 to run live API tests (requires OPENAI_API_KEY / MOONSHOT_API_KEY)",
 )
 class TestLiveOpenAI(unittest.TestCase):
     """Live OpenAI smoke tests — costs money. Run sparingly."""
@@ -306,8 +305,7 @@ class TestLiveOpenAI(unittest.TestCase):
 
 @unittest.skipUnless(
     LIVE_APIS_ENABLED,
-    "Set LUCY_TEST_LIVE_APIS=1 to run live API tests"
-    " (requires OPENAI_API_KEY / MOONSHOT_API_KEY)",
+    "Set LUCY_TEST_LIVE_APIS=1 to run live API tests (requires OPENAI_API_KEY / MOONSHOT_API_KEY)",
 )
 class TestLiveKimi(unittest.TestCase):
     """Live Kimi smoke tests — costs money. Run sparingly."""

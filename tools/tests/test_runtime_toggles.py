@@ -100,9 +100,9 @@ class RuntimeToggleTester:
 
     def test_toggle(self, name: str, field: str, values: list[str], check_env: bool = True) -> dict:
         """Test a toggle with multiple values."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Testing: {name}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         results = {"name": name, "field": field, "tests": []}
 
@@ -172,9 +172,9 @@ class RuntimeToggleTester:
 
     def test_interaction_evidence_augmentation(self) -> dict:
         """Test interaction: Evidence + Augmentation policy."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Testing Interaction: Evidence + Augmentation Policy")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         results = {"name": "Evidence + Augmentation", "tests": []}
 
@@ -228,9 +228,9 @@ class RuntimeToggleTester:
 
     def test_interaction_voice_mode(self) -> dict:
         """Test interaction: Voice + Mode."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Testing Interaction: Voice + Mode")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         results = {"name": "Voice + Mode", "tests": []}
 
@@ -269,9 +269,9 @@ class RuntimeToggleTester:
 
     def test_env_variable_propagation(self) -> dict:
         """Test that toggles propagate to environment variables."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Testing Environment Variable Propagation")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         results = {"name": "Env Variable Propagation", "tests": []}
 
@@ -363,9 +363,9 @@ class RuntimeToggleTester:
         all_results.append(self.test_env_variable_propagation())
 
         # Restore initial state
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Restoring Initial State")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         for field, value in initial_state.items():
             if field in [
                 "mode",
@@ -392,14 +392,16 @@ class RuntimeToggleTester:
             "total_tests": total_tests,
             "passed": passed_tests,
             "failed": total_tests - passed_tests,
-            "success_rate": f"{(passed_tests/total_tests*100):.1f}%" if total_tests > 0 else "N/A",
+            "success_rate": f"{(passed_tests / total_tests * 100):.1f}%"
+            if total_tests > 0
+            else "N/A",
             "results": all_results,
         }
 
         # Print summary
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("TEST SUMMARY")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Total Tests: {total_tests}")
         print(f"Passed: {passed_tests}")
         print(f"Failed: {total_tests - passed_tests}")

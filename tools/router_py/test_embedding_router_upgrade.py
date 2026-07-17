@@ -23,6 +23,7 @@ import pytest
 @pytest.fixture(scope="module")
 def router():
     from hybrid_router_v2 import HybridRouterV2
+
     return HybridRouterV2()
 
 
@@ -46,9 +47,11 @@ class TestModelSwap:
         # Also check via tokenizer vocab size (MiniLM has 30522, ModernBERT has 50257)
         vocab_size = router.model.tokenizer.vocab_size
         assert vocab_size == 30522, f"Expected MiniLM vocab 30522, got {vocab_size}"
-        assert "minilm" in model_str or "finetuned_minilm" in str(Path(router.model[0].auto_model.config._name_or_path)).lower(), (
-            f"Expected MiniLM model, got {model_str}"
-        )
+        assert (
+            "minilm" in model_str
+            or "finetuned_minilm"
+            in str(Path(router.model[0].auto_model.config._name_or_path)).lower()
+        ), f"Expected MiniLM model, got {model_str}"
 
     def test_embedding_dimension_is_384(self, router):
         """MiniLM-L6-v2 produces 384-dim embeddings, not ModernBERT's 768."""

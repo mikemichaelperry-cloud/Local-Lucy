@@ -186,9 +186,9 @@ def _set_state_model(model_alias: str, smart_routing: str) -> None:
 
 
 def benchmark_one(model_alias, model_label, smart_routing: str = "off"):
-    log(f"{'='*60}")
+    log(f"{'=' * 60}")
     log(f"MODEL: {model_alias} ({model_label})  [smart_routing={smart_routing}]")
-    log(f"{'='*60}")
+    log(f"{'=' * 60}")
 
     # STEP 0: Make sure the authoritative state matches the benchmark target
     _set_state_model(model_alias, smart_routing)

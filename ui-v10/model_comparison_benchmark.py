@@ -166,9 +166,9 @@ def run_query(prompt: str, model: str, timeout: int = 130) -> tuple[float, bool,
 
 def benchmark_model(model_alias: str, model_label: str) -> dict:
     """Run full benchmark for one model."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"MODEL: {model_alias} ({model_label})")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     results: list[RunResult] = []
 

@@ -7,6 +7,7 @@ Used by the feedback parser to attribute natural-language feedback
 The buffer persists to disk so feedback works across process restarts.
 Only the last N turns are kept (default 5).
 """
+
 from __future__ import annotations
 
 import json
@@ -17,7 +18,9 @@ from typing import Optional
 
 # Persist in runtime namespace so it survives restarts
 RUNTIME_NS = Path(
-    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"))
+    os.environ.get(
+        "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+    )
 )
 BUFFER_PATH = RUNTIME_NS / "feedback_buffer.json"
 DEFAULT_MAX_TURNS = 5

@@ -139,15 +139,21 @@ def _is_news_topic(text: str) -> bool:
     qn = _norm_text(text)
     if _has_re(qn, r"\b(news|headline|headlines|breaking)\b"):
         return True
-    if _has_re(qn, r"\b(latest|today|recent|right now|now|this week|as of|what happened)\b") and _has_re(
+    if _has_re(
+        qn, r"\b(latest|today|recent|right now|now|this week|as of|what happened)\b"
+    ) and _has_re(
         qn,
         r"\b(war|conflict|military action|ceasefire|talks?|developments?|hostilities|fighting|stock market|market|election|protest|strike)\b",
     ):
         return True
-    if _has_re(qn, r"\b(predict|prediction|outcome|forecast)\b") and _has_re(
-        qn,
-        r"\b(current|latest|today|recent|right now|now|this week|as of)\b",
-    ) and _has_re(qn, r"\b(war|conflict|military action|ceasefire|hostilities|fighting)\b"):
+    if (
+        _has_re(qn, r"\b(predict|prediction|outcome|forecast)\b")
+        and _has_re(
+            qn,
+            r"\b(current|latest|today|recent|right now|now|this week|as of)\b",
+        )
+        and _has_re(qn, r"\b(war|conflict|military action|ceasefire|hostilities|fighting)\b")
+    ):
         return True
     return False
 
@@ -168,7 +174,12 @@ def _news_anchor_topic(text: str) -> str:
     for pattern in patterns:
         match = re.search(pattern, qn, flags=re.IGNORECASE)
         if match:
-            topic = re.sub(r"\b(today|right now|at the moment|currently|latest)\b", "", match.group(1), flags=re.IGNORECASE)
+            topic = re.sub(
+                r"\b(today|right now|at the moment|currently|latest)\b",
+                "",
+                match.group(1),
+                flags=re.IGNORECASE,
+            )
             topic = re.sub(r"\s+", " ", topic).strip(" ,.-")
             if topic:
                 return topic
@@ -176,7 +187,9 @@ def _news_anchor_topic(text: str) -> str:
 
 
 def _followup_tail_text(question: str) -> str:
-    text = re.sub(r"^\s*(?:and(?:\s+what\s+about)?|what\s+about)\b", "", question or "", flags=re.IGNORECASE)
+    text = re.sub(
+        r"^\s*(?:and(?:\s+what\s+about)?|what\s+about)\b", "", question or "", flags=re.IGNORECASE
+    )
     text = re.sub(r"^[\s:,\-]+", "", text)
     text = re.sub(r"[\s.?!]+$", "", text)
     return text.strip()
@@ -354,14 +367,15 @@ def _pet_symptom_phrase(text: str) -> str:
 
 def _is_pet_medical_topic(text: str) -> bool:
     qn = _norm_text(text)
-    return _has_re(qn, r"\b(dog|dogs|cat|cats|pet|pets|puppy|puppies|kitten|kittens)\b") and _has_re(
+    return _has_re(
+        qn, r"\b(dog|dogs|cat|cats|pet|pets|puppy|puppies|kitten|kittens)\b"
+    ) and _has_re(
         qn,
         r"\b(stool|poo|poop|diarrhea|diarrhoea|vomit|vomiting|lethargy|lethargic|symptom|symptoms|vet|veterinarian|toxic|poison|poisonous)\b",
     )
 
 
 def _pet_followup_resolved_question(previous_question: str, question: str) -> str:
-    qn = _norm_text(question)
     previous_symptom = _pet_symptom_phrase(previous_question)
     if previous_symptom:
         clarify = re.match(
@@ -414,7 +428,11 @@ def resolve_contextual_followup(question: str, root: str) -> Optional[Dict[str, 
     except Exception:
         current_medical = {}
     explicit_medication_subject = _clean_candidate_subject(
-        str(current_medical.get("normalized_candidate") or current_medical.get("candidate_medication") or "")
+        str(
+            current_medical.get("normalized_candidate")
+            or current_medical.get("candidate_medication")
+            or ""
+        )
     )
     if has_human_medication_topic_query(question) and explicit_medication_subject:
         return None
@@ -438,7 +456,9 @@ def resolve_contextual_followup(question: str, root: str) -> Optional[Dict[str, 
                 "contextual_followup_kind": "comparison",
             }
 
-    if context_source == "memory" and (_is_repeat_explanation_followup(question) or _is_more_about_subject_followup(question)):
+    if context_source == "memory" and (
+        _is_repeat_explanation_followup(question) or _is_more_about_subject_followup(question)
+    ):
         subject = _single_subject_from_question(previous_question)
         if subject:
             resolved_question = f"Explain {subject}."
@@ -465,7 +485,9 @@ def resolve_contextual_followup(question: str, root: str) -> Optional[Dict[str, 
         anchor = _news_anchor_topic(previous_question)
         resolved_question = f"What are the latest developments about {tail} today?"
         if anchor:
-            resolved_question = f"What are the latest developments about {tail} related to {anchor} today?"
+            resolved_question = (
+                f"What are the latest developments about {tail} related to {anchor} today?"
+            )
         return {
             "resolved_question": resolved_question,
             "route_reason_override": "contextual_news_followup",

@@ -86,9 +86,9 @@ def corpus_metrics():
 
 def test_overall_accuracy(corpus_metrics):
     accuracy, _ = corpus_metrics
-    assert (
-        accuracy >= BASELINE_ACCURACY
-    ), f"accuracy {accuracy:.4f} below baseline {BASELINE_ACCURACY}"
+    assert accuracy >= BASELINE_ACCURACY, (
+        f"accuracy {accuracy:.4f} below baseline {BASELINE_ACCURACY}"
+    )
 
 
 def test_per_route_recall(corpus_metrics):

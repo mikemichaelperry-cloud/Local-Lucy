@@ -35,7 +35,9 @@ try:
 
     if not prewarm_router():
         _ROUTER_AVAILABLE = False
-        _ROUTER_SKIP_REASON = "Router assets (embeddings/examples) or sentence_transformers unavailable"
+        _ROUTER_SKIP_REASON = (
+            "Router assets (embeddings/examples) or sentence_transformers unavailable"
+        )
     else:
         _ROUTER_AVAILABLE = True
 except Exception as exc:
@@ -87,7 +89,9 @@ class TestAugmentedAutoRouting(unittest.TestCase):
 
     def test_historical_figure_augmented(self):
         route, _ = self._route("Who painted the Mona Lisa?")
-        self.assertEqual(route, "AUGMENTED", f"Expected AUGMENTED for historical figure, got {route}")
+        self.assertEqual(
+            route, "AUGMENTED", f"Expected AUGMENTED for historical figure, got {route}"
+        )
 
     def test_geography_augmented(self):
         route, _ = self._route("What is the capital of France?")
@@ -95,7 +99,9 @@ class TestAugmentedAutoRouting(unittest.TestCase):
 
     def test_population_augmented(self):
         route, _ = self._route("What is the population of Tokyo?")
-        self.assertEqual(route, "AUGMENTED", f"Expected AUGMENTED for population query, got {route}")
+        self.assertEqual(
+            route, "AUGMENTED", f"Expected AUGMENTED for population query, got {route}"
+        )
 
     def test_capital_germany_augmented(self):
         route, _ = self._route("What is the capital of Germany?")
@@ -159,6 +165,7 @@ class TestAugmentedAutoRouting(unittest.TestCase):
 
     def test_augmented_prefix_override(self):
         import re
+
         prefix_patterns = [
             (r"^local:\s*(.*)$", "LOCAL"),
             (r"^news:\s*(.*)$", "NEWS"),

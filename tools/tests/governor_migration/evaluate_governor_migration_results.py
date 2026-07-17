@@ -39,20 +39,28 @@ ROOT_CAUSE_NOTES = {
 }
 
 OUTCOME_FAMILY_MATCHERS = {
-    "local_success": lambda route, code, response: route == "LOCAL"
-    and code in {"answered", "knowledge_short_circuit_hit"},
-    "local_guarded_medical": lambda route, code, response: route == "LOCAL"
-    and code in {"answered", "knowledge_short_circuit_hit", "local_guard_fallback"},
-    "local_guarded_safety": lambda route, code, response: route == "LOCAL"
-    and code in {"answered", "knowledge_short_circuit_hit", "local_guard_fallback"},
-    "clarify_needed": lambda route, code, response: route == "CLARIFY"
-    and code == "clarification_requested",
+    "local_success": lambda route, code, response: (
+        route == "LOCAL" and code in {"answered", "knowledge_short_circuit_hit"}
+    ),
+    "local_guarded_medical": lambda route, code, response: (
+        route == "LOCAL"
+        and code in {"answered", "knowledge_short_circuit_hit", "local_guard_fallback"}
+    ),
+    "local_guarded_safety": lambda route, code, response: (
+        route == "LOCAL"
+        and code in {"answered", "knowledge_short_circuit_hit", "local_guard_fallback"}
+    ),
+    "clarify_needed": lambda route, code, response: (
+        route == "CLARIFY" and code == "clarification_requested"
+    ),
     "news_success": lambda route, code, response: route == "NEWS" and code == "answered",
     "evidence_success": lambda route, code, response: route == "EVIDENCE" and code == "answered",
-    "evidence_unavailable_offline": lambda route, code, response: route == "EVIDENCE"
-    and code in {"requires_evidence_mode", "validated_insufficient"},
-    "news_unavailable_offline": lambda route, code, response: route == "NEWS"
-    and code in {"requires_evidence_mode", "validated_insufficient"},
+    "evidence_unavailable_offline": lambda route, code, response: (
+        route == "EVIDENCE" and code in {"requires_evidence_mode", "validated_insufficient"}
+    ),
+    "news_unavailable_offline": lambda route, code, response: (
+        route == "NEWS" and code in {"requires_evidence_mode", "validated_insufficient"}
+    ),
 }
 
 MODE_MAP = {

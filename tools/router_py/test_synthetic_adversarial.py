@@ -438,7 +438,7 @@ def _run_direct():
         print(f"\n--- Failures ({len(failures)}) ---")
         for f in failures:
             print(f)
-    print(f"\nAccuracy: {passed}/{total} ({passed/total*100:.1f}%)")
+    print(f"\nAccuracy: {passed}/{total} ({passed / total * 100:.1f}%)")
 
     # Return exit code
     return 0 if not failures else 1

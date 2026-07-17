@@ -45,6 +45,7 @@ T = TypeVar("T")
 # State machine
 # ---------------------------------------------------------------------------
 
+
 class State(Enum):
     CLOSED = "closed"
     OPEN = "open"
@@ -64,6 +65,7 @@ DEFAULT_PROBE_REQUESTS = 1
 # ---------------------------------------------------------------------------
 # CircuitBreaker
 # ---------------------------------------------------------------------------
+
 
 class CircuitBreaker:
     """
@@ -267,6 +269,7 @@ def reset_all_breakers() -> None:
 # Decorator
 # ---------------------------------------------------------------------------
 
+
 def circuit_breaker(
     name: str | None = None,
     failure_threshold: int = DEFAULT_FAILURE_THRESHOLD,
@@ -275,6 +278,7 @@ def circuit_breaker(
     probe_requests: int = DEFAULT_PROBE_REQUESTS,
 ) -> Callable:
     """Decorator that wraps a function in a circuit breaker."""
+
     def decorator(fn: Callable) -> Callable:
         breaker_name = name or fn.__qualname__
         cb = get_breaker(
@@ -300,6 +304,7 @@ def circuit_breaker(
         if asyncio.iscoroutinefunction(fn):
             return async_wrapper
         return wrapper
+
     return decorator
 
 

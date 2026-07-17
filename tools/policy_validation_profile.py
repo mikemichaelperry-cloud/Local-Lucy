@@ -13,12 +13,26 @@ def normalize(text: str) -> str:
 
 def query_shape(query: str) -> str:
     q = normalize(query)
-    has_climate = re.search(r"\b(climate policy|climate regulation|emissions policy|carbon policy|global climate policy)\b", q) is not None
-    has_ai = re.search(
-        r"\b(ai|artificial intelligence|genai|llm|foundation models?|model evaluations?|ai safety|ai regulation|ai governance|technology regulation|technology governance|tech governance)\b",
-        q,
-    ) is not None
-    has_fin = re.search(r"\b(financial regulation|financial policy|banking regulation|market regulation)\b", q) is not None
+    has_climate = (
+        re.search(
+            r"\b(climate policy|climate regulation|emissions policy|carbon policy|global climate policy)\b",
+            q,
+        )
+        is not None
+    )
+    has_ai = (
+        re.search(
+            r"\b(ai|artificial intelligence|genai|llm|foundation models?|model evaluations?|ai safety|ai regulation|ai governance|technology regulation|technology governance|tech governance)\b",
+            q,
+        )
+        is not None
+    )
+    has_fin = (
+        re.search(
+            r"\b(financial regulation|financial policy|banking regulation|market regulation)\b", q
+        )
+        is not None
+    )
     if has_climate and has_ai and not has_fin:
         return "compound_climate_ai"
     if has_ai and not has_climate and not has_fin:
@@ -32,10 +46,13 @@ def query_shape(query: str) -> str:
 
 def requires_strict_specificity(query: str) -> bool:
     q = normalize(query)
-    return re.search(
-        r"\b(exact|exactly|specific|specify|deadline|deadlines|treaty|treaties|court|ruling|rulings|law number|article [0-9]+|section [0-9]+|which regulator|which country|which jurisdiction)\b",
-        q,
-    ) is not None
+    return (
+        re.search(
+            r"\b(exact|exactly|specific|specify|deadline|deadlines|treaty|treaties|court|ruling|rulings|law number|article [0-9]+|section [0-9]+|which regulator|which country|which jurisdiction)\b",
+            q,
+        )
+        is not None
+    )
 
 
 def key_family_for(key: str) -> str:
@@ -73,7 +90,9 @@ def support_from_pack(pack_dir: Path) -> tuple[dict[str, set[str]], set[str]]:
     return families, all_domains
 
 
-def decide_allow(shape: str, families: dict[str, set[str]], all_domains: set[str]) -> tuple[bool, str]:
+def decide_allow(
+    shape: str, families: dict[str, set[str]], all_domains: set[str]
+) -> tuple[bool, str]:
     climate_count = len(families.get("policy_climate", set()))
     ai_count = len(families.get("policy_ai_gov", set()))
     regulation_count = len(families.get("policy_regulation", set()))
@@ -126,14 +145,22 @@ def main() -> int:
         "POLICY_VALIDATION_APPLICABLE": "true" if shape != "none" else "false",
         "POLICY_VALIDATION_SHAPE": shape,
         "POLICY_VALIDATION_SUCCESS_FAMILIES": ",".join(
-            family for family in ("policy_climate", "policy_ai_gov", "policy_regulation") if families.get(family)
+            family
+            for family in ("policy_climate", "policy_ai_gov", "policy_regulation")
+            if families.get(family)
         ),
         "POLICY_VALIDATION_UNIQUE_DOMAINS": str(len(all_domains)),
         "POLICY_VALIDATION_ALLOW_BOUNDED": "1" if allow else "0",
         "POLICY_VALIDATION_REASON": reason,
-        "POLICY_VALIDATION_DOMAIN_COUNT_POLICY_CLIMATE": str(len(families.get("policy_climate", set()))),
-        "POLICY_VALIDATION_DOMAIN_COUNT_POLICY_AI_GOV": str(len(families.get("policy_ai_gov", set()))),
-        "POLICY_VALIDATION_DOMAIN_COUNT_POLICY_REGULATION": str(len(families.get("policy_regulation", set()))),
+        "POLICY_VALIDATION_DOMAIN_COUNT_POLICY_CLIMATE": str(
+            len(families.get("policy_climate", set()))
+        ),
+        "POLICY_VALIDATION_DOMAIN_COUNT_POLICY_AI_GOV": str(
+            len(families.get("policy_ai_gov", set()))
+        ),
+        "POLICY_VALIDATION_DOMAIN_COUNT_POLICY_REGULATION": str(
+            len(families.get("policy_regulation", set()))
+        ),
     }
     emit(assignments)
     return 0

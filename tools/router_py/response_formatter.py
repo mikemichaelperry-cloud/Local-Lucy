@@ -88,13 +88,17 @@ def render_chat_fast_from_raw(raw: str) -> str:
 
     # Strip common model-generated error prefixes
     error_prefixes = [
-        "Error:", "error:", "ERROR:",
-        "Sorry, I cannot", "sorry, i cannot",
-        "I cannot answer", "i cannot answer",
+        "Error:",
+        "error:",
+        "ERROR:",
+        "Sorry, I cannot",
+        "sorry, i cannot",
+        "I cannot answer",
+        "i cannot answer",
     ]
     for prefix in error_prefixes:
         if text.startswith(prefix):
-            text = text[len(prefix):].lstrip()
+            text = text[len(prefix) :].lstrip()
 
     return text.strip()
 
@@ -112,13 +116,13 @@ def _truncate_evidence(text: str, max_chars: int) -> str:
     # Find the last sentence boundary within the allowed range
     last_period = truncated.rfind(". ")
     if last_period > max_chars * 0.5:
-        return text[:last_period + 1].rstrip()
+        return text[: last_period + 1].rstrip()
     last_exclaim = truncated.rfind("! ")
     if last_exclaim > max_chars * 0.5:
-        return text[:last_exclaim + 1].rstrip()
+        return text[: last_exclaim + 1].rstrip()
     last_question = truncated.rfind("? ")
     if last_question > max_chars * 0.5:
-        return text[:last_question + 1].rstrip()
+        return text[: last_question + 1].rstrip()
     # Fallback to word boundary
     idx = truncated.rfind(" ")
     if idx > max_chars * 0.8:
@@ -206,6 +210,7 @@ def build_augmented_prompt(
 def guard_normalize(text: str | None) -> str:
     """Normalize text for guard pattern matching."""
     import re
+
     if not text:
         return ""
     normalized = text.lower()

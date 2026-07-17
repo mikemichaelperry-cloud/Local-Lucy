@@ -32,7 +32,13 @@ def main() -> int:
     if args.detect_query is not None:
         import json
 
-        print(json.dumps(detect_human_medication_query(args.detect_query), separators=(",", ":"), sort_keys=True))
+        print(
+            json.dumps(
+                detect_human_medication_query(args.detect_query),
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
         return 0
     if args.query is None:
         return 2

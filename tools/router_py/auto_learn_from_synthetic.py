@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "models" / "router"
 from router_py.classify import classify_intent, select_route
 from background_learner import learn_once, FEEDBACK_PATH, is_learning_enabled
 
+
 def main():
     cases_path = Path(__file__).parent.parent.parent / "tests" / "synthetic_adversarial_cases.jsonl"
     if not cases_path.exists():
@@ -44,17 +45,21 @@ def main():
             actual = decision.route
 
             if actual != expected:
-                mismatches.append({
-                    "id": case["id"],
-                    "query": query,
-                    "expected": expected,
-                    "actual": actual,
-                    "family": case.get("family", ""),
-                })
+                mismatches.append(
+                    {
+                        "id": case["id"],
+                        "query": query,
+                        "expected": expected,
+                        "actual": actual,
+                        "family": case.get("family", ""),
+                    }
+                )
 
     print(f"Total mismatches: {len(mismatches)}")
     for m in mismatches:
-        print(f"  {m['id']} ({m['family']}): '{m['query'][:60]}...' -> expected {m['expected']}, got {m['actual']}")
+        print(
+            f"  {m['id']} ({m['family']}): '{m['query'][:60]}...' -> expected {m['expected']}, got {m['actual']}"
+        )
 
     if not mismatches:
         print("No mismatches to learn from.")
@@ -94,9 +99,12 @@ def main():
             print(f"  FIXED {m['id']}: {m['query'][:60]}... -> {decision.route}")
         else:
             still_wrong += 1
-            print(f"  STILL {m['id']}: {m['query'][:60]}... -> expected {m['expected']}, got {decision.route}")
+            print(
+                f"  STILL {m['id']}: {m['query'][:60]}... -> expected {m['expected']}, got {decision.route}"
+            )
 
     print(f"\nFixed: {fixed}/{len(mismatches)}  Still wrong: {still_wrong}/{len(mismatches)}")
+
 
 if __name__ == "__main__":
     main()

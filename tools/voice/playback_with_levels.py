@@ -126,7 +126,6 @@ def _analyze_wav_levels(
 
     try:
         with wave.open(str(wav_path), "rb") as wav_file:
-            channels = wav_file.getnchannels()
             sample_width = wav_file.getsampwidth()
             frame_rate = wav_file.getframerate()
             n_frames = wav_file.getnframes()
@@ -318,7 +317,7 @@ def play_wav_file_with_levels(
         proc.terminate()
         try:
             proc.communicate(timeout=2)
-        except:
+        except Exception:
             proc.kill()
         raise PlaybackError("playback timed out")
     finally:

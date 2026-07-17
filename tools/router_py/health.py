@@ -47,6 +47,7 @@ def _check_sqlite() -> dict:
 def _check_embedding_model() -> dict:
     try:
         from sentence_transformers import SentenceTransformer
+
         model_path = Path("models/router/finetuned_minilm")
         if model_path.exists():
             _ = SentenceTransformer(str(model_path))
@@ -68,7 +69,9 @@ def _check_searxng() -> dict:
 
 
 def _check_voice() -> dict:
-    voice_runtime = Path(os.environ.get("LUCY_VOICE_RUNTIME_FILE", "runtime/state/voice_runtime.json"))
+    voice_runtime = Path(
+        os.environ.get("LUCY_VOICE_RUNTIME_FILE", "runtime/state/voice_runtime.json")
+    )
     if not voice_runtime.exists():
         return {"status": "healthy", "detail": "Voice idle (no runtime file)"}
     try:

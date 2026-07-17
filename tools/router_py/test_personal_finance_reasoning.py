@@ -52,6 +52,6 @@ class TestPersonalFinanceReasoning:
         """Live financial data lookups should route to FINANCE."""
         classification = classify_intent(query)
         decision = select_route(classification, query=query)
-        assert (
-            decision.route == "FINANCE"
-        ), f"{query!r} should route to FINANCE, got {decision.route}"
+        assert decision.route == "FINANCE", (
+            f"{query!r} should route to FINANCE, got {decision.route}"
+        )

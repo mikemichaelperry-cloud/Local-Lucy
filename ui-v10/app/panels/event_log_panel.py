@@ -1,5 +1,13 @@
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QSizePolicy, QVBoxLayout
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPlainTextEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+)
 
 
 class EventLogPanel(QFrame):

@@ -58,16 +58,17 @@ class TestShutdownHandler:
         obj.close.assert_called_once()
 
     def test_on_signal(self):
-        with patch.object(sh, "_close_all") as mock_close, \
-             patch("os.kill") as mock_kill, \
-             patch("signal.signal"):
+        with (
+            patch.object(sh, "_close_all") as mock_close,
+            patch("os.kill") as mock_kill,
+            patch("signal.signal"),
+        ):
             sh._on_signal(15, None)
             mock_close.assert_called_once()
             mock_kill.assert_called_once()
 
     def test_install_registers_atexit(self):
-        with patch("atexit.register") as mock_atexit, \
-             patch("signal.signal") as mock_signal:
+        with patch("atexit.register") as mock_atexit, patch("signal.signal") as mock_signal:
             sh.install()
             mock_atexit.assert_called_once_with(sh._close_all)
             assert mock_signal.call_count >= 2

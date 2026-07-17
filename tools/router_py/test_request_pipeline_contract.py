@@ -46,9 +46,9 @@ class TestSingleAuthoritativePath:
         from router_py import streaming_voice
 
         source = inspect.getsource(streaming_voice.StreamingVoicePipeline._get_full_response)
-        assert (
-            "ExecutionEngine(" not in source
-        ), "Voice streaming should not instantiate ExecutionEngine"
+        assert "ExecutionEngine(" not in source, (
+            "Voice streaming should not instantiate ExecutionEngine"
+        )
         assert (
             "main.run(" in source
             or "from router_py.main import run" in source
@@ -91,9 +91,9 @@ class TestMemoryTogglePropagation:
         from router_py.classify import _memory_routing_gate
 
         result = _memory_routing_gate("What did I say about him?", "WEATHER")
-        assert (
-            result == "LOCAL"
-        ), "Explicit recall should route LOCAL so model can explain memory is disabled"
+        assert result == "LOCAL", (
+            "Explicit recall should route LOCAL so model can explain memory is disabled"
+        )
 
     def test_memory_disabled_no_injection(self, monkeypatch):
         """When memory disabled, no memory should be injected into prompts."""

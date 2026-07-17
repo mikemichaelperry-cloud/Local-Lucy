@@ -196,7 +196,10 @@ def _limit_hedges(text: str, max_hedges: int = 1) -> str:
 def _is_broad_emotional_prompt(prompt: str) -> bool:
     p = (prompt or "").lower()
     return bool(
-        re.search(r"\b(people are idiots|everyone is|nobody|always|never|annoyed|furious|hate people|people are stupid)\b", p)
+        re.search(
+            r"\b(people are idiots|everyone is|nobody|always|never|annoyed|furious|hate people|people are stupid)\b",
+            p,
+        )
     )
 
 
@@ -220,7 +223,9 @@ def _apply_contrarian_layer(text: str, prompt: str, probability: float) -> str:
         return text
     if not _deterministic_pick(prompt, probability):
         return text
-    mechanism = "Usually this points to misaligned incentives or unclear constraints, not raw intelligence."
+    mechanism = (
+        "Usually this points to misaligned incentives or unclear constraints, not raw intelligence."
+    )
     alt = "A better read is to ask which rule, pressure, or reward is driving the behavior."
     sents = _split_sentences(text)
     if not sents:
@@ -235,7 +240,15 @@ def _has_conclusion(text: str) -> bool:
     if not sents:
         return False
     tail = sents[-1].lower()
-    markers = ["bottom line", "so", "therefore", "the takeaway", "you should", "focus on", "do this"]
+    markers = [
+        "bottom line",
+        "so",
+        "therefore",
+        "the takeaway",
+        "you should",
+        "focus on",
+        "do this",
+    ]
     if any(m in tail for m in markers):
         return True
     return bool(re.search(r"\b(should|matters|requires|works best|focus on)\b", tail))
@@ -244,7 +257,9 @@ def _has_conclusion(text: str) -> bool:
 def _ensure_conclusion(text: str) -> str:
     if _has_conclusion(text):
         return text
-    return _join_sentences(_split_sentences(text) + ["Bottom line: choose one clear action and execute it this week."])
+    return _join_sentences(
+        _split_sentences(text) + ["Bottom line: choose one clear action and execute it this week."]
+    )
 
 
 def _has_concrete_example(text: str) -> bool:
@@ -275,7 +290,9 @@ def _enforce_substance_floor(text: str) -> str:
     if not sents or _is_direct_yes_no(text) or len(sents) >= 3:
         return text
     if len(sents) == 1:
-        sents.append("Mechanism: clarity on criteria reduces second-guessing and prevents decision loops.")
+        sents.append(
+            "Mechanism: clarity on criteria reduces second-guessing and prevents decision loops."
+        )
         sents.append("Consequence: without that clarity, stress rises and execution slows.")
     elif len(sents) == 2:
         sents.append("Consequence: if you skip this step, you keep revisiting the same choice.")
@@ -291,7 +308,11 @@ def _reduce_balance_structure(text: str, max_balance_sentences: int) -> str:
     balance_count = 0
     for s in sents:
         low = s.lower()
-        is_balance = bool(re.search(r"\b(on the one hand|on the other hand|however|alternatively|conversely)\b", low))
+        is_balance = bool(
+            re.search(
+                r"\b(on the one hand|on the other hand|however|alternatively|conversely)\b", low
+            )
+        )
         if is_balance:
             balance_count += 1
             if balance_count > max_balance_sentences:
@@ -347,7 +368,10 @@ def _is_short_phatic_prompt(prompt: str) -> bool:
     p = re.sub(r"\s+", " ", (prompt or "").strip().lower())
     if not p:
         return False
-    if re.search(r"^(hmm+|hm+|uh+h*|uh-?huh|huh+|ok|okay|k|right|sure|thanks|thank you|cool|nice|interesting|weird|ugh|meh)[.!?]*$", p):
+    if re.search(
+        r"^(hmm+|hm+|uh+h*|uh-?huh|huh+|ok|okay|k|right|sure|thanks|thank you|cool|nice|interesting|weird|ugh|meh)[.!?]*$",
+        p,
+    ):
         return True
     if re.search(r"^(consider my last question|consider my las question|last question)[.!?]*$", p):
         return True
@@ -412,11 +436,15 @@ def main() -> int:
     if profile.get("hedge_reduction", True):
         out = _limit_hedges(out, max_hedges=1)
 
-    out = _apply_contrarian_layer(out, user_prompt, float(profile.get("contrarian_probability", 0.4) or 0.0))
+    out = _apply_contrarian_layer(
+        out, user_prompt, float(profile.get("contrarian_probability", 0.4) or 0.0)
+    )
     out = _reduce_balance_structure(out, int(profile.get("max_balance_sentences", 1) or 1))
     out = _soften_aggressive_language(out)
 
-    apply_heavy_shape = (not _is_short_phatic_prompt(user_prompt)) and _should_apply_heavy_shape(user_prompt, intent)
+    apply_heavy_shape = (not _is_short_phatic_prompt(user_prompt)) and _should_apply_heavy_shape(
+        user_prompt, intent
+    )
     if profile.get("min_specificity", True) and apply_heavy_shape:
         out = _ensure_concrete_example(out)
         out = _enforce_substance_floor(out)

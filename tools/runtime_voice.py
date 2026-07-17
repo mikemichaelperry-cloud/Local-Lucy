@@ -28,7 +28,6 @@ from runtime_control import (
     locked_state_file,
     resolve_state_file,
 )
-
 from voice.playback import PlaybackError, detect_audio_player, play_wav_file
 
 try:

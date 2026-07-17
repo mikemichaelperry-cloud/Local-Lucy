@@ -1,4 +1,5 @@
 """Small helper to load the project .env file for standalone tools."""
+
 from __future__ import annotations
 
 import os

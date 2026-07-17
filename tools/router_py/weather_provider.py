@@ -46,7 +46,7 @@ def _extract_location(query: str) -> str | None:
     for pat in patterns:
         m = re.search(pat, q)
         if m:
-            loc = q[m.end():].strip()
+            loc = q[m.end() :].strip()
             # Remove trailing punctuation
             loc = re.sub(r"[?.,!]+$", "", loc)
             # Strip trailing temporal/filler phrases that are not part of the location
@@ -98,7 +98,11 @@ def _format_weather(data: dict[str, Any], requested_location: str) -> dict[str, 
         # Use the requested location in the header; note resolved area if it differs
         display_name = requested_location.title()
         resolved_name = f"{area_name}, {country}" if country else area_name
-        loc_note = f" (resolved to {resolved_name})" if resolved_name.lower() != requested_location.lower() else ""
+        loc_note = (
+            f" (resolved to {resolved_name})"
+            if resolved_name.lower() != requested_location.lower()
+            else ""
+        )
 
         temp_c = current.get("temp_C", "?")
         temp_f = current.get("temp_F", "?")

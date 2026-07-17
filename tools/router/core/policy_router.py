@@ -54,9 +54,13 @@ def route_intent(
     signal_flags = dict(plan.get("routing_signals") or {})
 
     if route_prefix not in {"local", "news", "evidence"}:
-        if needs_clarification or (intent_class == "mixed" and confidence < max(confidence_threshold, 0.7)):
+        if needs_clarification or (
+            intent_class == "mixed" and confidence < max(confidence_threshold, 0.7)
+        ):
             if not clarification_question:
-                clarification_question = "Do you want general information, current news, or travel safety information?"
+                clarification_question = (
+                    "Do you want general information, current news, or travel safety information?"
+                )
             return {
                 "route_mode": "CLARIFY",
                 "force_mode": "CLARIFY",
@@ -70,10 +74,17 @@ def route_intent(
                 "policy_confidence_threshold": round(confidence_threshold, 3),
                 "confidence_band": "low" if confidence < confidence_threshold else "medium",
                 "freshness_requirement": "high" if plan.get("needs_current_info") else "low",
-                "risk_level": "high" if intent_class in {"evidence_check", "current_fact"} else "low",
-                "source_criticality": "high" if intent_class in {"evidence_check", "current_fact"} else "low",
+                "risk_level": "high"
+                if intent_class in {"evidence_check", "current_fact"}
+                else "low",
+                "source_criticality": "high"
+                if intent_class in {"evidence_check", "current_fact"}
+                else "low",
                 "operator_override": "none",
-                "reason_codes": ["needs_clarification", f"intent_class:{intent_class or 'unknown'}"],
+                "reason_codes": [
+                    "needs_clarification",
+                    f"intent_class:{intent_class or 'unknown'}",
+                ],
                 "reason_codes_csv": f"needs_clarification,intent_class:{intent_class or 'unknown'}",
                 "surface": _s(surface).strip().lower() or "cli",
                 "mixed_intent": mixed_intent,

@@ -211,7 +211,7 @@ class BurnInTestV3:
         print("\n" + "=" * 70)
         print("BURN-IN TEST SUMMARY")
         print("=" * 70)
-        print(f"Duration: {self.stats.duration_seconds/60:.1f} minutes")
+        print(f"Duration: {self.stats.duration_seconds / 60:.1f} minutes")
         print(f"Total Queries: {self.stats.total_queries}")
         print(f"Successful: {self.stats.successful_queries}")
         print(f"Failed: {self.stats.failed_queries}")

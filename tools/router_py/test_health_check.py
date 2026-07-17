@@ -42,6 +42,7 @@ class TestHealthCheck:
         state_dir.mkdir(parents=True)
         db = state_dir / "lucy_state.db"
         import sqlite3
+
         conn = sqlite3.connect(str(db))
         conn.execute("CREATE TABLE IF NOT EXISTS t (id INTEGER PRIMARY KEY)")
         conn.close()
@@ -65,18 +66,24 @@ class TestHealthCheck:
         assert result["status"] == "unhealthy"
 
     def test_run_health_check_overall(self):
-        with patch.object(hc, "_check_ollama", return_value={"status": "healthy"}), \
-             patch.object(hc, "_check_whisper", return_value={"status": "healthy"}), \
-             patch.object(hc, "_check_router_model", return_value={"status": "healthy"}), \
-             patch.object(hc, "_check_state_manager", return_value={"status": "healthy"}):
+        with (
+            patch.object(hc, "_check_ollama", return_value={"status": "healthy"}),
+            patch.object(hc, "_check_whisper", return_value={"status": "healthy"}),
+            patch.object(hc, "_check_router_model", return_value={"status": "healthy"}),
+            patch.object(hc, "_check_state_manager", return_value={"status": "healthy"}),
+        ):
             result = hc.run_health_check()
             assert result["healthy"] is True
             assert len(result["checks"]) == 4
 
     def test_run_health_check_unhealthy(self):
-        with patch.object(hc, "_check_ollama", return_value={"status": "unhealthy", "detail": "down"}), \
-             patch.object(hc, "_check_whisper", return_value={"status": "healthy"}), \
-             patch.object(hc, "_check_router_model", return_value={"status": "healthy"}), \
-             patch.object(hc, "_check_state_manager", return_value={"status": "healthy"}):
+        with (
+            patch.object(
+                hc, "_check_ollama", return_value={"status": "unhealthy", "detail": "down"}
+            ),
+            patch.object(hc, "_check_whisper", return_value={"status": "healthy"}),
+            patch.object(hc, "_check_router_model", return_value={"status": "healthy"}),
+            patch.object(hc, "_check_state_manager", return_value={"status": "healthy"}),
+        ):
             result = hc.run_health_check()
             assert result["healthy"] is False

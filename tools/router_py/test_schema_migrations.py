@@ -32,9 +32,9 @@ class TestSchemaMigrations:
             assert version == LATEST_SCHEMA_VERSION
 
             # Core tables must exist
-            tables = {row[0] for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )}
+            tables = {
+                row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
             assert "namespaces" in tables
             assert "routes" in tables
             assert "outcomes" in tables
@@ -56,9 +56,9 @@ class TestSchemaMigrations:
             version = apply_migrations(conn)
             assert version == LATEST_SCHEMA_VERSION
 
-            tables = {row[0] for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )}
+            tables = {
+                row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
             assert "namespaces" in tables
         finally:
             conn.close()
@@ -89,9 +89,7 @@ class TestSchemaMigrations:
             conn.commit()
 
             # Insert a sample row
-            conn.execute(
-                "INSERT INTO namespaces (name) VALUES (?)", ("test_ns",)
-            )
+            conn.execute("INSERT INTO namespaces (name) VALUES (?)", ("test_ns",))
             conn.commit()
 
             # Now run migrations (should apply v2)
@@ -121,7 +119,9 @@ class TestSchemaMigrations:
                 apply_migrations(conn)
 
             assert "999" in str(exc_info.value)
-            assert "newer" in str(exc_info.value).lower() or "supported" in str(exc_info.value).lower()
+            assert (
+                "newer" in str(exc_info.value).lower() or "supported" in str(exc_info.value).lower()
+            )
         finally:
             conn.close()
 
@@ -141,9 +141,7 @@ class TestSchemaMigrations:
 
             # Only inject the bomb if we can add a fake v3
             monkeypatch.setitem(MIGRATIONS, 3, _bomb)
-            monkeypatch.setattr(
-                schema_migrations, "LATEST_SCHEMA_VERSION", 3
-            )
+            monkeypatch.setattr(schema_migrations, "LATEST_SCHEMA_VERSION", 3)
 
             with pytest.raises(RuntimeError, match="simulated migration failure"):
                 apply_migrations(conn)

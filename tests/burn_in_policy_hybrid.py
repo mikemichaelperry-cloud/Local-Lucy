@@ -50,7 +50,6 @@ BURNIN_QUERIES = [
     ("What is my daughter's name?", "LOCAL", "personal_family_context"),
     ("Is my cat hungry?", "LOCAL", "personal_family_context"),
     ("When did I get my dog?", "LOCAL", "personal_family_context"),
-
     # --- EVIDENCE: medical / vet with symptoms (MUST trigger evidence) ---
     ("My wife has chest pain.", "EVIDENCE", "medical_context"),
     ("My dog has diarrhea.", "EVIDENCE", "veterinary_context"),
@@ -60,7 +59,6 @@ BURNIN_QUERIES = [
     ("My daughter has a fever.", "EVIDENCE", "medical_context"),
     ("My dog has been vomiting.", "EVIDENCE", "veterinary_context"),
     ("My son is vomiting.", "EVIDENCE", "medical_context"),
-
     # --- LOCAL: normal non-health queries ---
     ("Hello", "LOCAL", "default_light"),
     ("What is the weather today?", "WEATHER", "weather_query"),
@@ -70,30 +68,24 @@ BURNIN_QUERIES = [
     ("What is 2+2?", "LOCAL", "default_light"),
     ("Explain quantum mechanics", "LOCAL", "default_light"),
     ("Recipe for chocolate cake", "LOCAL", "default_light"),
-
     # --- EVIDENCE: medical without family subject ---
     ("What are the symptoms of flu?", "EVIDENCE", "medical_context"),
     ("How to treat a headache?", "EVIDENCE", "medical_context"),
     ("Diabetes medication", "EVIDENCE", "medical_context"),
     ("Heart attack symptoms", "EVIDENCE", "medical_context"),
-
     # --- LOCAL: personal finance reasoning (not live data) ---
     ("What would you consider a comfortable bank balance?", "LOCAL", "personal_finance_reasoning"),
     ("How should I budget for retirement?", "LOCAL", "personal_finance_reasoning"),
     ("Should I invest in stocks or bonds?", "LOCAL", "personal_finance_reasoning"),
-
     # --- AUGMENTED: live financial data ---
     ("What is the current stock price of Apple?", "AUGMENTED", "financial_data"),
     ("Bitcoin price today", "AUGMENTED", "financial_data"),
-
     # --- NEWS: conflict / live news ---
     ("Breaking news about the war", "NEWS", "conflict_live"),
     ("Current situation in Gaza", "NEWS", "conflict_live"),
-
     # --- LOCAL: creative writing guard ---
     ("Write a horror story about a hospital", "LOCAL", "creative_writing"),
     ("Tell me a joke", "LOCAL", "default_light"),
-
     # --- Boundary: pet without symptoms (must stay LOCAL) ---
     ("My dog likes to play fetch", "LOCAL", "personal_family_context"),
     ("My cat sleeps all day", "LOCAL", "personal_family_context"),
@@ -149,14 +141,16 @@ def run_burnin():
                 f.write(json.dumps(result, ensure_ascii=False) + "\n")
 
         except Exception as e:
-            results.append({
-                "query": query,
-                "expected_route": expected_route,
-                "expected_reason": expected_reason,
-                "passed": False,
-                "error": str(e),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
+            results.append(
+                {
+                    "query": query,
+                    "expected_route": expected_route,
+                    "expected_reason": expected_reason,
+                    "passed": False,
+                    "error": str(e),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             print(f"  ERROR: {query!r} -> {e}")
 
     total_elapsed = (time.time() - start_all) * 1000
@@ -183,7 +177,7 @@ def run_burnin():
     total = len(results)
     rate = (passed / total * 100) if total else 0
     print(f"\nPassed: {passed}/{total} ({rate:.1f}%)")
-    print(f"Total time: {total_elapsed:.0f}ms  |  Avg: {total_elapsed/total:.1f}ms")
+    print(f"Total time: {total_elapsed:.0f}ms  |  Avg: {total_elapsed / total:.1f}ms")
 
     if failures:
         print("\n" + "=" * 80)

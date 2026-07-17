@@ -27,9 +27,13 @@ class LogWatcher:
         runtime_namespace_root = Path(
             os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(_default_runtime_namespace_root()))
         ).expanduser()
-        runtime_log_dir = Path(os.environ.get("LUCY_UI_LOG_DIR", str(runtime_namespace_root / "logs"))).expanduser()
+        runtime_log_dir = Path(
+            os.environ.get("LUCY_UI_LOG_DIR", str(runtime_namespace_root / "logs"))
+        ).expanduser()
         if _contract_required():
-            _validate_within_namespace(runtime_log_dir, runtime_namespace_root, label="LUCY_UI_LOG_DIR")
+            _validate_within_namespace(
+                runtime_log_dir, runtime_namespace_root, label="LUCY_UI_LOG_DIR"
+            )
         self.candidate_paths = [
             runtime_log_dir / "events.log",
             runtime_log_dir / "runtime.log",
@@ -40,7 +44,9 @@ class LogWatcher:
             Path.home() / "lucy-v10" / "tmp" / "logs" / "whisper_worker.log",
             Path.home() / "lucy-v10" / "tmp" / "logs" / "kokoro_tts_worker.log",
         ]
-        self._cursors: dict[Path, _FileCursor] = {path: _FileCursor() for path in self.candidate_paths}
+        self._cursors: dict[Path, _FileCursor] = {
+            path: _FileCursor() for path in self.candidate_paths
+        }
         self._recent_lines_by_path: dict[Path, list[str]] = {}
         self._stopped = False
 
@@ -73,7 +79,11 @@ class LogWatcher:
         combined_lines = combined_lines[-self.max_lines :]
 
         if combined_lines:
-            return LogSnapshot(lines=list(reversed(combined_lines)), active_paths=active_paths, mode="incremental-tail")
+            return LogSnapshot(
+                lines=list(reversed(combined_lines)),
+                active_paths=active_paths,
+                mode="incremental-tail",
+            )
 
         return LogSnapshot(
             lines=[
@@ -245,7 +255,12 @@ def _parse_plain_log_line(line: str, source: str) -> str | None:
         return f"recent  [info   ] {source:<18} {_truncate(line, 120)}"
     if line.startswith("Model:") or line.startswith("Started:") or line.startswith("launcher="):
         return f"recent  [info   ] {source:<18} {_truncate(line, 120)}"
-    if line.startswith("workdir=") or line.startswith("pwd_before=") or line.startswith("user=") or line.startswith("shell="):
+    if (
+        line.startswith("workdir=")
+        or line.startswith("pwd_before=")
+        or line.startswith("user=")
+        or line.startswith("shell=")
+    ):
         return f"recent  [info   ] {source:<18} {_truncate(line, 120)}"
     if "error" in lower or "fail" in lower:
         return f"recent  [alarm  ] {source:<18} {_truncate(line, 120)}"

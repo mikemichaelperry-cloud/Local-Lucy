@@ -90,9 +90,7 @@ def format_alpaca(example: dict) -> dict[str, str]:
     response = example.get("response", "")
     if context:
         text = (
-            f"### Instruction:\n{instruction}\n\n"
-            f"### Input:\n{context}\n\n"
-            f"### Response:\n{response}"
+            f"### Instruction:\n{instruction}\n\n### Input:\n{context}\n\n### Response:\n{response}"
         )
     else:
         text = f"### Instruction:\n{instruction}\n\n### Response:\n{response}"

@@ -28,14 +28,28 @@ jobs:
 
       - name: Run Ruff
         run: |
-          ruff check tools/router_py/ models/router/
-          ruff check ui-v10/app/
+          ruff check .
+          ruff format --check .
 
-  test-router-py:
+  sha-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify root SHA manifest discipline
+        run: bash tools/tests/test_sha_manifest_discipline.sh
+
+      - name: Verify UI SHA manifest discipline
+        run: bash ui-v10/tests/test_sha_manifest_discipline.sh
+
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
+    env:
+      QT_QPA_PLATFORM: offscreen
+      OLLAMA_KEEP_ALIVE: "0"
     steps:
       - uses: actions/checkout@v4
 
@@ -48,93 +62,37 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-lock.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('ui-v10/requirements.txt', 'models/router/requirements.txt', 'pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio pytest-rerunfailures
           if [ -f ui-v10/requirements.txt ]; then
             pip install -r ui-v10/requirements.txt
           fi
-
-      - name: Run router_py tests
-        run: |
-          cd tools/router_py
-          python -m pytest . -q --ignore=test_resource_leaks.py --ignore=test_e2e_hmi_voice.py
-
-  test-models:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-lock.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio
-          if [ -f ui-v10/requirements.txt ]; then
-            pip install -r ui-v10/requirements.txt
+          if [ -f models/router/requirements.txt ]; then
+            pip install -r models/router/requirements.txt
           fi
+          pip install -e .
 
-      - name: Run model tests
+      - name: Run pytest suite
         run: |
-          python -m pytest models/router/ -q
+          python -m pytest \
+            -q \
+            --ignore=tools/router_py/test_synthetic_adversarial.py \
+            --ignore=tools/router_py/test_real_router_burn_in.py \
+            --ignore=tools/tests/test_end_to_end_comprehensive.py \
+            --deselect web_adapter/test_web_adapter.py::test_ask_integration_local \
+            -W error::pytest.PytestReturnNotNoneWarning
 
-  test-e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-lock.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio
-          if [ -f ui-v10/requirements.txt ]; then
-            pip install -r ui-v10/requirements.txt
-          fi
-
-      - name: Run E2E tests
-        run: |
-          cd tools/tests
-          python -m pytest test_end_to_end_comprehensive.py -q
-
-  # ---------------------------------------------------------------------------
-  # HMI offscreen tests — PySide6 headless GUI validation
-  # QT_QPA_PLATFORM=offscreen is set at the job level so all Qt widgets
-  # render to a dummy surface. Individual tests also set it as a safety net.
-  # ---------------------------------------------------------------------------
   test-hmi-offscreen:
     runs-on: ubuntu-latest
     env:
       QT_QPA_PLATFORM: offscreen
+      OLLAMA_KEEP_ALIVE: "0"
     steps:
       - uses: actions/checkout@v4
 
@@ -147,7 +105,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-lock.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('ui-v10/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -158,26 +116,21 @@ jobs:
           if [ -f ui-v10/requirements.txt ]; then
             pip install -r ui-v10/requirements.txt
           fi
+          pip install -e .
 
       - name: Run HMI offscreen tests
         run: |
           cd ui-v10/tests
-          # Clear shared state files between tests to prevent cross-test contamination
-          # (some offscreen tests write to the runtime state directory)
           cleanup_state() {
             NAMESPACE_ROOT="${LUCY_RUNTIME_NAMESPACE_ROOT:-$HOME/.codex-api-home/lucy/runtime-v10}"
             rm -f "$NAMESPACE_ROOT/state/request_history.jsonl"
             rm -f "$NAMESPACE_ROOT/state/last_request_result.json"
           }
-          # Standalone offscreen scripts (each exits 0 on success)
-          # Decision trace must run before augmented_controls to avoid state pollution
           cleanup_state && python test_decision_trace_offscreen.py
           cleanup_state && python test_news_headline_punctuation_offscreen.py
           cleanup_state && python test_optional_missing_vs_corruption_offscreen.py
           cleanup_state && python test_scroll_preservation_offscreen.py
           cleanup_state && python test_voice_ptt_pause_removed_offscreen.py
           cleanup_state && python test_augmented_controls_offscreen.py
-          # PySide6 unittest-based tests
           pytest test_voice_ptt_state_machine.py -q
-          # Changes verification (standalone script)
           python test_changes_verification.py

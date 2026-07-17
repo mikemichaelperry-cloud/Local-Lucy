@@ -18,7 +18,9 @@ def _session_memory_context() -> str:
         return ""
     try:
         with open(mem_file, "r", encoding="utf-8") as handle:
-            lines = [line.rstrip("\n") for line in handle if line.startswith(("User: ", "Assistant: "))]
+            lines = [
+                line.rstrip("\n") for line in handle if line.startswith(("User: ", "Assistant: "))
+            ]
     except OSError:
         return ""
     if not lines:
@@ -41,10 +43,13 @@ def _extract_dog_name(context: str) -> str:
 
 
 def _expects_dog_name(context: str) -> bool:
-    return re.search(
-        r"(?i)(who(?:'s| is)\s+my\s+dog|tell me your dog'?s name|i do not have your dog'?s name yet)",
-        context or "",
-    ) is not None
+    return (
+        re.search(
+            r"(?i)(who(?:'s| is)\s+my\s+dog|tell me your dog'?s name|i do not have your dog'?s name yet)",
+            context or "",
+        )
+        is not None
+    )
 
 
 def resolve_local_context_response(question: str, root: str = "") -> Optional[Dict[str, str]]:

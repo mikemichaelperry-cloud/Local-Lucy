@@ -95,11 +95,11 @@ def benchmark_backend(wav_path: Path, use_gpu: bool, iterations: int = 3) -> dic
         peak = get_gpu_snapshot() if use_gpu else {}
 
         if rc != 0:
-            print(f"  Iteration {i+1}: FAILED ({err[:200]})")
+            print(f"  Iteration {i + 1}: FAILED ({err[:200]})")
             continue
 
         times.append(t)
-        print(f"  Iteration {i+1}: {t:.2f}s")
+        print(f"  Iteration {i + 1}: {t:.2f}s")
 
         if baseline and peak:
             mem_delta = peak.get("memory_used_mb", 0) - baseline.get("memory_used_mb", 0)

@@ -115,10 +115,22 @@ def analyze_answer_quality(
     # Heuristic 1: AUGMENTED query got a failure response
     if route == "AUGMENTED":
         # Provider-level error
-        if error_message and _has_pattern(error_message, [
-            "error", "failed", "unable", "could not", "refused", "timeout",
-            "503", "502", "404", "500", "connection",
-        ]):
+        if error_message and _has_pattern(
+            error_message,
+            [
+                "error",
+                "failed",
+                "unable",
+                "could not",
+                "refused",
+                "timeout",
+                "503",
+                "502",
+                "404",
+                "500",
+                "connection",
+            ],
+        ):
             return {
                 "query": query,
                 "suggested_route": "LOCAL",
@@ -152,7 +164,19 @@ def analyze_answer_quality(
         query_lower = query.lower()
 
         # Medical
-        medical_keywords = ["symptom", "pain", "fever", "chest", "headache", "doctor", "medical", "treatment", "diagnosis", "prescription", "medication"]
+        medical_keywords = [
+            "symptom",
+            "pain",
+            "fever",
+            "chest",
+            "headache",
+            "doctor",
+            "medical",
+            "treatment",
+            "diagnosis",
+            "prescription",
+            "medication",
+        ]
         has_medical = any(kw in query_lower for kw in medical_keywords)
         if has_medical and _has_pattern(response_text, LOCAL_MEDICAL_DISCLAIMER_PATTERNS):
             return {
@@ -164,7 +188,18 @@ def analyze_answer_quality(
             }
 
         # Financial
-        financial_keywords = ["stock", "price", "bitcoin", "invest", "money", "market", "financial", "tax", "mortgage", "loan"]
+        financial_keywords = [
+            "stock",
+            "price",
+            "bitcoin",
+            "invest",
+            "money",
+            "market",
+            "financial",
+            "tax",
+            "mortgage",
+            "loan",
+        ]
         has_financial = any(kw in query_lower for kw in financial_keywords)
         if has_financial and _has_pattern(response_text, LOCAL_FINANCIAL_DISCLAIMER_PATTERNS):
             return {
@@ -176,7 +211,16 @@ def analyze_answer_quality(
             }
 
         # Legal
-        legal_keywords = ["legal", "law", "lawyer", "court", "sue", "contract", "license", "illegal"]
+        legal_keywords = [
+            "legal",
+            "law",
+            "lawyer",
+            "court",
+            "sue",
+            "contract",
+            "license",
+            "illegal",
+        ]
         has_legal = any(kw in query_lower for kw in legal_keywords)
         if has_legal and _has_pattern(response_text, LOCAL_LEGAL_DISCLAIMER_PATTERNS):
             return {
@@ -190,12 +234,38 @@ def analyze_answer_quality(
         # Heuristic 3: LOCAL "I don't know" on factual questions
         # Philosophy: correct answer > locality. If local model admits ignorance,
         # we should have routed to augmented (evidence/tools) instead.
-        factual_keywords = ["what is", "what are", "how to", "how do", "when did", "where is", "who is", "why does", "explain", "tell me about", "current", "today", "latest", "news", "price", "weather", "score"]
+        factual_keywords = [
+            "what is",
+            "what are",
+            "how to",
+            "how do",
+            "when did",
+            "where is",
+            "who is",
+            "why does",
+            "explain",
+            "tell me about",
+            "current",
+            "today",
+            "latest",
+            "news",
+            "price",
+            "weather",
+            "score",
+        ]
         has_factual = any(kw in query_lower for kw in factual_keywords)
-        if has_factual and _has_pattern(response_text, [
-            "i don't know", "i don't have", "i'm not sure", "i don't have information",
-            "i don't have access", "i cannot provide", "i don't have real-time",
-        ]):
+        if has_factual and _has_pattern(
+            response_text,
+            [
+                "i don't know",
+                "i don't have",
+                "i'm not sure",
+                "i don't have information",
+                "i don't have access",
+                "i cannot provide",
+                "i don't have real-time",
+            ],
+        ):
             return {
                 "query": query,
                 "suggested_route": "AUGMENTED",
@@ -221,9 +291,7 @@ def analyze_answer_quality(
 
 # Auto-feedback is lower-trust than manual user feedback.
 # Cap confidence to prevent auto-feedback from dominating the router.
-_MAX_AUTO_FEEDBACK_CONFIDENCE = float(
-    os.environ.get("LUCY_AUTO_FEEDBACK_MAX_CONFIDENCE", "0.5")
-)
+_MAX_AUTO_FEEDBACK_CONFIDENCE = float(os.environ.get("LUCY_AUTO_FEEDBACK_MAX_CONFIDENCE", "0.5"))
 
 
 def log_auto_feedback(suggestion: dict[str, Any]) -> None:
@@ -295,14 +363,26 @@ if __name__ == "__main__":
     # Self-test
     test_cases = [
         ("What is 2+2?", "LOCAL", "The answer is 4.", ""),
-        ("My chest feels tight", "LOCAL", "I'm not a medical professional. Please consult a doctor.", ""),
-        ("What is the stock price of Apple?", "AUGMENTED", "I don't have access to real-time stock prices.", ""),
+        (
+            "My chest feels tight",
+            "LOCAL",
+            "I'm not a medical professional. Please consult a doctor.",
+            "",
+        ),
+        (
+            "What is the stock price of Apple?",
+            "AUGMENTED",
+            "I don't have access to real-time stock prices.",
+            "",
+        ),
         ("What is the capital of France?", "LOCAL", "Paris is the capital of France.", ""),
     ]
 
     for query, route, response, error in test_cases:
         result = analyze_answer_quality(query, route, response, error)
         if result:
-            print(f"✗ {query[:40]:40s} → {route:12s} | suggest {result['suggested_route']:12s} | {result['reason']}")
+            print(
+                f"✗ {query[:40]:40s} → {route:12s} | suggest {result['suggested_route']:12s} | {result['reason']}"
+            )
         else:
             print(f"✓ {query[:40]:40s} → {route:12s} | OK")

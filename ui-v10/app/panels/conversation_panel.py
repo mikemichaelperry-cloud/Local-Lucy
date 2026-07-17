@@ -112,7 +112,9 @@ class ConversationPanel(QFrame):
         self._history.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._history.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self._history.setPlainText(self._default_history_text())
-        self._history.document().documentLayout().documentSizeChanged.connect(lambda _size: self._schedule_output_height_sync())
+        self._history.document().documentLayout().documentSizeChanged.connect(
+            lambda _size: self._schedule_output_height_sync()
+        )
         layout.addWidget(self._history, stretch=1)
 
         input_label = QLabel("Operator Input")
@@ -219,8 +221,12 @@ class ConversationPanel(QFrame):
         self._current_level = normalize_level(level)
         advanced_or_deeper = level_at_least(self._current_level, ENGINEERING)
         power_or_deeper = level_at_least(self._current_level, POWER)
-        self._history_label.setText("Persisted Request History" if power_or_deeper else "Recent History")
-        self._output_label.setText("Selected Request Output" if power_or_deeper else "Latest Answer")
+        self._history_label.setText(
+            "Persisted Request History" if power_or_deeper else "Recent History"
+        )
+        self._output_label.setText(
+            "Selected Request Output" if power_or_deeper else "Latest Answer"
+        )
         self._recent_history_summary.setVisible(not power_or_deeper)
         self._history_list.setVisible(power_or_deeper)
         self._decision_trace_summary_button.setVisible(True)
@@ -229,7 +235,9 @@ class ConversationPanel(QFrame):
             self._input_label.setVisible(True)
         self._draft.setVisible(True)
         self._force_augmented_once_checkbox.setVisible(advanced_or_deeper)
-        self._force_augmented_once_checkbox.setEnabled(advanced_or_deeper and self._submit_button.isEnabled())
+        self._force_augmented_once_checkbox.setEnabled(
+            advanced_or_deeper and self._submit_button.isEnabled()
+        )
         if not advanced_or_deeper:
             self._force_augmented_once_checkbox.setChecked(False)
         if self._clear_button is not None:
@@ -240,7 +248,7 @@ class ConversationPanel(QFrame):
 
     def set_voice_transcription_preview(self, text: str | None) -> None:
         """Display voice transcription preview during voice input.
-        
+
         Args:
             text: Transcription text to display, or None/empty to hide
         """
@@ -248,7 +256,7 @@ class ConversationPanel(QFrame):
             self._voice_preview_label.setText("")
             self._voice_preview_label.setVisible(False)
             return
-        
+
         preview = text if len(text) <= 80 else f"{text[:77]}..."
         self._voice_preview_label.setText(f"🎤 {preview}")
         self._voice_preview_label.setVisible(True)
@@ -262,10 +270,12 @@ class ConversationPanel(QFrame):
         """Write debug log to file."""
         import os
         from pathlib import Path
+
         log_path = Path.home() / "lucy-v10" / "ui_debug.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a") as f:
             from datetime import datetime
+
             f.write(f"{datetime.now().isoformat()} CONV {msg}\n")
 
     def set_history_entries(
@@ -284,13 +294,21 @@ class ConversationPanel(QFrame):
         if not entries:
             self._selection_blocked = False
             self._set_plain_text(self._history, self._default_history_text(), reset_scroll=False)
-            self._set_plain_text(self._recent_history_summary, self._default_recent_history_text(), reset_scroll=False)
+            self._set_plain_text(
+                self._recent_history_summary,
+                self._default_recent_history_text(),
+                reset_scroll=False,
+            )
             if draft_had_focus:
                 self._draft.setTextCursor(draft_cursor)
                 self.focus_draft()
             return None
 
-        self._set_plain_text(self._recent_history_summary, self._build_recent_history_text(entries), reset_scroll=False)
+        self._set_plain_text(
+            self._recent_history_summary,
+            self._build_recent_history_text(entries),
+            reset_scroll=False,
+        )
         display_entries = list(reversed(entries))
         selected_id = selected_request_id or self._request_id(display_entries[0])
 
@@ -319,7 +337,10 @@ class ConversationPanel(QFrame):
 
     def eventFilter(self, obj, event) -> bool:
         if obj is self._draft and event.type() == event.Type.KeyPress:
-            if event.key() in (Qt.Key_Return, Qt.Key_Enter) and not event.modifiers() & Qt.ShiftModifier:
+            if (
+                event.key() in (Qt.Key_Return, Qt.Key_Enter)
+                and not event.modifiers() & Qt.ShiftModifier
+            ):
                 self._emit_submit_requested()
                 return True
         return super().eventFilter(obj, event)
@@ -337,10 +358,7 @@ class ConversationPanel(QFrame):
                 "[system] Backend submit path is authoritative and non-interactive.\n"
                 "[system] No persisted request history is available yet."
             )
-        return (
-            "No latest request is available yet.\n"
-            "Submit a prompt to see the latest answer here."
-        )
+        return "No latest request is available yet.\nSubmit a prompt to see the latest answer here."
 
     def _default_recent_history_text(self) -> str:
         return (
@@ -432,7 +450,7 @@ class ConversationPanel(QFrame):
     def _format_operator_entry(self, entry: dict[str, object]) -> str:
         request_text = self._entry_text(entry, "request_text") or "Unknown request."
         status = self._entry_text(entry, "status") or "unknown"
-        
+
         # Handle processing status specially
         if status == "processing":
             return "\n\n".join(
@@ -441,7 +459,7 @@ class ConversationPanel(QFrame):
                     "Processing...\n⏳ Lucy is thinking...",
                 ]
             )
-        
+
         # Handle responding status - show full answer while TTS is speaking
         if status == "responding":
             response_text = self._entry_text(entry, "response_text")
@@ -458,24 +476,30 @@ class ConversationPanel(QFrame):
                     "Responding...\n🗣️ Speaking...",
                 ]
             )
-        
+
         has_failure = self._entry_has_operator_failure(entry)
         result_title = "Latest Result" if has_failure else "Latest Answer"
-        result_text = self._operator_failure_text(entry) if has_failure else self._operator_response_text(entry)
+        result_text = (
+            self._operator_failure_text(entry)
+            if has_failure
+            else self._operator_response_text(entry)
+        )
         if self._looks_like_html(result_text):
             # Build a proper HTML document with escaped request text and answer body.
             escaped_request = html.escape(request_text)
             # Extract inner content from <body>...</body> if present
-            body_match = re.search(r'<body[^>]*>(.*?)</body>', result_text, re.IGNORECASE | re.DOTALL)
+            body_match = re.search(
+                r"<body[^>]*>(.*?)</body>", result_text, re.IGNORECASE | re.DOTALL
+            )
             answer_content = body_match.group(1).strip() if body_match else result_text
-            answer_content = re.sub(r'</?html[^>]*>', '', answer_content, flags=re.IGNORECASE)
+            answer_content = re.sub(r"</?html[^>]*>", "", answer_content, flags=re.IGNORECASE)
             return (
                 '<html><body style="font-family: sans-serif; font-size: 13px; color: #d8e0e6;">'
                 f'<p style="margin: 4px 0;"><b>Latest Request</b><br>{escaped_request}</p>'
                 '<hr style="border: none; border-top: 1px solid #3a4a5a; margin: 8px 0;">'
                 f'<p style="margin: 4px 0;"><b>{result_title}</b></p>'
-                f'{answer_content}'
-                '</body></html>'
+                f"{answer_content}"
+                "</body></html>"
             )
         return "\n\n".join(
             [
@@ -518,8 +542,7 @@ class ConversationPanel(QFrame):
             action_hint = self._entry_text(outcome, "action_hint")
             if outcome_code or action_hint:
                 lines.append(
-                    f"[outcome] code={outcome_code or 'unknown'}"
-                    f" hint={action_hint or 'none'}"
+                    f"[outcome] code={outcome_code or 'unknown'} hint={action_hint or 'none'}"
                 )
 
         return "\n".join(lines)
@@ -558,7 +581,11 @@ class ConversationPanel(QFrame):
                 continue
             cleaned_lines.append(self._normalize_operator_answer_line(line))
 
-        cleaned_response = str(contract.get("answer") or "").strip() or "\n".join(cleaned_lines).strip() or "No answer was returned."
+        cleaned_response = (
+            str(contract.get("answer") or "").strip()
+            or "\n".join(cleaned_lines).strip()
+            or "No answer was returned."
+        )
         answer_path = self._operator_answer_path_text(entry)
         metadata_line = self._answer_contract_metadata_line(entry)
         rendered_lines: list[str] = []
@@ -612,7 +639,12 @@ class ConversationPanel(QFrame):
         route = entry.get("route")
         control_state = entry.get("control_state")
         outcome_code = self._nested_entry_text(outcome, "outcome_code").lower()
-        fallback_used = self._nested_entry_text(outcome, "fallback_used").lower() in {"1", "true", "yes", "on"}
+        fallback_used = self._nested_entry_text(outcome, "fallback_used").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
         if outcome_code == "validated_insufficient" and not fallback_used:
             return "Evidence insufficient"
@@ -621,7 +653,9 @@ class ConversationPanel(QFrame):
         if contract_path:
             return contract_path
 
-        final_mode = self._nested_entry_text(outcome, "final_mode") or self._nested_entry_text(route, "mode")
+        final_mode = self._nested_entry_text(outcome, "final_mode") or self._nested_entry_text(
+            route, "mode"
+        )
         final_mode_upper = final_mode.upper()
         trust_class = self._nested_entry_text(outcome, "trust_class").lower()
         fallback_reason = self._nested_entry_text(outcome, "fallback_reason")
@@ -630,7 +664,9 @@ class ConversationPanel(QFrame):
             or self._nested_entry_text(outcome, "augmented_provider")
             or self._nested_entry_text(control_state, "augmented_provider")
         )
-        provider_label = provider.upper() if provider and provider.lower() != "none" else "augmented"
+        provider_label = (
+            provider.upper() if provider and provider.lower() != "none" else "augmented"
+        )
 
         if final_mode_upper == "AUGMENTED" and fallback_used:
             if fallback_reason == "local_generation_degraded":
@@ -711,7 +747,9 @@ class ConversationPanel(QFrame):
             parts.append(f"Source basis: {source_basis_text}")
         return " | ".join(parts)
 
-    def _set_plain_text(self, widget: QPlainTextEdit | QTextBrowser, text: str, *, reset_scroll: bool) -> None:
+    def _set_plain_text(
+        self, widget: QPlainTextEdit | QTextBrowser, text: str, *, reset_scroll: bool
+    ) -> None:
         widget_name = "_history" if widget is self._history else "other"
         self._debug_log(f"_set_plain_text: {widget_name}, text length: {len(text)}")
         if widget.toPlainText() == text:
@@ -737,7 +775,13 @@ class ConversationPanel(QFrame):
         if "<" not in text or ">" not in text:
             return False
         # Detect common HTML tags including document-level (html, body) and inline tags
-        return bool(re.search(r'<(html|body|p|div|span|a|b|i|strong|em|br|h[1-6]|ul|ol|li)[\s>]', text, re.IGNORECASE))
+        return bool(
+            re.search(
+                r"<(html|body|p|div|span|a|b|i|strong|em|br|h[1-6]|ul|ol|li)[\s>]",
+                text,
+                re.IGNORECASE,
+            )
+        )
 
     @staticmethod
     def _contains_url(text: str) -> bool:
@@ -748,23 +792,19 @@ class ConversationPanel(QFrame):
         """Convert plain text URLs to clickable HTML links, preserving line breaks."""
         escaped = html.escape(text)
         # Convert URLs to clickable links
-        linked = re.sub(
-            r'(https?://[^\s<>"{}|\\^`\[\]]+)',
-            r'<a href="\1">\1</a>',
-            escaped
-        )
+        linked = re.sub(r'(https?://[^\s<>"{}|\\^`\[\]]+)', r'<a href="\1">\1</a>', escaped)
         # Split into paragraphs (separated by blank lines)
-        paragraphs = linked.split('\n\n')
+        paragraphs = linked.split("\n\n")
         html_paragraphs = []
         for para in paragraphs:
             # Within each paragraph, convert single newlines to <br>
-            para = para.replace('\n', '<br>')
+            para = para.replace("\n", "<br>")
             if para.strip():
                 html_paragraphs.append(f'<p style="margin: 8px 0;">{para}</p>')
-        body_content = '\n'.join(html_paragraphs)
+        body_content = "\n".join(html_paragraphs)
         return (
             '<html><body style="font-family: sans-serif; font-size: 13px; color: #d8e0e6;">'
-            f'{body_content}</body></html>'
+            f"{body_content}</body></html>"
         )
 
     def _schedule_output_height_sync(self) -> None:
@@ -780,7 +820,9 @@ class ConversationPanel(QFrame):
         margins = view.contentsMargins()
         chrome_height = margins.top() + margins.bottom() + (view.frameWidth() * 2) + 18
         target_height = max(180, int(doc_height) + chrome_height)
-        self._debug_log(f"_sync_output_height: doc_height={doc_height}, target={target_height}, current={view.height()}")
+        self._debug_log(
+            f"_sync_output_height: doc_height={doc_height}, target={target_height}, current={view.height()}"
+        )
         if view.height() != target_height:
             view.setFixedHeight(target_height)
             self._debug_log(f"height set to {target_height}")

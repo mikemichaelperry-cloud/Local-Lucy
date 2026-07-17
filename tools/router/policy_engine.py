@@ -42,7 +42,14 @@ LOCAL_INTENTS = {
 }
 NEWS_INTENTS = {"WEB_NEWS", "STATUS_UPDATE"}
 EVIDENCE_INTENTS = {"WEB_FACT", "WEB_DOC", "PRIMARY_DOC", "SHOPPING_LOCAL", "MEDICAL_INFO"}
-AUTO_INTENT_FAMILIES = {"", "self_review", "current_evidence", "background_overview", "synthesis_explanation", "local_answer"}
+AUTO_INTENT_FAMILIES = {
+    "",
+    "self_review",
+    "current_evidence",
+    "background_overview",
+    "synthesis_explanation",
+    "local_answer",
+}
 
 
 def _s(v) -> str:
@@ -79,9 +86,11 @@ def _has_temporal_freshness_marker(qn: str) -> bool:
 
 
 def _is_conceptual_travel_advisory_query(qn: str) -> bool:
-    return _has_re(qn, r"\b(explain|what is|what's|whats|define|meaning of|tell me about)\b") and _has_re(
-        qn, r"\btravel advisory\b"
-    ) and not _has_temporal_freshness_marker(qn)
+    return (
+        _has_re(qn, r"\b(explain|what is|what's|whats|define|meaning of|tell me about)\b")
+        and _has_re(qn, r"\btravel advisory\b")
+        and not _has_temporal_freshness_marker(qn)
+    )
 
 
 def _is_augmented_background_query(qn: str) -> bool:
@@ -97,7 +106,10 @@ def _is_augmented_background_query(qn: str) -> bool:
 def _is_augmented_synthesis_query(qn: str) -> bool:
     # Explanation/rewrite/comparison prompts benefit from stronger articulation
     # while remaining outside the evidence-required path.
-    if _has_re(qn, r"\b(rewrite|rephrase|paraphrase|reword|edit|improve|clarify|compare|contrast|tradeoff|tradeoffs)\b"):
+    if _has_re(
+        qn,
+        r"\b(rewrite|rephrase|paraphrase|reword|edit|improve|clarify|compare|contrast|tradeoff|tradeoffs)\b",
+    ):
         return True
     if _has_re(qn, r"\b(explain)\b") and _has_re(
         qn,
@@ -158,7 +170,10 @@ def _is_augmented_technical_query(qn: str) -> bool:
         r"\b(recommend|recommended|consider|best|optimum|optimal|why not|tradeoff|tradeoffs|reasonable|choose|use|set)\b",
     ):
         return False
-    if not _has_re(qn, r"\b(plate|screen|anode|cathode|grid|bias|class a|class ab1|operating point|load line|impedance|quiescent|feedback|compensation|stability|phase margin)\b"):
+    if not _has_re(
+        qn,
+        r"\b(plate|screen|anode|cathode|grid|bias|class a|class ab1|operating point|load line|impedance|quiescent|feedback|compensation|stability|phase margin)\b",
+    ):
         return False
     if _has_re(qn, r"\b(datasheet|manual|pdf|source|sources|citation|citations|cite|url|link)\b"):
         return False
@@ -200,13 +215,26 @@ def _build_auto_intent_profile(
         and not signal_flags.get("medical_context")
         and not signal_flags.get("current_product_recommendation")
     )
-    is_synthesis_request = local_safe_window and intent_class in {"local_knowledge", "technical_explanation"} and (
-        _is_augmented_synthesis_query(qn)
-        or _is_conditional_component_spec_query(qn)
-        or _is_conditional_technical_capability_query(qn)
+    is_synthesis_request = (
+        local_safe_window
+        and intent_class in {"local_knowledge", "technical_explanation"}
+        and (
+            _is_augmented_synthesis_query(qn)
+            or _is_conditional_component_spec_query(qn)
+            or _is_conditional_technical_capability_query(qn)
+        )
     )
-    is_background_request = local_safe_window and intent_class == "local_knowledge" and _is_augmented_background_query(qn)
-    is_local_answer_request = local_safe_window and intent_class == "local_knowledge" and not is_background_request and not is_synthesis_request
+    is_background_request = (
+        local_safe_window
+        and intent_class == "local_knowledge"
+        and _is_augmented_background_query(qn)
+    )
+    is_local_answer_request = (
+        local_safe_window
+        and intent_class == "local_knowledge"
+        and not is_background_request
+        and not is_synthesis_request
+    )
     is_unproven_specialized_request = (
         route_control_mode == "AUTO"
         and _s(os.environ.get("LUCY_AUGMENTATION_POLICY")).strip().lower() != "disabled"
@@ -345,19 +373,26 @@ def _infer_risk_level(qn: str, intent: str, category: str) -> str:
     return "low"
 
 
-def _infer_source_criticality(qn: str, needs_web: bool, needs_citations: bool, output_mode: str, intent: str) -> str:
+def _infer_source_criticality(
+    qn: str, needs_web: bool, needs_citations: bool, output_mode: str, intent: str
+) -> str:
     if intent == "MEDICAL_INFO":
         return "high"
     if needs_citations or needs_web:
         return "high"
     if output_mode in {"LIGHT_EVIDENCE", "VALIDATED"}:
         return "high"
-    if _has_re(qn, r"\b(source|sources|citation|citations|cite|verify|proof|evidence|wikipedia|wiki|url|link|http)\b") and not is_probable_culinary_source_misrecognition(qn):
+    if _has_re(
+        qn,
+        r"\b(source|sources|citation|citations|cite|verify|proof|evidence|wikipedia|wiki|url|link|http)\b",
+    ) and not is_probable_culinary_source_misrecognition(qn):
         return "high"
     return "low"
 
 
-def _recommended_route(intent: str, needs_web: bool, freshness: str, risk: str, source_criticality: str) -> str:
+def _recommended_route(
+    intent: str, needs_web: bool, freshness: str, risk: str, source_criticality: str
+) -> str:
     if intent in NEWS_INTENTS:
         return "news"
     if intent in EVIDENCE_INTENTS:
@@ -371,7 +406,9 @@ def _recommended_route(intent: str, needs_web: bool, freshness: str, risk: str, 
     return "evidence"
 
 
-def _is_explicit_doc_source_signal(intent: str, category: str, signal_flags: Dict[str, bool]) -> bool:
+def _is_explicit_doc_source_signal(
+    intent: str, category: str, signal_flags: Dict[str, bool]
+) -> bool:
     if signal_flags.get("url") or signal_flags.get("source_request"):
         return True
     if intent in {"WEB_DOC", "PRIMARY_DOC"}:
@@ -379,8 +416,14 @@ def _is_explicit_doc_source_signal(intent: str, category: str, signal_flags: Dic
     return category in {"reference", "url_reference", "primary_doc"}
 
 
-def _is_medical_high_stakes_signal(intent: str, category: str, signal_flags: Dict[str, bool]) -> bool:
-    return intent == "MEDICAL_INFO" or category == "medical" or bool(signal_flags.get("medical_context"))
+def _is_medical_high_stakes_signal(
+    intent: str, category: str, signal_flags: Dict[str, bool]
+) -> bool:
+    return (
+        intent == "MEDICAL_INFO"
+        or category == "medical"
+        or bool(signal_flags.get("medical_context"))
+    )
 
 
 def _is_temporal_live_signal(intent: str, category: str, signal_flags: Dict[str, bool]) -> bool:
@@ -394,10 +437,14 @@ def _is_temporal_live_signal(intent: str, category: str, signal_flags: Dict[str,
 
 
 def _is_current_product_signal(category: str, signal_flags: Dict[str, bool]) -> bool:
-    return category == "current_product_recommendation" or bool(signal_flags.get("current_product_recommendation"))
+    return category == "current_product_recommendation" or bool(
+        signal_flags.get("current_product_recommendation")
+    )
 
 
-def _is_policy_global_signal(plan: Dict, intent: str, category: str, signal_flags: Dict[str, bool]) -> bool:
+def _is_policy_global_signal(
+    plan: Dict, intent: str, category: str, signal_flags: Dict[str, bool]
+) -> bool:
     allow_domains_file = _s(plan.get("allow_domains_file")).strip().lower()
     if not allow_domains_file.endswith("policy_global_runtime.txt"):
         return False
@@ -446,7 +493,11 @@ def _resolve_signal_precedence(
         if _is_medical_high_stakes_signal(intent, category, signal_flags):
             return "evidence", "medical_high_stakes", intent_family
         if _is_temporal_live_signal(intent, category, signal_flags):
-            return ("news" if intent in NEWS_INTENTS or signal_flags.get("news") else "evidence"), "temporal_live", intent_family
+            return (
+                ("news" if intent in NEWS_INTENTS or signal_flags.get("news") else "evidence"),
+                "temporal_live",
+                intent_family,
+            )
         if _is_current_product_signal(category, signal_flags):
             return "evidence", "current_product", intent_family
     if not intent_family and _should_prefer_augmented_for_unproven_local(
@@ -465,15 +516,44 @@ def _resolve_signal_precedence(
     for signal_name in ROUTING_PRECEDENCE_LADDER:
         if signal_name == "ambiguity":
             continue
-        if signal_name == "doc_source" and _is_explicit_doc_source_signal(intent, category, signal_flags):
-            return "evidence", signal_name, intent_family if intent_family == "current_evidence" else ""
-        if signal_name == "medical_high_stakes" and _is_medical_high_stakes_signal(intent, category, signal_flags):
-            return "evidence", signal_name, intent_family if intent_family == "current_evidence" else ""
-        if signal_name == "temporal_live" and _is_temporal_live_signal(intent, category, signal_flags):
-            return ("news" if intent in NEWS_INTENTS or signal_flags.get("news") else "evidence"), signal_name, intent_family if intent_family == "current_evidence" else ""
+        if signal_name == "doc_source" and _is_explicit_doc_source_signal(
+            intent, category, signal_flags
+        ):
+            return (
+                "evidence",
+                signal_name,
+                intent_family if intent_family == "current_evidence" else "",
+            )
+        if signal_name == "medical_high_stakes" and _is_medical_high_stakes_signal(
+            intent, category, signal_flags
+        ):
+            return (
+                "evidence",
+                signal_name,
+                intent_family if intent_family == "current_evidence" else "",
+            )
+        if signal_name == "temporal_live" and _is_temporal_live_signal(
+            intent, category, signal_flags
+        ):
+            return (
+                ("news" if intent in NEWS_INTENTS or signal_flags.get("news") else "evidence"),
+                signal_name,
+                intent_family if intent_family == "current_evidence" else "",
+            )
         if signal_name == "current_product" and _is_current_product_signal(category, signal_flags):
-            return "evidence", signal_name, intent_family if intent_family == "current_evidence" else ""
-        if signal_name == "conceptual_local" and intent_family == "local_answer" and intent in LOCAL_INTENTS and not needs_web and risk_level == "low" and source_criticality == "low":
+            return (
+                "evidence",
+                signal_name,
+                intent_family if intent_family == "current_evidence" else "",
+            )
+        if (
+            signal_name == "conceptual_local"
+            and intent_family == "local_answer"
+            and intent in LOCAL_INTENTS
+            and not needs_web
+            and risk_level == "low"
+            and source_criticality == "low"
+        ):
             return "local", signal_name, intent_family
     return legacy_recommended_route, "legacy_policy", intent_family
 
@@ -500,6 +580,7 @@ def _apply_confidence_fail_open(recommended_route: str, confidence: float, thres
     if confidence < threshold and recommended_route == "local":
         return "evidence"
     return recommended_route
+
 
 def _resolve_override_route(
     recommended_route: str,
@@ -555,21 +636,31 @@ def evaluate_policy(
 
     freshness_requirement = _infer_freshness_requirement(qn, intent)
     risk_level = _infer_risk_level(qn, intent, category)
-    source_criticality = _infer_source_criticality(qn, needs_web, needs_citations, output_mode, intent)
+    source_criticality = _infer_source_criticality(
+        qn, needs_web, needs_citations, output_mode, intent
+    )
     signal_flags["medical_context"] = intent == "MEDICAL_INFO"
     signal_flags["travel_risk"] = _is_travel_advisory_query(qn, category)
-    signal_flags["legal_finance"] = _has_re(qn, r"\b(legal|lawsuit|regulation|tax|investment|mortgage|loan|debt|stock|market)\b")
+    signal_flags["legal_finance"] = _has_re(
+        qn, r"\b(legal|lawsuit|regulation|tax|investment|mortgage|loan|debt|stock|market)\b"
+    )
     signal_flags["policy_global"] = _is_policy_global_signal(plan, intent, category, signal_flags)
 
     policy_confidence = _confidence_from_policy_label(_s(plan.get("confidence_policy")))
-    intent_class = _s(plan.get("intent_class")).strip().lower()
     proven_local_capability = _b(plan.get("has_proven_local_capability"))
-    if intent in LOCAL_INTENTS and freshness_requirement == "low" and risk_level == "low" and source_criticality == "low":
+    if (
+        intent in LOCAL_INTENTS
+        and freshness_requirement == "low"
+        and risk_level == "low"
+        and source_criticality == "low"
+    ):
         policy_confidence = min(0.95, policy_confidence + 0.08)
     if freshness_requirement == "high" and intent in LOCAL_INTENTS:
         policy_confidence = max(0.25, policy_confidence - 0.28)
 
-    base_recommended_route = _recommended_route(intent, needs_web, freshness_requirement, risk_level, source_criticality)
+    base_recommended_route = _recommended_route(
+        intent, needs_web, freshness_requirement, risk_level, source_criticality
+    )
     if _is_travel_advisory_query(qn, category):
         base_recommended_route = "evidence"
     precedence_route, winning_signal, intent_family = _resolve_signal_precedence(
@@ -584,7 +675,9 @@ def evaluate_policy(
         legacy_recommended_route=base_recommended_route,
         route_control_mode=route_control_mode,
     )
-    recommended_route = _apply_confidence_fail_open(precedence_route, policy_confidence, confidence_threshold)
+    recommended_route = _apply_confidence_fail_open(
+        precedence_route, policy_confidence, confidence_threshold
+    )
 
     reason_codes: List[str] = []
     reason_codes.append(f"intent:{intent or 'unknown'}")
@@ -598,7 +691,17 @@ def evaluate_policy(
     augmented_family = _augmented_family_alias(intent_family)
     if augmented_family:
         reason_codes.append(f"augmented_family:{augmented_family}")
-    for signal_name in ("temporal", "news", "conflict", "geopolitics", "medical_context", "source_request", "url", "travel_risk", "policy_global"):
+    for signal_name in (
+        "temporal",
+        "news",
+        "conflict",
+        "geopolitics",
+        "medical_context",
+        "source_request",
+        "url",
+        "travel_risk",
+        "policy_global",
+    ):
         if signal_flags.get(signal_name):
             reason_codes.append(f"signal:{signal_name}")
     if policy_confidence < confidence_threshold:

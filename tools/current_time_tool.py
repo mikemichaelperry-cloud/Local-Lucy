@@ -355,7 +355,7 @@ def format_time_response(data: dict, query_location: str = "") -> str:
             if hour_12 == 0:
                 hour_12 = 12
             time_formatted = f"{hour_12}:{minute:02d} {ampm}"
-        except:
+        except Exception:
             time_formatted = time_str
 
         lines = [

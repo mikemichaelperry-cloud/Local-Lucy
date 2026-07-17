@@ -26,7 +26,9 @@ def detect_binary(root: Path, env: Mapping[str, str] | None = None) -> Path | No
     return Path(system) if system else None
 
 
-def resolve_voice_name(env: Mapping[str, str] | None = None, explicit_voice: str | None = None) -> str:
+def resolve_voice_name(
+    env: Mapping[str, str] | None = None, explicit_voice: str | None = None
+) -> str:
     if explicit_voice and explicit_voice.strip():
         return explicit_voice.strip()
     values = env or os.environ
@@ -67,11 +69,15 @@ def synthesize(
         raise PiperBackendError(f"missing piper model: {model_path}")
 
     args = [str(backend_bin), "--model", str(model_path), "--output_file", str(output_path)]
-    maybe_add_numeric_arg(args, "--speaker", values.get("LUCY_VOICE_PIPER_SPEAKER", ""), integer_only=True)
+    maybe_add_numeric_arg(
+        args, "--speaker", values.get("LUCY_VOICE_PIPER_SPEAKER", ""), integer_only=True
+    )
     maybe_add_numeric_arg(args, "--length-scale", values.get("LUCY_VOICE_PIPER_LENGTH_SCALE", ""))
     maybe_add_numeric_arg(args, "--noise-scale", values.get("LUCY_VOICE_PIPER_NOISE_SCALE", ""))
     maybe_add_numeric_arg(args, "--noise-w-scale", values.get("LUCY_VOICE_PIPER_NOISE_W_SCALE", ""))
-    maybe_add_numeric_arg(args, "--sentence-silence", values.get("LUCY_VOICE_PIPER_SENTENCE_SILENCE", ""))
+    maybe_add_numeric_arg(
+        args, "--sentence-silence", values.get("LUCY_VOICE_PIPER_SENTENCE_SILENCE", "")
+    )
 
     try:
         completed = subprocess.run(
@@ -112,11 +118,13 @@ def resolve_sample_rate(model_path: Path, env: Mapping[str, str] | None = None) 
         payload = json.loads(config_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    value = ((payload.get("audio") or {}).get("sample_rate"))
+    value = (payload.get("audio") or {}).get("sample_rate")
     return value if isinstance(value, int) and value >= 8000 else None
 
 
-def maybe_add_numeric_arg(args: list[str], flag: str, raw: str | None, *, integer_only: bool = False) -> None:
+def maybe_add_numeric_arg(
+    args: list[str], flag: str, raw: str | None, *, integer_only: bool = False
+) -> None:
     value = str(raw or "").strip()
     if not value:
         return

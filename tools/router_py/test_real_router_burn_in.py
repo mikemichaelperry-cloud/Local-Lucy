@@ -33,7 +33,9 @@ try:
 
     if not prewarm_router():
         _ROUTER_AVAILABLE = False
-        _ROUTER_SKIP_REASON = "Router assets (embeddings/examples) or sentence_transformers unavailable"
+        _ROUTER_SKIP_REASON = (
+            "Router assets (embeddings/examples) or sentence_transformers unavailable"
+        )
     else:
         _ROUTER_AVAILABLE = True
 except Exception as exc:
@@ -52,6 +54,7 @@ class TestRealRouterBurnIn(unittest.TestCase):
         # classify.py caches _ROUTER globally; we force a fresh instance.
         from hybrid_router_v2 import HybridRouterV2
         from pathlib import Path
+
         router_dir = Path(__file__).resolve().parent.parent.parent / "models" / "router"
         cls._router = HybridRouterV2(
             embeddings_path=str(router_dir / "comprehensive_embeddings.npy"),
@@ -59,6 +62,7 @@ class TestRealRouterBurnIn(unittest.TestCase):
         )
         # Also clear the classify.py module cache if it exists
         import sys
+
         for name in list(sys.modules.keys()):
             if "classify" in name.lower() and hasattr(sys.modules[name], "_ROUTER"):
                 sys.modules[name]._ROUTER = None
@@ -69,7 +73,11 @@ class TestRealRouterBurnIn(unittest.TestCase):
         result = self._router.predict(query)
         route = result.get("route", "LOCAL")
         # Apply the same policy-layer medical/vet guards that classify.py applies
-        if result.get("evidence_reason") in ("medical_context", "medical_body_symptom", "veterinary_context"):
+        if result.get("evidence_reason") in (
+            "medical_context",
+            "medical_body_symptom",
+            "veterinary_context",
+        ):
             route = "EVIDENCE"
         return route
 
@@ -139,11 +147,19 @@ class TestRealRouterBurnIn(unittest.TestCase):
 
     def test_bitcoin_price_augmented(self):
         route = self._route("What is the Bitcoin price?")
-        self.assertIn(route, ("AUGMENTED", "EVIDENCE"), f"Expected AUGMENTED/EVIDENCE for finance query, got {route}")
+        self.assertIn(
+            route,
+            ("AUGMENTED", "EVIDENCE"),
+            f"Expected AUGMENTED/EVIDENCE for finance query, got {route}",
+        )
 
     def test_stock_price_augmented(self):
         route = self._route("What is the current Apple stock price?")
-        self.assertIn(route, ("AUGMENTED", "EVIDENCE"), f"Expected AUGMENTED/EVIDENCE for finance query, got {route}")
+        self.assertIn(
+            route,
+            ("AUGMENTED", "EVIDENCE"),
+            f"Expected AUGMENTED/EVIDENCE for finance query, got {route}",
+        )
 
     # ------------------------------------------------------------------
     # Ordinary local questions — must stay LOCAL

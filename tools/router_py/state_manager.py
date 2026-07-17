@@ -505,8 +505,7 @@ class StateManager:
                     ),
                 )
                 logger.info(
-                    f"Batch written: route={route_data['intent']} "
-                    f"outcome={outcome_data['success']}"
+                    f"Batch written: route={route_data['intent']} outcome={outcome_data['success']}"
                 )
                 return True
         except Exception as e:

@@ -98,13 +98,17 @@ class TestMemoryCrossSession(unittest.TestCase):
             ms.maybe_summarize_session(session_id="tubes", threshold=5)
 
         # Create summary for session "python"
-        with patch.object(ms, "_summarize_turns_with_ollama", return_value="Python refactoring discussion."):
+        with patch.object(
+            ms, "_summarize_turns_with_ollama", return_value="Python refactoring discussion."
+        ):
             for i in range(6):
                 ms.store_turn("user", f"Q{i}", session_id="python")
             ms.maybe_summarize_session(session_id="python", threshold=5)
 
         # Now ask from "python" perspective — should see "tubes" summary
-        ctx = ms.assemble_context(current_session_id="python", max_chars=500, depth="deep", mode="augmented")
+        ctx = ms.assemble_context(
+            current_session_id="python", max_chars=500, depth="deep", mode="augmented"
+        )
         self.assertIn("Previous session: Tube amp discussion.", ctx)
         self.assertIn("Session summary: Python refactoring discussion.", ctx)
 
@@ -115,7 +119,9 @@ class TestMemoryCrossSession(unittest.TestCase):
                 ms.store_turn("user", f"Q{i}", session_id="other")
             ms.maybe_summarize_session(session_id="other", threshold=5)
 
-        ctx = ms.assemble_context(current_session_id="default", max_chars=500, depth="deep", mode="augmented")
+        ctx = ms.assemble_context(
+            current_session_id="default", max_chars=500, depth="deep", mode="augmented"
+        )
         # Should be truncated with "..."
         self.assertIn("...", ctx)
         self.assertLess(len(ctx), 500 + 50)  # reasonable bound
@@ -126,7 +132,9 @@ class TestMemoryCrossSession(unittest.TestCase):
                 ms.store_turn("user", f"Q{i}", session_id="only")
             ms.maybe_summarize_session(session_id="only", threshold=5)
 
-        ctx = ms.assemble_context(current_session_id="only", max_chars=500, depth="deep", mode="augmented")
+        ctx = ms.assemble_context(
+            current_session_id="only", max_chars=500, depth="deep", mode="augmented"
+        )
         self.assertIn("Session summary: Single summary.", ctx)
         # Should NOT contain "Previous session"
         self.assertNotIn("Previous session", ctx)

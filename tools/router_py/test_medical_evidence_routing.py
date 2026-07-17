@@ -11,6 +11,7 @@ Validates that:
 6. Financial queries route to AUGMENTED (not EVIDENCE)
 7. General knowledge queries route to LOCAL
 """
+
 from __future__ import annotations
 
 import os
@@ -52,9 +53,7 @@ class TestMedicalRouting(unittest.TestCase):
         for query, expected_reason in self.MEDICAL_QUERIES:
             with self.subTest(query=query):
                 classification = classify_intent(query)
-                decision = select_route(
-                    classification, policy="fallback_only", query=query
-                )
+                decision = select_route(classification, policy="fallback_only", query=query)
                 self.assertEqual(
                     decision.route,
                     "EVIDENCE",
@@ -125,9 +124,7 @@ class TestVeterinaryRouting(unittest.TestCase):
         for query, expected_reason in self.VET_QUERIES:
             with self.subTest(query=query):
                 classification = classify_intent(query)
-                decision = select_route(
-                    classification, policy="fallback_only", query=query
-                )
+                decision = select_route(classification, policy="fallback_only", query=query)
                 self.assertEqual(
                     decision.route,
                     "EVIDENCE",
@@ -152,7 +149,11 @@ class TestVeterinaryRouting(unittest.TestCase):
             root = Path(__file__).resolve().parents[2]
         vet_file = root / "config" / "trust" / "generated" / "vet_runtime.txt"
         self.assertTrue(vet_file.exists(), f"Missing veterinary allowlist: {vet_file}")
-        domains = [line.strip() for line in vet_file.read_text().splitlines() if line.strip() and not line.startswith("#")]
+        domains = [
+            line.strip()
+            for line in vet_file.read_text().splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
         self.assertTrue(len(domains) > 0, "Veterinary allowlist is empty")
         # Check for known veterinary sources
         known_sources = {"avma.org", "vcahospitals.com", "merckvetmanual.com", "aaha.org"}
@@ -240,13 +241,17 @@ class TestAugmentedRouting(unittest.TestCase):
     def test_weather_routes_weather(self) -> None:
         """Weather queries route to WEATHER."""
         classification = classify_intent("what is the weather in London")
-        decision = select_route(classification, policy="fallback_only", query="what is the weather in London")
+        decision = select_route(
+            classification, policy="fallback_only", query="what is the weather in London"
+        )
         self.assertEqual(decision.route, "WEATHER")
 
     def test_news_routes_news(self) -> None:
         """News queries route to NEWS."""
         classification = classify_intent("latest news about Israel")
-        decision = select_route(classification, policy="fallback_only", query="latest news about Israel")
+        decision = select_route(
+            classification, policy="fallback_only", query="latest news about Israel"
+        )
         self.assertEqual(decision.route, "NEWS")
 
 
@@ -269,7 +274,11 @@ class TestMedicalDomainAllowlist(unittest.TestCase):
         if not root or not root.exists():
             root = Path(__file__).resolve().parents[2]
         medical_file = root / "config" / "trust" / "generated" / "medical_runtime.txt"
-        domains = [line.strip().lower() for line in medical_file.read_text().splitlines() if line.strip() and not line.startswith("#")]
+        domains = [
+            line.strip().lower()
+            for line in medical_file.read_text().splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
         required = {
             "cochranelibrary.com",
             "dailymed.nlm.nih.gov",
@@ -349,15 +358,19 @@ class TestMedicalFollowUpRouting(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             buf_path = Path(tmp) / "feedback_buffer.json"
-            buf_path.write_text(json.dumps({
-                "exchanges": [
+            buf_path.write_text(
+                json.dumps(
                     {
-                        "route": "EVIDENCE",
-                        "query": "what are the side effects of metformin",
-                        "response": "...",
+                        "exchanges": [
+                            {
+                                "route": "EVIDENCE",
+                                "query": "what are the side effects of metformin",
+                                "response": "...",
+                            }
+                        ]
                     }
-                ]
-            }))
+                )
+            )
 
             # Patch the runtime namespace root so classify reads our buffer
             old_ns = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
@@ -373,9 +386,7 @@ class TestMedicalFollowUpRouting(unittest.TestCase):
                 for q in followups:
                     with self.subTest(query=q):
                         classification = classify_intent(q)
-                        decision = select_route(
-                            classification, policy="fallback_only", query=q
-                        )
+                        decision = select_route(classification, policy="fallback_only", query=q)
                         # After a medical EVIDENCE response, short informational
                         # follow-ups must not route to LOCAL.
                         self.assertNotEqual(
@@ -402,15 +413,19 @@ class TestMedicalFollowUpRouting(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             buf_path = Path(tmp) / "feedback_buffer.json"
-            buf_path.write_text(json.dumps({
-                "exchanges": [
+            buf_path.write_text(
+                json.dumps(
                     {
-                        "route": "EVIDENCE",
-                        "query": "my dog has hip dysplasia",
-                        "response": "...",
+                        "exchanges": [
+                            {
+                                "route": "EVIDENCE",
+                                "query": "my dog has hip dysplasia",
+                                "response": "...",
+                            }
+                        ]
                     }
-                ]
-            }))
+                )
+            )
 
             old_ns = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
             os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = tmp
@@ -423,9 +438,7 @@ class TestMedicalFollowUpRouting(unittest.TestCase):
                 for q in followups:
                     with self.subTest(query=q):
                         classification = classify_intent(q)
-                        decision = select_route(
-                            classification, policy="fallback_only", query=q
-                        )
+                        decision = select_route(classification, policy="fallback_only", query=q)
                         self.assertNotEqual(
                             decision.route,
                             "LOCAL",

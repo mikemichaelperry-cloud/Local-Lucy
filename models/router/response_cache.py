@@ -60,7 +60,9 @@ def get_cached(query: str) -> str | None:
     return response
 
 
-def set_cached(query: str, response: str, route: str = "LOCAL", ttl: int = DEFAULT_TTL_SECONDS) -> None:
+def set_cached(
+    query: str, response: str, route: str = "LOCAL", ttl: int = DEFAULT_TTL_SECONDS
+) -> None:
     """Store response in cache if route is cacheable.
 
     Args:

@@ -86,6 +86,7 @@ class TestMemoryIntegration(unittest.TestCase):
         ms.store_turn("assistant", "It's sunny today.")
 
         from router_py.execution_engine import _load_session_memory_context
+
         context = _load_session_memory_context()
 
         self.assertIn("User: What's the weather?", context)
@@ -94,9 +95,12 @@ class TestMemoryIntegration(unittest.TestCase):
     def test_execution_engine_falls_back_to_text_file_when_sqlite_empty(self):
         """If SQLite has no turns, fall back to the text file."""
         text_path = Path(self.tmp_text_path)
-        text_path.write_text("User: Fallback question\nAssistant: Fallback answer\n\n", encoding="utf-8")
+        text_path.write_text(
+            "User: Fallback question\nAssistant: Fallback answer\n\n", encoding="utf-8"
+        )
 
         from router_py.execution_engine import _load_session_memory_context
+
         context = _load_session_memory_context()
 
         self.assertIn("User: Fallback question", context)
@@ -108,6 +112,7 @@ class TestMemoryIntegration(unittest.TestCase):
         ms.store_turn("user", "Should not appear")
 
         from router_py.execution_engine import _load_session_memory_context
+
         context = _load_session_memory_context()
         self.assertEqual(context, "")
 
@@ -140,6 +145,7 @@ class TestMemoryIntegration(unittest.TestCase):
         ms._close_connection()
 
         from runtime_request import append_chat_memory_turn
+
         mem_path = Path(self.tmp_text_path)
         append_chat_memory_turn(mem_path, "Test question", "Test answer")
 

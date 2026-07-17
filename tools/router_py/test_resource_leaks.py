@@ -260,7 +260,9 @@ def test_zombie_processes():
     else:
         print(f"⚠️  WARNING: High thread count growth ({growth})")
 
-    assert passed, f"Thread count growth too high: {growth} (baseline {baseline_threads}, current {thread_count})"
+    assert passed, (
+        f"Thread count growth too high: {growth} (baseline {baseline_threads}, current {thread_count})"
+    )
 
 
 def test_repeated_execution():
