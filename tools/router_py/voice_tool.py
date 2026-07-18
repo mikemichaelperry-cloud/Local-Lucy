@@ -1175,7 +1175,7 @@ class VoicePipeline(BaseToolWrapper):
                     runtime_dir = Path(
                         os.environ.get(
                             "LUCY_RUNTIME_NAMESPACE_ROOT",
-                            Path.home() / ".codex-api-home/lucy/runtime-v10",
+                            Path.home() / ".codex-api-home/lucy/runtime-v11",
                         )
                     )
                     levels_file = runtime_dir / "state" / "voice_audio_levels.json"

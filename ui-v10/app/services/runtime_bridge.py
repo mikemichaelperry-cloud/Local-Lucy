@@ -1313,7 +1313,7 @@ class RuntimeBridge:
             workspace_home
             / ".codex-api-home"
             / "lucy"
-            / "runtime-v10"
+            / "runtime-v11"
             / "state"
             / "request_history.jsonl"
         )

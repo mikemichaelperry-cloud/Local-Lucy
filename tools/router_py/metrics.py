@@ -17,7 +17,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_METRICS_DIR = Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "metrics"
+_DEFAULT_METRICS_DIR = Path.home() / ".codex-api-home" / "lucy" / "runtime-v11" / "metrics"
 _DEFAULT_METRICS_FILE = _DEFAULT_METRICS_DIR / "routing_metrics.jsonl"
 
 # Module-level sink path. Tests may monkeypatch this to isolate output.

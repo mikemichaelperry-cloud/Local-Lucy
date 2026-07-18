@@ -252,7 +252,7 @@ class StateWriter:
         workspace_home = (
             home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
         )
-        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10" / "state"
+        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11" / "state"
 
     # -- Payload builder --
 
@@ -421,7 +421,7 @@ class StateWriter:
             or os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
         ).strip()
         model = str(context.get("model", "") or os.environ.get("LUCY_MODEL", "local-lucy")).strip()
-        profile = str(os.environ.get("LUCY_RUNTIME_PROFILE", "lucy-v10")).strip()
+        profile = str(os.environ.get("LUCY_RUNTIME_PROFILE", "lucy-v11")).strip()
 
         return {
             "mode": mode,
@@ -444,7 +444,7 @@ class StateWriter:
         authority_root = Path(
             os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path(__file__).resolve().parents[2]))
         ).expanduser()
-        runtime_namespace = workspace_home / ".codex-api-home" / "lucy" / "runtime-v10"
+        runtime_namespace = workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
         legacy_root = workspace_home / "lucy" / "runtime-v10"
         return {
             "active_root": str(authority_root),

@@ -87,7 +87,7 @@ def _resolve_db_path() -> Path:
 
         return lucy_memory_db_path()
     except Exception:
-        return Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "memory.db"
+        return Path.home() / ".codex-api-home" / "lucy" / "runtime-v11" / "state" / "memory.db"
 
 
 # ---------------------------------------------------------------------------

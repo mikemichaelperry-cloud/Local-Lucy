@@ -54,7 +54,7 @@ def _default_runtime_namespace_root() -> Path:
     # Match backend default from runtime_request.py
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10"
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
 
 
 def _default_legacy_runtime_namespace_root() -> Path:

@@ -72,7 +72,7 @@ def _self_analysis_state_path() -> Path:
     """Resolve current_state.json using the active runtime namespace."""
     namespace = os.environ.get(
         "LUCY_RUNTIME_NAMESPACE_ROOT",
-        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
     )
     return Path(namespace) / "state" / "current_state.json"
 

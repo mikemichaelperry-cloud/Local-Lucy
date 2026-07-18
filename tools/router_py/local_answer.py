@@ -100,7 +100,7 @@ def _get_active_model_from_state() -> str | None:
     else:
         namespace = os.environ.get(
             "LUCY_RUNTIME_NAMESPACE_ROOT",
-            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
         )
         state_file = Path(namespace).expanduser() / "state" / "current_state.json"
     try:
@@ -227,7 +227,7 @@ def _load_family_facts_direct() -> list[str]:
         db_path = os.environ.get("LUCY_MEMORY_DB_PATH", "")
         if not db_path:
             db_path = str(
-                Path.home() / ".codex-api-home" / "lucy" / "runtime-v10" / "state" / "memory.db"
+                Path.home() / ".codex-api-home" / "lucy" / "runtime-v11" / "state" / "memory.db"
             )
         conn = sqlite3.connect(db_path, check_same_thread=False)
         cursor = conn.execute(
@@ -600,7 +600,7 @@ class LocalAnswerConfig:
         if not model:
             namespace = os.environ.get(
                 "LUCY_RUNTIME_NAMESPACE_ROOT",
-                str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+                str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
             )
             state_file = Path(namespace) / "state" / "current_state.json"
             try:

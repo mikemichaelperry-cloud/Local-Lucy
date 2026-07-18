@@ -865,7 +865,7 @@ def select_route(
                 _ns = Path(
                     os.environ.get(
                         "LUCY_RUNTIME_NAMESPACE_ROOT",
-                        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+                        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
                     )
                 )
                 _buf_path = _ns / "feedback_buffer.json"
@@ -947,7 +947,7 @@ def select_route(
                 _ns2 = Path(
                     os.environ.get(
                         "LUCY_RUNTIME_NAMESPACE_ROOT",
-                        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+                        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
                     )
                 )
                 _buf_path2 = _ns2 / "feedback_buffer.json"
@@ -1251,7 +1251,7 @@ def select_route(
                     _ns_cont = Path(
                         os.environ.get(
                             "LUCY_RUNTIME_NAMESPACE_ROOT",
-                            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+                            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
                         )
                     )
                     _buf_path_cont = _ns_cont / "feedback_buffer.json"

@@ -1429,7 +1429,7 @@ def _last_exchange_was_medical_vet() -> bool:
         ns = Path(
             os.environ.get(
                 "LUCY_RUNTIME_NAMESPACE_ROOT",
-                str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+                str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
             )
         )
         buf_path = ns / "feedback_buffer.json"

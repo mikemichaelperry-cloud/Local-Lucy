@@ -269,7 +269,7 @@ def default_runtime_namespace_root() -> Path:
 def home_fallback_runtime_namespace_root() -> Path:
     home = Path.home()
     workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v10"
+    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
 
 
 def contract_required() -> bool:

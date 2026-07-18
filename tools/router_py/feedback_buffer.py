@@ -19,7 +19,7 @@ from typing import Optional
 # Persist in runtime namespace so it survives restarts
 RUNTIME_NS = Path(
     os.environ.get(
-        "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+        "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11")
     )
 )
 BUFFER_PATH = RUNTIME_NS / "feedback_buffer.json"
