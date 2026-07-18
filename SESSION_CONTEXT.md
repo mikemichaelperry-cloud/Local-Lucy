@@ -13,7 +13,7 @@
 | **Last tag** | `v11.0.0-dev` |
 | **Version** | `11.0.0-dev` |
 | **Model** | `local-lucy-llama31` (llama3.1:8b via Ollama) |
-| **Handoff file** | `~/Desktop/Local_Lucy_v10_Session_Handoff_<date>.md` |
+| **Handoff file** | `~/Desktop/Local_Lucy_v11_Session_Handoff_<date>.md` |
 | **Default branch on origin** | `v10-dev` ✅ |
 | **Working tree** | Modified (self-analysis large-file / large-response support implemented; docs and prompts updated) |
 

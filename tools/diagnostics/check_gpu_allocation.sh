@@ -1,5 +1,5 @@
 #!/bin/bash
-# GPU Resource Allocation Diagnostic for Local Lucy v7
+# GPU Resource Allocation Diagnostic for Local Lucy v11
 # Checks that both LLM (Ollama) and TTS (Kokoro) are using GPU efficiently
 
 set -e

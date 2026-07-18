@@ -1,5 +1,5 @@
 """
-Local Lucy v10 - Consolidated Backend (Single Source of Truth)
+Local Lucy v11 - Consolidated Backend (Single Source of Truth)
 
 This module provides a unified interface to the backend by importing
 from the authoritative location:
