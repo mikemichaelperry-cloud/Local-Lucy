@@ -143,7 +143,7 @@ class RuntimeBridge:
         threading.Thread(target=self._background_warmup_router, daemon=True).start()
 
     def _load_project_dotenv(self) -> None:
-        """Load lucy-v10/.env so API keys are available to HMI subprocesses.
+        """Load lucy-v11/.env so API keys are available to HMI subprocesses.
 
         Existing environment variables take precedence. This is a safety net
         for users who start the HMI directly instead of via START_LUCY.sh.
@@ -164,7 +164,7 @@ class RuntimeBridge:
                 break
 
     def _workspace_root(self) -> Path:
-        # When authority root is the project root (e.g., /home/mike/lucy-v10),
+        # When authority root is the project root (e.g., /home/mike/lucy-v11),
         # the workspace root is the same directory.
         return self.snapshot_root
 
@@ -196,7 +196,7 @@ class RuntimeBridge:
         bridge_file = Path(__file__).resolve()
         if ui_root.name != "ui-v10" or not ui_root.exists() or not ui_root.is_dir():
             raise RuntimeError(f"invalid UI root in authority contract: {ui_root}")
-        if authority_root.name not in ("lucy-v10",):
+        if authority_root.name not in ("lucy-v10", "lucy-v11"):
             raise RuntimeError(f"invalid authority root in authority contract: {authority_root}")
         if not runtime_ns_root.is_absolute():
             raise RuntimeError(
@@ -324,7 +324,7 @@ class RuntimeBridge:
         # Always fail loudly - no silent fallbacks allowed
         raise RuntimeError(
             f"missing required {self.authority_root_env}. "
-            f"Set it explicitly to the project root (e.g., /home/mike/lucy-v10)"
+            f"Set it explicitly to the project root (e.g., /home/mike/lucy-v11)"
         )
 
     def _discover_capabilities(self) -> dict[str, ActionCapability]:

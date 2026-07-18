@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Local Lucy V10 - Primary Chat Entry Point
+# Local Lucy V11 - Primary Chat Entry Point
 # ROLE: AUTHORITATIVE CHAT INTERFACE for lucy-v10
 #
 set -euo pipefail
@@ -18,13 +18,10 @@ export LUCY_RUNTIME_AUTHORITY_ROOT="${ROOT}"
 export LUCY_CONF_DIR="${ROOT}/config"
 export LUCY_TOOLS_DIR="${ROOT}/tools"
 
-# XDG-compliant runtime state with legacy fallback
 if [ -n "${LUCY_RUNTIME_NAMESPACE_ROOT:-}" ]; then
     : # user override
-elif [ -d "$HOME/.codex-api-home/lucy/runtime-v10" ]; then
-    export LUCY_RUNTIME_NAMESPACE_ROOT="$HOME/.codex-api-home/lucy/runtime-v10"
 else
-    export LUCY_RUNTIME_NAMESPACE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy"
+    export LUCY_RUNTIME_NAMESPACE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy-v11"
 fi
 
 # Python router for execution

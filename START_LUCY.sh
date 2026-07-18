@@ -29,21 +29,15 @@ export QT_QPA_PLATFORM_PLUGIN_PATH="/usr/lib/x86_64-linux-gnu/qt6/plugins"
 export LUCY_ROOT="$SCRIPT_DIR"
 export LUCY_UI_ROOT="${SCRIPT_DIR}/ui-v10"
 
-# XDG-compliant runtime state (data, config, cache).
-# Falls back to legacy ~/.codex-api-home path if the user already has it set.
 if [ -n "${LUCY_RUNTIME_NAMESPACE_ROOT:-}" ]; then
     : # user override — keep it
-elif [ -d "$HOME/.codex-api-home/lucy/runtime-v10" ]; then
-    # Legacy migration: existing data found
-    export LUCY_RUNTIME_NAMESPACE_ROOT="$HOME/.codex-api-home/lucy/runtime-v10"
 else
-    # XDG default
-    export LUCY_RUNTIME_NAMESPACE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy"
+    export LUCY_RUNTIME_NAMESPACE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy-v11"
 fi
 
 export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
-export LUCY_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/local-lucy"
-export LUCY_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/local-lucy"
+export LUCY_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/local-lucy-v11"
+export LUCY_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/local-lucy-v11"
 
 # Memory database: explicit env override wins, then XDG state dir, then legacy.
 export LUCY_MEMORY_DB_PATH="${LUCY_MEMORY_DB_PATH:-$LUCY_RUNTIME_NAMESPACE_ROOT/state/memory.db}"

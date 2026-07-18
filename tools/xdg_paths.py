@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local Lucy v10 — XDG Base Directory compliance
+"""Local Lucy v11 — XDG Base Directory compliance
 
 Provides portable paths for data, config, cache, and runtime state.
 Falls back to legacy paths when env vars are set for backward compatibility.
@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-_APP_NAME = "local-lucy"
+_APP_NAME = "local-lucy-v11"
 
 
 def _xdg_dir(env_var: str, fallback: Path) -> Path:
