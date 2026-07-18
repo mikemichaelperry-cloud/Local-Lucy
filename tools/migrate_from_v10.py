@@ -145,7 +145,7 @@ def _backup_sqlite(src: Path, dst: Path) -> dict[str, int]:
     destination file that replays any committed WAL data visible to the
     read-only connection.
     """
-    src_uri = f"file:{src}?mode=ro"
+    src_uri = f"{src.as_uri()}?mode=ro"
     src_conn = sqlite3.connect(src_uri, uri=True)
     try:
         src_counts = _table_counts(src_conn)
@@ -274,7 +274,7 @@ def _gather_metadata(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
         meta["src_size"] = item["src"].stat().st_size
         if item["kind"] == "database":
             try:
-                conn = sqlite3.connect(f"file:{item['src']}?mode=ro", uri=True)
+                conn = sqlite3.connect(f"{item['src'].as_uri()}?mode=ro", uri=True)
                 try:
                     counts = _table_counts(conn)
                     meta["src_rows"] = sum(c for c in counts.values() if c >= 0)
