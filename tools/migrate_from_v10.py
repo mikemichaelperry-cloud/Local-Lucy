@@ -129,7 +129,7 @@ def _table_counts(conn: sqlite3.Connection) -> dict[str, int]:
     counts: dict[str, int] = {}
     for table in _list_tables(conn):
         try:
-            row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+            row = conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()
             counts[table] = row[0] if row else 0
         except sqlite3.Error as exc:
             counts[table] = -1
@@ -151,7 +151,9 @@ def _backup_sqlite(src: Path, dst: Path) -> dict[str, int]:
         src_counts = _table_counts(src_conn)
         dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists():
-            dst.unlink()
+            raise MigrationError(
+                f"Destination {dst} already exists; migration logic must back it up first"
+            )
         dst_conn = sqlite3.connect(dst)
         try:
             with dst_conn:
@@ -170,7 +172,7 @@ def _backup_sqlite(src: Path, dst: Path) -> dict[str, int]:
 
 
 def _timestamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%f")
 
 
 def _backup_existing(path: Path) -> Path | None:
@@ -225,43 +227,28 @@ def _load_report(state_dir: Path) -> dict[str, Any]:
 def _discover_sources(
     v10_root: Path | None, v10_runtime: Path | None
 ) -> list[dict[str, Any]]:
-    """Build the canonical list of source -> destination mappings."""
+    """Build the canonical list of source -> destination mappings.
+
+    Warns about expected source files that are missing, but still only returns
+    items that actually exist.
+    """
     state_dir = _v11_state_dir()
     sources: list[dict[str, Any]] = []
 
+    expected_dbs: list[tuple[Path | None, Path, str]] = []
     if v10_root is not None:
-        src_db = v10_root / "state" / "lucy_state.db"
-        if src_db.is_file():
-            sources.append(
-                {
-                    "kind": "database",
-                    "name": "lucy_state.db",
-                    "src": src_db,
-                    "dst": state_dir / "lucy_state.db",
-                }
-            )
+        expected_dbs.append((v10_root / "state" / "lucy_state.db", state_dir / "lucy_state.db", "lucy_state.db"))
+    if v10_runtime is not None:
+        expected_dbs.append((v10_runtime / "state" / "memory.db", state_dir / "memory.db", "memory.db"))
+        expected_dbs.append((v10_runtime / "session_memory.db", state_dir / "session_memory.db", "session_memory.db"))
+
+    for src_db, dst_db, name in expected_dbs:
+        if src_db is not None and src_db.is_file():
+            sources.append({"kind": "database", "name": name, "src": src_db, "dst": dst_db})
+        elif src_db is not None:
+            print(f"  Warning: expected V10 database missing: {src_db}", file=sys.stderr)
 
     if v10_runtime is not None:
-        memory_db = v10_runtime / "state" / "memory.db"
-        if memory_db.is_file():
-            sources.append(
-                {
-                    "kind": "database",
-                    "name": "memory.db",
-                    "src": memory_db,
-                    "dst": state_dir / "memory.db",
-                }
-            )
-        session_db = v10_runtime / "session_memory.db"
-        if session_db.is_file():
-            sources.append(
-                {
-                    "kind": "database",
-                    "name": "session_memory.db",
-                    "src": session_db,
-                    "dst": state_dir / "session_memory.db",
-                }
-            )
         for json_name in JSON_STATE_FILES:
             src_json = v10_runtime / "state" / json_name
             if src_json.is_file():
@@ -273,6 +260,8 @@ def _discover_sources(
                         "dst": state_dir / json_name,
                     }
                 )
+            else:
+                print(f"  Warning: expected V10 JSON state missing: {src_json}", file=sys.stderr)
 
     return sources
 
@@ -285,11 +274,13 @@ def _gather_metadata(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
         meta["src_size"] = item["src"].stat().st_size
         if item["kind"] == "database":
             try:
-                counts = _table_counts(
-                    sqlite3.connect(f"file:{item['src']}?mode=ro", uri=True)
-                )
-                meta["src_rows"] = sum(c for c in counts.values() if c >= 0)
-                meta["src_tables"] = sorted(counts.keys())
+                conn = sqlite3.connect(f"file:{item['src']}?mode=ro", uri=True)
+                try:
+                    counts = _table_counts(conn)
+                    meta["src_rows"] = sum(c for c in counts.values() if c >= 0)
+                    meta["src_tables"] = sorted(counts.keys())
+                finally:
+                    conn.close()
             except sqlite3.Error as exc:
                 meta["src_rows"] = None
                 meta["src_tables"] = []
@@ -305,11 +296,11 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
         args.v10_runtime_root, os.environ.get("LUCY_V10_RUNTIME_ROOT")
     )
     sources = _discover_sources(v10_root, v10_runtime)
-    if not sources:
-        print("No V10 sources found; nothing to migrate.", file=sys.stderr)
-        return 1
-
     print("V10 -> V11 migration dry-run")
+    if not sources:
+        print("No V10 sources found; nothing to migrate.")
+        return 0
+
     print(f"  V10 root:        {v10_root or '(none)'}")
     print(f"  V10 runtime:     {v10_runtime or '(none)'}")
     print(f"  V11 state dir:   {_v11_state_dir()}")
