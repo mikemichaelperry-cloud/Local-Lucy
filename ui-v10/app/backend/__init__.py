@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 # -----------------------------------------------------------------------------
-# CRITICAL: Set up path to import from authoritative local v8 location
+# CRITICAL: Set up path to import from authoritative local v11 location
 # -----------------------------------------------------------------------------
 
 # V8 ISOLATION: Use environment variable or authority root, not hardcoded home path

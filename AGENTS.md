@@ -95,7 +95,7 @@ LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
 LUCY_LOCAL_MODEL=local-lucy-llama31
 LUCY_AUTO_LEARN=0                       # Set 0 during development to prevent mutation
 
-# Deprecated: Python router/execution are the default in V10.
+# Deprecated: Python router/execution are the default in V11.
 # LUCY_ROUTER_PY=1
 # LUCY_EXEC_PY=1
 ```
