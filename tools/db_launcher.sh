@@ -3,7 +3,7 @@
 
 DB1="/home/mike/lucy-v10/state/lucy_state.db"
 DB2="/home/mike/lucy-v10/data/tubes/tube_database.db"
-DB3="/home/mike/.codex-api-home/lucy/runtime-v10/state/memory.db"
+DB3="/home/mike/.codex-api-home/lucy/runtime-v11/state/memory.db"
 
 show_lucy_state() {
     echo ""

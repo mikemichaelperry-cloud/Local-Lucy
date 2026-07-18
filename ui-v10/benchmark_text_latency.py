@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 UI_ROOT = ROOT / "ui-v10"
 RUNTIME_NS = Path(
     os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    or (Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+    or (Path.home() / ".codex-api-home" / "lucy" / "runtime-v11")
 )
 
 PROMPTS = [

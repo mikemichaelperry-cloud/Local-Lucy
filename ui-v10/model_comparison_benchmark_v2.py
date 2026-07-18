@@ -30,7 +30,7 @@ _SMART_ROUTING = "off"
 SNAPSHOT_ROOT = Path(__file__).resolve().parent.parent
 RUNTIME_NS = Path(
     os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    or (Path.home() / ".codex-api-home" / "lucy" / "runtime-v10")
+    or (Path.home() / ".codex-api-home" / "lucy" / "runtime-v11")
 )
 REQUEST_TOOL = SNAPSHOT_ROOT / "tools/runtime_request.py"
 REPORT_FILE = (

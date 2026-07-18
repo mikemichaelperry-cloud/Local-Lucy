@@ -52,7 +52,7 @@ ROUTER_LOG_PATH = (
 RUNTIME_NS = Path(
     os.environ.get(
         "LUCY_RUNTIME_NAMESPACE_ROOT",
-        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
     )
 )
 FEEDBACK_BUFFER_PATH = RUNTIME_NS / "feedback_buffer.json"
