@@ -78,7 +78,11 @@ class SelfAnalysisEngine:
         return analysis
 
     async def suggest_improvements(self, relative_path: str, model: str | None = None) -> str:
-        """Generate staged code-review suggestions for the given file."""
+        """Generate staged code-review suggestions for the given file or directory."""
+        path = self._resolve_path(relative_path)
+        if path.is_dir():
+            return await self._review_directory(relative_path, model=model)
+
         analysis = self.analyze_file(relative_path)
         local_analysis = self._local_analysis_summary(analysis)
 
@@ -101,6 +105,52 @@ class SelfAnalysisEngine:
             return f"LOCAL analysis:\n{local_analysis}\n\nAUGMENTED suggestions:\n{stage1_result}\n\nDEEP INVESTIGATION:\n{stage2_result}"
 
         return f"LOCAL analysis:\n{local_analysis}\n\nAUGMENTED suggestions:\n{stage1_result}"
+
+    async def _review_directory(self, relative_path: str, model: str | None = None) -> str:
+        """Review a directory: small dirs get per-file reviews; large dirs get a summary."""
+        dir_path = self._resolve_path(relative_path)
+        py_files = sorted(p for p in dir_path.rglob("*.py") if p.is_file())
+        total_lines = sum(
+            len(p.read_text(encoding="utf-8", errors="replace").splitlines()) for p in py_files
+        )
+
+        header_lines = [
+            f"Directory: {relative_path}",
+            f"Python files: {len(py_files)}",
+            f"Total lines: {total_lines}",
+        ]
+
+        # For very large directories a full LLM review is impractical; give a
+        # structured map and invite the user to request specific files.
+        if len(py_files) > 5:
+            file_list = "\n".join(f"  - {p.relative_to(dir_path)}" for p in py_files[:50])
+            if len(py_files) > 50:
+                file_list += f"\n  ... and {len(py_files) - 50} more"
+            return (
+                "\n".join(header_lines)
+                + "\n\nThis directory is too large for a single detailed review. "
+                "Specify one of the files below for a focused SELF_REVIEW:\n\n" + file_list
+            )
+
+        # Small directories: review each file and concatenate results.
+        reviews: list[str] = []
+        for file_path in py_files:
+            file_relative = str(file_path.relative_to(self.project_root))
+            try:
+                analysis = self.analyze_file(file_relative)
+            except Exception as exc:
+                reviews.append(f"File: {file_relative}\nError during analysis: {exc}\n")
+                continue
+            local_analysis = self._local_analysis_summary(analysis)
+            stage1_prompt = self._build_staged_review_prompt(analysis)
+            stage1_result = await self._run_llm(
+                stage1_prompt, route_mode="SELF_REVIEW", model=model
+            )
+            reviews.append(
+                f"---\nLOCAL analysis:\n{local_analysis}\n\nAUGMENTED suggestions:\n{stage1_result}\n"
+            )
+
+        return "\n".join(header_lines) + "\n\n" + "\n".join(reviews)
 
     async def _run_llm(
         self,
@@ -183,7 +233,8 @@ Begin deep investigation and fix planning.
             parts.append("TODOs: " + ", ".join(analysis.todos))
         return "\n".join(parts)
 
-    def _resolve_file(self, relative_path: str) -> Path:
+    def _resolve_path(self, relative_path: str) -> Path:
+        """Resolve *relative_path* under the project root and validate it stays inside."""
         candidate = self.project_root / relative_path
         candidate = candidate.resolve()
         try:
@@ -191,7 +242,11 @@ Begin deep investigation and fix planning.
         except ValueError as exc:
             raise ValueError(f"Path escapes project root: {relative_path}") from exc
         if not candidate.exists():
-            raise FileNotFoundError(f"File not found: {relative_path}")
+            raise FileNotFoundError(f"Path not found: {relative_path}")
+        return candidate
+
+    def _resolve_file(self, relative_path: str) -> Path:
+        candidate = self._resolve_path(relative_path)
         if not candidate.is_file():
             raise ValueError(f"Not a regular file: {relative_path}")
         if candidate.suffix != ".py":

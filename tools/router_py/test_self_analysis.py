@@ -99,6 +99,71 @@ def test_analyze_file_rejects_directory_named_py(tmp_path):
         engine.analyze_file("not_a_dir.py")
 
 
+def test_extract_self_analysis_file_reference_detects_directories(tmp_path):
+    from router_py.execution_engine import extract_self_analysis_file_reference
+
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "pkg").mkdir()
+    (project / "pkg" / "module.py").write_text("x = 1\n")
+
+    ref = extract_self_analysis_file_reference(f"review {project}/pkg", project_root=project)
+    assert ref == "pkg"
+
+
+def test_extract_self_analysis_file_reference_rejects_external_directories(tmp_path):
+    from router_py.execution_engine import extract_self_analysis_file_reference
+
+    project = tmp_path / "project"
+    project.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    ref = extract_self_analysis_file_reference(f"review {outside}", project_root=project)
+    assert ref is None
+
+
+def test_review_directory_lists_large_directories(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    pkg = project / "pkg"
+    pkg.mkdir()
+    for i in range(10):
+        (pkg / f"file{i}.py").write_text("x = 1\n")
+
+    engine = SelfAnalysisEngine(project_root=project)
+    result = asyncio.run(engine._review_directory("pkg"))
+
+    assert "Python files: 10" in result
+    assert "too large for a single detailed review" in result
+    assert "file0.py" in result
+
+
+def test_review_directory_reviews_small_directories(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    project.mkdir()
+    pkg = project / "pkg"
+    pkg.mkdir()
+    (pkg / "a.py").write_text("def foo():\n    pass\n")
+    (pkg / "b.py").write_text("def bar():\n    pass\n")
+
+    calls = []
+
+    async def fake_run_llm(prompt, route_mode="SELF_REVIEW", model=None):
+        calls.append((route_mode, model))
+        return "STAGE 1 REPORT"
+
+    engine = SelfAnalysisEngine(project_root=project)
+    monkeypatch.setattr(engine, "_run_llm", fake_run_llm)
+
+    result = asyncio.run(engine._review_directory("pkg"))
+
+    assert "Python files: 2" in result
+    assert "STAGE 1 REPORT" in result
+    assert len(calls) == 2
+    assert all(rm == "SELF_REVIEW" for rm, _ in calls)
+
+
 def test_analyze_file_rejects_huge_file(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
@@ -855,14 +920,14 @@ def test_code_review_config_fields_have_defaults():
     from router_py.local_answer import LocalAnswerConfig
 
     config = LocalAnswerConfig()
-    assert config.code_review_model == "gemma4_code_review_agentic"
+    assert config.code_review_model == "local-lucy-gemma4"
     assert config.code_review_specialist_enabled is True
     assert config.code_review_temperature == 1.0
     assert config.code_review_top_p == 0.95
     assert config.code_review_top_k == 64
     assert config.code_review_context_target == 16384
     assert config.code_review_max_tokens == 4096
-    assert config.code_review_context_chars == 200000
+    assert config.code_review_context_chars == 32768
 
 
 def test_code_review_config_fields_read_from_env(monkeypatch):
@@ -958,6 +1023,7 @@ async def test_self_review_payload_uses_code_review_generation_params(monkeypatc
     assert options["temperature"] == config.code_review_temperature
     assert options["top_p"] == config.code_review_top_p
     assert options["top_k"] == config.code_review_top_k
+    assert options["num_ctx"] == config.code_review_context_target
 
 
 @pytest.mark.asyncio
@@ -1002,6 +1068,7 @@ async def test_self_review_payload_defaults_to_exact_code_review_params(monkeypa
     assert options["temperature"] == 1.0
     assert options["top_p"] == 0.95
     assert options["top_k"] == 64
+    assert options["num_ctx"] == 16384
 
 
 @pytest.mark.asyncio
@@ -1053,3 +1120,4 @@ async def test_non_self_review_payload_does_not_use_code_review_params(monkeypat
     assert options["temperature"] == config.temperature
     assert options["top_p"] == config.top_p
     assert "top_k" not in options
+    assert "num_ctx" not in options

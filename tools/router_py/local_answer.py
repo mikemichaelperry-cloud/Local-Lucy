@@ -550,16 +550,16 @@ class LocalAnswerConfig:
     evidence_max_tokens: int = 768
     creative_max_tokens: int = 512
     self_review_max_tokens: int = 4096
-    self_review_context_chars: int = 200000
+    self_review_context_chars: int = 32768
     # Code-review specialist model settings
-    code_review_model: str = "gemma4_code_review_agentic"
+    code_review_model: str = "local-lucy-gemma4"
     code_review_specialist_enabled: bool = True
     code_review_temperature: float = 1.0
     code_review_top_p: float = 0.95
     code_review_top_k: int = 64
     code_review_context_target: int = 16384
     code_review_max_tokens: int = 4096
-    code_review_context_chars: int = 200000
+    code_review_context_chars: int = 32768
     embedding_cache_size: int = 1024
     keep_model_warm: bool = True
     max_context_chars: int = 1200
@@ -632,11 +632,9 @@ class LocalAnswerConfig:
             creative_max_tokens=int(os.environ.get("LUCY_CREATIVE_MAX_TOKENS", "512")),
             self_review_max_tokens=int(os.environ.get("LUCY_SELF_REVIEW_MAX_TOKENS", "4096")),
             self_review_context_chars=int(
-                os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "200000")
+                os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "32768")
             ),
-            code_review_model=os.environ.get(
-                "LUCY_CODE_REVIEW_MODEL", "gemma4_code_review_agentic"
-            ),
+            code_review_model=os.environ.get("LUCY_CODE_REVIEW_MODEL", "local-lucy-gemma4"),
             code_review_specialist_enabled=os.environ.get(
                 "LUCY_CODE_REVIEW_SPECIALIST_ENABLED", "1"
             ).lower()
@@ -649,7 +647,7 @@ class LocalAnswerConfig:
             ),
             code_review_max_tokens=int(os.environ.get("LUCY_CODE_REVIEW_MAX_TOKENS", "4096")),
             code_review_context_chars=int(
-                os.environ.get("LUCY_CODE_REVIEW_CONTEXT_CHARS", "200000")
+                os.environ.get("LUCY_CODE_REVIEW_CONTEXT_CHARS", "32768")
             ),
             embedding_cache_size=int(os.environ.get("LUCY_EMBEDDING_CACHE_SIZE", "1024")),
             keep_model_warm=os.environ.get("LUCY_KEEP_MODEL_WARM", "1").lower()
@@ -2071,6 +2069,12 @@ class LocalAnswer:
             options["temperature"] = self.config.code_review_temperature
             options["top_p"] = self.config.code_review_top_p
             options["top_k"] = self.config.code_review_top_k
+            # Code-review prompts can be long (file source + staged instructions).
+            # Expand the context window so the output budget is not truncated by
+            # the default 8192-token Modelfile setting. The value is capped by the
+            # model's own limit and by available VRAM; Ollama offloads to system
+            # RAM automatically when VRAM is tight.
+            options["num_ctx"] = self.config.code_review_context_target
         payload = {
             "model": self.config.model,
             "prompt": prompt,

@@ -92,7 +92,7 @@ lucy-v10/
 │       ├── intent_classifier.py
 │       ├── semantic_interpreter.py
 │       └── policy_router.py
-├── tools/router/              # Thin backward-compat wrapper scripts (no core logic)
+├── tools/router/              # Legacy shell-test wrapper scripts (delegates to router_py)
 │   ├── classify_intent.py
 │   ├── extract_medical_fact.py
 │   └── plan_to_pipeline.py
@@ -252,7 +252,7 @@ The file shrank from ~3,900 lines to ~2,216 lines after the shell removal, reduc
 
 The UI exposes an **Auto** default. In shadow mode, the selector automatically chooses the most appropriate local model by query bucket. Manual overrides remain available for power users. `local-lucy-gemma4` (backed by `gemma4:12b-it-qat`) is available as an optional reasoning/multimodal model with the same runtime persona injection as the Llama variant.
 
-**Code-review specialist:** SELF_REVIEW mode can use the optional alias `gemma4_code_review_agentic` (resolved by `tools/router_py/code_review_model_resolver.py`). The resolver fallback chain is: configured specialist model if enabled and installed → `local-lucy-gemma4` → raw `gemma4:12b-it-qat` → normally configured local model. If nothing in the chain is installed, the request fails with `code_review_model_unavailable`.
+**Code-review specialist:** SELF_REVIEW mode is resolved by `tools/router_py/code_review_model_resolver.py`. The default configured specialist is `local-lucy-gemma4` (the same model used for general chat), with fallback chain: configured specialist model if enabled and installed → `local-lucy-gemma4` → raw `gemma4:12b-it-qat` → normally configured local model. If nothing in the chain is installed, the request fails with `code_review_model_unavailable`. The SELF_REVIEW call expands the Ollama context window (`num_ctx`) to `code_review_context_target` (default 16384) so long file prompts do not truncate the generated review.
 
 **Benchmarking:** `ui-v10/model_comparison_benchmark_v2.py` measures clean-slate cold-start and warm-run latency for every selectable mode (`auto`, `local-lucy-llama31`, `gemma4:12b-it-qat`). It unloads Ollama between modes, disables the repeat cache, and writes a JSON report plus a Markdown summary to the Desktop.
 
@@ -370,20 +370,24 @@ The Engineering panel enables a read-only code-review mode for analyzing Local L
 **Controls**
 - HMI toggle: **Engineering mode** (relabelled from "Self-analysis mode" on 2026-07-16; stored as `self_analysis_mode` in `current_state.json`).
 - Runtime env override: `LUCY_SELF_ANALYSIS_MODE=1`.
-- Trigger phrase in the UI: `review your own code <relative-path.py>`; explicit `.py` file references are also detected.
+- Trigger phrase in the UI: `review your own code <relative-path.py>`; explicit `.py` file references and directory paths (e.g. `review tools/router_py`) are also detected.
 
 **Model resolution (`tools/router_py/code_review_model_resolver.py`)**
-- Configured specialist alias: `gemma4_code_review_agentic`.
-- Fallback chain: `gemma4_code_review_agentic` (if enabled and installed) → `local-lucy-gemma4` → raw `gemma4:12b-it-qat` → normally configured local model.
-- `LUCY_CODE_REVIEW_MODEL` overrides the specialist alias; `LUCY_CODE_REVIEW_SPECIALIST_ENABLED=0` disables it.
+- Configured specialist alias: `local-lucy-gemma4` (the same model used for general chat).
+- Fallback chain: configured specialist alias (if enabled and installed) → `local-lucy-gemma4` → raw `gemma4:12b-it-qat` → normally configured local model.
+- `LUCY_CODE_REVIEW_MODEL` overrides the specialist alias; `LUCY_CODE_REVIEW_SPECIALIST_ENABLED=0` disables the specialist search and uses the stock fallback chain.
 - If no model in the chain is installed, the request returns `code_review_model_unavailable`.
 
 **Execution (`tools/router_py/self_analysis.py`)**
 - Static analysis uses `ast` plus `ruff` diagnostics.
+- File references resolve to a single `.py` file; directory references are accepted and handled pragmatically:
+  - Small directories (≤5 Python files) are reviewed file-by-file.
+  - Large directories return a file listing and ask for a specific file, avoiding unbounded context growth.
 - Two-call staged review:
   1. **Broad audit** — code map, coverage ledger, candidate findings.
   2. **Deep investigation** — runs only when stage 1 reports confirmed/high/moderate-confidence findings; traces call paths, validates defects, ranks fixes.
-- Source is truncated to `LUCY_SELF_REVIEW_CONTEXT_CHARS` (default 200,000) when it exceeds the code-review context budget; the prompt is flagged with a truncation warning.
+- Source is truncated to `LUCY_SELF_REVIEW_CONTEXT_CHARS` (default 32,768) when it exceeds the code-review context budget; the prompt is flagged with a truncation warning.
+- The Ollama context window (`num_ctx`) is expanded to `LUCY_CODE_REVIEW_CONTEXT_TARGET` (default 16,384) for each SELF_REVIEW call, leaving room for the prompt, source, and the full output budget.
 
 **HMI behaviour**
 - Self-review reports are intentionally read-only and can be lengthy, so TTS is suppressed for `SELF_REVIEW` results.
@@ -540,8 +544,10 @@ python3 -m pytest test_policy_router.py test_classify.py test_routing_edge_cases
 When enabled via the **Engineering mode** toggle (relabelled from "Self-analysis mode" on 2026-07-16), Local Lucy can parse her own Python source and suggest improvements.
 
 - The route is `SELF_REVIEW`, not `LOCAL` or `AUGMENTED`.
-- Dispatch bypasses the normal routing/local-answer pipeline: `tools/router_py/execution_engine.py` detects the enabled toggle plus an explicit `.py` file reference, resolves a code-review model (`tools/router_py/code_review_model_resolver.py`), and calls `tools/router_py/self_analysis.py::SelfAnalysisEngine` directly.
+- Dispatch bypasses the normal routing/local-answer pipeline: `tools/router_py/execution_engine.py` detects the enabled toggle plus a `.py` file reference or directory path, resolves a code-review model (`tools/router_py/code_review_model_resolver.py`), and calls `tools/router_py/self_analysis.py::SelfAnalysisEngine` directly.
 - `SelfAnalysisEngine` runs static analysis with stdlib `ast` and `ruff`, then performs a staged two-call LLM review through `LocalAnswer` with `route_mode="SELF_REVIEW"`.
+- Directory references are supported: small directories (≤5 Python files) are reviewed file-by-file; large directories return a file listing so the user can pick a specific file.
+- The SELF_REVIEW call expands the Ollama context window to `LUCY_CODE_REVIEW_CONTEXT_TARGET` (default 16,384) and truncates source to `LUCY_SELF_REVIEW_CONTEXT_CHARS` (default 32,768) to prevent output truncation.
 - Static facts are labeled **LOCAL**; LLM suggestions are labeled **AUGMENTED**.
 - The toggle is stored in `current_state.json` under `self_analysis_mode`.
 

@@ -125,6 +125,31 @@ def extract_self_analysis_file_reference(
                 return str(candidate.relative_to(root))
         return None
 
+    # Look for directory references (e.g. "review tools/router_py").  Require a
+    # slash so we do not treat every keyword as a path, and require the target to
+    # exist under the project root.
+    dir_matches = re.findall(r"[\'\"]?([\w\-/]+)[\'\"]?", question)
+    for raw in dir_matches:
+        if "/" not in raw:
+            continue
+        candidates: list[Path] = []
+        raw_path = Path(raw)
+        if raw_path.is_absolute():
+            candidates.append(raw_path.resolve())
+        normalized = raw.lstrip("/")
+        for prefix in ("lucy-v10/", "lucy/"):
+            if normalized.startswith(prefix):
+                normalized = normalized[len(prefix) :]
+                break
+        candidates.append((root / normalized).resolve())
+        for candidate in candidates:
+            try:
+                candidate.relative_to(root)
+            except ValueError:
+                continue
+            if candidate.is_dir():
+                return str(candidate.relative_to(root))
+
     # Look for module-style dotted paths (e.g. ui_v10.app.panels.control_panel)
     matches = re.findall(r"([\w]+(?:\.[\w]+)+)", question)
     for m in matches:

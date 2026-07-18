@@ -66,7 +66,7 @@ _collect_root_files() {
       -print0
     # Top-level project files.
     find . -maxdepth 1 -type f \
-      \( -name "lucy_chat.sh" -o -name "README.md" -o -name "ARCHITECTURE.md" -o -name "pyproject.toml" -o -name "Makefile" -o -name "CONTRIBUTING.md" -o -name "LICENSE" \) \
+      \( -name "lucy_chat.sh" -o -name "README.md" -o -name "Architecture.md" -o -name "ARCHITECTURE.md" -o -name "pyproject.toml" -o -name "Makefile" -o -name "CONTRIBUTING.md" -o -name "LICENSE" \) \
       -print0
   ) \
     | sort -z \

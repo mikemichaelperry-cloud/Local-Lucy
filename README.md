@@ -39,7 +39,7 @@ The frozen V9 baseline is archived under the `local-lucy-v9-frozen-2026-05-28` r
 - Async state machine with timeout guards
 
 ### 🔒 Privacy & Local-First
-- **Primary LLM runs locally** via Ollama (`local-lucy-llama31` backed by llama3.1:8b, 8192-token context; optional `local-lucy-gemma4` backed by gemma4:12b-it-qat)
+- **Primary LLM runs locally** via Ollama (`local-lucy-llama31` backed by llama3.1:8b, 8192-token context; optional `local-lucy-gemma4` backed by gemma4:12b-it-qat, 8192-token general context with 16,384-token SELF_REVIEW context)
 - **Optional cloud augmentation** (Kimi/OpenAI) for complex queries
 - **SQLite state management** with versioned schema migrations and `0o600` permissions
 - **XDG-compliant runtime paths** (`~/.local/share/local-lucy`) with legacy fallback
@@ -47,6 +47,7 @@ The frozen V9 baseline is archived under the `local-lucy-v9-frozen-2026-05-28` r
 
 ### 📡 Live Data Integration
 - **LOCAL** — Default local LLM inference via Ollama (`local-lucy-llama31`; optional `local-lucy-gemma4`)
+- **SELF_REVIEW** — Read-only code review of Local Lucy's own Python source (files or small directories) in Engineering mode
 - **AUGMENTED** — Wikipedia evidence + OpenAI/Kimi synthesis with evidence-backed answers
 - **EVIDENCE** — Medical/vet/finance/legal queries with trusted-source citations
 - **FINANCE** — Live FX, crypto, stock/index, and net-worth lookups with source citations
@@ -149,8 +150,9 @@ ollama create local-lucy-llama31 -f config/Modelfile.local-lucy-llama31
 ollama pull gemma4:12b-it-qat
 ollama create local-lucy-gemma4 -f config/Modelfile.local-lucy-gemma4
 
-# Optional: code-review specialist model for Engineering mode
-# (falls back to local-lucy-gemma4, then gemma4:12b-it-qat, then the default local model if not installed)
+# Optional: code-review specialist model for Engineering mode.
+# The default specialist is local-lucy-gemma4; the fallback chain is:
+# configured specialist → local-lucy-gemma4 → gemma4:12b-it-qat → default local model.
 
 # (Optional) Copy and configure API keys for cloud providers
 cp .env.example .env
@@ -336,6 +338,7 @@ Local-Lucy/
 │   ├── logging_config.py   # Structured JSON logging
 │   ├── feedback_parser.py  # NL feedback detection
 │   └── test_*.py           # Comprehensive test suite
+├── tools/router/           # Legacy shell-test wrappers (delegate to router_py)
 ├── models/router/          # Embedding model & learner
 │   ├── hybrid_router_v2.py # MiniLM-L6-v2 routing
 │   ├── background_learner.py
