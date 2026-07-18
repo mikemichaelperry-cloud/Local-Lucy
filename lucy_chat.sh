@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Local Lucy V11 - Primary Chat Entry Point
-# ROLE: AUTHORITATIVE CHAT INTERFACE for lucy-v10
+# ROLE: AUTHORITATIVE CHAT INTERFACE for lucy-v11
 #
 set -euo pipefail
 
