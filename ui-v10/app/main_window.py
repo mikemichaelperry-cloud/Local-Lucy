@@ -359,7 +359,7 @@ class OperatorConsoleWindow(QMainWindow):
             from pathlib import Path
             import os
 
-            root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10")).resolve()
+            root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v11")).resolve()
             socket_path = root / "tmp" / "run" / "kokoro_tts_worker.sock"
             if socket_path.exists():
                 import socket
@@ -377,7 +377,7 @@ class OperatorConsoleWindow(QMainWindow):
             import sys
             from pathlib import Path
 
-            root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10")).resolve()
+            root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v11")).resolve()
             tools_voice = root / "tools" / "voice"
             if str(tools_voice) not in sys.path:
                 sys.path.insert(0, str(tools_voice))
@@ -1206,7 +1206,7 @@ class OperatorConsoleWindow(QMainWindow):
         """Write debug log to file."""
         import os
 
-        root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10")).resolve()
+        root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v11")).resolve()
         log_path = root / "ui_debug.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a") as f:

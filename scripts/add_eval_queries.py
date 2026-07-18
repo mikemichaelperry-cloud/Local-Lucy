@@ -4,7 +4,7 @@
 import json
 from pathlib import Path
 
-EXAMPLES_PATH = Path("/home/mike/lucy-v10/models/router/comprehensive_examples.json")
+EXAMPLES_PATH = Path.home() / "lucy-v11" / "models" / "router" / "comprehensive_examples.json"
 
 # Evaluation queries with correct labels
 EVAL_QUERIES = [

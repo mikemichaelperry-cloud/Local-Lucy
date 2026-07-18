@@ -2,7 +2,7 @@
 """Expanded validation barrage for Local Lucy routing.
 
 Usage:
-    cd ~/lucy-v10
+    cd ~/lucy-v11
     source .env
     python3 tools/router_py/run_barrage_validation.py \
         --output-jsonl /tmp/lucy_barrage_validation.jsonl \

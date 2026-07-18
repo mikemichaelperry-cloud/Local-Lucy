@@ -48,13 +48,13 @@ def main() -> int:
 
     api_key = os.environ.get("GROK_API_KEY", "").strip()
     if not api_key:
-        return _fail("missing_grok_configuration: set GROK_API_KEY in lucy-v10/.env or environment")
+        return _fail("missing_grok_configuration: set GROK_API_KEY in lucy-v11/.env or environment")
 
     api_base = os.environ.get("GROK_API_BASE_URL", "https://api.x.ai/v1").strip().rstrip("/")
     model = os.environ.get("GROK_MODEL", "grok-2-latest").strip()
     if not api_base or not model:
         return _fail(
-            "missing_grok_configuration: set GROK_API_BASE_URL/GROK_MODEL in lucy-v10/.env or environment"
+            "missing_grok_configuration: set GROK_API_BASE_URL/GROK_MODEL in lucy-v11/.env or environment"
         )
 
     payload = {

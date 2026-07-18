@@ -111,7 +111,7 @@ def extract_self_analysis_file_reference(
             candidates.append(raw_path.resolve())
         # Also try stripping common project prefixes and resolving under root.
         normalized = raw.lstrip("/")
-        for prefix in ("lucy-v10/", "lucy/"):
+        for prefix in ("lucy-v10/", "lucy-v11/", "lucy/"):
             if normalized.startswith(prefix):
                 normalized = normalized[len(prefix) :]
                 break
@@ -137,7 +137,7 @@ def extract_self_analysis_file_reference(
         if raw_path.is_absolute():
             candidates.append(raw_path.resolve())
         normalized = raw.lstrip("/")
-        for prefix in ("lucy-v10/", "lucy/"):
+        for prefix in ("lucy-v10/", "lucy-v11/", "lucy/"):
             if normalized.startswith(prefix):
                 normalized = normalized[len(prefix) :]
                 break

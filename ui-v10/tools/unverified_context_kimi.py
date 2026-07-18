@@ -54,14 +54,14 @@ def main() -> int:
     )
     if not api_key:
         return _fail(
-            "missing_kimi_configuration: set KIMI_API_KEY or MOONSHOT_API_KEY in lucy-v10/.env or environment"
+            "missing_kimi_configuration: set KIMI_API_KEY or MOONSHOT_API_KEY in lucy-v11/.env or environment"
         )
 
     api_base = os.environ.get("KIMI_API_BASE_URL", "https://api.moonshot.ai/v1").strip().rstrip("/")
     model = os.environ.get("KIMI_MODEL", "moonshot-v1-8k").strip()
     if not api_base or not model:
         return _fail(
-            "missing_kimi_configuration: set KIMI_API_BASE_URL/KIMI_MODEL in lucy-v10/.env or environment"
+            "missing_kimi_configuration: set KIMI_API_BASE_URL/KIMI_MODEL in lucy-v11/.env or environment"
         )
 
     # Moonshot API can be slow from some regions; use a generous default timeout

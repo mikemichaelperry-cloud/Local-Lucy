@@ -50,14 +50,14 @@ def answer_question(question: str) -> dict[str, Any]:
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
         return _fail_payload(
-            "missing_openai_configuration: set OPENAI_API_KEY in lucy-v10/.env or environment"
+            "missing_openai_configuration: set OPENAI_API_KEY in lucy-v11/.env or environment"
         )
 
     api_base = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").strip().rstrip("/")
     model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip()
     if not api_base or not model:
         return _fail_payload(
-            "missing_openai_configuration: set OPENAI_BASE_URL/OPENAI_MODEL in lucy-v10/.env or environment"
+            "missing_openai_configuration: set OPENAI_BASE_URL/OPENAI_MODEL in lucy-v11/.env or environment"
         )
 
     # Network latency to OpenAI can spike; use a generous default timeout and

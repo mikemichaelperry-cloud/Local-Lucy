@@ -35,7 +35,7 @@ class SelfAnalysisEngine:
         self_review_context_chars: int | None = None,
     ) -> None:
         if project_root is None:
-            project_root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v10"))
+            project_root = Path(os.environ.get("LUCY_ROOT", Path.home() / "lucy-v11"))
         self.project_root = Path(project_root).expanduser().resolve()
         if self_review_context_chars is None:
             try:

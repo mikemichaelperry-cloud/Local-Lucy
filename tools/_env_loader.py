@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def load_project_dotenv() -> None:
-    """Load lucy-v10/.env into environment variables if python-dotenv is available.
+    """Load lucy-v11/.env into environment variables if python-dotenv is available.
 
     Existing environment variables are never overwritten, so values set by
     START_LUCY.sh or a user's shell take precedence over the file.

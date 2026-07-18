@@ -6,7 +6,7 @@ Runs the full synthetic adversarial suite (403 cases) through both routing
 strategies and reports comparative accuracy.
 
 Usage:
-    cd /home/mike/lucy-v10
+    cd /home/mike/lucy-v11
     source ui-v10/.venv/bin/activate
     PYTHONPATH=tools:models/router python eval_router_keyword_vs_hybrid.py
 """

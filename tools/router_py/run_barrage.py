@@ -2,7 +2,7 @@
 """Run a focused question barrage through Local Lucy and capture outcomes.
 
 Usage:
-    cd ~/lucy-v10
+    cd ~/lucy-v11
     source .env
     python3 tools/router_py/run_barrage.py --output /tmp/lucy_barrage.jsonl
 

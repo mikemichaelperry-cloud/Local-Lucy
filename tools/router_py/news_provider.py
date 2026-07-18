@@ -40,7 +40,7 @@ except ImportError:
 
 
 def _load_project_dotenv() -> None:
-    """Load lucy-v10/.env so NEWSAPI_API_KEY is available."""
+    """Load lucy-v11/.env so NEWSAPI_API_KEY is available."""
     if not _dotenv_available:
         return
     for root in (
@@ -1134,7 +1134,7 @@ class NewsAPIProvider:
                 ok=False,
                 text="",
                 source="newsapi",
-                error="NewsAPI key not configured: set NEWSAPI_API_KEY in lucy-v10/.env or environment",
+                error="NewsAPI key not configured: set NEWSAPI_API_KEY in lucy-v11/.env or environment",
             )
 
         if query:

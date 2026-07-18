@@ -2,7 +2,7 @@
 """Benchmark: naked Ollama vs Local Lucy v10/11.
 
 Usage:
-    cd ~/lucy-v10
+    cd ~/lucy-v11
     source .env
     python3 tools/benchmark_naked_vs_lucy.py
 
