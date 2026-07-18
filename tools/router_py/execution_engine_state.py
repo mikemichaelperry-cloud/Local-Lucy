@@ -154,7 +154,7 @@ class StateWriter:
         context: dict[str, Any],
     ) -> None:
         try:
-            question = _redact_pii(context.get("question", "")[:200])
+            question = _redact_pii(context.get("question", ""))
             route_data = {
                 "intent": context.get("intent", ""),
                 "confidence": route.confidence,

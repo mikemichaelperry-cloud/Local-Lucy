@@ -133,6 +133,15 @@ class TestSQLiteWrites:
         assert route_payload["metadata"]["provider"] == "local"
         assert route_payload["metadata"]["final_mode"] == "LOCAL"
 
+    def test_sqlite_stores_long_question_without_truncation(
+        self, writer, mock_state_manager, sample_route, sample_result, sample_context
+    ):
+        long_question = "Explain " + "quantum computing " * 50
+        sample_context["question"] = long_question
+        writer._write_state_to_sqlite(sample_route, sample_result, sample_context)
+        route_payload, _ = mock_state_manager.write_batch.call_args[0]
+        assert route_payload["metadata"]["question"] == long_question
+
     def test_sqlite_outcome_write(
         self, writer, mock_state_manager, sample_route, sample_result, sample_context
     ):
