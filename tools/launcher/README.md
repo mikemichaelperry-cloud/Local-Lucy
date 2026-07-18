@@ -32,5 +32,5 @@ This file declares the operator-facing entry surfaces for the active V11 runtime
   - Router: `tools/router_py/classify.py`, `tools/router_py/policy_router.py`
   - Execution engine: `tools/router_py/execution_engine.py`
   - State/runtime control: `tools/runtime_control.py`
-- Default runtime namespace: `~/.codex-api-home/lucy/runtime-v10`
+- Default runtime namespace: `~/.codex-api-home/lucy/runtime-v11`
 - Authority override: `LUCY_RUNTIME_AUTHORITY_ROOT=/abs/path`

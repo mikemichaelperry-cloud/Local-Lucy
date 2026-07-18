@@ -5,7 +5,7 @@
 set -e
 
 echo "============================================================"
-echo "LOCAL LUCY v10 - GPU ALLOCATION DIAGNOSTIC"
+echo "LOCAL LUCY v11 - GPU ALLOCATION DIAGNOSTIC"
 echo "============================================================"
 echo "Timestamp: $(date)"
 echo ""
@@ -70,8 +70,9 @@ if [ -n "$KOKORO_PID" ]; then
     fi
     
     # Check socket
-    # V8 ISOLATION: Use v8 socket path
-    SOCKET="${LUCY_VOICE_KOKORO_SOCKET:-/home/mike/lucy-v10/tmp/run/kokoro_tts_worker.sock}"
+    # V11 ISOLATION: Use runtime namespace socket path, fallback to LUCY_ROOT
+    _NAMESPACE_ROOT="${LUCY_RUNTIME_NAMESPACE_ROOT:-${LUCY_ROOT:-/home/mike/lucy-v11}}"
+    SOCKET="${LUCY_VOICE_KOKORO_SOCKET:-${_NAMESPACE_ROOT}/tmp/run/kokoro_tts_worker.sock}"
     if [ -S "$SOCKET" ]; then
         echo -e "  ${GREEN}✓${NC} Socket available"
     else
@@ -101,7 +102,7 @@ echo ""
 
 # Check PyTorch CUDA (if venv available)
 echo "=== PYTORCH CUDA ==="
-VENV_PYTHON="/home/mike/lucy-v10/ui-v10/.venv/bin/python"
+VENV_PYTHON="${LUCY_ROOT:-/home/mike/lucy-v11}/ui-v10/.venv/bin/python"
 if [ -x "$VENV_PYTHON" ]; then
     CUDA_CHECK=$($VENV_PYTHON -c "import torch; print(torch.cuda.is_available())" 2>/dev/null || echo "False")
     if [ "$CUDA_CHECK" = "True" ]; then

@@ -274,7 +274,7 @@ These options are preserved for backward compatibility but are no longer needed 
 Persona LoRA adapters are trained on the RTX 3060 12 GB using QLoRA:
 
 ```bash
-cd ~/lucy-v10
+cd ~/lucy-v11
 source ui-v10/.venv/bin/activate
 python3 tools/lora/build_datasets.py
 HF_TOKEN=... tools/lora/train_all_personas.sh
@@ -301,7 +301,7 @@ python3 tools/lora/evaluate_persona.py --model gemma4:12b-it-qat --prompt-person
 
 ```bash
 # Full suite (~4 min)
-cd ~/lucy-v10
+cd ~/lucy-v11
 source ui-v10/.venv/bin/activate
 make test
 

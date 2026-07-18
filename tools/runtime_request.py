@@ -540,7 +540,7 @@ def _run_backend_submit_python(
             "augmentation_policy": state.get("augmentation_policy", "disabled"),
             "augmented_provider": state.get("augmented_provider", "wikipedia"),
             "model": state.get("model", "local-lucy"),
-            "profile": state.get("profile", "lucy-v10"),
+            "profile": state.get("profile", "lucy-v11"),
         },
         "error": "",
         "outcome": build_outcome_payload(

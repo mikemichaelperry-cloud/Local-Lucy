@@ -8,10 +8,10 @@
 
 | | |
 |---|---|
-| **Repository** | `~/lucy-v10` (also `LUCY_ROOT`) |
+| **Repository** | `~/lucy-v11` (also `LUCY_ROOT`) |
 | **Branch** | `v10-dev` |
-| **Last tag** | `v10.0.0-beta.1` |
-| **Version** | `10.0.0-beta.1` |
+| **Last tag** | `v11.0.0-dev` |
+| **Version** | `11.0.0-dev` |
 | **Model** | `local-lucy-llama31` (llama3.1:8b via Ollama) |
 | **Handoff file** | `~/Desktop/Local_Lucy_v10_Session_Handoff_<date>.md` |
 | **Default branch on origin** | `v10-dev` ✅ |
@@ -22,7 +22,7 @@
 ## Directory Structure
 
 ```
-lucy-v10/
+lucy-v11/
 ├── tools/                    # Core backend (router, execution, voice, memory, internet)
 │   ├── router_py/            # Main execution engine (~50 modules)
 │   ├── lora/                 # Persona LoRA training, conversion, evaluation
@@ -55,7 +55,7 @@ lucy-v10/
 ├── START_LUCY.sh             # Desktop launcher (entry point)
 ├── lucy_chat.sh              # CLI chat entry point
 ├── Makefile                  # install, test, lint, run, clean, check-env
-├── VERSION                   # 10.0.0-beta.1
+├── VERSION                   # 11.0.0-dev
 ├── CHANGELOG.md              # Keep a Changelog format
 └── pyproject.toml            # Packaging, dependencies, tool configs
 ```
@@ -99,7 +99,7 @@ lucy-v10/
 # Current state (auto-generated)
 Branch: v10-dev
 Origin HEAD: v10-dev ✅ (pushed and in sync)
-Latest tag: v10.0.0-beta.1
+Latest tag: v11.0.0-dev
 Commits since tag: 62
 Working tree: clean
 ```
@@ -205,7 +205,7 @@ aa655d0 feat(self-analysis): include source code and guard large/non-file paths
 
 ## Architecture Summary
 
-Local Lucy v10 is a **privacy-first, self-learning desktop AI assistant**.
+Local Lucy v11 is a **privacy-first, self-learning desktop AI assistant**.
 
 ### Three-Layer Stack
 
@@ -298,7 +298,7 @@ When ending a session, update this file with:
 
 Then run:
 ```bash
-cd ~/lucy-v10 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSION_CONTEXT.md"
+cd ~/lucy-v11 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSION_CONTEXT.md"
 ```
 
 ---

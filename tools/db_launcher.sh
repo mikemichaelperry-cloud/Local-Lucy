@@ -1,8 +1,9 @@
 #!/bin/bash
-# Local Lucy V10 Database Viewer
+# Local Lucy V11 Database Viewer
 
-DB1="/home/mike/lucy-v10/state/lucy_state.db"
-DB2="/home/mike/lucy-v10/data/tubes/tube_database.db"
+LUCY_ROOT="${LUCY_ROOT:-/home/mike/lucy-v11}"
+DB1="${LUCY_ROOT}/state/lucy_state.db"
+DB2="${LUCY_ROOT}/data/tubes/tube_database.db"
 DB3="/home/mike/.codex-api-home/lucy/runtime-v11/state/memory.db"
 
 show_lucy_state() {

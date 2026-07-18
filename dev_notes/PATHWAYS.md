@@ -2,11 +2,11 @@
 
 ## Python Environments
 - System Python: `/usr/bin/python3`
-- UI Venv (has Kokoro): `/home/mike/lucy-v10/ui-v10/.venv/bin/python3`
+- UI Venv (has Kokoro): `/home/mike/lucy-v11/ui-v10/.venv/bin/python3`
 
 ## Critical Paths
-- Project Root: `/home/mike/lucy-v10`
-- Runtime State: `~/.codex-api-home/lucy/runtime-v10/state/`
+- Project Root: `/home/mike/lucy-v11`
+- Runtime State: `~/.codex-api-home/lucy/runtime-v11/state/`
 - Kokoro Socket: `tmp/run/kokoro_tts_worker.sock`
 - Logs: `~/.local/share/lucy/logs/`
 

@@ -3,11 +3,11 @@ Local Lucy v10 - Consolidated Backend (Single Source of Truth)
 
 This module provides a unified interface to the backend by importing
 from the authoritative location:
-  /home/mike/lucy-v10/tools/router_py/
+  /home/mike/lucy-v11/tools/router_py/
 
 This ensures both text and voice paths use the exact same code.
 
-Last Updated: 2026-06-08
+Last Updated: 2026-07-18
 Architecture: Single Source of Truth
 """
 
@@ -32,7 +32,7 @@ if AUTHORITY_ROOT:
     else:
         SNAPSHOT_ROOT = Path(__file__).resolve().parents[3]
 else:
-    # Fallback: derive local lucy-v10 root from ui-v10/app/backend/__init__.py.
+    # Fallback: derive local lucy-v11 root from ui-v10/app/backend/__init__.py.
     SNAPSHOT_ROOT = Path(__file__).resolve().parents[3]
 TOOLS_PATH = SNAPSHOT_ROOT / "tools"
 ROUTER_PY_PATH = TOOLS_PATH / "router_py"
@@ -98,7 +98,7 @@ try:
     BACKEND_AVAILABLE = True
 
 except ImportError as e:
-    print(f"[Backend] CRITICAL ERROR: Failed to import from local v8 backend: {e}", file=sys.stderr)
+    print(f"[Backend] CRITICAL ERROR: Failed to import from local v11 backend: {e}", file=sys.stderr)
     print(f"[Backend] Path attempted: {ROUTER_PY_PATH}", file=sys.stderr)
     BACKEND_AVAILABLE = False
     raise

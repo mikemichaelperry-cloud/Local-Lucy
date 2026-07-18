@@ -61,7 +61,7 @@ Local Lucy V11 is a privacy-first, locally-hosted AI assistant. The primary runt
 ## 3. Directory Layout
 
 ```
-lucy-v10/
+lucy-v11/
 ├── config/                    # Modelfiles, system prompts, policy configs
 │   ├── Modelfile.local-lucy-llama31
 │   ├── Modelfile.local-lucy-gemma4
@@ -517,7 +517,7 @@ The control panel blocks checkbox signals while programmatically refreshing a to
 Run the routing/policy suite:
 
 ```bash
-cd /home/mike/lucy-v10/tools/router_py
+cd /home/mike/lucy-v11/tools/router_py
 python3 -m pytest test_policy_router.py test_classify.py test_routing_edge_cases.py test_policy.py test_finance_routing.py test_medical_evidence_routing.py test_news_synthesis_routing.py test_augmented_auto_routing.py test_news_provider.py test_evidence_provider.py test_self_analysis.py test_code_review_model_resolver.py -v
 ```
 

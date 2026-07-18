@@ -1,4 +1,4 @@
-# Local Lucy v10 — Agent Instructions
+# Local Lucy v11 — Agent Instructions
 
 > **READ `SESSION_CONTEXT.md` FIRST at every session start.**
 > It contains the current branch, git state, environment variables, and latest changes.
@@ -8,7 +8,7 @@
 
 ## Authority
 
-- **Working root:** `/home/mike/lucy-v10`
+- **Working root:** `/home/mike/lucy-v11`
 - **Active branch:** `v10-dev`
 - **Frozen:** V9 is tagged `local-lucy-v9-frozen-2026-05-28`. Never modify it.
 - **Default model:** `local-lucy-llama31` (llama3.1:8b via Ollama)
@@ -87,10 +87,10 @@
 ## Environment Variables
 
 ```bash
-LUCY_ROOT=~/lucy-v10                    # Project root
+LUCY_ROOT=~/lucy-v11                    # Project root
 LUCY_RUNTIME_NAMESPACE_ROOT=~/.local/share/local-lucy   # XDG data (or legacy ~/.codex-api-home)
-LUCY_RUNTIME_AUTHORITY_ROOT=~/lucy-v10  # Code authority validation
-LUCY_UI_ROOT=~/lucy-v10/ui-v10          # HMI path
+LUCY_RUNTIME_AUTHORITY_ROOT=~/lucy-v11  # Code authority validation
+LUCY_UI_ROOT=~/lucy-v11/ui-v10          # HMI path
 LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
 LUCY_LOCAL_MODEL=local-lucy-llama31
 LUCY_AUTO_LEARN=0                       # Set 0 during development to prevent mutation
@@ -106,7 +106,7 @@ LUCY_AUTO_LEARN=0                       # Set 0 during development to prevent mu
 
 ```bash
 # Full router suite (CPU only, ~1min40s)
-cd ~/lucy-v10
+cd ~/lucy-v11
 source ui-v10/.venv/bin/activate
 python -m pytest tools/router_py/ -q
 
@@ -153,7 +153,7 @@ The primary runtime supports a single user-specific persona (Michael). It is tri
 > **Note:** The pre-trained Michael LoRA artifacts and datasets were archived to `backups/v10-dev-cleanup/2026-07-04/lora/` as part of the v10-dev cleanup. The commands below regenerate them at their original paths from the built-in specs.
 
 ```bash
-cd ~/lucy-v10
+cd ~/lucy-v11
 source ui-v10/.venv/bin/activate
 python3 tools/lora/build_datasets.py
 python3 tools/lora/train_persona_lora.py --dataset data/lora/datasets/michael.jsonl --base-tag local-lucy-llama31 --persona michael
@@ -210,7 +210,7 @@ Local Lucy learns from natural-language user feedback.
 
 ## Common Footguns
 
-1. **Two `current_state.json` locations** — HMI uses `~/.local/share/local-lucy/state/` (XDG) or legacy `~/.codex-api-home/lucy/runtime-v10/state/`. `START_LUCY.sh` sets the canonical path via `LUCY_RUNTIME_NAMESPACE_ROOT`.
+1. **Two `current_state.json` locations** — HMI uses `~/.local/share/local-lucy/state/` (XDG) or legacy `~/.codex-api-home/lucy/runtime-v11/state/`. `START_LUCY.sh` sets the canonical path via `LUCY_RUNTIME_NAMESPACE_ROOT`.
 
 2. **`PipelineContext` is frozen** — Use `dataclasses.replace()` to modify. Unknown keys from `context` dict merge into `.extras`.
 

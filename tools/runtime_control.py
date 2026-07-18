@@ -347,7 +347,7 @@ def default_state() -> dict[str, Any]:
         "schema_version": 1,
         "profile": os.environ.get("LUCY_RUNTIME_PROFILE")
         or os.environ.get("LUCY_LAUNCHER_LABEL")
-        or "lucy-v10",
+        or "lucy-v11",
         "mode": "auto",
         "conversation": coerce_toggle(os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0")),
         "memory": "on",

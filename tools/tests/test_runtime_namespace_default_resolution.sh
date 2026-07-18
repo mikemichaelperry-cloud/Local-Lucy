@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 TOOLS_DIR="${ROOT}/tools"
-UI_ROOT="/home/mike/lucy-v10/ui-v10"
+UI_ROOT="/home/mike/lucy-v11/ui-v10"
 
 ok(){ echo "OK: $*"; }
 die(){ echo "FAIL: $*" >&2; exit 1; }
@@ -34,6 +34,8 @@ home_value = Path(sys.argv[4]).resolve()
 for key in list(os.environ):
     if key.startswith("LUCY_RUNTIME_") or key.startswith("LUCY_UI_") or key == "LUCY_VOICE_RUNTIME_FILE" or key == "LUCY_VOICE_CAPTURE_DIR":
         os.environ.pop(key, None)
+# Disable contract enforcement so default namespace resolution can be verified.
+os.environ["LUCY_RUNTIME_CONTRACT_REQUIRED"] = "0"
 
 sys.path.insert(0, str(tools_dir))
 import runtime_control
@@ -111,11 +113,11 @@ assert Path(state_store.STATE_DIRECTORY) == namespace_root / "state"
 PY
 }
 
-EXPECTED_ROOT="${USER_HOME}/.codex-api-home/lucy/runtime-v10"
+EXPECTED_ROOT="${USER_HOME}/.codex-api-home/lucy/runtime-v11"
 check_resolution "${USER_HOME}" "${EXPECTED_ROOT}"
 check_resolution "${SANDBOX_HOME}" "${EXPECTED_ROOT}"
 check_resolution "${PLUS_HOME}" "${EXPECTED_ROOT}"
-check_namespace_override "/home/mike/.codex-plus-home" "/home/mike/.codex-api-home/lucy/runtime-v10"
+check_namespace_override "/home/mike/.codex-plus-home" "/home/mike/.codex-api-home/lucy/runtime-v11"
 
 ok "default runtime namespace resolution stays stable for normal and Codex sandbox HOME values"
 echo "PASS: test_runtime_namespace_default_resolution"
