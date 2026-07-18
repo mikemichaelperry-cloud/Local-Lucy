@@ -39,7 +39,7 @@ class LogWatcher:
             runtime_log_dir / "runtime.log",
             runtime_log_dir / "chat.log",
             runtime_log_dir / "stable_desktop.log",
-            # V10: also tail actively-written debug and worker logs
+            # Also tail actively-written debug and worker logs
             Path.home() / "lucy-v11" / "ui_debug.log",
             Path.home() / "lucy-v11" / "tmp" / "logs" / "whisper_worker.log",
             Path.home() / "lucy-v11" / "tmp" / "logs" / "kokoro_tts_worker.log",
