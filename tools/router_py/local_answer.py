@@ -541,14 +541,14 @@ class LocalAnswerConfig:
     num_predict_detail: int = 768
     num_predict_long: int = 1536
     num_predict_clarify: int = 48
-    num_predict_augmented_default: int = 128
+    num_predict_augmented_default: int = 512
     num_predict_augmented_brief: int = 64
     num_predict_augmented_detail: int = 512
     num_predict_augmented_background: int = 128
-    local_max_tokens: int = 256
-    augmented_max_tokens: int = 512
-    evidence_max_tokens: int = 768
-    creative_max_tokens: int = 512
+    local_max_tokens: int = 2048
+    augmented_max_tokens: int = 1536
+    evidence_max_tokens: int = 1536
+    creative_max_tokens: int = 2048
     self_review_max_tokens: int = 4096
     self_review_context_chars: int = 32768
     # Code-review specialist model settings
@@ -626,10 +626,10 @@ class LocalAnswerConfig:
             num_predict_detail=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_DETAIL", "768")),
             num_predict_long=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_LONG", "1536")),
             num_predict_clarify=int(os.environ.get("LUCY_LOCAL_NUM_PREDICT_CLARIFY", "64")),
-            local_max_tokens=int(os.environ.get("LUCY_LOCAL_MAX_TOKENS", "256")),
-            augmented_max_tokens=int(os.environ.get("LUCY_AUGMENTED_MAX_TOKENS", "512")),
-            evidence_max_tokens=int(os.environ.get("LUCY_EVIDENCE_MAX_TOKENS", "768")),
-            creative_max_tokens=int(os.environ.get("LUCY_CREATIVE_MAX_TOKENS", "512")),
+            local_max_tokens=int(os.environ.get("LUCY_LOCAL_MAX_TOKENS", "2048")),
+            augmented_max_tokens=int(os.environ.get("LUCY_AUGMENTED_MAX_TOKENS", "1536")),
+            evidence_max_tokens=int(os.environ.get("LUCY_EVIDENCE_MAX_TOKENS", "1536")),
+            creative_max_tokens=int(os.environ.get("LUCY_CREATIVE_MAX_TOKENS", "2048")),
             self_review_max_tokens=int(os.environ.get("LUCY_SELF_REVIEW_MAX_TOKENS", "4096")),
             self_review_context_chars=int(
                 os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "32768")

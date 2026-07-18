@@ -692,7 +692,7 @@ class TestIntegration(unittest.TestCase):
 
             # Pre-populate cache
             q_norm = answer._normalize_query("test query for cache")
-            answer._cache_store(q_norm, "chat:256:0.0:1.0", "cached response")
+            answer._cache_store(q_norm, "chat:2048:0.0:1.0", "cached response")
 
             with patch.object(answer, "_call_ollama") as mock_call:
                 mock_call.side_effect = Exception("Should not be called")
