@@ -328,6 +328,28 @@ def test_extract_self_analysis_explicit_path_overrides_last_file(tmp_path, monke
     )
 
 
+def test_extract_self_analysis_absolute_path_prefix(tmp_path, monkeypatch):
+    """Users often paste terminal-style paths like /lucy-v10/tools/foo.py."""
+    root = _make_self_analysis_root(tmp_path, monkeypatch)
+    subdir = root / "tools" / "router_py"
+    subdir.mkdir(parents=True)
+    (subdir / "classify.py").write_text("x = 1\n")
+    engine = ExecutionEngine()
+
+    assert (
+        engine._extract_self_analysis_file_reference("review /lucy-v10/tools/router_py/classify.py")
+        == "tools/router_py/classify.py"
+    )
+    assert (
+        engine._extract_self_analysis_file_reference("review lucy-v10/tools/router_py/classify.py")
+        == "tools/router_py/classify.py"
+    )
+    assert (
+        engine._extract_self_analysis_file_reference("review /tools/router_py/classify.py")
+        == "tools/router_py/classify.py"
+    )
+
+
 @pytest.mark.asyncio
 async def test_execution_engine_remembers_last_self_analysis_file(tmp_path, monkeypatch):
     """The engine stores the last successfully dispatched self-analysis file."""

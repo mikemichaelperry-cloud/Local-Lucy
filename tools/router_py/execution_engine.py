@@ -891,10 +891,24 @@ class ExecutionEngine:
 
     def _extract_explicit_self_analysis_file_reference(self, question: str) -> str | None:
         """Return a relative path only when the query explicitly names a file."""
-        # Look for quoted or bare file paths ending in .py
+        # Look for quoted or bare file paths ending in .py.  Accept both relative
+        # paths (tools/router_py/classify.py) and absolute-style paths that users
+        # paste from their terminal (/lucy-v10/tools/router_py/classify.py).
         matches = re.findall(r"[\'\"]?([\w\-/]+\.py)[\'\"]?", question)
         if matches:
-            candidate = (ROOT_DIR / matches[0]).resolve()
+            raw = matches[0]
+            # Strip a leading slash and/or the common project directory prefix so
+            # ROOT_DIR / raw resolves inside the project instead of at filesystem root.
+            normalized = raw.lstrip("/")
+            if normalized.startswith("lucy-v10/"):
+                normalized = normalized[len("lucy-v10/") :]
+            elif normalized.startswith("lucy/"):
+                normalized = normalized[len("lucy/") :]
+            candidate = (ROOT_DIR / normalized).resolve()
+            try:
+                candidate.relative_to(ROOT_DIR)
+            except ValueError:
+                return None
             if candidate.exists():
                 return str(candidate.relative_to(ROOT_DIR))
         # Look for module-style dotted paths (e.g. ui_v10.app.panels.control_panel)

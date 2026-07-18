@@ -43,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
-from local_answer import LocalAnswer, LocalAnswerConfig
+from local_answer import LocalAnswer, LocalAnswerConfig, _MODEL_IDENTITIES
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -279,14 +279,22 @@ def _get_model_goldens(golden_data: Any, model: str) -> tuple[Dict[str, Any], Di
     Supports the per-model structure:
         golden_data["models"][model]["responses"]
     Falls back to the legacy top-level "responses" for single-model files.
+
+    If *model* is a persona Modelfile wrapper (e.g. local-lucy-gemma4),
+    falls back to the underlying Ollama model's golden responses
+    (e.g. gemma4:12b-it-qat) so wrapper variants do not require duplicate
+    golden data.
     """
     if not isinstance(golden_data, dict):
         return {}, {}
     models = golden_data.get("models")
-    if isinstance(models, dict) and model in models:
-        model_entry = models[model]
-        if isinstance(model_entry, dict):
-            return model_entry.get("responses", {}), model_entry
+    if isinstance(models, dict):
+        for candidate in (model, _MODEL_IDENTITIES.get(model, ("",))[0]):
+            if not candidate:
+                continue
+            model_entry = models.get(candidate)
+            if isinstance(model_entry, dict):
+                return model_entry.get("responses", {}), model_entry
     return golden_data.get("responses", {}), golden_data
 
 
