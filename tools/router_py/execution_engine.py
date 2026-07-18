@@ -84,6 +84,72 @@ def _load_medical_domains(path: Path) -> list[str]:
         return list(_MEDICAL_DEFAULT_DOMAINS)
 
 
+def extract_self_analysis_file_reference(
+    question: str,
+    last_file: str | None = None,
+    project_root: Path | None = None,
+) -> str | None:
+    """Return a relative path if *question* asks to analyze/review/improve a file.
+
+    This is the module-level implementation shared by the execution engine and
+    the request pipeline.  It must stay independent of engine instance state so
+    it can be called before routing decisions are made.
+    """
+    root = project_root or ROOT_DIR
+    q = question.lower()
+    if not any(k in q for k in ("analyze", "analyse", "review", "improve", "inspect")):
+        return None
+
+    # Look for quoted or bare file paths ending in .py.  Accept both relative
+    # paths and absolute paths that users paste from their terminal.
+    matches = re.findall(r"[\'\"]?([\w\-/]+\.py)[\'\"]?", question)
+    if matches:
+        raw = matches[0]
+        candidates: list[Path] = []
+        raw_path = Path(raw)
+        if raw_path.is_absolute():
+            candidates.append(raw_path.resolve())
+        # Also try stripping common project prefixes and resolving under root.
+        normalized = raw.lstrip("/")
+        for prefix in ("lucy-v10/", "lucy/"):
+            if normalized.startswith(prefix):
+                normalized = normalized[len(prefix) :]
+                break
+        candidates.append((root / normalized).resolve())
+        for candidate in candidates:
+            try:
+                candidate.relative_to(root)
+            except ValueError:
+                continue
+            if candidate.exists():
+                return str(candidate.relative_to(root))
+        return None
+
+    # Look for module-style dotted paths (e.g. ui_v10.app.panels.control_panel)
+    matches = re.findall(r"([\w]+(?:\.[\w]+)+)", question)
+    for m in matches:
+        converted = m.replace(".", "/") + ".py"
+        if "ui_v10" in converted:
+            converted = converted.replace("ui_v10", "ui-v10")
+        candidate = (root / converted).resolve()
+        if candidate.exists():
+            return str(candidate.relative_to(root))
+
+    if last_file:
+        followup_markers = (
+            " it",
+            "that file",
+            "this file",
+            "the file",
+            "same file",
+            "again",
+        )
+        if any(marker in q for marker in followup_markers):
+            return last_file
+
+    return None
+
+
 def _trusted_evidence_metadata(
     payload: dict[str, Any] | None,
     *,
@@ -889,39 +955,6 @@ class ExecutionEngine:
         except Exception:
             return {}
 
-    def _extract_explicit_self_analysis_file_reference(self, question: str) -> str | None:
-        """Return a relative path only when the query explicitly names a file."""
-        # Look for quoted or bare file paths ending in .py.  Accept both relative
-        # paths (tools/router_py/classify.py) and absolute-style paths that users
-        # paste from their terminal (/lucy-v10/tools/router_py/classify.py).
-        matches = re.findall(r"[\'\"]?([\w\-/]+\.py)[\'\"]?", question)
-        if matches:
-            raw = matches[0]
-            # Strip a leading slash and/or the common project directory prefix so
-            # ROOT_DIR / raw resolves inside the project instead of at filesystem root.
-            normalized = raw.lstrip("/")
-            if normalized.startswith("lucy-v10/"):
-                normalized = normalized[len("lucy-v10/") :]
-            elif normalized.startswith("lucy/"):
-                normalized = normalized[len("lucy/") :]
-            candidate = (ROOT_DIR / normalized).resolve()
-            try:
-                candidate.relative_to(ROOT_DIR)
-            except ValueError:
-                return None
-            if candidate.exists():
-                return str(candidate.relative_to(ROOT_DIR))
-        # Look for module-style dotted paths (e.g. ui_v10.app.panels.control_panel)
-        matches = re.findall(r"([\w]+(?:\.[\w]+)+)", question)
-        for m in matches:
-            converted = m.replace(".", "/") + ".py"
-            if "ui_v10" in converted:
-                converted = converted.replace("ui_v10", "ui-v10")
-            candidate = (ROOT_DIR / converted).resolve()
-            if candidate.exists():
-                return str(candidate.relative_to(ROOT_DIR))
-        return None
-
     def _extract_self_analysis_file_reference(
         self, question: str, last_file: str | None = None
     ) -> str | None:
@@ -931,27 +964,7 @@ class ExecutionEngine:
         the query looks like a follow-up ("analyze it", "review that file", etc.),
         return the previously used file reference.
         """
-        q = question.lower()
-        if not any(k in q for k in ("analyze", "analyse", "review", "improve", "inspect")):
-            return None
-
-        explicit = self._extract_explicit_self_analysis_file_reference(question)
-        if explicit:
-            return explicit
-
-        if last_file:
-            followup_markers = (
-                " it",
-                "that file",
-                "this file",
-                "the file",
-                "same file",
-                "again",
-            )
-            if any(marker in q for marker in followup_markers):
-                return last_file
-
-        return None
+        return extract_self_analysis_file_reference(question, last_file=last_file)
 
     def _resolve_code_review_model(self) -> tuple[str, str | None]:
         """Resolve effective Ollama model for SELF_REVIEW mode.

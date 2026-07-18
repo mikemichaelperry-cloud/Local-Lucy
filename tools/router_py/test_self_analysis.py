@@ -350,6 +350,21 @@ def test_extract_self_analysis_absolute_path_prefix(tmp_path, monkeypatch):
     )
 
 
+def test_extract_self_analysis_real_absolute_path_under_root(tmp_path, monkeypatch):
+    """A full absolute path under ROOT_DIR (e.g. /home/mike/lucy-v10/...) resolves."""
+    root = _make_self_analysis_root(tmp_path, monkeypatch)
+    subdir = root / "tools" / "router_py"
+    subdir.mkdir(parents=True)
+    (subdir / "classify.py").write_text("x = 1\n")
+    engine = ExecutionEngine()
+
+    abs_path = str(root / "tools" / "router_py" / "classify.py")
+    assert (
+        engine._extract_self_analysis_file_reference(f"review {abs_path}")
+        == "tools/router_py/classify.py"
+    )
+
+
 @pytest.mark.asyncio
 async def test_execution_engine_remembers_last_self_analysis_file(tmp_path, monkeypatch):
     """The engine stores the last successfully dispatched self-analysis file."""

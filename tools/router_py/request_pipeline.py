@@ -26,6 +26,7 @@ NOT responsibilities (stays in main.py entry wrapper):
 from __future__ import annotations
 
 import dataclasses
+import json
 import logging
 import os
 import re
@@ -57,9 +58,39 @@ from router_py import provider_resolver
 # ---------------------------------------------------------------------------
 # Execution
 # ---------------------------------------------------------------------------
-from router_py.execution_engine import ExecutionEngine
+from router_py.execution_engine import ExecutionEngine, extract_self_analysis_file_reference
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Self-analysis pre-check (must run before Gemma 4 smart-routing bypass)
+# ---------------------------------------------------------------------------
+
+
+def _self_analysis_state_path() -> Path:
+    """Resolve current_state.json using the active runtime namespace."""
+    namespace = os.environ.get(
+        "LUCY_RUNTIME_NAMESPACE_ROOT",
+        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"),
+    )
+    return Path(namespace) / "state" / "current_state.json"
+
+
+def _self_analysis_mode_enabled() -> bool:
+    """Return True if Engineering / self-analysis mode is on in state."""
+    try:
+        state = json.loads(_self_analysis_state_path().read_text(encoding="utf-8"))
+        return str(state.get("self_analysis_mode", "off")).lower() == "on"
+    except Exception:
+        return False
+
+
+def _self_analysis_file_reference(question: str) -> str | None:
+    """Return a file reference if the question is a self-analysis request."""
+    if not _self_analysis_mode_enabled():
+        return None
+    return extract_self_analysis_file_reference(question)
 
 
 # ---------------------------------------------------------------------------
@@ -161,11 +192,14 @@ def process(
     active_model = (
         model or os.environ.get("LUCY_MODEL", "") or os.environ.get("LUCY_LOCAL_MODEL", "")
     )
+    # Engineering / self-analysis mode must not be bypassed, even by smart routing.
+    _self_analysis_ref = _self_analysis_file_reference(question)
     if (
         classification is None
         and decision is None
         and _is_gemma4_smart_routing_enabled(active_model)
         and not route_prefix
+        and _self_analysis_ref is None
     ):
         if _looks_like_news(question):
             route_prefix = "NEWS"

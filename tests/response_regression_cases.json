@@ -27,7 +27,7 @@
     "description": "Lucy should name her provider chain accurately.",
     "checks": {
       "must_include_regexes": [
-        "(?i)Ollama|model|locally|computer"
+        "(?i)Ollama|model|locally|computer|backend|local"
       ],
       "must_exclude_regexes": [
         "(?i)I do not use any providers",
