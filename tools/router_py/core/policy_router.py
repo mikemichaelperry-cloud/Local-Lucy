@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from typing import Dict
 
-from policy_engine import evaluate_policy
+from router_py.core.policy_engine import evaluate_policy
 from .routing_signals import ROUTING_PRECEDENCE_VERSION
 
 
