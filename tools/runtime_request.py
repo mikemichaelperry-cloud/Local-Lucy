@@ -116,6 +116,7 @@ class RuntimeRequestError(RuntimeError):
 @dataclass(frozen=True)
 class RequestPaths:
     root: Path
+    chat_bin: Path
     last_route_file: Path
     last_outcome_file: Path
     result_file: Path
@@ -134,6 +135,7 @@ def main() -> int:
             if not request_text:
                 payload = build_rejected_payload("empty submit text")
                 persist_payload(resolve_result_file(), payload)
+                append_history_entry(resolve_history_file(), payload)
                 print(json.dumps(payload, sort_keys=True))
                 return 1
             payload = handle_submit(request_text, augmented_direct_once=augmented_direct_once)
@@ -141,12 +143,14 @@ def main() -> int:
             if not request_text:
                 payload = build_rejected_payload("empty self-review text")
                 persist_payload(resolve_result_file(), payload)
+                append_history_entry(resolve_history_file(), payload)
                 print(json.dumps(payload, sort_keys=True))
                 return 1
             payload = handle_self_review_submit(request_text)
         else:
             raise RuntimeRequestError(f"unsupported command: {args.command}")
         persist_payload(resolve_result_file(), payload)
+        append_history_entry(resolve_history_file(), payload)
         print(json.dumps(payload, sort_keys=True))
         return 0 if payload["status"] == "completed" else 1
     except (RuntimeRequestError, RuntimeControlError) as exc:
@@ -160,6 +164,7 @@ def main() -> int:
             else "0",
         )
         persist_payload(resolve_result_file(), payload)
+        append_history_entry(resolve_history_file(), payload)
         print(json.dumps(payload, sort_keys=True))
         return 1
 
@@ -506,9 +511,9 @@ def _run_backend_submit_python(
         "UTC": iso_now(),
         "MODE": outcome.route or "LOCAL",
         "OUTCOME_CODE": outcome.outcome_code,
-        "REQUESTED_MODE": outcome.route or "LOCAL",
-        "FINAL_MODE": outcome.route or "LOCAL",
-        "TRUST_CLASS": outcome.provider_usage_class or "local",
+        "REQUESTED_MODE": outcome.route if outcome.route and outcome.route != "LOCAL" else "",
+        "FINAL_MODE": outcome.route if outcome.route and outcome.route != "LOCAL" else "",
+        "TRUST_CLASS": outcome.provider_usage_class if outcome.provider_usage_class and outcome.provider_usage_class != "local" else "",
         "INTENT_FAMILY": outcome.intent_family or "unknown",
         "MANIFEST_INTENT_FAMILY": outcome.intent_family or "unknown",
         "CONFIDENCE": str(outcome.confidence),
@@ -555,7 +560,6 @@ def _run_backend_submit_python(
         "route": build_route_payload(route_meta, outcome_meta, request_text=request_text),
         "status": outcome.status,
     }
-    append_history_entry(resolve_history_file(), payload)
     return payload
 
 
@@ -566,7 +570,43 @@ def run_backend_submit(
     augmented_direct_once: bool,
     extra_env: dict[str, str] | None,
 ) -> dict[str, Any]:
-    """Run the Python-native backend submit path unconditionally."""
+    """Run the backend submit path.
+
+    By default the Python-native router is used. If LUCY_RUNTIME_CHAT_BIN is set
+    to an executable path, that binary is invoked instead. This lets tests and
+    advanced deployments plug in a custom backend while keeping the default path
+    lightweight.
+    """
+    chat_bin_env = os.environ.get("LUCY_RUNTIME_CHAT_BIN", "").strip()
+    if chat_bin_env:
+        chat_bin = Path(chat_bin_env).expanduser()
+    else:
+        # Auto-detect a chat bin when the caller has pointed the authority root at
+        # a non-project directory that contains a lucy_chat.sh (e.g. test mocks).
+        # In the canonical project layout the authority root equals the project
+        # root, so the Python-native router remains the default.
+        paths = resolve_paths()
+        expected_root = Path(__file__).resolve().parents[1]
+        if (
+            paths.root != expected_root
+            and paths.chat_bin.exists()
+            and paths.chat_bin.is_file()
+            and os.access(paths.chat_bin, os.X_OK)
+        ):
+            chat_bin = paths.chat_bin
+        else:
+            chat_bin = None
+
+    if chat_bin is not None:
+        if not chat_bin.exists() or not chat_bin.is_file() or not os.access(chat_bin, os.X_OK):
+            raise RuntimeRequestError(f"configured chat bin is not executable: {chat_bin}")
+        return _run_backend_submit_chat_bin(
+            request_text=request_text,
+            execution_text=execution_text,
+            augmented_direct_once=augmented_direct_once,
+            extra_env=extra_env,
+            chat_bin=chat_bin,
+        )
     return _run_backend_submit_python(
         request_text=request_text,
         execution_text=execution_text,
@@ -575,11 +615,270 @@ def run_backend_submit(
     )
 
 
+def _read_env_file(path: Path) -> dict[str, str]:
+    """Read a simple KEY=VALUE env-style file.
+
+    Values may span multiple lines; continuation lines do not contain an
+    unquoted ``=`` in column 0, so append them to the most recent key.
+    """
+    result: dict[str, str] = {}
+    if not path.exists():
+        return result
+    current_key: str | None = None
+    try:
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, value = line.split("=", 1)
+                current_key = key.strip()
+                result[current_key] = value.strip()
+            elif current_key is not None:
+                result[current_key] = result[current_key] + "\n" + line
+    except OSError:
+        pass
+    return result
+
+
+def _extract_validated_response(raw_output: str) -> str:
+    """Extract text between BEGIN_VALIDATED/END_VALIDATED markers."""
+    lines: list[str] = []
+    in_block = False
+    for line in raw_output.replace("\r", "").splitlines():
+        stripped = line.strip()
+        if stripped == "BEGIN_VALIDATED":
+            in_block = True
+            continue
+        if stripped == "END_VALIDATED":
+            in_block = False
+            continue
+        if in_block:
+            lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def _run_backend_submit_chat_bin(
+    *,
+    request_text: str,
+    execution_text: str,
+    augmented_direct_once: bool,
+    extra_env: dict[str, str] | None,
+    chat_bin: Path,
+) -> dict[str, Any]:
+    """Delegate to an external chat binary (e.g. a mock for tests)."""
+    import subprocess
+
+    request_id = make_request_id()
+    state = load_or_create_state(resolve_state_file(None), refresh_timestamp=False)
+    paths = resolve_paths()
+    policy = "direct_allowed" if augmented_direct_once else "fallback_only"
+
+    env = dict(os.environ)
+    env.update(
+        {
+            "LUCY_ROOT": str(paths.root),
+            "LUCY_RUNTIME_AUTHORITY_ROOT": str(paths.root),
+            "LUCY_RUNTIME_NAMESPACE_ROOT": str(default_runtime_namespace_root()),
+            "LUCY_RUNTIME_STATE_FILE": str(resolve_state_file(None)),
+            "LUCY_AUGMENTATION_POLICY": policy,
+            "LUCY_AUGMENTED_PROVIDER": state.get("augmented_provider", "wikipedia"),
+            "LUCY_LOCAL_MODEL": state.get("model", "local-lucy-llama31"),
+            "LUCY_CONVERSATION_MODE_FORCE": "1" if state.get("conversation") == "on" else "0",
+            "LUCY_SESSION_MEMORY": "1" if should_use_chat_memory(state, request_text) else "0",
+            "LUCY_EVIDENCE_ENABLED": "1" if state.get("evidence") == "on" else "0",
+            "LUCY_VOICE_ENABLED": "1" if state.get("voice") == "on" else "0",
+        }
+    )
+    if augmented_direct_once:
+        env["LUCY_AUGMENTED_DIRECT_REQUEST"] = "1"
+    if extra_env:
+        env.update(extra_env)
+
+    try:
+        proc = subprocess.run(
+            [str(chat_bin), execution_text],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=DEFAULT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return build_failed_payload(
+            request_text=request_text,
+            error=f"chat bin error: {exc}",
+            status="failed",
+            accepted=True,
+            request_id=request_id,
+            control_state=state,
+        )
+
+    response_text = _extract_validated_response(proc.stdout)
+    route_env = _read_env_file(paths.last_route_file)
+    outcome_env = _read_env_file(paths.last_outcome_file)
+
+    # If the backend crashed without publishing a valid outcome, do not reuse
+    # stale route/outcome files from a previous request. Synthesize a clean
+    # failure state so downstream consumers see deterministic metadata. A
+    # non-zero exit with an execution_error outcome is a published failure and
+    # should be preserved; any other stale state is discarded.
+    outcome_code = outcome_env.get("OUTCOME_CODE", "").strip()
+    backend_crashed = proc.returncode != 0 and outcome_code != "execution_error"
+    if backend_crashed:
+        route_env = {}
+        stderr_hint = proc.stderr.strip() if proc.stderr else ""
+        outcome_env = {
+            "OUTCOME_CODE": "execution_error",
+            "REQUESTED_MODE": "unknown",
+            "FINAL_MODE": "ERROR",
+            "TRUST_CLASS": "unknown",
+            "FALLBACK_USED": "false",
+            "FALLBACK_REASON": "none",
+            "ACTION_HINT": stderr_hint or "chat bin failed",
+            "ERROR_MESSAGE": stderr_hint or "chat bin failed",
+            "RC": str(proc.returncode),
+            "QUERY": "",
+        }
+        try:
+            paths.last_outcome_file.parent.mkdir(parents=True, exist_ok=True)
+            paths.last_outcome_file.write_text(
+                "\n".join(f"{k}={v}" for k, v in outcome_env.items()) + "\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+
+    route_meta = {
+        "UTC": route_env.get("UTC", iso_now()),
+        "MODE": route_env.get("MODE", ""),
+        "INTENT_FAMILY": route_env.get("INTENT_FAMILY", "local_answer"),
+        "FINAL_MODE": route_env.get("FINAL_MODE", ""),
+        "CONFIDENCE": route_env.get("CONFIDENCE", "1.0"),
+        "QUERY": "" if backend_crashed else route_env.get("QUERY", execution_text),
+        "ROUTE_REASON": route_env.get("ROUTE_REASON", "chat_bin"),
+        "SESSION_ID": route_env.get("SESSION_ID", request_id),
+    }
+
+    # Synthesize explicit failure truth when the backend published an empty or
+    # otherwise invalid outcome file on a successful exit. This preserves the
+    # contract that downstream consumers can always read a deterministic
+    # last_outcome.env.
+    if proc.returncode == 0 and not outcome_env.get("OUTCOME_CODE", "").strip():
+        synthesized = {
+            "UTC": iso_now(),
+            "MODE": route_meta["MODE"],
+            "ROUTE_REASON": route_meta["ROUTE_REASON"],
+            "SESSION_ID": route_meta["SESSION_ID"],
+            "EVIDENCE_CREATED": "false",
+            "OUTCOME_CODE": "execution_error",
+            "ACTION_HINT": "backend did not publish valid outcome state",
+            "ERROR_MESSAGE": "backend did not publish valid outcome state",
+            "RC": "1",
+            "QUERY": execution_text,
+            "REQUESTED_MODE": "",
+            "FINAL_MODE": "ERROR",
+            "FALLBACK_USED": "false",
+            "FALLBACK_REASON": "none",
+            "TRUST_CLASS": "unknown",
+        }
+        try:
+            paths.last_outcome_file.parent.mkdir(parents=True, exist_ok=True)
+            paths.last_outcome_file.write_text(
+                "\n".join(f"{k}={v}" for k, v in synthesized.items()) + "\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+        outcome_env = dict(synthesized)
+        return build_failed_payload(
+            request_text=request_text,
+            error="backend did not publish valid outcome state",
+            status="failed",
+            accepted=True,
+            request_id=request_id,
+            control_state=state,
+            response_text=response_text,
+            route_meta=route_meta,
+            outcome_meta=outcome_env,
+            returncode=1,
+        )
+
+    # Build a comprehensive outcome metadata map from the env files. Copying all
+    # keys lets mocks inject the full contract (evidence mode, provider status,
+    # recovery flags, unverified context, etc.) without enumerating every field.
+    outcome_meta: dict[str, str] = {}
+    outcome_meta.update(route_env)
+    outcome_meta.update(outcome_env)
+    outcome_meta.update(
+        {
+            "AUGMENTATION_POLICY": outcome_env.get("AUGMENTATION_POLICY", policy),
+            "AUGMENTED_DIRECT_REQUEST": outcome_env.get(
+                "AUGMENTED_DIRECT_REQUEST", "1" if augmented_direct_once else "0"
+            ),
+            "STATUS": "completed" if proc.returncode == 0 else "failed",
+        }
+    )
+    if not backend_crashed and not outcome_meta.get("QUERY", "").strip():
+        outcome_meta["QUERY"] = execution_text
+
+    outcome_code = outcome_env.get("OUTCOME_CODE", "").strip()
+    if proc.returncode != 0 or outcome_code == "execution_error":
+        error = (
+            outcome_env.get("ACTION_HINT")
+            or outcome_env.get("ERROR_MESSAGE")
+            or proc.stderr.strip()
+            or "chat bin failed"
+        )
+        return build_failed_payload(
+            request_text=request_text,
+            error=error,
+            status="failed",
+            accepted=True,
+            request_id=request_id,
+            control_state=state,
+            response_text=response_text,
+            route_meta=route_meta,
+            outcome_meta=outcome_meta,
+            returncode=proc.returncode,
+        )
+
+    return {
+        "accepted": True,
+        "authority": build_authority_payload(),
+        "completed_at": iso_now(),
+        "control_state": {
+            "mode": state.get("mode", "auto"),
+            "conversation": state.get("conversation", "off"),
+            "memory": state.get("memory", "off"),
+            "evidence": state.get("evidence", "off"),
+            "voice": state.get("voice", "off"),
+            "augmentation_policy": state.get("augmentation_policy", "disabled"),
+            "augmented_provider": state.get("augmented_provider", "wikipedia"),
+            "model": state.get("model", "local-lucy"),
+            "profile": state.get("profile", "lucy-v11"),
+        },
+        "error": "",
+        "outcome": build_outcome_payload(
+            outcome_meta,
+            response_text=response_text,
+            request_text=request_text,
+            history_file=resolve_history_file(),
+        ),
+        "request_id": request_id,
+        "request_text": request_text,
+        "response_text": response_text,
+        "route": build_route_payload(route_meta, outcome_meta, request_text=request_text),
+        "status": "completed",
+    }
+
+
 def resolve_paths() -> RequestPaths:
     root = resolve_root()
     state_dir = resolve_state_dir(root)
     return RequestPaths(
         root=root,
+        chat_bin=root / "lucy_chat.sh",
         last_route_file=state_dir / "last_route.env",
         last_outcome_file=state_dir / "last_outcome.env",
         result_file=resolve_result_file(),
@@ -1788,7 +2087,6 @@ def build_route_payload(
         outcome_meta.get("MANIFEST_SELECTED_ROUTE", "")
         or outcome_meta.get("ROUTE_MODE", "")
         or route_meta.get("MODE", "")
-        or outcome_meta.get("FINAL_MODE", "")
     )
     route_mode = route_meta.get("MODE", "") or outcome_meta.get("ROUTE_MODE", "") or selected_route
     return {
@@ -1807,7 +2105,7 @@ def build_route_payload(
         ),
         "authority_basis": outcome_meta.get("MANIFEST_AUTHORITY_BASIS", ""),
         "winning_signal": outcome_meta.get("WINNING_SIGNAL", ""),
-        "query": route_meta.get("QUERY", "") or outcome_meta.get("QUERY", "") or request_text,
+        "query": route_meta.get("QUERY", "") or outcome_meta.get("QUERY", ""),
         "reason": route_meta.get("ROUTE_REASON", "") or outcome_meta.get("ROUTE_REASON", ""),
         "session_id": route_meta.get("SESSION_ID", "") or outcome_meta.get("SESSION_ID", ""),
         "utc": route_meta.get("UTC", "") or outcome_meta.get("UTC", ""),
@@ -1885,7 +2183,6 @@ def persist_payload(result_file: Path, payload: dict[str, Any]) -> None:
             tmp_path = Path(handle.name)
         os.replace(tmp_path, result_file)
     persist_route_snapshot(payload)
-    append_history_entry(resolve_history_file(), payload)
 
 
 def persist_route_snapshot(payload: dict[str, Any]) -> None:

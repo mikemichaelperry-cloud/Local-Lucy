@@ -13,6 +13,7 @@ die(){ echo "FAIL: $*" >&2; exit 1; }
 [[ -f "${CONTROL_TOOL}" ]] || die "missing control tool: ${CONTROL_TOOL}"
 
 TMPD="$(mktemp -d)"
+export LUCY_RUNTIME_NAMESPACE_ROOT="${TMPD}"
 trap 'rm -rf "${TMPD}"' EXIT
 STATE_FILE="${TMPD}/current_state.json"
 RESULT_FILE="${TMPD}/last_request_result.json"

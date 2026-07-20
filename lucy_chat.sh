@@ -17,6 +17,7 @@ fi
 
 export LUCY_ROOT="${ROOT}"
 export LUCY_RUNTIME_AUTHORITY_ROOT="${ROOT}"
+export LUCY_UI_ROOT="${ROOT}/ui-v10"
 export LUCY_CONF_DIR="${ROOT}/config"
 export LUCY_TOOLS_DIR="${ROOT}/tools"
 

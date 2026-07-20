@@ -21,7 +21,7 @@ mkdir -p "${SANDBOX_HOME}" "${PLUS_HOME}"
 check_resolution() {
   local home_value="$1"
   local expected_root="$2"
-  HOME="${home_value}" python3 - <<'PY' "${TOOLS_DIR}" "${UI_ROOT}" "${expected_root}" "${home_value}"
+  HOME="${home_value}" "${ROOT}/ui-v10/.venv/bin/python3" - <<'PY' "${TOOLS_DIR}" "${UI_ROOT}" "${expected_root}" "${home_value}"
 import os
 import sys
 from pathlib import Path
@@ -76,7 +76,7 @@ PY
 check_namespace_override() {
   local home_value="$1"
   local namespace_root="$2"
-  HOME="${home_value}" LUCY_RUNTIME_NAMESPACE_ROOT="${namespace_root}" python3 - <<'PY' "${TOOLS_DIR}" "${UI_ROOT}" "${namespace_root}"
+  HOME="${home_value}" LUCY_RUNTIME_NAMESPACE_ROOT="${namespace_root}" "${ROOT}/ui-v10/.venv/bin/python3" - <<'PY' "${TOOLS_DIR}" "${UI_ROOT}" "${namespace_root}"
 import os
 import sys
 from pathlib import Path

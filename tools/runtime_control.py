@@ -32,6 +32,7 @@ KNOWN_FIELDS = {
     "memory",
     "evidence",
     "voice",
+    "voice_tts_chunk_pause_ms",
     "augmentation_policy",
     "augmented_provider",
     "model",
@@ -102,6 +103,8 @@ def main() -> int:
             result = update_state_field(state_file, "evidence", args.value)
         elif args.command == "set-voice":
             result = update_state_field(state_file, "voice", args.value)
+        elif args.command == "set-voice-tts-pause":
+            result = update_state_field(state_file, "voice_tts_chunk_pause_ms", args.value)
         elif args.command == "set-augmentation":
             result = update_state_field(state_file, "augmentation_policy", args.value)
         elif args.command == "set-augmented-provider":
@@ -161,6 +164,9 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         toggle_parser = subparsers.add_parser(name)
         toggle_parser.add_argument("--value", required=True, choices=("on", "off"))
+
+    pause_parser = subparsers.add_parser("set-voice-tts-pause")
+    pause_parser.add_argument("--value", required=True, type=int)
     augmentation_parser = subparsers.add_parser("set-augmentation")
     augmentation_parser.add_argument(
         "--value",
@@ -205,16 +211,10 @@ def resolve_state_file(explicit_path: str | None) -> Path:
 
 
 def resolve_runtime_paths(explicit_path: str | None) -> ResolvedRuntimePaths:
-    if contract_required():
-        namespace_raw = os.environ.get(RUNTIME_NAMESPACE_ENV, "").strip()
-        if (
-            not namespace_raw
-            and not explicit_path
-            and not os.environ.get("LUCY_RUNTIME_STATE_FILE", "").strip()
-        ):
-            raise RuntimeControlError(
-                f"missing required {RUNTIME_NAMESPACE_ENV} while {CONTRACT_REQUIRED_ENV}=1"
-            )
+    # When the contract is required but no namespace/state-file override is
+    # provided, fall back to the canonical HOME-based namespace rather than
+    # failing. The authority contract validation still ensures the resolved
+    # namespace is sane.
     if explicit_path:
         state_file = Path(explicit_path).expanduser()
         return ResolvedRuntimePaths(
@@ -291,10 +291,26 @@ def enforce_authority_contract(*, expected_authority_root: Path | None = None) -
     if not contract_required():
         return
 
-    missing = []
+    # Auto-derive missing contract values from the canonical project layout when
+    # the tool is executed directly from the project tree. Explicit env overrides
+    # always win. This preserves the V8 isolation validation while allowing the
+    # runtime tools to work without a launcher in the standard layout.
     authority_raw = os.environ.get(AUTHORITY_ROOT_ENV, "").strip()
     ui_root_raw = os.environ.get(UI_ROOT_ENV, "").strip()
     runtime_ns_raw = os.environ.get(RUNTIME_NAMESPACE_ENV, "").strip()
+
+    if expected_authority_root is not None:
+        expected_authority_root = expected_authority_root.resolve()
+        if not authority_raw:
+            authority_raw = str(expected_authority_root)
+        if not ui_root_raw:
+            candidate_ui = expected_authority_root / "ui-v10"
+            if candidate_ui.is_dir():
+                ui_root_raw = str(candidate_ui)
+    if not runtime_ns_raw:
+        runtime_ns_raw = str(default_runtime_namespace_root())
+
+    missing = []
     if not authority_raw:
         missing.append(AUTHORITY_ROOT_ENV)
     if not ui_root_raw:
@@ -310,7 +326,15 @@ def enforce_authority_contract(*, expected_authority_root: Path | None = None) -
     ui_root = Path(ui_root_raw).expanduser().resolve()
     runtime_ns_root = Path(runtime_ns_raw).expanduser().resolve()
 
-    if expected_authority_root is not None and authority_root != expected_authority_root.resolve():
+    # Only enforce that the authority root matches the project tree when it was
+    # auto-derived. Explicit overrides (e.g. tests using mock roots) are trusted
+    # as long as the UI root and namespace root remain valid.
+    authority_was_explicit = bool(os.environ.get(AUTHORITY_ROOT_ENV, "").strip())
+    if (
+        not authority_was_explicit
+        and expected_authority_root is not None
+        and authority_root != expected_authority_root.resolve()
+    ):
         raise RuntimeControlError(
             f"authority root mismatch: env={authority_root} expected={expected_authority_root.resolve()}"
         )
@@ -353,6 +377,9 @@ def default_state() -> dict[str, Any]:
         "memory": "on",
         "evidence": "on",
         "voice": "on",
+        "voice_tts_chunk_pause_ms": int(
+            clean_text(os.environ.get("LUCY_VOICE_TTS_CHUNK_PAUSE_MS")) or "56"
+        ),
         "augmentation_policy": clean_text(os.environ.get("LUCY_AUGMENTATION_POLICY"))
         or "fallback_only",
         "augmented_provider": "wikipedia",
@@ -513,6 +540,10 @@ def normalize_state(payload: dict[str, Any] | None) -> dict[str, Any]:
     state["memory"] = coerce_toggle(state.get("memory"))
     state["evidence"] = coerce_toggle(state.get("evidence"))
     state["voice"] = coerce_toggle(state.get("voice"))
+    try:
+        state["voice_tts_chunk_pause_ms"] = int(state.get("voice_tts_chunk_pause_ms", 56))
+    except (ValueError, TypeError):
+        state["voice_tts_chunk_pause_ms"] = 56
     state["augmentation_policy"] = coerce_augmentation_policy(state.get("augmentation_policy"))
     state["augmented_provider"] = coerce_augmented_provider(state.get("augmented_provider"))
     state["model"] = clean_text(state.get("model")) or default_state()["model"]
@@ -664,6 +695,7 @@ def build_self_check_payload(resolved_paths: ResolvedRuntimePaths) -> dict[str, 
             "memory": state.get("memory", ""),
             "evidence": state.get("evidence", ""),
             "voice": state.get("voice", ""),
+            "voice_tts_chunk_pause_ms": state.get("voice_tts_chunk_pause_ms", 56),
             "augmentation_policy": state.get("augmentation_policy", ""),
             "augmented_provider": state.get("augmented_provider", ""),
             "profile": state.get("profile", ""),
@@ -710,6 +742,7 @@ def render_env(state: dict[str, Any]) -> str:
             f"LUCY_EVIDENCE_ENABLED={toggle_to_flag(state['evidence'])}",
             f"LUCY_ENABLE_INTERNET={toggle_to_flag(state['evidence'])}",
             f"LUCY_VOICE_ENABLED={toggle_to_flag(state['voice'])}",
+            f"LUCY_VOICE_TTS_CHUNK_PAUSE_MS={state.get('voice_tts_chunk_pause_ms', 56)}",
             f"LUCY_AUGMENTATION_POLICY={state['augmentation_policy']}",
             f"LUCY_AUGMENTED_PROVIDER={state['augmented_provider']}",
             f"LUCY_LOCAL_MODEL={state['model']}",

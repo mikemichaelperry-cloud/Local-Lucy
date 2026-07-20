@@ -14,6 +14,7 @@ die(){ echo "FAIL: $*" >&2; exit 1; }
 
 TMPD="$(mktemp -d)"
 trap 'rm -rf "${TMPD}"' EXIT
+export LUCY_RUNTIME_NAMESPACE_ROOT="${TMPD}"
 
 STATE_FILE="${TMPD}/current_state.json"
 RESULT_FILE="${TMPD}/last_request_result.json"
@@ -84,6 +85,7 @@ python3 "${CONTROL_TOOL}" --state-file "${STATE_FILE}" set-augmented-provider --
 
 success_json="$(
   LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" \
+  LUCY_RUNTIME_CHAT_BIN="${MOCK_ROOT}/lucy_chat.sh" \
   LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" \
   LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \
   LUCY_RUNTIME_REQUEST_HISTORY_FILE="${HISTORY_FILE}" \
@@ -135,6 +137,7 @@ PY
 
 multiline_json="$(
   LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" \
+  LUCY_RUNTIME_CHAT_BIN="${MOCK_ROOT}/lucy_chat.sh" \
   LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" \
   LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \
   LUCY_RUNTIME_REQUEST_HISTORY_FILE="${HISTORY_FILE}" \
@@ -263,7 +266,8 @@ assert [entry["request_id"] for entry in active_entries] == ["req-3", "req-4"]
 assert sorted(archived_request_ids) == ["req-1", "req-2"]
 PY
 
-if LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \
+if LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" LUCY_RUNTIME_CHAT_BIN="${MOCK_ROOT}/lucy_chat.sh" \
+  LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \
   LUCY_RUNTIME_REQUEST_HISTORY_FILE="${HISTORY_FILE}" LUCY_UI_STATE_DIR="${UI_STATE_DIR}" \
   python3 "${REQUEST_TOOL}" submit --text "   " >/tmp/runtime_request_empty.out 2>/tmp/runtime_request_empty.err; then
   die "empty submit should fail"
@@ -282,7 +286,8 @@ assert history_entry["status"] == "rejected"
 assert history_entry["error"] == "empty submit text"
 PY
 
-if LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \
+if LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" LUCY_RUNTIME_CHAT_BIN="${MOCK_ROOT}/lucy_chat.sh" \
+  LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \
   LUCY_RUNTIME_REQUEST_HISTORY_FILE="${HISTORY_FILE}" LUCY_UI_STATE_DIR="${UI_STATE_DIR}" \
   python3 "${REQUEST_TOOL}" submit --text "fail case" >/tmp/runtime_request_fail.out 2>/tmp/runtime_request_fail.err; then
   die "backend failure should return non-zero"

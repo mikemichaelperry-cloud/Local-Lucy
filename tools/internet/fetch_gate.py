@@ -17,6 +17,7 @@ Environment variables:
 
 from __future__ import annotations
 
+import errno
 import gzip
 import ipaddress
 import os
@@ -105,6 +106,27 @@ def _domain_of(url: str) -> str:
     if host.startswith("www."):
         host = host[4:]
     return host
+
+
+def _normalize_url(url: str) -> str:
+    """Strip a trailing root dot from the hostname to avoid TLS/SNI mismatches."""
+    try:
+        p = urlparse(url)
+        host = p.hostname or ""
+        if not host.endswith("."):
+            return url
+        normalized_host = host[:-1]
+        netloc = normalized_host
+        if p.port is not None:
+            netloc = f"{netloc}:{p.port}"
+        if p.username is not None:
+            auth = p.username
+            if p.password is not None:
+                auth = f"{auth}:{p.password}"
+            netloc = f"{auth}@{netloc}"
+        return p._replace(netloc=netloc).geturl()
+    except Exception:
+        return url
 
 
 def _load_allowlist(path: Path) -> list[str]:
@@ -248,11 +270,11 @@ def _bucket_url_error(exc: urllib.error.URLError) -> str:
             if err in {socket.EAI_NONAME, socket.EAI_NODATA, socket.EAI_FAIL}:
                 return FAIL_DNS
             if err in {
-                socket.ECONNREFUSED,
-                socket.ECONNRESET,
-                socket.ECONNABORTED,
-                socket.ENETUNREACH,
-                socket.EHOSTUNREACH,
+                errno.ECONNREFUSED,
+                errno.ECONNRESET,
+                errno.ECONNABORTED,
+                errno.ENETUNREACH,
+                errno.EHOSTUNREACH,
             }:
                 return FAIL_CONNECT
     return FAIL_UNKNOWN
@@ -396,6 +418,7 @@ def _run_attempt(
     allowlist: list[str],
     filter_allowlist: list[str],
 ) -> _AttemptResult:
+    url = _normalize_url(url)
     r = _AttemptResult()
     start = time.perf_counter()
     host = _domain_of(url)

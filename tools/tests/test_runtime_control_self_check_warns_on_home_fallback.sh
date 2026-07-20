@@ -27,7 +27,8 @@ from pathlib import Path
 
 payload = json.loads(sys.argv[1])
 home_value = Path(sys.argv[2])
-expected_root = home_value / ".codex-api-home" / "lucy" / "runtime-v10"
+workspace_home = home_value.parent if home_value.name in {".codex-api-home", ".codex-plus-home"} else home_value
+expected_root = workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
 
 assert payload["status"] == "warning"
 assert payload["resolution_source"] == "home_fallback"

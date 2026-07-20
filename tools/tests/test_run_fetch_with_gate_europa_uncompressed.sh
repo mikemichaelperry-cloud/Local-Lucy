@@ -2,90 +2,86 @@
 set -euo pipefail
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
-TMPDIR_TEST="$(mktemp -d)"
-trap 'rm -rf "${TMPDIR_TEST}"' EXIT
+GATE="${ROOT}/tools/internet/fetch_gate.py"
 
 die() {
   echo "FAIL: $*" >&2
   exit 1
 }
 
-FAKE_ROOT="${TMPDIR_TEST}/root"
-mkdir -p "${TMPDIR_TEST}/bin" "${FAKE_ROOT}/tools/internet" "${FAKE_ROOT}/config/trust/generated"
+TMPDIR_TEST="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR_TEST}"' EXIT
 
-cp "${ROOT}/tools/internet/run_fetch_with_gate.sh" "${FAKE_ROOT}/tools/internet/run_fetch_with_gate.sh"
-chmod +x "${FAKE_ROOT}/tools/internet/run_fetch_with_gate.sh"
+ALLOWLIST="${TMPDIR_TEST}/allowlist_fetch.txt"
+printf 'ec.europa.eu\nbbc.com\n' > "${ALLOWLIST}"
 
-cat > "${FAKE_ROOT}/tools/internet/url_safety.py" <<'EOF'
-#!/usr/bin/env python3
+python3 - <<'PY' "${GATE}" "${ALLOWLIST}"
 import sys
-if len(sys.argv) >= 3 and sys.argv[1] == "validate-url":
-    print("OK")
-    raise SystemExit(0)
-raise SystemExit(1)
-EOF
-chmod +x "${FAKE_ROOT}/tools/internet/url_safety.py"
+from pathlib import Path
 
-cat > "${TMPDIR_TEST}/bin/curl" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-args=("$@")
-outfile=""
-url=""
-compressed=0
-for ((i=0; i<${#args[@]}; i++)); do
-  case "${args[$i]}" in
-    --compressed)
-      compressed=1
-      ;;
-    -o)
-      i=$((i+1))
-      outfile="${args[$i]}"
-      ;;
-    http*)
-      url="${args[$i]}"
-      ;;
-  esac
-done
+gate_path = Path(sys.argv[1])
+allowlist_path = Path(sys.argv[2])
+sys.path.insert(0, str(gate_path.parent))
+import fetch_gate as fg
 
-case "${url}" in
-  https://ec.europa.eu/*)
-    [[ "${compressed}" -eq 0 ]] || exit 91
-    printf 'ec ok' > "${outfile}"
-    printf 'http_status=200 final_url=%s total_time_s=0.1 size_download=5 redirect_count=0 http_version=1.1\n' "${url}"
-    ;;
-  https://www.bbc.com/*)
-    [[ "${compressed}" -eq 1 ]] || exit 92
-    printf 'bbc ok' > "${outfile}"
-    printf 'http_status=200 final_url=%s total_time_s=0.1 size_download=6 redirect_count=0 http_version=2\n' "${url}"
-    ;;
-  *)
-    exit 93
-    ;;
-esac
-EOF
-chmod +x "${TMPDIR_TEST}/bin/curl"
 
-cat > "${FAKE_ROOT}/config/trust/generated/allowlist_fetch.txt" <<'EOF'
-ec.europa.eu
-bbc.com
-EOF
+class FakeResp:
+    def __init__(self, url: str, code: int, body: bytes = b"ok") -> None:
+        self._url = url
+        self._code = code
+        self._body = body
+        self._offset = 0
+        self.headers = {}
+        self.redirects = 0
 
-PATH="${TMPDIR_TEST}/bin:${PATH}" \
-  "${FAKE_ROOT}/tools/internet/run_fetch_with_gate.sh" "https://ec.europa.eu/commission/presscorner/api/rss?language=en" \
-  > /dev/null 2> "${TMPDIR_TEST}/ec.err" || {
-    cat "${TMPDIR_TEST}/ec.err" >&2
-    die "ec.europa.eu fetch should succeed without --compressed"
-  }
+    def getcode(self) -> int:
+        return self._code
 
-PATH="${TMPDIR_TEST}/bin:${PATH}" \
-  "${FAKE_ROOT}/tools/internet/run_fetch_with_gate.sh" "https://www.bbc.com/news/technology" \
-  > /dev/null 2> "${TMPDIR_TEST}/bbc.err" || {
-    cat "${TMPDIR_TEST}/bbc.err" >&2
-    die "bbc.com fetch should preserve --compressed"
-  }
+    def geturl(self) -> str:
+        return self._url
 
-grep -q 'reason=OK' "${TMPDIR_TEST}/ec.err" || die "missing OK fetch meta for ec.europa.eu"
-grep -q 'reason=OK' "${TMPDIR_TEST}/bbc.err" || die "missing OK fetch meta for bbc.com"
+    def read(self, n: int = -1) -> bytes:
+        if n < 0 or n > len(self._body) - self._offset:
+            n = len(self._body) - self._offset
+        chunk = self._body[self._offset : self._offset + n]
+        self._offset += len(chunk)
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+captured: list[fg.urllib.request.Request] = []
+
+def fake_urlopen(req, timeout=None):
+    captured.append(req)
+    return FakeResp(req.get_full_url(), 200)
+
+
+fg.urllib.request.urlopen = fake_urlopen
+fg._allowlist_path = lambda: allowlist_path
+
+
+def accept_encoding(url: str) -> str | None:
+    captured.clear()
+    reason, _body, _meta = fg.fetch_with_meta(url, _emit=False)
+    if reason != fg.OK:
+        raise AssertionError(f"fetch unexpectedly failed for {url}: {reason}")
+    if len(captured) != 1:
+        raise AssertionError(f"expected exactly one request for {url}, got {len(captured)}")
+    return captured[0].headers.get("Accept-encoding")
+
+
+ec_encoding = accept_encoding("https://ec.europa.eu/commission/presscorner/api/rss?language=en")
+if ec_encoding:
+    raise AssertionError(f"ec.europa.eu fetch should be uncompressed, got Accept-Encoding: {ec_encoding}")
+
+bbc_encoding = accept_encoding("https://www.bbc.com/news/technology")
+if not bbc_encoding or "gzip" not in bbc_encoding:
+    raise AssertionError(f"bbc.com fetch should use compression, got Accept-Encoding: {bbc_encoding}")
+PY
 
 echo "PASS: europa fetch uses uncompressed path only for ec.europa.eu"

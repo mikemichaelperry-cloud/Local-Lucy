@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 URL_SAFETY="${ROOT}/tools/internet/url_safety.py"
-GATE="${ROOT}/tools/internet/run_fetch_with_gate.sh"
+GATE="${ROOT}/tools/internet/fetch_gate.py"
 
 ok(){ echo "OK: $*"; }
 die(){ echo "FAIL: $*" >&2; exit 1; }
@@ -32,70 +32,72 @@ ok "url_safety CLI blocks local/meta/ip-literal inputs"
 
 TMPD="$(mktemp -d)"
 trap 'rm -rf "${TMPD}"' EXIT
-FAKEBIN="${TMPD}/bin"
-mkdir -p "${FAKEBIN}"
-REAL_PYTHON3="$(command -v python3)"
+ALLOWLIST="${TMPD}/allowlist_fetch.txt"
+printf 'example.com\n' > "${ALLOWLIST}"
 
-cat > "${FAKEBIN}/curl" <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-outfile=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -o)
-      outfile="${2:-}"
-      shift 2
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-: "${outfile:?missing -o outfile}"
-printf 'fake body\n' > "${outfile}"
-final="${FAKE_CURL_FINAL_URL:-https://reuters.com/}"
-printf 'http_status=200 final_url=%s total_time_s=0.001 size_download=9 redirect_count=1 http_version=2\n' "${final}"
-exit 0
-SH
-chmod +x "${FAKEBIN}/curl"
+python3 - <<'PY' "${GATE}" "${ALLOWLIST}"
+import os
+import sys
+from io import StringIO
+from pathlib import Path
 
-cat > "${FAKEBIN}/python3" <<SH
-#!/usr/bin/env bash
-set -euo pipefail
-REAL_PYTHON3="${REAL_PYTHON3}"
-if [[ "\${1:-}" == "${ROOT}/tools/internet/url_safety.py" && "\${2:-}" == "validate-url" ]]; then
-  u="\${3:-}"
-  case "\$u" in
-    http://*) echo "ERR reason=https only"; exit 1 ;;
-    *127.0.0.1*|*169.254.169.254*|*\\[::1\\]*)
-      echo "ERR reason=forbidden"
-      exit 1
-      ;;
-    *)
-      echo "OK url=\$u host=example.com port=443"
-      exit 0
-      ;;
-  esac
-fi
-exec "\$REAL_PYTHON3" "\$@"
-SH
-chmod +x "${FAKEBIN}/python3"
+gate_path = Path(sys.argv[1])
+allowlist_path = Path(sys.argv[2])
+sys.path.insert(0, str(gate_path.parent))
+import fetch_gate as fg
 
-# Simulate redirect escape to localhost; unified URL safety should reject final URL with FAIL_POLICY.
-set +e
-gate_out="$(
-  PATH="${FAKEBIN}:$PATH" \
-  FAKE_CURL_FINAL_URL="http://127.0.0.1:8080/" \
-  "${GATE}" "https://reuters.com/" 2>&1
-)"
-gate_rc=$?
-set -e
-[[ "${gate_rc}" == "41" ]] || die "expected gate rc=41 for unsafe final redirect (got ${gate_rc})"
-printf '%s\n' "${gate_out}" | grep -q 'reason=FAIL_POLICY' || die "expected FAIL_POLICY in FETCH_META for unsafe final redirect"
+
+class FakeResp:
+    def __init__(self, url: str, code: int, body: bytes = b"ok") -> None:
+        self._url = url
+        self._code = code
+        self._body = body
+        self._offset = 0
+        self.headers = {}
+        self.redirects = 1
+
+    def getcode(self) -> int:
+        return self._code
+
+    def geturl(self) -> str:
+        return self._url
+
+    def read(self, n: int = -1) -> bytes:
+        if n < 0 or n > len(self._body) - self._offset:
+            n = len(self._body) - self._offset
+        chunk = self._body[self._offset : self._offset + n]
+        self._offset += len(chunk)
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def fake_urlopen(req, timeout=None):
+    return FakeResp("https://example.com/", 200)
+
+
+fg.urllib.request.urlopen = fake_urlopen
+fg._allowlist_path = lambda: allowlist_path
+os.environ["LUCY_FETCH_FORCE_FINAL_URL"] = "http://127.0.0.1:8080/"
+
+old_stderr = sys.stderr
+sys.stderr = StringIO()
+try:
+    rc = fg.main(["https://example.com/"])
+finally:
+    captured = sys.stderr.getvalue()
+    sys.stderr = old_stderr
+
+if rc != 41:
+    raise AssertionError(f"expected gate rc=41 for unsafe final redirect (got {rc})")
+if "reason=FAIL_POLICY" not in captured:
+    raise AssertionError(f"expected FAIL_POLICY in FETCH_META for unsafe final redirect: {captured}")
+PY
+
 ok "fetch gate uses unified URL safety for final redirect URL"
 
 echo "PASS: test_fetch_gate_url_safety_unified"

@@ -98,7 +98,7 @@ if python3 "${CONTROL_TOOL}" --state-file "${STATE_FILE}" set-augmented-provider
 fi
 grep -qi 'invalid choice' "${TMPD}/invalid_provider.err" || die "invalid provider error should mention invalid choice"
 
-LUCY_RUNTIME_STATE_FILE="${STATE_FILE_ENV}" python3 "${CONTROL_TOOL}" ensure-state >/dev/null
+LUCY_RUNTIME_NAMESPACE_ROOT="${TMPD}" LUCY_RUNTIME_STATE_FILE="${STATE_FILE_ENV}" python3 "${CONTROL_TOOL}" ensure-state >/dev/null
 python3 - <<'PY' "${STATE_FILE_ENV}"
 import json
 import sys
@@ -153,7 +153,7 @@ assert payload["augmented_availability"]["error_reason"] == "openai_network_erro
 assert "augmented_provider_external_unavailable" in payload["warning_codes"]
 PY
 
-LUCY_RUNTIME_STATE_FILE="${STATE_FILE_ENV}" python3 "${CONTROL_TOOL}" --state-file "${CLI_STATE_FILE}" ensure-state >/dev/null
+LUCY_RUNTIME_NAMESPACE_ROOT="${TMPD}" LUCY_RUNTIME_STATE_FILE="${STATE_FILE_ENV}" python3 "${CONTROL_TOOL}" --state-file "${CLI_STATE_FILE}" ensure-state >/dev/null
 python3 - <<'PY' "${STATE_FILE_ENV}" "${CLI_STATE_FILE}"
 import json
 import sys
