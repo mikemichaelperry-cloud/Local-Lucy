@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import sys
+from pathlib import Path
+
+TOOLS_DIR = Path(__file__).resolve().parent.parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from router_py.core.medical_query_heuristics import (
+    detect_human_medication_query,
+    is_human_medication_high_risk_query,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--is-human-medication-high-risk", dest="query", default=None)
+    parser.add_argument("--detect-human-medication", dest="detect_query", default=None)
+    args = parser.parse_args()
+
+    if args.detect_query is not None:
+        print(
+            json.dumps(
+                detect_human_medication_query(args.detect_query),
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+        return 0
+    if args.query is None:
+        return 2
+    return 0 if is_human_medication_high_risk_query(args.query) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

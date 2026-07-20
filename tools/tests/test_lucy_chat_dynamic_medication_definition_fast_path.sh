@@ -35,7 +35,8 @@ EOF
 cp "${REAL_ROOT}/tools/evidence_session.sh" "${FAKE_ROOT}/tools/evidence_session.sh"
 cp "${REAL_ROOT}/tools/build_evidence_pack.sh" "${FAKE_ROOT}/tools/build_evidence_pack.sh"
 cp "${REAL_ROOT}/tools/fetch_key.sh" "${FAKE_ROOT}/tools/fetch_key.sh"
-cp "${REAL_ROOT}/tools/router/medical_query_heuristics.py" "${FAKE_ROOT}/tools/router/medical_query_heuristics.py"
+mkdir -p "${FAKE_ROOT}/tools/router_py"
+cp "${REAL_ROOT}/tools/router_py/medical_query_heuristics_cli.py" "${FAKE_ROOT}/tools/router_py/medical_query_heuristics_cli.py"
 cp "${REAL_ROOT}/tools/router_py/core/medical_query_heuristics.py" "${FAKE_ROOT}/tools/router_py/core/medical_query_heuristics.py"
 
 cat > "${FAKE_ROOT}/tools/fetch_url_allowlisted.sh" <<'SH'
@@ -82,7 +83,7 @@ chmod +x \
   "${FAKE_ROOT}/tools/fetch_url_allowlisted.sh" \
   "${FAKE_ROOT}/tools/compose_from_evidence.sh" \
   "${FAKE_ROOT}/tools/print_validated.sh" \
-  "${FAKE_ROOT}/tools/router/medical_query_heuristics.py"
+  "${FAKE_ROOT}/tools/router_py/medical_query_heuristics_cli.py"
 
 out="$(LUCY_ROOT="${FAKE_ROOT}" LUCY_ROUTER_BYPASS=1 LUCY_CHAT_FORCE_MODE=EVIDENCE LUCY_FETCH_URL_TOOL="${FAKE_ROOT}/tools/fetch_url_allowlisted.sh" "${LUCY_CHAT}" "What is lisinopril?")"
 printf '%s\n' "${out}" | grep -q "lisinopril is a medication covered by the retrieved trusted medical sources." || die "missing generic medication definition answer"
