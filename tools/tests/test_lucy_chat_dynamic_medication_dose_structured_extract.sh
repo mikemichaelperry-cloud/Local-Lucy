@@ -35,8 +35,9 @@ EOF
 cp "${REAL_ROOT}/tools/evidence_session.sh" "${FAKE_ROOT}/tools/evidence_session.sh"
 cp "${REAL_ROOT}/tools/build_evidence_pack.sh" "${FAKE_ROOT}/tools/build_evidence_pack.sh"
 cp "${REAL_ROOT}/tools/fetch_key.sh" "${FAKE_ROOT}/tools/fetch_key.sh"
-cp "${REAL_ROOT}/tools/router/medical_query_heuristics.py" "${FAKE_ROOT}/tools/router/medical_query_heuristics.py"
-cp "${REAL_ROOT}/tools/router/extract_medical_fact.py" "${FAKE_ROOT}/tools/router/extract_medical_fact.py"
+mkdir -p "${FAKE_ROOT}/tools/router_py"
+cp "${REAL_ROOT}/tools/router_py/medical_query_heuristics_cli.py" "${FAKE_ROOT}/tools/router_py/medical_query_heuristics_cli.py"
+cp "${REAL_ROOT}/tools/router_py/extract_medical_fact_cli.py" "${FAKE_ROOT}/tools/router_py/extract_medical_fact_cli.py"
 cp "${REAL_ROOT}/tools/router_py/core/medical_query_heuristics.py" "${FAKE_ROOT}/tools/router_py/core/medical_query_heuristics.py"
 cp "${REAL_ROOT}/tools/router_py/core/medical_fact_extractor.py" "${FAKE_ROOT}/tools/router_py/core/medical_fact_extractor.py"
 
@@ -95,7 +96,8 @@ chmod +x \
   "${FAKE_ROOT}/tools/fetch_url_allowlisted.sh" \
   "${FAKE_ROOT}/tools/compose_from_evidence.sh" \
   "${FAKE_ROOT}/tools/print_validated.sh" \
-  "${FAKE_ROOT}/tools/router/medical_query_heuristics.py"
+  "${FAKE_ROOT}/tools/router_py/medical_query_heuristics_cli.py" \
+  "${FAKE_ROOT}/tools/router_py/extract_medical_fact_cli.py"
 
 out="$(LUCY_ROOT="${FAKE_ROOT}" LUCY_ROUTER_BYPASS=1 LUCY_CHAT_FORCE_MODE=EVIDENCE LUCY_FETCH_URL_TOOL="${FAKE_ROOT}/tools/fetch_url_allowlisted.sh" "${LUCY_CHAT}" "Dose of lisinopril?")"
 printf '%s\n' "${out}" | grep -q "The retrieved evidence for lisinopril includes this dosing statement: Usual adult dose is 10 mg once daily" || die "missing structured dose answer"
