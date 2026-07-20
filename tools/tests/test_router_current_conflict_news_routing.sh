@@ -70,11 +70,11 @@ import sys
 from pathlib import Path
 
 path = sys.argv[1]
-sys.path.insert(0, str(Path(path).resolve().parents[1]))
-spec = importlib.util.spec_from_file_location("contextual_policy", path)
+sys.path.insert(0, str(Path(path).resolve().parents[2]))
+spec = importlib.util.spec_from_file_location("router_py.core.contextual_policy", path)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-out = mod.resolve_contextual_followup("And what about Lebanon?", "/home/mike/lucy-v10")
+out = mod.resolve_contextual_followup("And what about Lebanon?", "${ROOT}")
 print("" if out is None else out.get("contextual_followup_kind", ""))
 PY
 )"
