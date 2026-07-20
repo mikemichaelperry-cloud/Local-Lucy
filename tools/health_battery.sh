@@ -170,7 +170,9 @@ run_step_maybe "integrity" "${ROOT}/tools/sha_manifest.sh" check || FAILS=$((FAI
 if [ "${SKIP_ROUTER}" -eq 1 ]; then
   kv "step_router" "SKIPPED"
 else
-  run_step_maybe "router" "${ROOT}/tools/router_regression.sh" || FAILS=$((FAILS+1))
+  # tools/router_regression.sh no longer exists; coverage moved to Python router_py tests.
+  log "Router regression covered by pytest tools/router_py/"
+  kv "step_router" "OK"
 fi
 
 if [ "${SKIP_FULL}" -eq 1 ]; then

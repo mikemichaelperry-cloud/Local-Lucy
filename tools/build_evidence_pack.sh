@@ -4,14 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DEFAULT="$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)"
 ROOT="${LUCY_ROOT:-$ROOT_DEFAULT}"
-LATPROF_LIB="${ROOT}/tools/router/latency_profile.sh"
-if [[ -f "${LATPROF_LIB}" ]]; then
-  # shellcheck disable=SC1090
-  source "${LATPROF_LIB}"
-else
-  latprof_now_ms(){ date +%s000; }
-  latprof_append(){ return 0; }
-fi
+# tools/router/latency_profile.sh no longer exists; keep no-op fallbacks.
+latprof_now_ms(){ date +%s000; }
+latprof_append(){ return 0; }
 
 STATE_DIR="${LUCY_STATE_DIR:-$HOME/lucy/state}"
 CACHE_DIR="${LUCY_CACHE_DIR:-$HOME/lucy/cache/evidence}"

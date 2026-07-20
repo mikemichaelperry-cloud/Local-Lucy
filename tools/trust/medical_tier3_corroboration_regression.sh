@@ -23,11 +23,8 @@ if bad:
     raise SystemExit('tier3 without requires_corroboration: ' + ', '.join(bad))
 PY
 q='Does tadalafil affect arrhythmia risk?'
-if [[ -x "$ROOT/tools/router/execute_plan.sh" ]]; then
-  out="$(LUCY_ROUTE_CONTROL_MODE=FORCED_OFFLINE "$ROOT/tools/router/execute_plan.sh" "$q" 2>&1 || true)"
-else
-  out="$(LUCY_ENABLE_INTERNET=0 "$ROOT/lucy_chat.sh" "$q" 2>&1 || true)"
-fi
+# tools/router/execute_plan.sh no longer exists; use lucy_chat.sh fallback.
+out="$(LUCY_ENABLE_INTERNET=0 "$ROOT/lucy_chat.sh" "$q" 2>&1 || true)"
 printf '%s\n' "$out" | grep -q '^BEGIN_VALIDATED$' || { echo "ERR: no validated block" >&2; exit 1; }
 printf '%s\n' "$out" | grep -q '^Insufficient evidence from trusted sources\.$' || { echo "ERR: no insufficient evidence line" >&2; exit 1; }
 echo "PASS: medical_tier3_corroboration_regression (simulated via high-stakes source-shortage + tier3 flag checks)"
