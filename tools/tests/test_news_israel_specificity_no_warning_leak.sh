@@ -16,8 +16,8 @@ trap 'rm -rf "${TMPD}"' EXIT
 FAKE_ROOT="${TMPD}/root"
 mkdir -p "${FAKE_ROOT}/tools" "${FAKE_ROOT}/tools/router_py/core" "${FAKE_ROOT}/config" "${FAKE_ROOT}/state" "${FAKE_ROOT}/evidence" "${FAKE_ROOT}/cache/evidence"
 
-cp "${REAL_ROOT}/tools/router/classify_intent.py" "${FAKE_ROOT}/tools/router/classify_intent.py"
-cp "${REAL_ROOT}/tools/router/plan_to_pipeline.py" "${FAKE_ROOT}/tools/router/plan_to_pipeline.py"
+cp "${REAL_ROOT}/tools/router_py/classify_intent_cli.py" "${FAKE_ROOT}/tools/router_py/classify_intent_cli.py"
+cp "${REAL_ROOT}/tools/router_py/plan_to_pipeline_cli.py" "${FAKE_ROOT}/tools/router_py/plan_to_pipeline_cli.py"
 cp "${REAL_ROOT}/tools/router_py/core/"*.py "${FAKE_ROOT}/tools/router_py/core/"
 
 cat > "${FAKE_ROOT}/config/evidence_keys_allowlist.txt" <<'EOF'
@@ -117,7 +117,7 @@ exit 0
 SH
 
 chmod +x "${FAKE_ROOT}/tools/"*
-chmod +x "${FAKE_ROOT}/tools/router/"*.py
+chmod +x "${FAKE_ROOT}/tools/router_py/"*.py
 
 run_out="$(
   LUCY_ROOT="${FAKE_ROOT}" \
@@ -146,7 +146,7 @@ printf '%s\n' "${keys}" | grep -q 'news_israel_2' || die "expected israel key"
 printf '%s\n' "${keys}" | grep -q 'news_world_' && die "specific israel mapping should prevent generic news key accumulation"
 ok "israel-news mapping specificity prevents generic news key contamination"
 
-strict_plan="$("${FAKE_ROOT}/tools/router/classify_intent.py" "What is the latest news from only Israeli sources?")"
+strict_plan="$("${FAKE_ROOT}/tools/router_py/classify_intent_cli.py" "What is the latest news from only Israeli sources?")"
 strict_allow="$(python3 - "${strict_plan}" <<'PY'
 import json,sys
 print(json.loads(sys.argv[1]).get("allow_domains_file","") or "")
@@ -155,7 +155,7 @@ PY
 [[ "${strict_allow}" == "config/trust/generated/news_israel_only_runtime.txt" ]] || die "strict Israeli-source request should route to news_israel_only_runtime.txt (got: ${strict_allow})"
 ok "strict Israeli-source query routes to Israeli-only domain allowlist"
 
-typo_plan="$("${FAKE_ROOT}/tools/router/classify_intent.py" "Whats the latest Iraeli news?")"
+typo_plan="$("${FAKE_ROOT}/tools/router_py/classify_intent_cli.py" "Whats the latest Iraeli news?")"
 typo_allow="$(python3 - "${typo_plan}" <<'PY'
 import json,sys
 print(json.loads(sys.argv[1]).get("allow_domains_file","") or "")

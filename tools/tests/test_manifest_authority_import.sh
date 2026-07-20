@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
-PLAN_TO_PIPELINE="${ROOT}/tools/router/plan_to_pipeline.py"
+PLAN_TO_PIPELINE="${ROOT}/tools/router_py/plan_to_pipeline_cli.py"
 EXPECTED_MANIFEST="${ROOT}/tools/router_py/core/route_manifest.py"
 
 ok(){ echo "OK: $*"; }
@@ -27,7 +27,7 @@ spec = importlib.util.spec_from_file_location("plan_to_pipeline_under_test", pla
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module
 spec.loader.exec_module(module)
-route_manifest = sys.modules["route_manifest"]
+route_manifest = sys.modules["router_py.core.route_manifest"]
 assert Path(route_manifest.__file__).resolve() == expected_manifest
 
 override_root = expected_root.parent / "tmp" / "plan_to_pipeline_override_check"

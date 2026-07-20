@@ -16,8 +16,8 @@ trap 'rm -rf "${TMPD}"' EXIT
 FAKE_ROOT="${TMPD}/root"
 mkdir -p "${FAKE_ROOT}/tools" "${FAKE_ROOT}/tools/router_py/core" "${FAKE_ROOT}/config" "${FAKE_ROOT}/state" "${FAKE_ROOT}/evidence" "${FAKE_ROOT}/cache/evidence"
 
-cp "${REAL_ROOT}/tools/router/classify_intent.py" "${FAKE_ROOT}/tools/router/classify_intent.py"
-cp "${REAL_ROOT}/tools/router/plan_to_pipeline.py" "${FAKE_ROOT}/tools/router/plan_to_pipeline.py"
+cp "${REAL_ROOT}/tools/router_py/classify_intent_cli.py" "${FAKE_ROOT}/tools/router_py/classify_intent_cli.py"
+cp "${REAL_ROOT}/tools/router_py/plan_to_pipeline_cli.py" "${FAKE_ROOT}/tools/router_py/plan_to_pipeline_cli.py"
 cp "${REAL_ROOT}/tools/router_py/core/"*.py "${FAKE_ROOT}/tools/router_py/core/"
 
 cat > "${FAKE_ROOT}/config/query_to_keys.tsv" <<'EOF'
@@ -101,7 +101,7 @@ exit 0
 SH
 
 chmod +x "${FAKE_ROOT}/tools/"*
-chmod +x "${FAKE_ROOT}/tools/router/"*.py
+chmod +x "${FAKE_ROOT}/tools/router_py/"*.py
 
 write_allowlist_with_au(){
   cat > "${FAKE_ROOT}/config/evidence_keys_allowlist.txt" <<'EOF'

@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
-MAPPER="${ROOT}/tools/router/plan_to_pipeline.py"
+MAPPER="${ROOT}/tools/router_py/plan_to_pipeline_cli.py"
 
 ok(){ echo "OK: $*"; }
 die(){ echo "FAIL: $*" >&2; exit 1; }

@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
 export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
-CLASSIFIER="${ROOT}/tools/router/classify_intent.py"
+CLASSIFIER="${ROOT}/tools/router_py/classify_intent_cli.py"
 GATE="${ROOT}/tools/internet/run_fetch_with_gate.sh"
 MEDICAL_ALLOWLIST="${ROOT}/config/trust/generated/medical_runtime.txt"
 

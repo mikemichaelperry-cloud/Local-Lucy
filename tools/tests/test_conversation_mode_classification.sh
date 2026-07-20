@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${LUCY_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)}"
 export PYTHONPATH="${ROOT}/tools${PYTHONPATH:+:${PYTHONPATH}}"
-CLASSIFIER="${ROOT}/tools/router/classify_intent.py"
+CLASSIFIER="${ROOT}/tools/router_py/classify_intent_cli.py"
 
 needx(){ [[ -x "$1" ]] || { echo "ERR: missing executable: $1" >&2; exit 2; }; }
 needx "$CLASSIFIER"
