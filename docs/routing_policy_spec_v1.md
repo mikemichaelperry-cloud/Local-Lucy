@@ -7,7 +7,7 @@ This specification defines the centralized routing policy for Local Lucy stage: 
 
 ## Canonical rule
 - `auto` is the canonical routing behavior.
-- All routing decisions are produced by a single policy engine: `tools/router/policy_engine.py`.
+- All routing decisions are produced by a single policy engine: `tools/router_py/core/policy_engine.py`.
 - Surfaces (CLI, conversation, voice) may change UX behavior only, not route policy.
 
 ## Policy inputs

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # DEPRECATED: This test validates the legacy shell-based router pipeline
-# (tools/router_py/classify_intent_cli.py + plan_to_pipeline.py), which is no longer
+# (tools/router_py/classify_intent_cli.py + plan_to_pipeline_cli.py), which is no longer
 # the authoritative routing path. The Python-native router (tools/router_py/)
 # replaced this pipeline in Stage 9 of the refactor and is covered by 550+
 # unit/integration tests. This test is preserved for reference but is NOT

@@ -88,10 +88,11 @@ lucy-v11/
 │   ├── context_guard.py
 │   ├── feedback_buffer.py
 │   ├── providers/
-│   └── core/                  # Semantic interpreter / intent classifier
+│   └── core/                  # Semantic interpreter / intent classifier / policy engine
 │       ├── intent_classifier.py
 │       ├── semantic_interpreter.py
-│       └── policy_router.py
+│       ├── policy_router.py
+│       └── policy_engine.py
 ├── tools/memory/              # SQLite memory service
 │   └── memory_service.py
 ├── tools/voice/               # Whisper STT, Kokoro/Piper/Edge TTS
