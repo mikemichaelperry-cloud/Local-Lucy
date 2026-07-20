@@ -1,4 +1,3 @@
-import json
 import re
 
 
@@ -7,7 +6,7 @@ def clean(s: str) -> str:
     return "\n".join([ln.rstrip() for ln in s.splitlines()])
 
 
-def parse(text: str):
+def parse(text: str) -> dict:
     raw = clean(text)
     lines = raw.splitlines()
     out = {
