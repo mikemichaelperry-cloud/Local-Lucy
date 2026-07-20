@@ -87,7 +87,8 @@ chmod +x \
   "${FAKE_ROOT}/tools/fetch_url_allowlisted.sh" \
   "${FAKE_ROOT}/tools/compose_from_evidence.sh" \
   "${FAKE_ROOT}/tools/print_validated.sh" \
-  "${FAKE_ROOT}/tools/router_py/medical_query_heuristics_cli.py"
+  "${FAKE_ROOT}/tools/router_py/medical_query_heuristics_cli.py" \
+  "${FAKE_ROOT}/tools/router_py/extract_medical_fact_cli.py"
 
 out="$(LUCY_ROOT="${FAKE_ROOT}" LUCY_ROUTER_BYPASS=1 LUCY_CHAT_FORCE_MODE=EVIDENCE LUCY_FETCH_URL_TOOL="${FAKE_ROOT}/tools/fetch_url_allowlisted.sh" "${LUCY_CHAT}" "Does lisinopril interact with grapefruit?")"
 printf '%s\n' "${out}" | grep -q "Unable to provide a bounded medication interaction answer from current evidence." || die "missing fail-closed interaction response"
