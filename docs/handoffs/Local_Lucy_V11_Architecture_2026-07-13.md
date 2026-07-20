@@ -8,6 +8,8 @@
 > This document describes **v11 as implemented**. Hebrew / Racheli support has been removed from the primary runtime; the standalone Hebrew assistant was archived separately on 2026-07-10.
 >
 > Latest commits on `v10-dev`: Gemma 4 12B integration + smart-routing bypass (`357ce55`), low-VRAM warning (`fce4aa4`), heartbeat retargeting + HMI recursion guard (`<this-session>`).
+>
+> **Historical note:** This handoff predates the Phase 5 migration that removed the legacy `tools/router/` directory in favor of `tools/router_py/`. References to `tools/router/` below are historical.
 
 ---
 

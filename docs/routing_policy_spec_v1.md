@@ -1,5 +1,7 @@
 # Routing Policy Specification v1
 
+> **Historical note:** This specification predates the Phase 5 migration that removed the legacy `tools/router/` directory in favor of `tools/router_py/`. References to `tools/router/` below are historical; the active policy engine now lives under `tools/router_py/core/`.
+
 ## Scope
 This specification defines the centralized routing policy for Local Lucy stage: Routing Policy Consolidation.
 

@@ -92,10 +92,6 @@ lucy-v11/
 │       ├── intent_classifier.py
 │       ├── semantic_interpreter.py
 │       └── policy_router.py
-├── tools/router/              # Legacy shell-test wrapper scripts (delegates to router_py)
-│   ├── classify_intent.py
-│   ├── extract_medical_fact.py
-│   └── plan_to_pipeline.py
 ├── tools/memory/              # SQLite memory service
 │   └── memory_service.py
 ├── tools/voice/               # Whisper STT, Kokoro/Piper/Edge TTS

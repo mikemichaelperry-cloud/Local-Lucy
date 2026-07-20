@@ -338,7 +338,6 @@ Local-Lucy/
 │   ├── logging_config.py   # Structured JSON logging
 │   ├── feedback_parser.py  # NL feedback detection
 │   └── test_*.py           # Comprehensive test suite
-├── tools/router/           # Legacy shell-test wrappers (delegate to router_py)
 ├── models/router/          # Embedding model & learner
 │   ├── hybrid_router_v2.py # MiniLM-L6-v2 routing
 │   ├── background_learner.py
