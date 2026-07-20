@@ -212,43 +212,88 @@ def ensure_control_env() -> None:
     """
     Ensure control environment variables reflect the current state file.
 
-    This is the single source of truth for control toggles: the process env is
-    overwritten from current_state.json on every call so that HMI toggles always
-    drive live process behavior. Callers must re-read these env vars after this
-    function returns.
+    The state file is the authoritative source when no explicit environment
+    override is present (e.g. from the HMI).  Explicit environment values are
+    preserved so tests and CLI one-shots can override state without editing
+    current_state.json.
     """
+    # Snapshot explicit environment overrides before touching them.
+    env_overrides = {
+        "LUCY_EVIDENCE_ENABLED": os.environ.get("LUCY_EVIDENCE_ENABLED"),
+        "LUCY_ENABLE_INTERNET": os.environ.get("LUCY_ENABLE_INTERNET"),
+        "LUCY_AUGMENTATION_POLICY": os.environ.get("LUCY_AUGMENTATION_POLICY"),
+        "LUCY_AUGMENTED_PROVIDER": os.environ.get("LUCY_AUGMENTED_PROVIDER"),
+        "LUCY_CONVERSATION_MODE_FORCE": os.environ.get("LUCY_CONVERSATION_MODE_FORCE"),
+        "LUCY_SESSION_MEMORY": os.environ.get("LUCY_SESSION_MEMORY"),
+        "LUCY_VOICE_ENABLED": os.environ.get("LUCY_VOICE_ENABLED"),
+        "LUCY_MODEL": os.environ.get("LUCY_MODEL"),
+        "LUCY_LOCAL_MODEL": os.environ.get("LUCY_LOCAL_MODEL"),
+        "LUCY_GEMMA4_SMART_ROUTING": os.environ.get("LUCY_GEMMA4_SMART_ROUTING"),
+    }
+
     state = load_state_from_file()
     if not state:
+        # Apply safe defaults when no state file exists, without clobbering
+        # explicit environment overrides.
+        defaults = {
+            "LUCY_EVIDENCE_ENABLED": "1",
+            "LUCY_ENABLE_INTERNET": "1",
+            "LUCY_AUGMENTATION_POLICY": "disabled",
+            "LUCY_AUGMENTED_PROVIDER": "wikipedia",
+            "LUCY_CONVERSATION_MODE_FORCE": "0",
+            "LUCY_SESSION_MEMORY": "0",
+            "LUCY_VOICE_ENABLED": "0",
+            "LUCY_MODEL": "local-lucy-llama31",
+            "LUCY_LOCAL_MODEL": "local-lucy-llama31",
+            "LUCY_GEMMA4_SMART_ROUTING": "0",
+        }
+        for key, default in defaults.items():
+            if env_overrides.get(key) is None:
+                os.environ[key] = default
         return
 
     evidence = state.get("evidence", "off")
-    os.environ["LUCY_EVIDENCE_ENABLED"] = "1" if evidence in ("on", "true", "1") else "0"
-    # Mirror evidence for the legacy internet flag.
-    os.environ["LUCY_ENABLE_INTERNET"] = os.environ["LUCY_EVIDENCE_ENABLED"]
+    if env_overrides.get("LUCY_EVIDENCE_ENABLED") is None:
+        os.environ["LUCY_EVIDENCE_ENABLED"] = (
+            "1" if evidence in ("on", "true", "1") else "0"
+        )
+    if env_overrides.get("LUCY_ENABLE_INTERNET") is None:
+        # Mirror evidence for the legacy internet flag.
+        os.environ["LUCY_ENABLE_INTERNET"] = os.environ.get("LUCY_EVIDENCE_ENABLED", "0")
 
     policy = state.get("augmentation_policy", "disabled")
-    os.environ["LUCY_AUGMENTATION_POLICY"] = policy
+    if env_overrides.get("LUCY_AUGMENTATION_POLICY") is None:
+        os.environ["LUCY_AUGMENTATION_POLICY"] = policy
 
     provider = state.get("augmented_provider", "wikipedia")
-    os.environ["LUCY_AUGMENTED_PROVIDER"] = provider
+    if env_overrides.get("LUCY_AUGMENTED_PROVIDER") is None:
+        os.environ["LUCY_AUGMENTED_PROVIDER"] = provider
 
     conv = state.get("conversation", "off")
-    os.environ["LUCY_CONVERSATION_MODE_FORCE"] = "1" if conv in ("on", "true", "1") else "0"
+    if env_overrides.get("LUCY_CONVERSATION_MODE_FORCE") is None:
+        os.environ["LUCY_CONVERSATION_MODE_FORCE"] = (
+            "1" if conv in ("on", "true", "1") else "0"
+        )
 
     mem = state.get("memory", "off")
-    os.environ["LUCY_SESSION_MEMORY"] = "1" if mem in ("on", "true", "1") else "0"
+    if env_overrides.get("LUCY_SESSION_MEMORY") is None:
+        os.environ["LUCY_SESSION_MEMORY"] = "1" if mem in ("on", "true", "1") else "0"
 
     voice = state.get("voice", "off")
-    os.environ["LUCY_VOICE_ENABLED"] = "1" if voice in ("on", "true", "1") else "0"
+    if env_overrides.get("LUCY_VOICE_ENABLED") is None:
+        os.environ["LUCY_VOICE_ENABLED"] = "1" if voice in ("on", "true", "1") else "0"
 
     model = state.get("model", "local-lucy-llama31")
-    os.environ["LUCY_MODEL"] = model
-    os.environ["LUCY_LOCAL_MODEL"] = model
+    if env_overrides.get("LUCY_MODEL") is None:
+        os.environ["LUCY_MODEL"] = model
+    if env_overrides.get("LUCY_LOCAL_MODEL") is None:
+        os.environ["LUCY_LOCAL_MODEL"] = model
 
     gemma4_smart_routing = state.get("gemma4_smart_routing", "off")
-    os.environ["LUCY_GEMMA4_SMART_ROUTING"] = (
-        "1" if gemma4_smart_routing in ("on", "true", "1") else "0"
-    )
+    if env_overrides.get("LUCY_GEMMA4_SMART_ROUTING") is None:
+        os.environ["LUCY_GEMMA4_SMART_ROUTING"] = (
+            "1" if gemma4_smart_routing in ("on", "true", "1") else "0"
+        )
 
 
 def _persist_memory_turn(question: str, response_text: str, session_id: str = "default") -> None:

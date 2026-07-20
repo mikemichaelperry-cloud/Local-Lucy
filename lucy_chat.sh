@@ -33,8 +33,9 @@ LOCAL_WORKER="${SCRIPT_DIR}/tools/local_worker.py"
 # Environment defaults - NOW DEFAULT TO PYTHON
 export LUCY_LOCAL_MODEL="${LUCY_LOCAL_MODEL:-local-lucy}"
 export LUCY_OLLAMA_API_URL="${LUCY_OLLAMA_API_URL:-http://127.0.0.1:11434/api/generate}"
-export LUCY_ENABLE_INTERNET="${LUCY_ENABLE_INTERNET:-1}"
-export LUCY_AUGMENTATION_POLICY="${LUCY_AUGMENTATION_POLICY:-disabled}"
+# Control toggles (evidence/augmentation) are loaded from current_state.json by
+# the Python router.  Do not hard-code defaults here; that prevents the state
+# file from being the single source of truth and breaks test overrides.
 export LUCY_ROUTER_PY="${LUCY_ROUTER_PY:-1}"
 export LUCY_EXEC_PY="${LUCY_EXEC_PY:-1}"
 

@@ -4,9 +4,19 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DEFAULT="$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)"
 ROOT="${LUCY_ROOT:-$ROOT_DEFAULT}"
-# tools/router/latency_profile.sh no longer exists; keep no-op fallbacks.
+# tools/router/latency_profile.sh no longer exists; keep inline fallbacks.
 latprof_now_ms(){ date +%s000; }
-latprof_append(){ return 0; }
+latprof_append(){
+  # Inline latency-appender so standalone runs still produce profiles when asked.
+  [ "${LUCY_LATENCY_PROFILE_ACTIVE:-0}" = "1" ] || return 0
+  local path="${LUCY_LATENCY_PROFILE_FILE:-}"
+  [ -n "$path" ] || return 0
+  local component="${1:-}" stage="${2:-}" ms="${3:-}"
+  local run_id="${LUCY_LATENCY_RUN_ID:-}"
+  mkdir -p "$(dirname "$path")"
+  printf 'run=%s\tcomponent=%s\tstage=%s\tms=%s\n' \
+    "$run_id" "$component" "$stage" "$ms" >> "$path"
+}
 
 STATE_DIR="${LUCY_STATE_DIR:-$HOME/lucy/state}"
 CACHE_DIR="${LUCY_CACHE_DIR:-$HOME/lucy/cache/evidence}"

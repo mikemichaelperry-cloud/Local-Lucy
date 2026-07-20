@@ -48,6 +48,7 @@ from router_py.request_types import (
 # Routing & classification
 # ---------------------------------------------------------------------------
 from router_py.classify import classify_intent, select_route
+from router_py.core.medical_query_heuristics import detect_human_medication_query
 from router_py.policy import normalize_augmentation_policy, provider_usage_class_for
 
 # ---------------------------------------------------------------------------
@@ -133,6 +134,108 @@ def _gemma4_bypass_decision(question: str) -> tuple[ClassificationResult, Routin
     return classification, decision
 
 
+# ---------------------------------------------------------------------------
+# Legacy shell-bypass env-var support (LUCY_ROUTER_BYPASS / LUCY_CHAT_FORCE_MODE)
+# ---------------------------------------------------------------------------
+
+
+def _is_truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "on", "yes")
+
+
+def _forced_route_from_env(question: str) -> str | None:
+    """Return the route forced by LUCY_CHAT_FORCE_MODE, or None if not bypassed."""
+    if not _is_truthy_env("LUCY_ROUTER_BYPASS"):
+        return None
+    forced = os.environ.get("LUCY_CHAT_FORCE_MODE", "").strip().upper()
+    if forced in ("LOCAL", "NEWS", "EVIDENCE", "AUGMENTED", "FULL", "TIME", "WEATHER", "FINANCE", "CLARIFY"):
+        return forced
+    # Infer from query when bypass is requested without an explicit mode.
+    q = (question or "").lower()
+    if re.search(r"\b(news|headlines|latest news|breaking news)\b", q):
+        return "NEWS"
+    return None
+
+
+def _bypass_classification_decision(
+    question: str, route: str
+) -> tuple[ClassificationResult, RoutingDecision]:
+    """Create classification + routing decision for a bypass/forced route."""
+    q = (question or "").lower()
+    route_providers = {
+        "LOCAL": "local",
+        "NEWS": "news",
+        "EVIDENCE": "trusted",
+        "AUGMENTED": os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia").strip().lower() or "wikipedia",
+        "FULL": os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia").strip().lower() or "wikipedia",
+        "TIME": "time",
+        "WEATHER": "weather",
+        "FINANCE": "finance",
+        "CLARIFY": "local",
+    }
+    provider = route_providers.get(route, "local")
+
+    if route == "NEWS":
+        intent_family = "current_fact"
+        evidence_reason = "news_query"
+    elif route in ("WEATHER",):
+        intent_family = "current_fact"
+        evidence_reason = "weather_query"
+    elif route in ("TIME",):
+        intent_family = "current_fact"
+        evidence_reason = "time_query"
+    elif route == "FINANCE":
+        intent_family = "current_fact"
+        evidence_reason = "financial_data"
+    elif route == "EVIDENCE":
+        med_detector = detect_human_medication_query(q)
+        if med_detector.get("detector_fired") or re.search(
+            r"\b(medical|medication|medicine|drug|dose|dosage|side effect|interaction|contraindication)\b",
+            q,
+        ):
+            intent_family = "evidence_check"
+            evidence_reason = "medical_context"
+        elif re.search(r"\b(stock|finance|currency|exchange rate|market|economy)\b", q):
+            intent_family = "current_fact"
+            evidence_reason = "financial_data"
+        else:
+            intent_family = "evidence_check"
+            evidence_reason = "source_request"
+    elif route == "AUGMENTED":
+        intent_family = "background_overview"
+        evidence_reason = "source_request"
+    elif route == "FULL":
+        intent_family = "background_overview"
+        evidence_reason = "source_request"
+    else:
+        intent_family = "local_knowledge"
+        evidence_reason = ""
+
+    classification = ClassificationResult(
+        intent=intent_family,
+        intent_family=intent_family,
+        intent_class="bypass",
+        confidence=1.0,
+        evidence_reason=evidence_reason,
+        needs_web=route not in ("LOCAL", "CLARIFY"),
+    )
+    decision = RoutingDecision(
+        route=route,
+        mode="FORCED",
+        intent_family=intent_family,
+        confidence=1.0,
+        provider=provider,
+        provider_usage_class=provider_usage_class_for(provider),
+        evidence_mode="required" if route not in ("LOCAL", "CLARIFY") else "",
+        evidence_reason=evidence_reason,
+        requires_evidence=route not in ("LOCAL", "CLARIFY"),
+        policy_reason="env_bypass",
+        decision_stage="env_override",
+        reason_code="LUCY_ROUTER_BYPASS",
+    )
+    return classification, decision
+
+
 def _looks_like_news(query: str) -> bool:
     return bool(_NEWS_RE.search(query))
 
@@ -187,86 +290,93 @@ def process(
     start_time = _time.time()
 
     # ------------------------------------------------------------------
-    # 0. Gemma 4 smart-routing bypass
+    # 0. Environment bypass (LUCY_ROUTER_BYPASS / LUCY_CHAT_FORCE_MODE)
     # ------------------------------------------------------------------
-    active_model = (
-        model or os.environ.get("LUCY_MODEL", "") or os.environ.get("LUCY_LOCAL_MODEL", "")
-    )
-    # Engineering / self-analysis mode must not be bypassed, even by smart routing.
-    _self_analysis_ref = _self_analysis_file_reference(question)
-    if (
-        classification is None
-        and decision is None
-        and _is_gemma4_smart_routing_enabled(active_model)
-        and not route_prefix
-        and _self_analysis_ref is None
-    ):
-        if _looks_like_news(question):
-            route_prefix = "NEWS"
-        elif _looks_like_evidence(question):
-            route_prefix = "EVIDENCE"
-        else:
-            classification, decision = _gemma4_bypass_decision(question)
+    forced_route = _forced_route_from_env(question)
+    if forced_route:
+        classification, decision = _bypass_classification_decision(question, forced_route)
+    else:
+        # ------------------------------------------------------------------
+        # 0b. Gemma 4 smart-routing bypass
+        # ------------------------------------------------------------------
+        active_model = (
+            model or os.environ.get("LUCY_MODEL", "") or os.environ.get("LUCY_LOCAL_MODEL", "")
+        )
+        # Engineering / self-analysis mode must not be bypassed, even by smart routing.
+        _self_analysis_ref = _self_analysis_file_reference(question)
+        if (
+            classification is None
+            and decision is None
+            and _is_gemma4_smart_routing_enabled(active_model)
+            and not route_prefix
+            and _self_analysis_ref is None
+        ):
+            if _looks_like_news(question):
+                route_prefix = "NEWS"
+            elif _looks_like_evidence(question):
+                route_prefix = "EVIDENCE"
+            else:
+                classification, decision = _gemma4_bypass_decision(question)
 
-    # ------------------------------------------------------------------
-    # 1. Classify (skipped if caller provides classification)
-    # ------------------------------------------------------------------
-    if classification is None:
-        _t0 = _time.time()
-        try:
-            classification = classify_intent(question, surface=surface)
-            if _profiling:
-                _profile["classify_ms"] = int((_time.time() - _t0) * 1000)
-        except Exception as exc:
-            logger.exception("Classification failed")
-            execution_time = int((_time.time() - start_time) * 1000)
-            outcome = RouterOutcome(
-                status="failed",
-                outcome_code="classification_error",
-                route="LOCAL",
-                provider="local",
-                provider_usage_class="local",
-                intent_family="unknown",
-                confidence=0.0,
-                error_message=f"Classification failed: {exc}",
-                execution_time_ms=execution_time,
-                evidence_reason="",
-                policy_reason="classification_failed",
-            )
-            return outcome, None, None
+        # ------------------------------------------------------------------
+        # 1. Classify (skipped if caller provides classification)
+        # ------------------------------------------------------------------
+        if classification is None:
+            _t0 = _time.time()
+            try:
+                classification = classify_intent(question, surface=surface)
+                if _profiling:
+                    _profile["classify_ms"] = int((_time.time() - _t0) * 1000)
+            except Exception as exc:
+                logger.exception("Classification failed")
+                execution_time = int((_time.time() - start_time) * 1000)
+                outcome = RouterOutcome(
+                    status="failed",
+                    outcome_code="classification_error",
+                    route="LOCAL",
+                    provider="local",
+                    provider_usage_class="local",
+                    intent_family="unknown",
+                    confidence=0.0,
+                    error_message=f"Classification failed: {exc}",
+                    execution_time_ms=execution_time,
+                    evidence_reason="",
+                    policy_reason="classification_failed",
+                )
+                return outcome, None, None
 
-    # ------------------------------------------------------------------
-    # 2. Route (skipped if caller provides decision)
-    # ------------------------------------------------------------------
-    if decision is None:
-        _t1 = _time.time()
-        try:
-            normalized_policy = normalize_augmentation_policy(policy)
-            session_id = (context or {}).get(
-                "session_id", os.environ.get("LUCY_SESSION_ID", "default")
-            ) or "default"
-            decision = select_route(
-                classification, policy=normalized_policy, query=question, session_id=session_id
-            )
-            if _profiling:
-                _profile["route_ms"] = int((_time.time() - _t1) * 1000)
-        except Exception as exc:
-            logger.exception("Routing failed")
-            execution_time = int((_time.time() - start_time) * 1000)
-            outcome = RouterOutcome(
-                status="failed",
-                outcome_code="routing_error",
-                route="LOCAL",
-                provider="local",
-                provider_usage_class="local",
-                intent_family=classification.intent_family,
-                confidence=classification.confidence,
-                error_message=f"Routing failed: {exc}",
-                execution_time_ms=execution_time,
-                evidence_reason=classification.evidence_reason,
-                policy_reason="routing_failed",
-            )
-            return outcome, classification, None
+        # ------------------------------------------------------------------
+        # 2. Route (skipped if caller provides decision)
+        # ------------------------------------------------------------------
+        if decision is None:
+            _t1 = _time.time()
+            try:
+                normalized_policy = normalize_augmentation_policy(policy)
+                session_id = (context or {}).get(
+                    "session_id", os.environ.get("LUCY_SESSION_ID", "default")
+                ) or "default"
+                decision = select_route(
+                    classification, policy=normalized_policy, query=question, session_id=session_id
+                )
+                if _profiling:
+                    _profile["route_ms"] = int((_time.time() - _t1) * 1000)
+            except Exception as exc:
+                logger.exception("Routing failed")
+                execution_time = int((_time.time() - start_time) * 1000)
+                outcome = RouterOutcome(
+                    status="failed",
+                    outcome_code="routing_error",
+                    route="LOCAL",
+                    provider="local",
+                    provider_usage_class="local",
+                    intent_family=classification.intent_family,
+                    confidence=classification.confidence,
+                    error_message=f"Routing failed: {exc}",
+                    execution_time_ms=execution_time,
+                    evidence_reason=classification.evidence_reason,
+                    policy_reason="routing_failed",
+                )
+                return outcome, classification, None
 
     # ------------------------------------------------------------------
     # 3. Apply overrides
@@ -310,6 +420,45 @@ def process(
     decision = provider_resolver.apply_provider(decision, classification, context)
     if _profiling:
         _profile["provider_resolve_ms"] = int((_time.time() - _t2) * 1000)
+
+    # 3d. Evidence-disabled operator gate
+    evidence_enabled = (
+        os.environ.get("LUCY_EVIDENCE_ENABLED", os.environ.get("LUCY_ENABLE_INTERNET", "0"))
+        .strip()
+        .lower()
+        in ("1", "true", "on", "yes")
+    )
+    if not evidence_enabled and decision.route in (
+        "NEWS",
+        "EVIDENCE",
+        "AUGMENTED",
+        "FULL",
+        "WEATHER",
+        "TIME",
+        "FINANCE",
+    ):
+        execution_time = int((_time.time() - start_time) * 1000)
+        logger.info("evidence_disabled_gate", extra={"route": decision.route})
+        return (
+            RouterOutcome(
+                status="completed",
+                outcome_code="operator_blocked",
+                route=decision.route,
+                provider="local",
+                provider_usage_class="local",
+                intent_family=classification.intent_family,
+                confidence=classification.confidence,
+                response_text=(
+                    "Evidence disabled by operator control.\n"
+                    "Enable evidence to allow news routes."
+                ),
+                execution_time_ms=execution_time,
+                evidence_reason=decision.evidence_reason,
+                policy_reason="evidence_disabled",
+            ),
+            classification,
+            decision,
+        )
 
     # ------------------------------------------------------------------
     # 4. Build PipelineContext
