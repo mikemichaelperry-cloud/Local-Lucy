@@ -20,7 +20,7 @@ CACHE_DIR="${FAKE_ROOT}/cache/evidence"
 OUT_DIR="${TMPD}/out"
 PROFILE_FILE="${TMPD}/latency.tsv"
 
-mkdir -p "${FAKE_ROOT}/tools/router" "${STATE_DIR}" "${CACHE_DIR}"
+mkdir -p "${FAKE_ROOT}/tools" "${STATE_DIR}" "${CACHE_DIR}"
 
 cat > "${STATE_DIR}/evidence_session_parallel.json" <<'EOF'
 {"session_id":"parallel","keys":["alpha","beta","gamma"]}
