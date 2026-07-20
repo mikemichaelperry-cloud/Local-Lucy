@@ -6,9 +6,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="${SCRIPT_DIR}"
+# Runtime authority root may be overridden (e.g. by tests using a fake root).
+# The script's own directory remains the source for the Python entry points.
+ROOT="${LUCY_ROOT:-${SCRIPT_DIR}}"
 
-# Source user .env for API keys (if present)
+# Source user .env for API keys from the runtime root (if present)
 if [ -f "${ROOT}/.env" ]; then
     source "${ROOT}/.env"
 fi
@@ -24,9 +26,9 @@ else
     export LUCY_RUNTIME_NAMESPACE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy-v11"
 fi
 
-# Python router for execution
-ROUTER_PY="${ROOT}/tools/router_py/main.py"
-LOCAL_WORKER="${ROOT}/tools/local_worker.py"
+# Python router for execution — always use the installation that contains this script
+ROUTER_PY="${SCRIPT_DIR}/tools/router_py/main.py"
+LOCAL_WORKER="${SCRIPT_DIR}/tools/local_worker.py"
 
 # Environment defaults - NOW DEFAULT TO PYTHON
 export LUCY_LOCAL_MODEL="${LUCY_LOCAL_MODEL:-local-lucy}"

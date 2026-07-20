@@ -57,6 +57,7 @@ alpha_out="$(
   LUCY_SHARED_STATE_NAMESPACE="alpha" \
   LUCY_SEMANTIC_INTERPRETER_FAILURE_TTL_S=300 \
   LUCY_OLLAMA_API_URL="http://127.0.0.1:9/api/generate" \
+  LUCY_LOCAL_MODEL="local-lucy" \
   run_mapper "${prompt}"
 )"
 [[ "$(json_field "${alpha_out}" semantic_interpreter_result_status)" == "backend_unavailable_cached" ]] || die "expected alpha namespace to reuse cached outage"
@@ -68,6 +69,7 @@ beta_out="$(
   LUCY_SHARED_STATE_NAMESPACE="beta" \
   LUCY_SEMANTIC_INTERPRETER_FAILURE_TTL_S=300 \
   LUCY_OLLAMA_API_URL="http://127.0.0.1:9/api/generate" \
+  LUCY_LOCAL_MODEL="local-lucy" \
   run_mapper "${prompt}"
 )"
 [[ "$(json_field "${beta_out}" semantic_interpreter_result_status)" == "model_unavailable" ]] || die "expected beta namespace to attempt the backend independently"

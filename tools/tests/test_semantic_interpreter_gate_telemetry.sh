@@ -91,6 +91,7 @@ EOF
 cached_out="$(
   LUCY_ROOT="${state_root}" \
   LUCY_SEMANTIC_INTERPRETER_FAILURE_TTL_S=300 \
+  LUCY_LOCAL_MODEL="local-lucy" \
   run_mapper "What was the purpose of the Antikythera mechanism?"
 )"
 [[ "$(json_field "${cached_out}" semantic_interpreter_fired)" == "false" ]] || die "expected cached backend outage to skip semantic interpreter output"
