@@ -109,6 +109,8 @@ def main() -> int:
             result = update_state_field(state_file, "augmentation_policy", args.value)
         elif args.command == "set-augmented-provider":
             result = update_state_field(state_file, "augmented_provider", args.value)
+        elif args.command == "set-profile":
+            result = update_state_field(state_file, "profile", args.value)
         elif args.command == "set-model":
             result = update_state_field(state_file, "model", args.value)
         elif args.command == "set-gemma4-smart-routing":
@@ -178,6 +180,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--value",
         required=True,
         choices=("wikipedia", "openai", "kimi"),
+    )
+    profile_parser = subparsers.add_parser("set-profile")
+    profile_parser.add_argument(
+        "--value",
+        required=True,
+        choices=("lucy-v10", "lucy-v11"),
     )
     model_parser = subparsers.add_parser("set-model")
     model_parser.add_argument(

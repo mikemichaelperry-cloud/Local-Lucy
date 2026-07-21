@@ -39,6 +39,10 @@ export LUCY_RUNTIME_AUTHORITY_ROOT="$SCRIPT_DIR"
 export LUCY_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/local-lucy-v11"
 export LUCY_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/local-lucy-v11"
 
+# Persistent profile identity: fresh state files must be created as lucy-v11,
+# never inherit a v10 label from wrapper environments.
+export LUCY_RUNTIME_PROFILE="${LUCY_RUNTIME_PROFILE:-lucy-v11}"
+
 # Memory database: explicit env override wins, then XDG state dir, then legacy.
 export LUCY_MEMORY_DB_PATH="${LUCY_MEMORY_DB_PATH:-$LUCY_RUNTIME_NAMESPACE_ROOT/state/memory.db}"
 
