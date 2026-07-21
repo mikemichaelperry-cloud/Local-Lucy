@@ -52,6 +52,11 @@ mkdir -p "$LUCY_RUNTIME_NAMESPACE_ROOT/logs"
 mkdir -p "$LUCY_CONFIG_DIR"
 mkdir -p "$LUCY_CACHE_DIR"
 
+# Enforce the v11 profile identity in the persistent state file.
+# The environment default above only protects fresh state files; this call
+# corrects any existing state that still carries a v10 label.
+python3 "${SCRIPT_DIR}/tools/runtime_control.py" set-profile --value lucy-v11 >/dev/null 2>&1 || true
+
 # Voice capture directory stays in project tree (temporary audio, not persistent state)
 export LUCY_VOICE_CAPTURE_DIR="$SCRIPT_DIR/voice/ui_ptt"
 

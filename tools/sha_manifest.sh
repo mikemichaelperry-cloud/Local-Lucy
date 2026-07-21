@@ -136,12 +136,13 @@ verify_manifest() {
   )
 }
 
-# Parse optional --ui-v10 flag
+# Parse optional --ui-v10 flag. Delegate to the UI-local collector so paths are
+# recorded relative to ui-v10/ (e.g. ./app/main.py), not relative to the repo
+# root (which would produce broken ./ui-v10/app/main.py entries).
 cmd="${1:-check}"
 if [[ "$cmd" == "--ui-v10" ]]; then
-  UI_V8_MODE=1
-  MANIFEST="$ROOT/ui-v10/SHA256SUMS.clean"
-  cmd="${2:-check}"
+  UI_CMD="${2:-check}"
+  exec "$ROOT/ui-v10/tools/sha_manifest.sh" "$UI_CMD"
 fi
 
 case "$cmd" in

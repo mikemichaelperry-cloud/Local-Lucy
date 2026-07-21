@@ -27,6 +27,25 @@ try:
 except ImportError:  # pragma: no cover - python-dotenv may be absent in minimal installs
     load_dotenv = None  # type: ignore[assignment,misc]
 
+try:
+    from router_py.payload_builders import build_history_entry
+except Exception:  # pragma: no cover - fallback if router_py is not on path during tests
+    def build_history_entry(payload: dict[str, Any]) -> dict[str, Any]:  # type: ignore[misc]
+        return {
+            "authority": payload.get("authority", {}) if isinstance(payload.get("authority"), dict) else {},
+            "completed_at": payload.get("completed_at", ""),
+            "control_state": payload.get("control_state", {}) if isinstance(payload.get("control_state"), dict) else {},
+            "error": payload.get("error", ""),
+            "outcome": payload.get("outcome", {}) if isinstance(payload.get("outcome"), dict) else {},
+            "request_id": payload.get("request_id", ""),
+            "request_text": payload.get("request_text", ""),
+            "response_text": payload.get("response_text", ""),
+            "route": payload.get("route", {}) if isinstance(payload.get("route"), dict) else {},
+            "status": payload.get("status", ""),
+        }
+
+from app.services.state_store import REQUEST_HISTORY_FILE
+
 
 @dataclass(frozen=True)
 class ActionCapability:
@@ -1134,12 +1153,12 @@ class RuntimeBridge:
             if is_auto_model is not None and not is_auto_model(manual_model):
                 self._last_used_model = effective_model
 
-            # NOTE: We do NOT write history entries here.
-            # The core ExecutionEngine's StateWriter already writes the
-            # canonical entry to request_history.jsonl using the SAME
-            # request_id. Dual writes caused duplicate entries and data
-            # divergence (runtime_bridge used a different ID schema).
-            # The HMI reads from that file via load_recent_request_history().
+            # Write the canonical history entry so the HMI conversation panel
+            # can display this request. The direct-Python path
+            # (execute_plan_python) does not use ExecutionEngine/StateWriter, so
+            # the bridge must write the entry here. Deduplication by request_id
+            # prevents duplicates if a future core path also writes history.
+            self._append_request_history(payload)
 
             return CommandResult(
                 action=action,
@@ -1300,23 +1319,51 @@ class RuntimeBridge:
             return os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
 
     def _resolve_history_file(self) -> Path:
-        """Resolve the history file path (same logic as runtime_request.py)."""
+        """Resolve the history file path (same logic as state_store/state_writer)."""
         raw = os.environ.get("LUCY_RUNTIME_REQUEST_HISTORY_FILE")
         if raw:
             return Path(raw).expanduser()
-        # Default path matching runtime_request.py
-        home = Path.home()
-        workspace_home = (
-            home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-        )
-        return (
-            workspace_home
-            / ".codex-api-home"
-            / "lucy"
-            / "runtime-v11"
-            / "state"
-            / "request_history.jsonl"
-        )
+        namespace_root = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "").strip()
+        if namespace_root:
+            return Path(namespace_root).expanduser() / "state" / "request_history.jsonl"
+        # Fallback for tests / dev environments without the launcher.
+        return Path.home() / ".local" / "share" / "local-lucy-v11" / "state" / "request_history.jsonl"
+
+    def _append_request_history(self, payload: dict[str, Any]) -> None:
+        """Append a completed request to the HMI history file.
+
+        Deduplicates by request_id so the entry remains safe even if a future
+        core path also writes history.
+        """
+        history_file = self._resolve_history_file()
+        entry = build_history_entry(payload)
+        request_id = str(entry.get("request_id", "")).strip()
+        if not request_id:
+            return
+
+        history_file.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(history_file, "a", encoding="utf-8") as handle:
+                # Best-effort dedup: check last 50 lines for the same request_id.
+                if history_file.exists():
+                    try:
+                        lines = history_file.read_text(encoding="utf-8").splitlines()
+                        for raw_line in lines[-50:]:
+                            line = raw_line.strip()
+                            if not line:
+                                continue
+                            try:
+                                parsed = json.loads(line)
+                            except json.JSONDecodeError:
+                                continue
+                            if str(parsed.get("request_id", "")).strip() == request_id:
+                                return
+                    except OSError:
+                        pass
+                handle.write(json.dumps(entry, sort_keys=True))
+                handle.write("\n")
+        except OSError:
+            pass
 
     def _run_lifecycle_action(self, action: str, requested_value: str) -> CommandResult:
         expected_value = "start" if action == "runtime_start" else "stop"
