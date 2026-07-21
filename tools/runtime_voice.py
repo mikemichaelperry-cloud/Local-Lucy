@@ -845,10 +845,19 @@ def bundled_whisper_library_dirs(root: Path) -> list[Path]:
 
 
 def bundled_whisper_runtime_ready(root: Path) -> bool:
+    """Return True if the bundled whisper symlink/binary is usable.
+
+    CPU-only builds do not produce ggml-cuda library directories, so we only
+    require the binary to exist and be executable. Optional library dirs are
+    added to LD_LIBRARY_PATH at runtime when present.
+    """
     whisper_bin = bundled_whisper_binary(root)
     if not whisper_bin.exists():
         return False
-    return all(path.is_dir() for path in bundled_whisper_library_dirs(root))
+    try:
+        return os.access(str(whisper_bin), os.X_OK) or whisper_bin.resolve().stat().st_mode & 0o111
+    except OSError:
+        return False
 
 
 def whisper_command_env(stt_bin: str) -> dict[str, str]:
