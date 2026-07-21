@@ -969,6 +969,8 @@ def synchronize_state(
         status = "fault"
     else:
         status = "idle"
+        if backend.available:
+            state["last_error"] = ""
     state["status"] = status
     return normalize_voice_runtime(state)
 
