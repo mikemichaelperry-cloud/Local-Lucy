@@ -45,7 +45,6 @@ fi
 # Use a query that matches medical keywords so _is_category_supported triggers
 medical_json="$(python3 - "${TRUSTED_PY}" <<'PY'
 import sys, os, json
-os.environ["LUCY_ROOT"] = os.path.expanduser("~/lucy-v10")
 sys.path.insert(0, os.path.join(os.environ["LUCY_ROOT"], "tools"))
 import unverified_context_trusted as uct
 result = uct.fetch_context("what is amoxicillin used for", evidence_reason="medical_context")
@@ -100,7 +99,6 @@ fi
 # Use a nonsense query that won't match any real article
 nonsense_json="$(python3 - "${TRUSTED_PY}" <<'PY'
 import sys, os, json
-os.environ["LUCY_ROOT"] = os.path.expanduser("~/lucy-v10")
 sys.path.insert(0, os.path.join(os.environ["LUCY_ROOT"], "tools"))
 import unverified_context_trusted as uct
 result = uct.fetch_context("xyzqwerty12345nonsense", evidence_reason="medical_context")
