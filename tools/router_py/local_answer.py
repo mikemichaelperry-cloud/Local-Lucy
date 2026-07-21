@@ -325,8 +325,13 @@ def _is_personal_fact_query(query: str) -> bool:
 # model has a 2048-token context window and long system blocks get ignored.
 # This is now a function so the identity string adapts to the active model.
 
+def _lucy_version_label() -> str:
+    """Return the version label injected into the local model self-knowledge prompt."""
+    return os.environ.get("LUCY_VERSION_LABEL", "V11").strip() or "V11"
+
+
 _SELF_KNOWLEDGE_TEMPLATE = (
-    "You are Local Lucy V10, an AI assistant running on the user's computer via Ollama "
+    "You are Local Lucy {version_label}, an AI assistant running on the user's computer via Ollama "
     "({model_identity}).\n"
     "Architecture: PySide6/Qt6 HMI (Python 3.10); Ollama LLM backend; "
     "MiniLM-L6-v2 embedding router (384-dim, k=3) with deterministic policy guards; "
@@ -341,9 +346,9 @@ _SELF_KNOWLEDGE_TEMPLATE = (
     "cannot browse the web on your own — only when the router fetches it; "
     "cannot read files on the computer unless explicitly provided in context.\n"
     "Safety: medical/vet/legal → AUGMENTED with citations; stories/poems → LOCAL.\n"
-    "If asked who you are, say 'I am Local Lucy V10.' If asked about capabilities, "
-    "list them truthfully. If asked about your architecture, describe the V10 stack above. "
-    "Do not claim to be a different AI."
+    "If asked who you are or what version you are, say 'I am Local Lucy {version_label}.' "
+    "If asked about capabilities, list them truthfully. If asked about your architecture, "
+    "describe the {version_label} stack above. Do not claim to be a different AI."
 )
 
 # Model-specific identity strings. Add new models here.
@@ -367,9 +372,11 @@ def get_self_knowledge(model_name: str = "local-lucy-llama31") -> str:
     Defaults to llama3.1:8b identity for unknown models.
     """
     ollama_name, params = _MODEL_IDENTITIES.get(model_name, _MODEL_IDENTITIES["local-lucy-llama31"])
+    version_label = _lucy_version_label()
     return _SELF_KNOWLEDGE_TEMPLATE.format(
         model_identity=f"{ollama_name}, {params}",
         param_count=params.split(",")[0].strip().replace("~", ""),
+        version_label=version_label,
     )
 
 

@@ -393,6 +393,8 @@ class TestPromptBuilding(unittest.TestCase):
         """Test retrieval failure falls back to direct SQLite load for family queries."""
         with patch(
             "local_answer._get_relevant_persistent_facts", side_effect=RuntimeError("embed failed")
+        ), patch(
+            "local_answer._load_family_facts_direct", return_value=["Oscar is Mike's dog."]
         ):
             prompt = self.answer._build_prompt(
                 "What is my dog's name?", "", "chat", "- Be concise.", False, False

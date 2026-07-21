@@ -829,6 +829,20 @@ def select_route(
         )
         return decision
 
+    # Self-knowledge guard: identity, version, and capability questions must
+    # stay LOCAL so the model answers from its injected SELF_KNOWLEDGE prompt.
+    # Without this guard the embedding router may send them to AUGMENTED, where
+    # they are blocked when evidence is disabled.
+    if query and _is_capability_query(query):
+        decision = _make_local_decision(classification, query=query)
+        _log_decision(
+            query or "",
+            decision,
+            embedding_route="SELF_KNOWLEDGE",
+            guards_fired=["self_knowledge"],
+        )
+        return decision
+
     # Shared lowercased query for the embedding path — compute once, reuse everywhere
     q_lower = query.lower()
 
@@ -2075,6 +2089,25 @@ def _is_capability_query(query: str) -> bool:
 
     # Trust / safety / routing probing (prompt-leakage family)
     if "trust class" in q or "routing class" in q or "evidence mode" in q:
+        return True
+
+    # Identity / version questions must stay LOCAL and use SELF_KNOWLEDGE.
+    # Otherwise the embedding router may send them to AUGMENTED, where they
+    # get blocked when evidence is disabled.
+    if any(
+        p in q
+        for p in [
+            "what version are you",
+            "what version of local lucy",
+            "what version of lucy",
+            "which version are you",
+            "who are you",
+            "what is your name",
+            "what are you called",
+            "are you local lucy",
+            "are you lucy",
+        ]
+    ):
         return True
 
     return False

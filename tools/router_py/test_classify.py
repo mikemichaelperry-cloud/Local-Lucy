@@ -18,6 +18,7 @@ from router_py.classify import (
     ClassificationResult,
     RoutingDecision,
     _call_llm_arbiter,
+    _is_capability_query,
     _map_to_intent_family,
     _make_local_decision,
     _make_augmented_decision,
@@ -256,6 +257,32 @@ class TestRouteSelection(unittest.TestCase):
 
         self.assertEqual(decision.route, "LOCAL")
         self.assertEqual(decision.intent_family, "local_answer")
+
+
+class TestSelfKnowledgeRouting(unittest.TestCase):
+    """Test identity/version/capability queries route LOCAL."""
+
+    def _background_classification(self) -> ClassificationResult:
+        return ClassificationResult(
+            intent="background_overview",
+            intent_family="background_overview",
+            intent_class="background_overview",
+            category="informational",
+            confidence=0.85,
+            needs_web=True,
+        )
+
+    def test_capability_query_detects_version_question(self):
+        """_is_capability_query must catch version questions."""
+        self.assertTrue(_is_capability_query("What version of Local Lucy are you?"))
+        self.assertTrue(_is_capability_query("What version are you?"))
+        self.assertTrue(_is_capability_query("Who are you?"))
+
+    def test_select_route_self_knowledge_stays_local(self):
+        """Version/identity questions must route LOCAL even with web intent."""
+        classification = self._background_classification()
+        decision = select_route(classification, query="What version of Local Lucy are you?")
+        self.assertEqual(decision.route, "LOCAL")
 
 
 class TestDataClasses(unittest.TestCase):
