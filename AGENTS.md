@@ -88,7 +88,7 @@
 
 ```bash
 LUCY_ROOT=~/lucy-v11                    # Project root
-LUCY_RUNTIME_NAMESPACE_ROOT=~/.local/share/local-lucy   # XDG data (or legacy ~/.codex-api-home)
+LUCY_RUNTIME_NAMESPACE_ROOT=~/.local/share/local-lucy-v11   # XDG data dir
 LUCY_RUNTIME_AUTHORITY_ROOT=~/lucy-v11  # Code authority validation
 LUCY_UI_ROOT=~/lucy-v11/ui-v10          # HMI path
 LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
@@ -210,7 +210,7 @@ Local Lucy learns from natural-language user feedback.
 
 ## Common Footguns
 
-1. **Two `current_state.json` locations** — HMI uses `~/.local/share/local-lucy/state/` (XDG) or legacy `~/.codex-api-home/lucy/runtime-v11/state/`. `START_LUCY.sh` sets the canonical path via `LUCY_RUNTIME_NAMESPACE_ROOT`.
+1. **Single `current_state.json` location** — The canonical state directory is `~/.local/share/local-lucy-v11/state/`. `START_LUCY.sh` sets `LUCY_RUNTIME_NAMESPACE_ROOT` to this path; explicit overrides still win.
 
 2. **`PipelineContext` is frozen** — Use `dataclasses.replace()` to modify. Unknown keys from `context` dict merge into `.extras`.
 
