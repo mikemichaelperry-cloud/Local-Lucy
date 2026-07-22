@@ -20,6 +20,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+# Ensure project root is on sys.path so tools.xdg_paths resolves when this
+# script is executed directly from the tools/ directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 from runtime_control import (
     RuntimeControlError,
     enforce_authority_contract,
@@ -347,27 +353,18 @@ def resolve_voice_runtime_file(explicit_path: str | None) -> Path:
     raw = explicit_path or os.environ.get("LUCY_VOICE_RUNTIME_FILE")
     if raw:
         return Path(raw).expanduser()
-    return default_runtime_namespace_root() / "state" / "voice_runtime.json"
+    return lucy_runtime_namespace_root() / "state" / "voice_runtime.json"
 
 
 def resolve_capture_directory(explicit_path: str | None) -> Path:
     raw = explicit_path or os.environ.get("LUCY_VOICE_CAPTURE_DIR")
     if raw:
         return Path(raw).expanduser()
-    return default_runtime_namespace_root() / "voice" / "ui_ptt"
+    return lucy_runtime_namespace_root() / "voice" / "ui_ptt"
 
 
-def default_runtime_namespace_root() -> Path:
-    explicit_root = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    if explicit_root:
-        return Path(explicit_root).expanduser()
-    home = Path.home()
-    workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
-
-
-DEFAULT_VOICE_RUNTIME_FILE = str(default_runtime_namespace_root() / "state" / "voice_runtime.json")
-DEFAULT_CAPTURE_DIR = str(default_runtime_namespace_root() / "voice" / "ui_ptt")
+DEFAULT_VOICE_RUNTIME_FILE = str(lucy_runtime_namespace_root() / "state" / "voice_runtime.json")
+DEFAULT_CAPTURE_DIR = str(lucy_runtime_namespace_root() / "voice" / "ui_ptt")
 
 
 def resolve_request_tool() -> Path:
@@ -1770,14 +1767,14 @@ def _resolve_history_file() -> Path:
     raw = os.environ.get("LUCY_RUNTIME_REQUEST_HISTORY_FILE")
     if raw:
         return Path(raw).expanduser()
-    return default_runtime_namespace_root() / "state" / "request_history.jsonl"
+    return lucy_runtime_namespace_root() / "state" / "request_history.jsonl"
 
 
 def _resolve_control_state() -> dict[str, Any]:
     """Load current control state for history entry."""
     state_file = os.environ.get("LUCY_RUNTIME_STATE_FILE")
     if not state_file:
-        state_file = default_runtime_namespace_root() / "state" / "current_state.json"
+        state_file = lucy_runtime_namespace_root() / "state" / "current_state.json"
     else:
         state_file = Path(state_file).expanduser()
 

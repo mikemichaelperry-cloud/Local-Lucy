@@ -2,10 +2,15 @@
 """Local Lucy v11 — XDG Base Directory compliance
 
 Provides portable paths for data, config, cache, and runtime state.
-Falls back to legacy paths when env vars are set for backward compatibility.
+Honours explicit ``LUCY_RUNTIME_NAMESPACE_ROOT`` overrides (used by tests).
 
 Usage:
-    from tools.xdg_paths import lucy_data_dir, lucy_config_dir, lucy_cache_dir
+    from tools.xdg_paths import (
+        lucy_data_dir,
+        lucy_config_dir,
+        lucy_cache_dir,
+        lucy_runtime_namespace_root,
+    )
 """
 
 from __future__ import annotations
@@ -30,6 +35,14 @@ def lucy_data_dir() -> Path:
         return Path(legacy)
     fallback = Path.home() / ".local" / "share"
     return _xdg_dir("XDG_DATA_HOME", fallback) / _APP_NAME
+
+
+def lucy_runtime_namespace_root() -> Path:
+    """Runtime namespace root: alias for the canonical Lucy data directory.
+
+    ``LUCY_RUNTIME_NAMESPACE_ROOT`` overrides this when explicitly set.
+    """
+    return lucy_data_dir()
 
 
 def lucy_config_dir() -> Path:

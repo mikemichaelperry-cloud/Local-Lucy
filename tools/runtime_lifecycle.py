@@ -15,6 +15,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+# Ensure project root is on sys.path so tools.xdg_paths resolves when this
+# script is executed directly from the tools/ directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 from runtime_control import enforce_authority_contract, iso_now, locked_state_file
 
 DEFAULT_START_TIMEOUT_SECONDS = 8.0
@@ -88,7 +94,7 @@ def resolve_lifecycle_file(explicit_path: str | None) -> Path:
     raw = explicit_path or os.environ.get("LUCY_RUNTIME_LIFECYCLE_FILE")
     if raw:
         return Path(raw).expanduser()
-    return default_runtime_namespace_root() / "state" / "runtime_lifecycle.json"
+    return lucy_runtime_namespace_root() / "state" / "runtime_lifecycle.json"
 
 
 def resolve_launcher_path(explicit_path: str | None) -> Path:
@@ -104,20 +110,11 @@ def resolve_log_file(explicit_path: str | None) -> Path:
     raw = explicit_path or os.environ.get("LUCY_RUNTIME_LIFECYCLE_LOG_FILE")
     if raw:
         return Path(raw).expanduser()
-    return default_runtime_namespace_root() / "logs" / "runtime_lifecycle.log"
+    return lucy_runtime_namespace_root() / "logs" / "runtime_lifecycle.log"
 
 
-def default_runtime_namespace_root() -> Path:
-    explicit_root = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    if explicit_root:
-        return Path(explicit_root).expanduser()
-    home = Path.home()
-    workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
-
-
-DEFAULT_LIFECYCLE_FILE = str(default_runtime_namespace_root() / "state" / "runtime_lifecycle.json")
-DEFAULT_LOG_FILE = str(default_runtime_namespace_root() / "logs" / "runtime_lifecycle.log")
+DEFAULT_LIFECYCLE_FILE = str(lucy_runtime_namespace_root() / "state" / "runtime_lifecycle.json")
+DEFAULT_LOG_FILE = str(lucy_runtime_namespace_root() / "logs" / "runtime_lifecycle.log")
 
 
 def default_lifecycle_state() -> dict[str, Any]:

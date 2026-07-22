@@ -13,6 +13,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
+# Ensure project root is on sys.path so tools.xdg_paths resolves when this
+# script is executed directly from the tools/ directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 MODE_TO_ROUTE_CONTROL = {
     "auto": "AUTO",
     "online": "FORCED_ONLINE",
@@ -255,29 +261,14 @@ def resolve_runtime_paths(explicit_path: str | None) -> ResolvedRuntimePaths:
             warnings=(),
         )
 
-    namespace_root = home_fallback_runtime_namespace_root()
+    namespace_root = lucy_runtime_namespace_root()
     return ResolvedRuntimePaths(
         state_file=namespace_root / "state" / "current_state.json",
         namespace_root=namespace_root,
-        resolution_source="home_fallback",
-        warning_codes=("runtime_namespace_home_fallback",),
-        warnings=(
-            "Runtime namespace is resolved from HOME fallback only; set LUCY_RUNTIME_NAMESPACE_ROOT or --state-file to pin the authoritative runtime namespace.",
-        ),
+        resolution_source="xdg_default",
+        warning_codes=(),
+        warnings=(),
     )
-
-
-def default_runtime_namespace_root() -> Path:
-    explicit_root = os.environ.get(RUNTIME_NAMESPACE_ENV)
-    if explicit_root:
-        return Path(explicit_root).expanduser()
-    return home_fallback_runtime_namespace_root()
-
-
-def home_fallback_runtime_namespace_root() -> Path:
-    home = Path.home()
-    workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
 
 
 def contract_required() -> bool:
@@ -316,7 +307,7 @@ def enforce_authority_contract(*, expected_authority_root: Path | None = None) -
             if candidate_ui.is_dir():
                 ui_root_raw = str(candidate_ui)
     if not runtime_ns_raw:
-        runtime_ns_raw = str(default_runtime_namespace_root())
+        runtime_ns_raw = str(lucy_runtime_namespace_root())
 
     missing = []
     if not authority_raw:
@@ -371,7 +362,7 @@ def infer_runtime_namespace_root_from_state_file(state_file: Path) -> Path:
     return state_file.parent
 
 
-DEFAULT_STATE_FILE = str(default_runtime_namespace_root() / "state" / "current_state.json")
+DEFAULT_STATE_FILE = str(lucy_runtime_namespace_root() / "state" / "current_state.json")
 
 
 def default_state() -> dict[str, Any]:

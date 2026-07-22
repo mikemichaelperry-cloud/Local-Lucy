@@ -14,6 +14,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# Ensure project root is on sys.path so tools.xdg_paths resolves when this
+# script is executed directly from the tools/ directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 from runtime_control import (
     RuntimeControlError,
     enforce_authority_contract,
@@ -200,23 +206,14 @@ def resolve_result_file() -> Path:
     raw = os.environ.get("LUCY_RUNTIME_REQUEST_RESULT_FILE")
     if raw:
         return Path(raw).expanduser()
-    return default_runtime_namespace_root() / "state" / "last_request_result.json"
+    return lucy_runtime_namespace_root() / "state" / "last_request_result.json"
 
 
 def resolve_history_file() -> Path:
     raw = os.environ.get("LUCY_RUNTIME_REQUEST_HISTORY_FILE")
     if raw:
         return Path(raw).expanduser()
-    return default_runtime_namespace_root() / "state" / "request_history.jsonl"
-
-
-def default_runtime_namespace_root() -> Path:
-    explicit_root = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    if explicit_root:
-        return Path(explicit_root).expanduser()
-    home = Path.home()
-    workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
+    return lucy_runtime_namespace_root() / "state" / "request_history.jsonl"
 
 
 def legacy_runtime_namespace_root() -> Path:
@@ -231,7 +228,7 @@ def legacy_runtime_namespace_status(
     legacy_root: Path | None = None,
 ) -> str:
     resolved_runtime_root = (
-        (runtime_namespace_root or default_runtime_namespace_root()).expanduser().resolve()
+        (runtime_namespace_root or lucy_runtime_namespace_root()).expanduser().resolve()
     )
     resolved_legacy_root = (legacy_root or legacy_runtime_namespace_root()).expanduser().resolve()
     if resolved_runtime_root == resolved_legacy_root:
@@ -241,10 +238,10 @@ def legacy_runtime_namespace_status(
     return "absent"
 
 
-DEFAULT_RESULT_FILE = str(default_runtime_namespace_root() / "state" / "last_request_result.json")
-DEFAULT_HISTORY_FILE = str(default_runtime_namespace_root() / "state" / "request_history.jsonl")
+DEFAULT_RESULT_FILE = str(lucy_runtime_namespace_root() / "state" / "last_request_result.json")
+DEFAULT_HISTORY_FILE = str(lucy_runtime_namespace_root() / "state" / "request_history.jsonl")
 DEFAULT_CHAT_MEMORY_FILE = str(
-    default_runtime_namespace_root() / "state" / "chat_session_memory.txt"
+    lucy_runtime_namespace_root() / "state" / "chat_session_memory.txt"
 )
 
 
@@ -679,7 +676,7 @@ def _run_backend_submit_chat_bin(
         {
             "LUCY_ROOT": str(paths.root),
             "LUCY_RUNTIME_AUTHORITY_ROOT": str(paths.root),
-            "LUCY_RUNTIME_NAMESPACE_ROOT": str(default_runtime_namespace_root()),
+            "LUCY_RUNTIME_NAMESPACE_ROOT": str(lucy_runtime_namespace_root()),
             "LUCY_RUNTIME_STATE_FILE": str(resolve_state_file(None)),
             "LUCY_AUGMENTATION_POLICY": policy,
             "LUCY_AUGMENTED_PROVIDER": state.get("augmented_provider", "wikipedia"),
@@ -1974,7 +1971,7 @@ def operator_note(outcome_meta: dict[str, str], answer_class: str) -> str:
 
 def build_authority_payload() -> dict[str, Any]:
     authority_root = resolve_root()
-    runtime_namespace = default_runtime_namespace_root()
+    runtime_namespace = lucy_runtime_namespace_root()
     legacy_root = legacy_runtime_namespace_root()
     return {
         "active_root": str(authority_root),
