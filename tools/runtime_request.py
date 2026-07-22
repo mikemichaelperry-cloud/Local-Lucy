@@ -1,22 +1,38 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
+import sys
+from pathlib import Path
+
+# Re-execute from the project venv if available so runtime dependencies (e.g.
+# tenacity) are found even when HOME or user-site paths are redirected. This
+# keeps the CLI isolated from the user's HOME-specific Python packages.
+_SCRIPT = Path(__file__).resolve()
+_VENV_PYTHON = _SCRIPT.parents[1] / "ui-v10" / ".venv" / "bin" / "python3"
+# Only re-exec when this file is the main entry point. When it is imported as
+# a module (e.g. from test heredocs) sys.argv[0] is the invoking script and a
+# re-exec would replace that script with this one.
+if (
+    _VENV_PYTHON.exists()
+    and sys.executable != str(_VENV_PYTHON)
+    and Path(sys.argv[0]).resolve() == _SCRIPT
+):
+    os.execv(str(_VENV_PYTHON), [str(_VENV_PYTHON), str(_SCRIPT)] + sys.argv[1:])
+
 import argparse
 import difflib
 import hashlib
 import json
-import os
 import re
-import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 # Ensure project root is on sys.path so tools.xdg_paths resolves when this
 # script is executed directly from the tools/ directory.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(_SCRIPT.parents[1]))
 
 from tools.xdg_paths import lucy_runtime_namespace_root
 
