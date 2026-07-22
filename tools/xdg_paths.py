@@ -59,9 +59,6 @@ def lucy_cache_dir() -> Path:
 
 def lucy_state_dir() -> Path:
     """Runtime state: SQLite DBs, JSON state dumps, logs."""
-    legacy = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "").strip()
-    if legacy:
-        return Path(legacy)
     return lucy_data_dir() / "state"
 
 
