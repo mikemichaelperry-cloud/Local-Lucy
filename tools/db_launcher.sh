@@ -2,7 +2,7 @@
 # Local Lucy V11 Database Viewer
 
 LUCY_ROOT="${LUCY_ROOT:-/home/mike/lucy-v11}"
-DB1="${LUCY_ROOT}/state/lucy_state.db"
+DB1="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy-v11/state/lucy_state.db"
 DB2="${LUCY_ROOT}/data/tubes/tube_database.db"
 DB3="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy-v11/state/memory.db"
 
@@ -20,11 +20,15 @@ show_lucy_state() {
     echo ""
 
     echo "📝 Recent 5 Queries:"
-    sqlite3 "$DB1" "SELECT substr(COALESCE(json_extract(metadata,'\$.question'),'?'),1,40) AS question, COALESCE(json_extract(metadata,'\$.final_mode'),'?') AS route, substr(created_at,1,19) AS time FROM routes ORDER BY created_at DESC LIMIT 5;" -column -header
+    sqlite3 "$DB1" "SELECT COALESCE(json_extract(metadata,'\$.question'),'?') AS question, COALESCE(json_extract(metadata,'\$.final_mode'),'?') AS route, substr(created_at,1,19) AS time FROM routes ORDER BY created_at DESC LIMIT 5;" -line
+    echo ""
+
+    echo "💬 Recent 5 Answers:"
+    sqlite3 "$DB1" "SELECT substr(created_at,1,19) AS time, COALESCE(json_extract(result,'\$.response_text'),'(empty)') AS answer FROM outcomes WHERE success = 1 ORDER BY created_at DESC LIMIT 5;" -line
     echo ""
 
     echo "🐢 Slowest Recent Outcomes (top 5):"
-    sqlite3 "$DB1" "SELECT substr(COALESCE(json_extract(result,'\$.route'),'?'),1,10) AS route, duration_ms/1000.0 AS seconds, substr(error_message,1,30) AS error FROM outcomes WHERE duration_ms > 0 ORDER BY duration_ms DESC LIMIT 5;" -column -header
+    sqlite3 "$DB1" "SELECT COALESCE(json_extract(result,'\$.route.mode'),'?') AS route, duration_ms/1000.0 AS seconds, COALESCE(error_message,'') AS error FROM outcomes WHERE duration_ms > 0 ORDER BY duration_ms DESC LIMIT 5;" -line
     echo ""
 
     read -rp "Press Enter to run custom SQL, or 'q' to go back: " ans
@@ -81,7 +85,7 @@ show_memory() {
     # Try to show turns if table exists
     if echo "$tables" | grep -qi "conversation_turns"; then
         echo "💬 Recent Conversation Turns:"
-        sqlite3 "$DB3" "SELECT substr(role,1,10) AS role, substr(text,1,55) AS text, substr(created_at,1,19) AS time FROM conversation_turns ORDER BY created_at DESC LIMIT 8;" -column -header 2>/dev/null || echo "(Could not read conversation_turns table)"
+        sqlite3 "$DB3" "SELECT role, text, substr(created_at,1,19) AS time FROM conversation_turns ORDER BY created_at DESC LIMIT 8;" -line 2>/dev/null || echo "(Could not read conversation_turns table)"
     else
         echo "No 'conversation_turns' table found."
     fi
@@ -90,7 +94,7 @@ show_memory() {
     # Show persistent facts
     if echo "$tables" | grep -qi "persistent_facts"; then
         echo "📌 Persistent Facts:"
-        sqlite3 "$DB3" "SELECT substr(fact_text,1,55) AS fact FROM persistent_facts ORDER BY id;" -column -header 2>/dev/null || echo "(Could not read persistent_facts table)"
+        sqlite3 "$DB3" "SELECT fact_text AS fact, category FROM persistent_facts ORDER BY id;" -line 2>/dev/null || echo "(Could not read persistent_facts table)"
     else
         echo "No 'persistent_facts' table found."
     fi
@@ -104,7 +108,7 @@ show_memory() {
 while true; do
     echo ""
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║              LOCAL LUCY V10  —  DATABASE VIEWER              ║"
+    echo "║              LOCAL LUCY V11  —  DATABASE VIEWER              ║"
     echo "╠══════════════════════════════════════════════════════════════╣"
     echo "║  1) lucy_state.db     — routes, outcomes, telemetry          ║"
     echo "║  2) tube_database.db  — 647 vacuum tube specs                ║"

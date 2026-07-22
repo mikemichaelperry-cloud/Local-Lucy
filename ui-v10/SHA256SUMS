@@ -30,7 +30,7 @@ de0bb32b8799949de0d015f0373e134c724496a0330668c5c732d4dd1dfc8957  ./app/panels/e
 5fc3ef19082e1a3d14e2887da4db628b44ec481d67b542b585a75d206a3a09f8  ./app/panels/status_panel.py.backup.20260422_200547
 f6f6cfa5912d21e37090d3a281c25e828c6d071043a7c151deee024b5579216e  ./app/services/__init__.py
 465e109887e55d265ab8713ba7b1f7d24c86411fada5da8a284e69af7ad15d2d  ./app/services/log_watcher.py
-9df688892e3d5c7dbd170ae3438831d36bc94aca6a096e448b1b68b10ec5df32  ./app/services/runtime_bridge.py
+57417003a4f4f2376e48eea298c09a8c7b44dd1d4c8e93a96728ae3cf2d85715  ./app/services/runtime_bridge.py
 60dddefc6107b024608a966ddc411289b9e5106adbc6dae3fab2b2b6759aec47  ./app/services/state_store.py
 0d688c97c1c41c8587a02081035b4960951382b0b4211b8cc0f594f323ac614e  ./app/ui_levels.py
 e4bfd02c1f9e71fa87ba8a4fd3afffa8f3655473b22262eded925884951a59c7  ./app/widgets/avatar_widget.py
