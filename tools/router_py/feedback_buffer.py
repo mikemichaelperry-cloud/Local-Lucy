@@ -12,16 +12,20 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+# Ensure tools package is importable when this module is loaded directly.
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 # Persist in runtime namespace so it survives restarts
-RUNTIME_NS = Path(
-    os.environ.get(
-        "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11")
-    )
-)
+RUNTIME_NS = lucy_runtime_namespace_root()
 BUFFER_PATH = RUNTIME_NS / "feedback_buffer.json"
 DEFAULT_MAX_TURNS = 5
 

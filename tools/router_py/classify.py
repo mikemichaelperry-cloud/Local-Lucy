@@ -17,6 +17,13 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Ensure tools package is importable when this module is loaded directly.
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 from router_py.logging_config import get_logger
 
 # Centralized pipeline types (Stage 5 migration)
@@ -879,7 +886,7 @@ def select_route(
                 _ns = Path(
                     os.environ.get(
                         "LUCY_RUNTIME_NAMESPACE_ROOT",
-                        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
+                        str(lucy_runtime_namespace_root()),
                     )
                 )
                 _buf_path = _ns / "feedback_buffer.json"
@@ -961,7 +968,7 @@ def select_route(
                 _ns2 = Path(
                     os.environ.get(
                         "LUCY_RUNTIME_NAMESPACE_ROOT",
-                        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
+                        str(lucy_runtime_namespace_root()),
                     )
                 )
                 _buf_path2 = _ns2 / "feedback_buffer.json"
@@ -1265,7 +1272,7 @@ def select_route(
                     _ns_cont = Path(
                         os.environ.get(
                             "LUCY_RUNTIME_NAMESPACE_ROOT",
-                            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
+                            str(lucy_runtime_namespace_root()),
                         )
                     )
                     _buf_path_cont = _ns_cont / "feedback_buffer.json"

@@ -12,10 +12,18 @@ The policy router is intentionally conservative: when in doubt it returns
 from __future__ import annotations
 
 import re
+import sys
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+# Ensure tools package is importable when this module is loaded directly.
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
 
 from router_py.request_types import ClassificationResult
 
@@ -1429,7 +1437,7 @@ def _last_exchange_was_medical_vet() -> bool:
         ns = Path(
             os.environ.get(
                 "LUCY_RUNTIME_NAMESPACE_ROOT",
-                str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
+                str(lucy_runtime_namespace_root()),
             )
         )
         buf_path = ns / "feedback_buffer.json"

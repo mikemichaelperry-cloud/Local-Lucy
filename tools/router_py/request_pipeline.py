@@ -30,8 +30,16 @@ import json
 import logging
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+# Ensure tools package is importable when this module is loaded directly.
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
 
 # ---------------------------------------------------------------------------
 # Types
@@ -73,7 +81,7 @@ def _self_analysis_state_path() -> Path:
     """Resolve current_state.json using the active runtime namespace."""
     namespace = os.environ.get(
         "LUCY_RUNTIME_NAMESPACE_ROOT",
-        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
+        str(lucy_runtime_namespace_root()),
     )
     return Path(namespace) / "state" / "current_state.json"
 

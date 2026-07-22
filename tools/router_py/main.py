@@ -55,6 +55,7 @@ from router_py.shutdown_handler import install as install_shutdown_handler
 from router_py.shutdown_handler import register_closeable
 from router_py.structured_logging import get_structured_logger
 from router_py.utils import sha256_text
+from tools.xdg_paths import lucy_runtime_namespace_root
 
 # Configuration
 DEFAULT_TIMEOUT = 130
@@ -164,13 +165,6 @@ def _write_outcome_telemetry(
         pass
 
 
-def _home_fallback_runtime_namespace_root() -> Path:
-    """Mirror runtime_control.home_fallback_runtime_namespace_root()."""
-    home = Path.home()
-    workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
-
-
 def load_state_from_file() -> dict[str, Any]:
     """Load control state from state file (fallback when env vars not set).
 
@@ -191,8 +185,8 @@ def load_state_from_file() -> dict[str, Any]:
     if namespace_root:
         candidates.append(Path(namespace_root).expanduser() / "state" / "current_state.json")
 
-    # 3. Home fallback namespace
-    candidates.append(_home_fallback_runtime_namespace_root() / "state" / "current_state.json")
+    # 3. Canonical XDG namespace
+    candidates.append(lucy_runtime_namespace_root() / "state" / "current_state.json")
 
     # 4. Legacy fallback (project root state dir)
     candidates.append(ROOT_DIR / "state" / "state" / "current_state.json")

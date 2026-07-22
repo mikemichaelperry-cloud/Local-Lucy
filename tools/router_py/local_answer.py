@@ -30,6 +30,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+# Ensure tools package (and thus tools.xdg_paths) is importable when this module
+# is loaded directly.
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_memory_db_path, lucy_runtime_namespace_root
+
 try:
     import aiohttp
 
@@ -100,7 +108,7 @@ def _get_active_model_from_state() -> str | None:
     else:
         namespace = os.environ.get(
             "LUCY_RUNTIME_NAMESPACE_ROOT",
-            str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
+            str(lucy_runtime_namespace_root()),
         )
         state_file = Path(namespace).expanduser() / "state" / "current_state.json"
     try:
@@ -226,9 +234,7 @@ def _load_family_facts_direct() -> list[str]:
 
         db_path = os.environ.get("LUCY_MEMORY_DB_PATH", "")
         if not db_path:
-            db_path = str(
-                Path.home() / ".codex-api-home" / "lucy" / "runtime-v11" / "state" / "memory.db"
-            )
+            db_path = str(lucy_memory_db_path())
         conn = sqlite3.connect(db_path, check_same_thread=False)
         cursor = conn.execute(
             "SELECT fact_text FROM persistent_facts WHERE category = 'family' OR category IS NULL OR category = '' ORDER BY id"
@@ -607,7 +613,7 @@ class LocalAnswerConfig:
         if not model:
             namespace = os.environ.get(
                 "LUCY_RUNTIME_NAMESPACE_ROOT",
-                str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
+                str(lucy_runtime_namespace_root()),
             )
             state_file = Path(namespace) / "state" / "current_state.json"
             try:

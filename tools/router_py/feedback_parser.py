@@ -23,11 +23,19 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum, auto
 from pathlib import Path
 from typing import Optional
+
+# Ensure tools package is importable when this module is loaded directly.
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
 
 try:
     from .feedback_buffer import get_buffer
@@ -35,11 +43,7 @@ except ImportError:
     from feedback_buffer import get_buffer
 
 # Where to write user feedback for background_learner.py
-RUNTIME_NS = Path(
-    os.environ.get(
-        "LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11")
-    )
-)
+RUNTIME_NS = lucy_runtime_namespace_root()
 # feedback_parser.py lives in tools/router_py/ → go up two levels to project root → models/router
 ROUTER_DIR = Path(__file__).resolve().parent.parent.parent / "models" / "router"
 FEEDBACK_PATH = ROUTER_DIR / "user_feedback.jsonl"

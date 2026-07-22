@@ -18,12 +18,19 @@ import json
 import logging
 import os
 import re
+import sys
 import tempfile
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Generator
+
+# Ensure tools package (and thus tools.xdg_paths) is importable when this module
+# is loaded directly.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root, lucy_state_dir
 
 from router_py.request_types import ExecutionResult, RoutingDecision
 from router_py.state_manager import StateManager
@@ -247,12 +254,8 @@ class StateWriter:
         raw = os.environ.get("LUCY_UI_STATE_DIR", "").strip()
         if raw:
             return Path(raw).expanduser()
-        # Fallback: same default as runtime_request.py
-        home = Path.home()
-        workspace_home = (
-            home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-        )
-        return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11" / "state"
+        # Canonical XDG state directory
+        return lucy_state_dir()
 
     # -- Payload builder --
 
@@ -444,7 +447,7 @@ class StateWriter:
         authority_root = Path(
             os.environ.get("LUCY_RUNTIME_AUTHORITY_ROOT", str(Path(__file__).resolve().parents[2]))
         ).expanduser()
-        runtime_namespace = workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
+        runtime_namespace = lucy_runtime_namespace_root()
         legacy_root = workspace_home / "lucy" / "runtime-v10"
         return {
             "active_root": str(authority_root),

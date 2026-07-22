@@ -43,6 +43,12 @@ except ImportError:
 # Import TTS adapter
 import sys
 
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 VOICE_DIR = Path(__file__).resolve().parents[1] / "voice"
 if str(VOICE_DIR) not in sys.path:
     sys.path.insert(0, str(VOICE_DIR))
@@ -1175,7 +1181,7 @@ class VoicePipeline(BaseToolWrapper):
                     runtime_dir = Path(
                         os.environ.get(
                             "LUCY_RUNTIME_NAMESPACE_ROOT",
-                            Path.home() / ".codex-api-home/lucy/runtime-v11",
+                            str(lucy_runtime_namespace_root()),
                         )
                     )
                     levels_file = runtime_dir / "state" / "voice_audio_levels.json"

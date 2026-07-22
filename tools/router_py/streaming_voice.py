@@ -18,6 +18,12 @@ import time
 from pathlib import Path
 from typing import AsyncIterator, Optional
 
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "voice" / "backends"))
 
@@ -26,7 +32,7 @@ def _get_audio_levels_file() -> Path:
     """Get path to audio levels file for VU meter."""
     runtime_dir = Path(
         os.environ.get(
-            "LUCY_RUNTIME_NAMESPACE_ROOT", Path.home() / ".codex-api-home/lucy/runtime-v11"
+            "LUCY_RUNTIME_NAMESPACE_ROOT", str(lucy_runtime_namespace_root())
         )
     )
     return runtime_dir / "state" / "voice_audio_levels.json"

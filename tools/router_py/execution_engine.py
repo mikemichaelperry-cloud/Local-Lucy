@@ -206,6 +206,8 @@ def _trusted_evidence_metadata(
 
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 from router_py.classify import ClassificationResult, RoutingDecision
 from router_py.policy import requires_evidence_mode
 from router_py.request_types import ExecutionResult
@@ -324,7 +326,9 @@ DEFAULT_TIMEOUT = 130
 DEFAULT_POLICY_CONFIDENCE_THRESHOLD = 0.60
 
 # Default chat memory file path (matches runtime_request.py)
-DEFAULT_CHAT_MEMORY_FILE = "~/.codex-api-home/lucy/runtime-v11/state/chat_session_memory.txt"
+DEFAULT_CHAT_MEMORY_FILE = str(
+    lucy_runtime_namespace_root() / "state" / "chat_session_memory.txt"
+)
 
 # Current-fact markers used for route-dependent evidence fallback.
 _CURRENT_FACT_MARKERS = {"current", "latest", "now", "today", "price"}
