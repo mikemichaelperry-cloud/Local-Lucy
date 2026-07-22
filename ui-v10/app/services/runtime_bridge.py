@@ -27,25 +27,6 @@ try:
 except ImportError:  # pragma: no cover - python-dotenv may be absent in minimal installs
     load_dotenv = None  # type: ignore[assignment,misc]
 
-try:
-    from router_py.payload_builders import build_history_entry
-except Exception:  # pragma: no cover - fallback if router_py is not on path during tests
-    def build_history_entry(payload: dict[str, Any]) -> dict[str, Any]:  # type: ignore[misc]
-        return {
-            "authority": payload.get("authority", {}) if isinstance(payload.get("authority"), dict) else {},
-            "completed_at": payload.get("completed_at", ""),
-            "control_state": payload.get("control_state", {}) if isinstance(payload.get("control_state"), dict) else {},
-            "error": payload.get("error", ""),
-            "outcome": payload.get("outcome", {}) if isinstance(payload.get("outcome"), dict) else {},
-            "request_id": payload.get("request_id", ""),
-            "request_text": payload.get("request_text", ""),
-            "response_text": payload.get("response_text", ""),
-            "route": payload.get("route", {}) if isinstance(payload.get("route"), dict) else {},
-            "status": payload.get("status", ""),
-        }
-
-from app.services.state_store import REQUEST_HISTORY_FILE
-
 
 @dataclass(frozen=True)
 class ActionCapability:
@@ -996,13 +977,12 @@ class RuntimeBridge:
         context: dict[str, Any] | None = None,
     ) -> CommandResult:
         """
-        Direct Python execution path via main.py — unified entry point.
+        Direct Python execution path via runtime_request.submit_request().
 
-        Before: runtime_bridge → ExecutionEngine (direct, bypassed main.py)
-        After:  runtime_bridge → main.run() → ExecutionEngine
-
-        This ensures all execution goes through the single entry point,
-        preserving state resolution, feedback detection, locking, and telemetry.
+        Both the HMI and the CLI now call the same canonical function so that
+        last_request_result.json and request_history.jsonl share one schema.
+        The bridge only adds HMI-specific display metadata (model recommendation,
+        execution time) on top of the canonical payload.
         """
         request_text = requested_value if requested_value is not None else ""
         if not request_text.strip():
@@ -1013,26 +993,6 @@ class RuntimeBridge:
                 returncode=None,
                 stdout="",
                 stderr="empty submit text",
-                timed_out=False,
-                payload=None,
-            )
-
-        # Add router_py to path for imports
-        router_py_path = str(self.snapshot_root / "tools")
-        if router_py_path not in sys.path:
-            sys.path.insert(0, router_py_path)
-
-        try:
-            from router_py.main import execute_plan_python
-            from router_py.policy import normalize_augmentation_policy
-        except ImportError as e:
-            return CommandResult(
-                action=action,
-                requested_value=requested_value,
-                status="failed",
-                returncode=1,
-                stdout="",
-                stderr=f"Direct execution import failed: {e}. Fallback to subprocess path.",
                 timed_out=False,
                 payload=None,
             )
@@ -1070,50 +1030,36 @@ class RuntimeBridge:
         if effective_model and effective_model.lower() != "auto":
             self._unload_other_ollama_models(effective_model)
 
-        # Get augmentation policy from environment
-        policy = normalize_augmentation_policy(
-            os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
-        )
-
         start_time = os.times()[0]  # User CPU time
 
         try:
-            # Call unified entry point directly (main.run() is a thin
-            # pass-through; using execute_plan_python eliminates one
-            # wrapper hop and aligns with the consolidated bridge).
-            outcome = execute_plan_python(
-                question=request_text,
-                policy=policy,
-                timeout=self.request_timeout_seconds,
-                surface="hmi",
+            runtime_request = self._import_tool("runtime_request")
+            payload = runtime_request.submit_request(
+                request_text,
                 augmented_direct_once=augmented_direct_once,
                 self_review=self_review,
+                surface="hmi",
                 context=context,
                 model=effective_model,
+                persist=True,
             )
 
             # Calculate execution time
             execution_time_ms = int((os.times()[0] - start_time) * 1000)
 
-            # Build payload directly from RouterOutcome — no reconstruction.
-            # The HMI is a display layer only; it must reflect the core's
-            # exact output without reinterpretation.
-            payload = self._build_payload_from_outcome(
-                outcome=outcome,
-                request_text=request_text,
-                execution_time_ms=execution_time_ms,
-            )
-
-            # Phase 3: expose the recommendation to the HMI and log shadow metrics.
+            # Add HMI-specific display metadata on top of the canonical payload.
+            if "outcome" in payload and isinstance(payload["outcome"], dict):
+                payload["outcome"]["execution_time_ms"] = execution_time_ms
             if recommendation is not None:
                 payload["model_recommendation"] = recommendation["recommended"]
                 payload["model_recommendation_reason"] = recommendation["reason"]
                 if router_metrics is not None:
                     try:
+                        request_id = str(payload.get("request_id", ""))
                         router_metrics.record_model_selection_shadow(
-                            request_id=outcome.request_id or "",
+                            request_id=request_id,
                             query=request_text,
-                            route=outcome.route or "",
+                            route=str(payload.get("route", {}).get("mode", "")),
                             manual_model=manual_model,
                             recommended_model=recommendation["recommended"],
                             competing_model=recommendation["competing"],
@@ -1121,12 +1067,12 @@ class RuntimeBridge:
                             confidence=recommendation["confidence"],
                         )
                         router_metrics.record_model_latency(
-                            request_id=outcome.request_id or "",
+                            request_id=request_id,
                             model=effective_model,
                             latency_ms=execution_time_ms,
                             extra={
-                                "route": outcome.route,
-                                "outcome_code": outcome.outcome_code,
+                                "route": payload.get("route", {}).get("mode", ""),
+                                "outcome_code": payload.get("outcome", {}).get("outcome_code", ""),
                             },
                         )
                     except Exception:
@@ -1153,20 +1099,14 @@ class RuntimeBridge:
             if is_auto_model is not None and not is_auto_model(manual_model):
                 self._last_used_model = effective_model
 
-            # Write the canonical history entry so the HMI conversation panel
-            # can display this request. The direct-Python path
-            # (execute_plan_python) does not use ExecutionEngine/StateWriter, so
-            # the bridge must write the entry here. Deduplication by request_id
-            # prevents duplicates if a future core path also writes history.
-            self._append_request_history(payload)
-
+            status = payload.get("status", "failed")
             return CommandResult(
                 action=action,
                 requested_value=requested_value,
-                status="ok" if outcome.status == "completed" else outcome.status,
-                returncode=0 if outcome.status == "completed" else 1,
-                stdout=outcome.response_text,
-                stderr=outcome.error_message or "",
+                status="ok" if status == "completed" else status,
+                returncode=0 if status == "completed" else 1,
+                stdout=payload.get("response_text", ""),
+                stderr=payload.get("error", ""),
                 timed_out=False,
                 payload=payload,
             )
@@ -1182,107 +1122,6 @@ class RuntimeBridge:
                 timed_out=False,
                 payload=None,
             )
-
-    def _build_payload_from_outcome(
-        self,
-        outcome: Any,
-        request_text: str,
-        execution_time_ms: int,
-    ) -> dict[str, Any]:
-        """
-        Build JSON payload from RouterOutcome — faithful, no reinterpretation.
-
-        The HMI is a display layer; it must show exactly what the core
-        pipeline produced.  All fields are copied directly from the
-        RouterOutcome dataclass.
-        """
-        # Use the core's request_id (propagated from main.py via pipeline)
-        request_id = outcome.request_id or ""
-
-        control_state = {
-            "mode": os.environ.get("LUCY_MODE", "offline"),
-            "conversation": os.environ.get("LUCY_CONVERSATION_MODE", "off"),
-            "memory": os.environ.get("LUCY_SESSION_MEMORY", "1"),
-            "evidence": os.environ.get("LUCY_EVIDENCE_ENABLED", "0"),
-            "voice": os.environ.get("LUCY_VOICE_ENABLED", "0"),
-            "augmentation_policy": os.environ.get("LUCY_AUGMENTATION_POLICY", "auto"),
-            "augmented_provider": os.environ.get("LUCY_AUGMENTED_PROVIDER", "auto"),
-            "model": os.environ.get("LUCY_MODEL", "local"),
-            "profile": os.environ.get("LUCY_PROFILE", "default"),
-            "self_analysis_mode": os.environ.get("LUCY_SELF_ANALYSIS_MODE", "0"),
-        }
-
-        is_augmented = (outcome.route or "") == "AUGMENTED"
-        is_completed = (outcome.status or "") == "completed"
-        meta = outcome.metadata or {}
-
-        route_payload = {
-            "mode": outcome.route or "LOCAL",
-            "intent_family": outcome.intent_family or "unknown",
-            "confidence": outcome.confidence or 0.0,
-            "reason": outcome.evidence_reason or outcome.policy_reason or "unknown",
-            "route_reason": outcome.policy_reason or "unknown",
-            "evidence_reason": outcome.evidence_reason or "",
-            "provider": outcome.provider or "local",
-            "provider_usage_class": outcome.provider_usage_class or "local",
-            "final_mode": outcome.route or "LOCAL",
-            "is_medical": meta.get("is_medical_query", False),
-        }
-
-        outcome_payload = {
-            "outcome_code": outcome.outcome_code or "completed",
-            "fallback_used": "false" if is_completed else "true",
-            "fallback_reason": outcome.error_message or "none",
-            "trust_class": meta.get("trust_class", "local") or "local",
-            "error_message": outcome.error_message or "",
-            "execution_time_ms": execution_time_ms,
-            "augmented_provider_used": outcome.provider if is_augmented else "none",
-            "augmented_provider_usage_class": outcome.provider_usage_class or "local",
-            "augmented_provider_call_reason": (
-                "direct"
-                if is_augmented and outcome.outcome_code == "augmented_answer"
-                else "fallback"
-                if is_augmented and outcome.outcome_code == "augmented_fallback"
-                else "error"
-                if is_augmented and not is_completed
-                else "not_needed"
-            ),
-            "augmented_provider_status": (
-                "available"
-                if is_augmented and is_completed
-                else "error"
-                if is_augmented
-                else "none"
-            ),
-            "augmented_paid_provider_invoked": (
-                "true" if is_augmented and outcome.provider_usage_class == "paid" else "false"
-            ),
-            "augmented_direct_request": "",
-        }
-
-        return {
-            "accepted": True,
-            "authority": {
-                "runtime_authority_root": str(self.snapshot_root),
-                "ui_authority_root": str(self.snapshot_root),
-            },
-            "completed_at": self._iso_now(),
-            "control_state": control_state,
-            "error": outcome.error_message or "",
-            "outcome": outcome_payload,
-            "metadata": meta,
-            "request_id": request_id,
-            "request_text": request_text,
-            "response_text": outcome.response_text,
-            "route": route_payload,
-            "status": "completed" if outcome.status == "completed" else outcome.status,
-        }
-
-    def _iso_now(self) -> str:
-        """Return ISO format current timestamp."""
-        from datetime import datetime, timezone
-
-        return datetime.now(timezone.utc).isoformat()
 
     def _resolve_current_model(self) -> str:
         """Read the active model from runtime state file."""
@@ -1317,53 +1156,6 @@ class RuntimeBridge:
             )
         except (OSError, json.JSONDecodeError):
             return os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
-
-    def _resolve_history_file(self) -> Path:
-        """Resolve the history file path (same logic as state_store/state_writer)."""
-        raw = os.environ.get("LUCY_RUNTIME_REQUEST_HISTORY_FILE")
-        if raw:
-            return Path(raw).expanduser()
-        namespace_root = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "").strip()
-        if namespace_root:
-            return Path(namespace_root).expanduser() / "state" / "request_history.jsonl"
-        # Fallback for tests / dev environments without the launcher.
-        return Path.home() / ".local" / "share" / "local-lucy-v11" / "state" / "request_history.jsonl"
-
-    def _append_request_history(self, payload: dict[str, Any]) -> None:
-        """Append a completed request to the HMI history file.
-
-        Deduplicates by request_id so the entry remains safe even if a future
-        core path also writes history.
-        """
-        history_file = self._resolve_history_file()
-        entry = build_history_entry(payload)
-        request_id = str(entry.get("request_id", "")).strip()
-        if not request_id:
-            return
-
-        history_file.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            with open(history_file, "a", encoding="utf-8") as handle:
-                # Best-effort dedup: check last 50 lines for the same request_id.
-                if history_file.exists():
-                    try:
-                        lines = history_file.read_text(encoding="utf-8").splitlines()
-                        for raw_line in lines[-50:]:
-                            line = raw_line.strip()
-                            if not line:
-                                continue
-                            try:
-                                parsed = json.loads(line)
-                            except json.JSONDecodeError:
-                                continue
-                            if str(parsed.get("request_id", "")).strip() == request_id:
-                                return
-                    except OSError:
-                        pass
-                handle.write(json.dumps(entry, sort_keys=True))
-                handle.write("\n")
-        except OSError:
-            pass
 
     def _run_lifecycle_action(self, action: str, requested_value: str) -> CommandResult:
         expected_value = "start" if action == "runtime_start" else "stop"
