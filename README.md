@@ -42,7 +42,7 @@ The frozen V9 baseline is archived under the `local-lucy-v9-frozen-2026-05-28` r
 - **Primary LLM runs locally** via Ollama (`local-lucy-llama31` backed by llama3.1:8b, 8192-token context; optional `local-lucy-gemma4` backed by gemma4:12b-it-qat, 8192-token general context with 16,384-token SELF_REVIEW context)
 - **Optional cloud augmentation** (Kimi/OpenAI) for complex queries
 - **SQLite state management** with versioned schema migrations and `0o600` permissions
-- **XDG-compliant runtime paths** (`~/.local/share/local-lucy`) with legacy fallback
+- **XDG-compliant runtime paths** (`~/.local/share/local-lucy-v11`)
 - **Session memory** persists across restarts
 
 ### 📡 Live Data Integration
@@ -249,7 +249,7 @@ See [docs/runbooks/PERSONAS.md](docs/runbooks/PERSONAS.md) for the historical ad
 |----------|---------|-------------|
 | `LUCY_LOCAL_MODEL` | `local-lucy-llama31` | Default Ollama model |
 | `LUCY_AUTO_LEARN` | `1` | Allow background learning from explicit user feedback |
-| `LUCY_RUNTIME_NAMESPACE_ROOT` | `~/.local/share/local-lucy` | XDG runtime state directory |
+| `LUCY_RUNTIME_NAMESPACE_ROOT` | `~/.local/share/local-lucy-v11` | XDG runtime state directory |
 | `LUCY_RUNTIME_AUTHORITY_ROOT` | project root | Project root for contract validation |
 | `LUCY_OLLAMA_API_URL` | `http://127.0.0.1:11434/api/generate` | Local LLM endpoint |
 | `LUCY_WEB_ENABLED` | `0` | Set to `1` to start the optional web adapter |
