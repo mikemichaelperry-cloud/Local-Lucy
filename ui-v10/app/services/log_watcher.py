@@ -6,6 +6,16 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import sys
+
+# Ensure project root is on sys.path so tools.xdg_paths resolves when this
+# module is imported by the HMI or standalone tests.
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 
 @dataclass(frozen=True)
 class LogSnapshot:
@@ -172,13 +182,7 @@ def _default_runtime_namespace_root() -> Path:
                 "missing required LUCY_RUNTIME_NAMESPACE_ROOT while LUCY_RUNTIME_CONTRACT_REQUIRED is active"
             )
         return Path(raw).expanduser()
-    explicit_root = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    if explicit_root:
-        return Path(explicit_root).expanduser()
-    home = Path.home()
-    workspace_home = home.parent if home.name in {".codex-api-home", ".codex-plus-home"} else home
-    # v11 ISOLATION: Use V11 runtime namespace
-    return workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
+    return lucy_runtime_namespace_root()
 
 
 def _contract_required() -> bool:

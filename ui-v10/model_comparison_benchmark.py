@@ -28,14 +28,21 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import sys
+
+SNAPSHOT_ROOT = Path(__file__).resolve().parent.parent
+if str(SNAPSHOT_ROOT / "tools") not in sys.path:
+    sys.path.insert(0, str(SNAPSHOT_ROOT / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
-SNAPSHOT_ROOT = Path(__file__).resolve().parent.parent
 RUNTIME_NS = Path(
     os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    or (Path.home() / ".codex-api-home" / "lucy" / "runtime-v11")
+    or lucy_runtime_namespace_root()
 )
 REQUEST_TOOL = SNAPSHOT_ROOT / "tools/runtime_request.py"
 REPORT_FILE = (

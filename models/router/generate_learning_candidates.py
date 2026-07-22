@@ -36,6 +36,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+# Ensure tools package is importable when this script is run directly.
+import sys
+
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -49,12 +58,7 @@ ROUTER_LOG_PATH = (
     Path(DEFAULT_ROUTER_LOG_DIR) / "router_decisions.jsonl" if DEFAULT_ROUTER_LOG_DIR else None
 )
 
-RUNTIME_NS = Path(
-    os.environ.get(
-        "LUCY_RUNTIME_NAMESPACE_ROOT",
-        str(Path.home() / ".codex-api-home" / "lucy" / "runtime-v11"),
-    )
-)
+RUNTIME_NS = lucy_runtime_namespace_root()
 FEEDBACK_BUFFER_PATH = RUNTIME_NS / "feedback_buffer.json"
 USER_FEEDBACK_PATH = ROUTER_DIR / "user_feedback.jsonl"
 AUTO_FEEDBACK_PATH = ROUTER_DIR / "auto_feedback.jsonl"

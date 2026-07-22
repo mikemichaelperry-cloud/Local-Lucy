@@ -25,11 +25,18 @@ import logging
 import os
 import re
 import sqlite3
+import sys
 import threading
 import time
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+# Ensure project root is on sys.path so tools.xdg_paths resolves when this
+# script is executed directly from the tools/memory/ directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from tools.xdg_paths import lucy_memory_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -80,14 +87,7 @@ def _resolve_db_path() -> Path:
     if raw:
         return Path(raw).expanduser()
 
-    # Prefer the shared XDG path resolver; fall back to a legacy default if
-    # the import is unavailable (e.g., standalone use without full repo path).
-    try:
-        from tools.xdg_paths import lucy_memory_db_path
-
-        return lucy_memory_db_path()
-    except Exception:
-        return Path.home() / ".codex-api-home" / "lucy" / "runtime-v11" / "state" / "memory.db"
+    return lucy_memory_db_path()
 
 
 # ---------------------------------------------------------------------------

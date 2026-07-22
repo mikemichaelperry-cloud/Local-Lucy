@@ -9,7 +9,7 @@ APPDIR="${APPDIR:-$(dirname "$(readlink -f "$0")")}"
 export LUCY_ROOT="$APPDIR/opt/local-lucy"
 export LUCY_UI_ROOT="$LUCY_ROOT/ui-v10"
 export LUCY_RUNTIME_AUTHORITY_ROOT="$LUCY_ROOT"
-export LUCY_RUNTIME_NAMESPACE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy"
+export LUCY_RUNTIME_NAMESPACE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy-v11"
 export PATH="$LUCY_ROOT/ui-v10/.venv/bin:$PATH"
 
 # Ensure the venv exists; if not, warn and fall back to system Python.

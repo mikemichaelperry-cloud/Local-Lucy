@@ -8,15 +8,23 @@ to build a labeled dataset of (query, intent_family, evidence_mode, route, polic
 import json
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+# Ensure tools package is importable when this script is run directly.
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
 
 
 def resolve_state_dirs() -> list[Path]:
     """Find all state directories (workspace + namespaces)."""
     roots = []
     namespace_root = Path(
-        os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(Path.home() / "lucy-v11"))
+        os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(lucy_runtime_namespace_root()))
     )
     roots.append(namespace_root / "state")
 

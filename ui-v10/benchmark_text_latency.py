@@ -7,12 +7,18 @@ import statistics
 import subprocess
 import time
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 UI_ROOT = ROOT / "ui-v10"
+if str(ROOT / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 RUNTIME_NS = Path(
     os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    or (Path.home() / ".codex-api-home" / "lucy" / "runtime-v11")
+    or lucy_runtime_namespace_root()
 )
 
 PROMPTS = [

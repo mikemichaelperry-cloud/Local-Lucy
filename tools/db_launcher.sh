@@ -4,7 +4,7 @@
 LUCY_ROOT="${LUCY_ROOT:-/home/mike/lucy-v11}"
 DB1="${LUCY_ROOT}/state/lucy_state.db"
 DB2="${LUCY_ROOT}/data/tubes/tube_database.db"
-DB3="/home/mike/.codex-api-home/lucy/runtime-v11/state/memory.db"
+DB3="${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy-v11/state/memory.db"
 
 show_lucy_state() {
     echo ""

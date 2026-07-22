@@ -10,13 +10,19 @@ import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
+import sys
 
 # Configuration
 SNAPSHOT_ROOT = Path(__file__).resolve().parent.parent
 UI_ROOT = SNAPSHOT_ROOT / "ui-v10"
+if str(SNAPSHOT_ROOT / "tools") not in sys.path:
+    sys.path.insert(0, str(SNAPSHOT_ROOT / "tools"))
+
+from tools.xdg_paths import lucy_runtime_namespace_root
+
 RUNTIME_NS = Path(
     os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    or (Path.home() / ".codex-api-home" / "lucy" / "runtime-v11")
+    or lucy_runtime_namespace_root()
 )
 
 # Environment setup
