@@ -77,7 +77,7 @@ fe0113dce1102569cc97151ddfded440cf4e8f0693abc446f2f2096129d174fa  ./data/tubes/t
 c44de8517b2878d2c8d7b67b1fb4b53617ff14b798d6920264fc6f652be53d76  ./.github/ISSUE_TEMPLATE/bug_report.md
 1d3a2fb9903ba9625089a07b1e405cea11548e0bddcb7c3bec15c5cf11391173  ./.github/ISSUE_TEMPLATE/feature_request.md
 be024269163f32bd3b2699e16806f9348953ae85507952d05a63941bed48f6d0  ./.github/PULL_REQUEST_TEMPLATE.md
-bf048500c533d0a59c7fbdf3f4e6fc4b4ca4e5583e99184ce63d8335398fa5b5  ./.github/workflows/ci.yml
+f494cc5470f1af6d1bfd01a0fcaf0c617c8f365508cb8237067373946edb6ef1  ./.github/workflows/ci.yml
 61216aa5e555c8af6dc07429c1750c36a81bbd94e8b44352304e6c96bfd31c6f  ./.github/workflows/release.yml
 da6462ed88772e6c4fd8a8f3a19467d835f78890a4e353e5bbb33a8853522ab0  ./LICENSE
 55f05f62a163d686e3bd8c18822415f9317ac599e12e42df9f80c4988e137fdf  ./lucy_chat.sh

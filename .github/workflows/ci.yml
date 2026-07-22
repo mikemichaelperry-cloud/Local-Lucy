@@ -122,7 +122,7 @@ jobs:
         run: |
           cd ui-v10/tests
           cleanup_state() {
-            NAMESPACE_ROOT="${LUCY_RUNTIME_NAMESPACE_ROOT:-$HOME/.codex-api-home/lucy/runtime-v11}"
+            NAMESPACE_ROOT="${LUCY_RUNTIME_NAMESPACE_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/local-lucy-v11}"
             rm -f "$NAMESPACE_ROOT/state/request_history.jsonl"
             rm -f "$NAMESPACE_ROOT/state/last_request_result.json"
           }
