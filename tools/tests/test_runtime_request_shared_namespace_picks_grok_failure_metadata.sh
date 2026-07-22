@@ -68,6 +68,7 @@ python3 "${CONTROL_TOOL}" --state-file "${STATE_FILE}" ensure-state >/dev/null
 python3 "${CONTROL_TOOL}" --state-file "${STATE_FILE}" set-augmentation --value direct_allowed >/dev/null
 
 if LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" \
+  LUCY_RUNTIME_REQUEST_MOCK=1 \
   LUCY_SHARED_STATE_NAMESPACE="${NAMESPACE}" \
   LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" \
   LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \

@@ -61,12 +61,17 @@ chmod +x "${MOCK_ROOT}/lucy_chat.sh"
 python3 "${CONTROL_TOOL}" --state-file "${STATE_FILE}" ensure-state >/dev/null
 
 LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" \
+LUCY_RUNTIME_REQUEST_MOCK=1 \
 LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" \
 LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \
 LUCY_RUNTIME_REQUEST_HISTORY_FILE="${HISTORY_FILE}" \
 python3 "${REQUEST_TOOL}" submit --text "good" >/dev/null
 
+[[ -f "${MOCK_ROOT}/state/last_route.env" ]] || die "good request should publish last_route.env"
+[[ -f "${MOCK_ROOT}/state/last_outcome.env" ]] || die "good request should publish last_outcome.env"
+
 if LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" \
+  LUCY_RUNTIME_REQUEST_MOCK=1 \
   LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" \
   LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \
   LUCY_RUNTIME_REQUEST_HISTORY_FILE="${HISTORY_FILE}" \
@@ -74,12 +79,15 @@ if LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" \
   die "backend failure should return non-zero"
 fi
 
-python3 - <<'PY' "${RESULT_FILE}"
+python3 - <<'PY' "${RESULT_FILE}" "${MOCK_ROOT}/state/last_route.env" "${MOCK_ROOT}/state/last_outcome.env"
 import json
 import sys
 from pathlib import Path
 
 payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+route_path = Path(sys.argv[2])
+outcome_path = Path(sys.argv[3])
+
 assert payload["status"] == "failed"
 assert payload["accepted"] is True
 assert payload["error"] == "backend exploded"
@@ -90,7 +98,16 @@ assert payload["outcome"]["requested_mode"] == "unknown"
 assert payload["outcome"]["final_mode"] == "ERROR"
 assert payload["outcome"]["trust_class"] == "unknown"
 assert payload["outcome"]["fallback_used"] == "false"
+assert payload["outcome"]["fallback_reason"] == ""
 assert payload["outcome"]["rc"] == 7
+
+# Stale files from the previous successful request must not survive the crash.
+assert not route_path.exists(), "stale last_route.env should be deleted after backend crash"
+outcome_env = outcome_path.read_text(encoding="utf-8")
+assert "OUTCOME_CODE=execution_error" in outcome_env
+assert "FINAL_MODE=ERROR" in outcome_env
+assert "FALLBACK_USED=false" in outcome_env
+assert "FALLBACK_REASON=" in outcome_env
 PY
 
 ok "runtime_request clears stale truth metadata when backend fails before state refresh"

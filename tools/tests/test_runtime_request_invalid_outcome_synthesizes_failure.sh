@@ -41,6 +41,7 @@ chmod +x "${MOCK_ROOT}/lucy_chat.sh"
 python3 "${CONTROL_TOOL}" --state-file "${STATE_FILE}" ensure-state >/dev/null
 
 if LUCY_RUNTIME_AUTHORITY_ROOT="${MOCK_ROOT}" \
+  LUCY_RUNTIME_REQUEST_MOCK=1 \
   LUCY_RUNTIME_STATE_FILE="${STATE_FILE}" \
   LUCY_RUNTIME_REQUEST_RESULT_FILE="${RESULT_FILE}" \
   LUCY_RUNTIME_REQUEST_HISTORY_FILE="${HISTORY_FILE}" \
@@ -61,6 +62,7 @@ assert payload["error"] == "backend did not publish valid outcome state"
 assert payload["outcome"]["outcome_code"] == "execution_error"
 assert payload["outcome"]["final_mode"] == "ERROR"
 assert payload["outcome"]["fallback_used"] == "false"
+assert payload["outcome"]["fallback_reason"] == ""
 assert payload["outcome"]["trust_class"] == "unknown"
 assert payload["route"]["mode"] == "EVIDENCE"
 
@@ -68,6 +70,7 @@ assert "OUTCOME_CODE=execution_error" in outcome_env
 assert "FINAL_MODE=ERROR" in outcome_env
 assert "TRUST_CLASS=unknown" in outcome_env
 assert "FALLBACK_USED=false" in outcome_env
+assert "FALLBACK_REASON=" in outcome_env
 PY
 
 ok "runtime_request synthesizes explicit failure truth when outcome file is empty or invalid"
