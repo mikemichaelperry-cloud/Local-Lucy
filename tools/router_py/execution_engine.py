@@ -204,6 +204,7 @@ def _trusted_evidence_metadata(
     }
 
 
+sys.path.insert(0, str(ROOT_DIR))
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from tools.xdg_paths import lucy_runtime_namespace_root

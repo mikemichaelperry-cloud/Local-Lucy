@@ -15,6 +15,9 @@ import sys
 # Configuration
 SNAPSHOT_ROOT = Path(__file__).resolve().parent.parent
 UI_ROOT = SNAPSHOT_ROOT / "ui-v10"
+if str(SNAPSHOT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SNAPSHOT_ROOT))
+
 if str(SNAPSHOT_ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(SNAPSHOT_ROOT / "tools"))
 

@@ -11,6 +11,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 UI_ROOT = ROOT / "ui-v10"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 if str(ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT / "tools"))
 

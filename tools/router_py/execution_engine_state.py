@@ -28,7 +28,9 @@ from typing import Any, Generator
 
 # Ensure tools package (and thus tools.xdg_paths) is importable when this module
 # is loaded directly.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT_DIR))
+sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from tools.xdg_paths import lucy_runtime_namespace_root, lucy_state_dir
 

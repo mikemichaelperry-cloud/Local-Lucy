@@ -31,6 +31,9 @@ from typing import Optional
 import sys
 
 SNAPSHOT_ROOT = Path(__file__).resolve().parent.parent
+if str(SNAPSHOT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SNAPSHOT_ROOT))
+
 if str(SNAPSHOT_ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(SNAPSHOT_ROOT / "tools"))
 

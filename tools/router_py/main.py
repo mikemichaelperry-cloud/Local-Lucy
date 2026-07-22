@@ -44,6 +44,7 @@ from typing import Any
 
 # Add parent to path for imports
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT_DIR))
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from router_py import request_pipeline
