@@ -27,16 +27,15 @@ from pathlib import Path
 
 payload = json.loads(sys.argv[1])
 home_value = Path(sys.argv[2])
-workspace_home = home_value.parent if home_value.name in {".codex-api-home", ".codex-plus-home"} else home_value
-expected_root = workspace_home / ".codex-api-home" / "lucy" / "runtime-v11"
+expected_root = home_value / ".local" / "share" / "local-lucy-v11"
 
-assert payload["status"] == "warning"
-assert payload["resolution_source"] == "home_fallback"
+assert payload["status"] == "ok", payload["status"]
+assert payload["resolution_source"] == "xdg_default", payload["resolution_source"]
 assert Path(payload["runtime_namespace_root"]) == expected_root
-assert "runtime_namespace_home_fallback" in payload["warning_codes"]
-assert any("HOME fallback only" in warning for warning in payload["warnings"])
+assert "runtime_namespace_home_fallback" not in payload["warning_codes"]
+assert not any("HOME fallback only" in warning for warning in payload["warnings"])
 assert payload["augmented_availability"]["status"] in {"unknown", "not_used", "disabled"}
 PY
 
-ok "runtime_control self-check warns loudly when runtime resolution is using HOME fallback only"
+ok "runtime_control self-check uses canonical XDG path and reports no home-fallback warning"
 echo "PASS: test_runtime_control_self_check_warns_on_home_fallback"

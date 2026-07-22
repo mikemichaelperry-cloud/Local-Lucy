@@ -20,7 +20,7 @@ mkdir -p "${SANDBOX_HOME}" "${PLUS_HOME}"
 
 check_resolution() {
   local home_value="$1"
-  local expected_root="$2"
+  local expected_root="${home_value}/.local/share/local-lucy-v11"
   HOME="${home_value}" "${ROOT}/ui-v10/.venv/bin/python3" - <<'PY' "${TOOLS_DIR}" "${UI_ROOT}" "${expected_root}" "${home_value}"
 import os
 import sys
@@ -113,11 +113,12 @@ assert Path(state_store.STATE_DIRECTORY) == namespace_root / "state"
 PY
 }
 
-EXPECTED_ROOT="${USER_HOME}/.codex-api-home/lucy/runtime-v11"
-check_resolution "${USER_HOME}" "${EXPECTED_ROOT}"
-check_resolution "${SANDBOX_HOME}" "${EXPECTED_ROOT}"
-check_resolution "${PLUS_HOME}" "${EXPECTED_ROOT}"
-check_namespace_override "/home/mike/.codex-plus-home" "/home/mike/.codex-api-home/lucy/runtime-v11"
+check_resolution "${USER_HOME}"
+check_resolution "${SANDBOX_HOME}"
+check_resolution "${PLUS_HOME}"
 
-ok "default runtime namespace resolution stays stable for normal and Codex sandbox HOME values"
+OVERRIDE_NS="${TMPD}/override_namespace"
+check_namespace_override "${USER_HOME}" "${OVERRIDE_NS}"
+
+ok "default runtime namespace resolution uses canonical XDG path for normal and Codex sandbox HOME values"
 echo "PASS: test_runtime_namespace_default_resolution"
