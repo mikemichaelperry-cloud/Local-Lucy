@@ -144,7 +144,12 @@ def main() -> int:
                 append_history_entry(resolve_history_file(), payload)
                 print(json.dumps(payload, sort_keys=True))
                 return 1
-            payload = handle_submit(request_text, augmented_direct_once=augmented_direct_once)
+            payload = submit_request(
+                request_text,
+                augmented_direct_once=augmented_direct_once,
+                surface="cli",
+                persist=True,
+            )
         elif args.command == "submit-review":
             if not request_text:
                 payload = build_rejected_payload("empty self-review text")
@@ -152,11 +157,14 @@ def main() -> int:
                 append_history_entry(resolve_history_file(), payload)
                 print(json.dumps(payload, sort_keys=True))
                 return 1
-            payload = handle_self_review_submit(request_text)
+            payload = submit_request(
+                request_text,
+                self_review=True,
+                surface="cli",
+                persist=True,
+            )
         else:
             raise RuntimeRequestError(f"unsupported command: {args.command}")
-        persist_payload(resolve_result_file(), payload)
-        append_history_entry(resolve_history_file(), payload)
         print(json.dumps(payload, sort_keys=True))
         return 0 if payload["status"] == "completed" else 1
     except (RuntimeRequestError, RuntimeControlError) as exc:
@@ -339,13 +347,57 @@ def resolve_history_max_entries() -> int:
     return value
 
 
-def handle_submit(request_text: str, *, augmented_direct_once: bool = False) -> dict[str, Any]:
+def handle_submit(
+    request_text: str,
+    *,
+    augmented_direct_once: bool = False,
+    surface: str = "cli",
+    context: dict[str, Any] | None = None,
+    model: str | None = None,
+) -> dict[str, Any]:
     return run_backend_submit(
         request_text=request_text,
         execution_text=request_text,
         augmented_direct_once=augmented_direct_once,
         extra_env=None,
+        surface=surface,
+        context=context,
+        model=model,
     )
+
+
+def submit_request(
+    request_text: str,
+    *,
+    augmented_direct_once: bool = False,
+    self_review: bool = False,
+    surface: str = "cli",
+    context: dict[str, Any] | None = None,
+    model: str | None = None,
+    persist: bool = True,
+) -> dict[str, Any]:
+    """Canonical request entry point used by CLI and HMI.
+
+    Runs the backend, builds the canonical payload, and (when persist=True)
+    writes last_request_result.json and appends to request_history.jsonl so
+    both callers produce the same on-disk schema.
+    """
+    if self_review:
+        payload = handle_self_review_submit(request_text)
+    else:
+        payload = run_backend_submit(
+            request_text=request_text,
+            execution_text=request_text,
+            augmented_direct_once=augmented_direct_once,
+            extra_env=None,
+            surface=surface,
+            context=context,
+            model=model,
+        )
+    if persist:
+        persist_payload(resolve_result_file(), payload)
+        append_history_entry(resolve_history_file(), payload)
+    return payload
 
 
 def handle_self_review_submit(request_text: str) -> dict[str, Any]:
@@ -438,6 +490,10 @@ def _run_backend_submit_python(
     execution_text: str,
     augmented_direct_once: bool,
     extra_env: dict[str, str] | None,
+    surface: str = "cli",
+    self_review: bool = False,
+    context: dict[str, Any] | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Python-native backend submit using router_py.main.run()."""
     from router_py.main import run as router_run
@@ -466,8 +522,11 @@ def _run_backend_submit_python(
             execution_text,
             policy=policy,
             timeout=DEFAULT_TIMEOUT_SECONDS,
-            surface="cli",
+            surface=surface,
             augmented_direct_once=augmented_direct_once,
+            self_review=self_review,
+            context=context,
+            model=model,
         )
     except Exception as exc:
         return build_failed_payload(
@@ -566,33 +625,46 @@ def run_backend_submit(
     execution_text: str,
     augmented_direct_once: bool,
     extra_env: dict[str, str] | None,
+    surface: str = "cli",
+    self_review: bool = False,
+    context: dict[str, Any] | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Run the backend submit path.
 
-    By default the Python-native router is used. If LUCY_RUNTIME_CHAT_BIN is set
-    to an executable path, that binary is invoked instead. This lets tests and
-    advanced deployments plug in a custom backend while keeping the default path
-    lightweight.
+    By default the Python-native router is always used. A chat-bin-style
+    backend is only used when explicitly enabled via:
+      - LUCY_CHAT_BINARY or LUCY_RUNTIME_CHAT_BIN pointing to an executable, or
+      - LUCY_RUNTIME_REQUEST_MOCK=1, or
+      - LUCY_TEST_MODE=1.
     """
-    chat_bin_env = os.environ.get("LUCY_RUNTIME_CHAT_BIN", "").strip()
-    if chat_bin_env:
-        chat_bin = Path(chat_bin_env).expanduser()
-    else:
-        # Auto-detect a chat bin when the caller has pointed the authority root at
-        # a non-project directory that contains a lucy_chat.sh (e.g. test mocks).
-        # In the canonical project layout the authority root equals the project
-        # root, so the Python-native router remains the default.
+    explicit_bin = (
+        os.environ.get("LUCY_CHAT_BINARY", "").strip()
+        or os.environ.get("LUCY_RUNTIME_CHAT_BIN", "").strip()
+    )
+    mock_enabled = str(os.environ.get("LUCY_RUNTIME_REQUEST_MOCK", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    } or str(os.environ.get("LUCY_TEST_MODE", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+    chat_bin: Path | None = None
+    if explicit_bin:
+        chat_bin = Path(explicit_bin).expanduser()
+    elif mock_enabled:
         paths = resolve_paths()
-        expected_root = Path(__file__).resolve().parents[1]
         if (
-            paths.root != expected_root
-            and paths.chat_bin.exists()
+            paths.chat_bin.exists()
             and paths.chat_bin.is_file()
             and os.access(paths.chat_bin, os.X_OK)
         ):
             chat_bin = paths.chat_bin
-        else:
-            chat_bin = None
 
     if chat_bin is not None:
         if not chat_bin.exists() or not chat_bin.is_file() or not os.access(chat_bin, os.X_OK):
@@ -609,6 +681,10 @@ def run_backend_submit(
         execution_text=execution_text,
         augmented_direct_once=augmented_direct_once,
         extra_env=extra_env,
+        surface=surface,
+        self_review=self_review,
+        context=context,
+        model=model,
     )
 
 
@@ -692,6 +768,14 @@ def _run_backend_submit_chat_bin(
     if extra_env:
         env.update(extra_env)
 
+    # Do not let stale route/outcome files from a previous request influence the
+    # current request's truth metadata.
+    try:
+        paths.last_route_file.unlink(missing_ok=True)
+        paths.last_outcome_file.unlink(missing_ok=True)
+    except OSError:
+        pass
+
     try:
         proc = subprocess.run(
             [str(chat_bin), execution_text],
@@ -723,6 +807,12 @@ def _run_backend_submit_chat_bin(
     outcome_code = outcome_env.get("OUTCOME_CODE", "").strip()
     backend_crashed = proc.returncode != 0 and outcome_code != "execution_error"
     if backend_crashed:
+        # Discard stale files and synthesize a clean execution_error state.
+        for stale_path in (paths.last_route_file, paths.last_outcome_file):
+            try:
+                stale_path.unlink(missing_ok=True)
+            except OSError:
+                pass
         route_env = {}
         stderr_hint = proc.stderr.strip() if proc.stderr else ""
         outcome_env = {
@@ -731,7 +821,7 @@ def _run_backend_submit_chat_bin(
             "FINAL_MODE": "ERROR",
             "TRUST_CLASS": "unknown",
             "FALLBACK_USED": "false",
-            "FALLBACK_REASON": "none",
+            "FALLBACK_REASON": "",
             "ACTION_HINT": stderr_hint or "chat bin failed",
             "ERROR_MESSAGE": stderr_hint or "chat bin failed",
             "RC": str(proc.returncode),
@@ -776,7 +866,7 @@ def _run_backend_submit_chat_bin(
             "REQUESTED_MODE": "",
             "FINAL_MODE": "ERROR",
             "FALLBACK_USED": "false",
-            "FALLBACK_REASON": "none",
+            "FALLBACK_REASON": "",
             "TRUST_CLASS": "unknown",
         }
         try:
@@ -2220,10 +2310,42 @@ def append_history_entry(history_file: Path, payload: dict[str, Any]) -> None:
     with locked_state_file(history_file):
         if _history_contains_request_id(history_file, request_id):
             return
+        # Also avoid writing an exact duplicate of the most recent entry
+        # (same request_id, timestamp, and response_text).
+        last_entry = _read_last_history_entry(history_file)
+        if last_entry is not None:
+            if (
+                str(last_entry.get("request_id", "")).strip() == request_id
+                and str(last_entry.get("completed_at", "")).strip()
+                == str(entry.get("completed_at", "")).strip()
+                and str(last_entry.get("response_text", "")).strip()
+                == str(entry.get("response_text", "")).strip()
+            ):
+                return
         with history_file.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, sort_keys=True))
             handle.write("\n")
         rotate_history_if_needed(history_file, max_entries=resolve_history_max_entries())
+
+
+def _read_last_history_entry(history_file: Path) -> dict[str, Any] | None:
+    if not history_file.exists():
+        return None
+    try:
+        lines = history_file.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for raw_line in reversed(lines):
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
 
 
 def _history_contains_request_id(history_file: Path, request_id: str) -> bool:
