@@ -9,6 +9,7 @@ Test to verify the changes made in the code review:
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -172,41 +173,18 @@ def test_direct_request_ids_are_unique():
     from app.services.runtime_bridge import RuntimeBridge
 
     bridge = RuntimeBridge()
-    fake_result1 = SimpleNamespace(
-        route="AUGMENTED",
-        provider="openai",
-        provider_usage_class="paid",
-        outcome_code="answered",
-        status="completed",
-        error_message="",
-        response_text="synthetic answer",
-        metadata={},
-        request_id="req-12345",
-        intent_family="background_overview",
-        confidence=0.95,
-        evidence_reason="",
-        policy_reason="router_augmented",
+
+    # The bridge now receives canonical JSON payloads from runtime_request.submit_request()
+    # (subprocess or direct). It must faithfully preserve the core request_id.
+    payload1 = bridge._extract_payload(
+        json.dumps({"request_id": "req-12345", "response_text": "synthetic answer"})
     )
-    fake_result2 = SimpleNamespace(
-        route="AUGMENTED",
-        provider="openai",
-        provider_usage_class="paid",
-        outcome_code="answered",
-        status="completed",
-        error_message="",
-        response_text="synthetic answer",
-        metadata={},
-        request_id="req-67890",
-        intent_family="background_overview",
-        confidence=0.95,
-        evidence_reason="",
-        policy_reason="router_augmented",
+    payload2 = bridge._extract_payload(
+        json.dumps({"request_id": "req-67890", "response_text": "synthetic answer"})
     )
 
-    payload1 = bridge._build_payload_from_outcome(fake_result1, "repeat request", 1)
-    payload2 = bridge._build_payload_from_outcome(fake_result2, "repeat request", 1)
-
-    # The bridge is a display layer — it must faithfully preserve the core's request_id
+    assert_ok(payload1 is not None, "bridge must parse HMI payload")
+    assert_ok(payload2 is not None, "bridge must parse HMI payload")
     assert_ok(payload1["request_id"] == "req-12345", "bridge must preserve core request_id")
     assert_ok(payload2["request_id"] == "req-67890", "bridge must preserve core request_id")
     assert_ok(

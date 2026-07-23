@@ -27,8 +27,14 @@ class TestSingleAuthoritativePath:
 
         assert callable(run)
 
-    def test_hmi_bridge_uses_main_run_not_direct_engine(self):
-        """HMI bridge must call main.run(), not instantiate ExecutionEngine directly."""
+    def test_hmi_bridge_uses_unified_pipeline_not_direct_engine(self):
+        """HMI bridge must use the canonical runtime_request.submit_request() contract,
+        not instantiate ExecutionEngine directly.
+
+        The bridge migrated from main.run() to an in-process call to
+        runtime_request.submit_request() so that the HMI and CLI share the same
+        request/response schema and persistence behavior.
+        """
         source = (
             Path(__file__).resolve().parent.parent.parent
             / "ui-v10"
@@ -37,8 +43,13 @@ class TestSingleAuthoritativePath:
             / "runtime_bridge.py"
         )
         source_text = source.read_text()
-        assert "main.run(" in source_text or "from router_py.main import run" in source_text
-        assert "ExecutionEngine(" not in source_text
+        assert (
+            "runtime_request.submit_request(" in source_text
+            or "submit_request(" in source_text
+        ), "HMI bridge must use the canonical runtime_request.submit_request() entry point"
+        assert "ExecutionEngine(" not in source_text, (
+            "HMI bridge must not instantiate ExecutionEngine directly"
+        )
 
     def test_voice_streaming_uses_unified_pipeline(self):
         """streaming_voice.py must use main.run(), not instantiate ExecutionEngine directly."""
