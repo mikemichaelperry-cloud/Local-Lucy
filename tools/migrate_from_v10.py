@@ -54,7 +54,13 @@ JSON_STATE_FILES = [
     "last_route.json",
     "voice_runtime.json",
     "health.json",
+    "request_history.jsonl",
 ]
+
+# Archived request-history files use the same stem/suffix pattern V11 already
+# recognises (request_history.<timestamp>.jsonl). They are copied as-is so V11
+# scans them automatically.
+HISTORY_ARCHIVE_GLOB = "request_history.*.jsonl"
 
 
 class MigrationError(Exception):
@@ -192,6 +198,14 @@ def _copy_json(src: Path, dst: Path) -> Path | None:
     return backup
 
 
+def _copy_file(src: Path, dst: Path) -> Path | None:
+    """Copy a generic file, backing up any existing destination."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    backup = _backup_existing(dst)
+    shutil.copy2(src, dst)
+    return backup
+
+
 # ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
@@ -263,6 +277,19 @@ def _discover_sources(
             else:
                 print(f"  Warning: expected V10 JSON state missing: {src_json}", file=sys.stderr)
 
+        # Archived request-history files (request_history.<timestamp>.jsonl).
+        archive_dir = v10_runtime / "state"
+        if archive_dir.is_dir():
+            for src_archive in sorted(archive_dir.glob(HISTORY_ARCHIVE_GLOB)):
+                sources.append(
+                    {
+                        "kind": "history_archive",
+                        "name": src_archive.name,
+                        "src": src_archive,
+                        "dst": state_dir / src_archive.name,
+                    }
+                )
+
     return sources
 
 
@@ -285,6 +312,13 @@ def _gather_metadata(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 meta["src_rows"] = None
                 meta["src_tables"] = []
                 meta["warning"] = f"Could not read database: {exc}"
+        elif item["kind"] == "history_archive":
+            try:
+                with item["src"].open("r", encoding="utf-8") as fh:
+                    meta["src_lines"] = sum(1 for _ in fh if _.strip())
+            except OSError as exc:
+                meta["src_lines"] = None
+                meta["warning"] = f"Could not read history archive: {exc}"
         enriched.append(meta)
     return enriched
 
@@ -313,6 +347,13 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
             print(
                 f"  [DB]  {item['name']}: {item['src']} ({item['src_size']} bytes, "
                 f"{rows_text}, tables={item.get('src_tables', [])}) -> {item['dst']}"
+            )
+        elif item["kind"] == "history_archive":
+            lines = item.get("src_lines")
+            lines_text = f"{lines} entries" if lines is not None else "unknown entries"
+            print(
+                f"  [HIST] {item['name']}: {item['src']} ({item['src_size']} bytes, "
+                f"{lines_text}) -> {item['dst']}"
             )
         else:
             print(
@@ -378,6 +419,12 @@ def cmd_migrate(args: argparse.Namespace) -> int:
                 f"  Copied database {item['name']} ({total_src} source rows, "
                 f"{total_dst} destination rows)"
             )
+        elif item["kind"] == "history_archive":
+            backup = _copy_file(item["src"], item["dst"])
+            if backup:
+                print(f"  Backed up existing {item['dst'].name} -> {backup.name}")
+                record["backup"] = str(backup)
+            print(f"  Copied history archive {item['name']}")
         else:
             backup = _copy_json(item["src"], item["dst"])
             if backup:
@@ -398,24 +445,36 @@ def cmd_verify(args: argparse.Namespace) -> int:
     errors: list[str] = []
 
     for item in report.get("items", []):
-        if item["kind"] != "database":
-            continue
+        kind = item.get("kind")
         dst = Path(item["dst"])
-        if not dst.is_file():
-            errors.append(f"Missing database: {dst}")
-            continue
-        expected = item.get("dst_counts", {})
-        try:
-            actual = _table_counts(sqlite3.connect(dst))
-        except sqlite3.Error as exc:
-            errors.append(f"Could not open {dst}: {exc}")
-            continue
-        for table, expected_count in expected.items():
-            actual_count = actual.get(table)
-            if actual_count != expected_count:
-                errors.append(
-                    f"{dst.name}.{table}: expected {expected_count}, got {actual_count}"
-                )
+        if kind == "database":
+            if not dst.is_file():
+                errors.append(f"Missing database: {dst}")
+                continue
+            expected = item.get("dst_counts", {})
+            try:
+                actual = _table_counts(sqlite3.connect(dst))
+            except sqlite3.Error as exc:
+                errors.append(f"Could not open {dst}: {exc}")
+                continue
+            for table, expected_count in expected.items():
+                actual_count = actual.get(table)
+                if actual_count != expected_count:
+                    errors.append(
+                        f"{dst.name}.{table}: expected {expected_count}, got {actual_count}"
+                    )
+        elif kind == "history_archive":
+            if not dst.is_file():
+                errors.append(f"Missing history archive: {dst}")
+                continue
+            expected_lines = item.get("src_lines")
+            if expected_lines is not None:
+                with dst.open("r", encoding="utf-8") as fh:
+                    actual_lines = sum(1 for _ in fh if _.strip())
+                if actual_lines != expected_lines:
+                    errors.append(
+                        f"{dst.name}: expected {expected_lines} entries, got {actual_lines}"
+                    )
 
     if errors:
         print("Verification FAILED:", file=sys.stderr)
@@ -423,7 +482,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
             print(f"  - {err}", file=sys.stderr)
         return 1
 
-    print("Verification passed: V11 database counts match migration report.")
+    print("Verification passed: V11 database counts and history archives match migration report.")
     return 0
 
 
