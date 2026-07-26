@@ -6,11 +6,6 @@ Replaces shell-based state management with a robust SQLite backend.
 Supports namespaces, concurrent access via WAL mode, and provides
 transaction safety with automatic rollback on errors.
 
-Migration Path:
-    - Reads legacy .env files if SQLite is empty
-    - Writes to both during transition period
-    - Eventually .env files will be deprecated
-
 Example:
     >>> sm = StateManager(namespace="production")
     >>> sm.write_route({"intent": "search", "confidence": 0.95})
