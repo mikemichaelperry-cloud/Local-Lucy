@@ -905,48 +905,6 @@ class StateManager:
             logger.error(f"Failed to get telemetry summary: {e}")
             return {"total_count": 0, "event_breakdown": {}, "namespace": self.namespace}
 
-    def write_env_backup(self, key: str, value: str) -> bool:
-        """
-        Write to legacy .env file during transition period.
-
-        Maintains backward compatibility while migrating.
-
-        Args:
-            key: Environment variable name
-            value: Value to write
-
-        Returns:
-            bool: True if write succeeded
-        """
-        try:
-            router_root = Path(__file__).parent.parent.parent
-            env_file = router_root / "state_backup.env"
-
-            # Read existing content
-            lines = []
-            if env_file.exists():
-                with open(env_file, "r") as f:
-                    lines = f.readlines()
-
-            # Update or append key
-            key_found = False
-            for i, line in enumerate(lines):
-                if line.startswith(f"{key}="):
-                    lines[i] = f"{key}={value}\n"
-                    key_found = True
-                    break
-
-            if not key_found:
-                lines.append(f"{key}={value}\n")
-
-            with open(env_file, "w") as f:
-                f.writelines(lines)
-
-            return True
-        except Exception as e:
-            logger.error(f"Failed to write .env backup: {e}")
-            return False
-
     # ---------------------------------------------------------------------
     # Utility Methods
     # ---------------------------------------------------------------------
