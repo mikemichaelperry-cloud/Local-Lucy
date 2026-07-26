@@ -2,9 +2,9 @@
 """
 State Manager - SQLite-backed state management for Lucy V8 Router.
 
-Replaces shell-based state management with a robust SQLite backend.
-Supports namespaces, concurrent access via WAL mode, and provides
-transaction safety with automatic rollback on errors.
+SQLite is the sole state backend. It replaces shell-based state management
+with a robust SQLite backend that supports namespaces, concurrent access via
+WAL mode, and transaction safety with automatic rollback on errors.
 
 Example:
     >>> sm = StateManager(namespace="production")
