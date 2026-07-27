@@ -9,8 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from news_provider import (
-    RSSNewsProvider,
+from router_py.news import RSSNewsProvider
+from router_py.news.utils import (
     _article_is_stale,
     _detect_source_disagreement,
     _query_asks_for_history,

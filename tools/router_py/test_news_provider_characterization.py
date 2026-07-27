@@ -14,7 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from news_provider import (
+from router_py.news import (
     NewsProvider,
     NewsResult,
     RSSNewsProvider,

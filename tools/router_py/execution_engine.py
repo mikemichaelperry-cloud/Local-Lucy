@@ -296,7 +296,7 @@ except ImportError:
 
 # Import news provider for live news fetching
 try:
-    from router_py.news_provider import NewsProvider, NewsResult
+    from router_py.news import NewsProvider, NewsResult
 
     HAS_NEWS_PROVIDER = True
 except ImportError:

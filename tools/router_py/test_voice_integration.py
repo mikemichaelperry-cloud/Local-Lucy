@@ -261,7 +261,7 @@ class TestTtsSanitization:
 
     def test_news_header_no_double_escape(self):
         """News HTML header should not contain double-escaped entities."""
-        from router_py.news_provider import RSSNewsProvider
+        from router_py.news import RSSNewsProvider
 
         articles = [
             {"title": "Test", "description": "Desc", "source": "S", "time_ago": "1h", "url": ""}

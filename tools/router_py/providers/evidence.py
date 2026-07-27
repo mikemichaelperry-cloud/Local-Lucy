@@ -35,7 +35,7 @@ def _ensure_tools_path() -> None:
 
 # Optional imports
 try:
-    from router_py.news_provider import NewsProvider
+    from router_py.news import NewsProvider
 
     HAS_NEWS_PROVIDER = True
 except ImportError:
