@@ -24,8 +24,6 @@ from typing import Any
 # script is executed directly from the tools/ directory.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.xdg_paths import lucy_runtime_namespace_root
-
 from runtime_control import (
     RuntimeControlError,
     enforce_authority_contract,
@@ -35,6 +33,8 @@ from runtime_control import (
     resolve_state_file,
 )
 from voice.playback import PlaybackError, detect_audio_player, play_wav_file
+
+from tools.xdg_paths import lucy_runtime_namespace_root
 
 try:
     from voice.playback_with_levels import play_wav_file_with_levels
