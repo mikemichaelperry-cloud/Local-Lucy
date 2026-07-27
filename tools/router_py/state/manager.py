@@ -366,9 +366,6 @@ class StateManager:
                 with self._transaction() as conn:
                     if queries.acquire_lock(conn, self._namespace_id, lock_name, owner):
                         return True
-            except sqlite3.IntegrityError:
-                # Lock already held
-                pass
             except Exception as e:
                 logger.error(f"Error acquiring lock: {e}")
 
