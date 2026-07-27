@@ -19,11 +19,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pytest
 
 # Simple utilities — always available, independent of heavy deps
-from router_py.voice_tool import clean_text, iso_now
+from router_py.voice import clean_text, iso_now
 
 
 try:
-    from router_py.voice_tool import (
+    from router_py.voice import (
         VoicePipeline,
         VADConfig,
         VoiceResult,

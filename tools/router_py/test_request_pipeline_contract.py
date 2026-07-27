@@ -70,7 +70,7 @@ class TestSingleAuthoritativePath:
     def test_voice_tool_uses_unified_pipeline(self):
         """voice_tool.py must use main.run(), not instantiate ExecutionEngine directly."""
         import inspect
-        from router_py import voice_tool
+        from router_py.voice import pipeline as voice_tool
 
         source = inspect.getsource(voice_tool.VoicePipeline.process_query)
         assert "ExecutionEngine(" not in source, "Voice tool should not instantiate ExecutionEngine"

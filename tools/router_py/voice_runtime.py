@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT_DIR / "tools" / "router_py"))
 
 try:
     from streaming_voice import StreamingVoicePipeline
-    from voice_tool import VoicePipeline, AudioBuffer
+    from router_py.voice import VoicePipeline, AudioBuffer
 
     HAS_VOICE = True
 except ImportError as e:
@@ -139,7 +139,7 @@ class VoiceRuntime:
 
     async def _record_audio(self) -> Optional[Path]:
         """Record audio from microphone using PTT controller."""
-        from voice_tool import VoicePipeline
+        from router_py.voice import VoicePipeline
 
         pipeline = VoicePipeline()
         self._ptt.reset()

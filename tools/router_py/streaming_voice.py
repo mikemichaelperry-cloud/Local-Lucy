@@ -291,7 +291,7 @@ class StreamingVoicePipeline:
         on_response_chunk: Optional[callable] = None,
         on_response_ready: Optional[callable] = None,
     ) -> dict:
-        from voice_tool import AudioBuffer
+        from router_py.voice import AudioBuffer
 
         result = {
             "success": False,
@@ -528,7 +528,7 @@ class StreamingVoicePipeline:
         return cleaned.strip()
 
     async def _transcribe_async(self, audio) -> str:
-        from voice_tool import VoicePipeline
+        from router_py.voice import VoicePipeline
 
         pipeline = VoicePipeline()
         result = await pipeline.transcribe(audio)

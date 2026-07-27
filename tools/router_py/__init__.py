@@ -84,7 +84,7 @@ from .request_tool import (
 
 # Voice Pipeline (Phase 5) - optional import for graceful fallback
 try:
-    from .voice_tool import (
+    from .voice import (
         VoicePipeline,
         AudioBuffer,
         VoiceResult,
