@@ -64,7 +64,7 @@ All settings are environment variables:
 | `LUCY_WEB_HOST` | `127.0.0.1` | Bind address. Use a LAN/Tailscale IP only with auth. |
 | `LUCY_WEB_PORT` | `8765` | Bind port. |
 | `LUCY_WEB_AUTH_TOKEN` | *(none)* | Secret token or password. **Required** for non-loopback binds. |
-| `LUCY_WEB_MAX_QUESTION` | `4000` | Maximum question length in characters. |
+| `LUCY_WEB_MAX_QUESTION` | `16000` | Maximum question length in characters. |
 
 Example with authentication for Tailscale/LAN access:
 

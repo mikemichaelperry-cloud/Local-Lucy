@@ -21,6 +21,8 @@ import logging
 import os
 import re
 import sys
+import threading
+import warnings
 from collections import Counter
 from pathlib import Path
 
@@ -32,6 +34,32 @@ from sentence_transformers import SentenceTransformer
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "router_py"))
 from policy import requires_evidence_mode
+
+# Suppress noisy transformers/sentence-transformers progress bars and download
+# messages during model load. These create terminal spam at Local Lucy startup.
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+
+# Global lock around SentenceTransformer model creation. Concurrent loads of the
+# same local checkpoint from multiple threads can leave parameters on the meta
+# device, causing "Cannot copy out of meta tensor" errors and erratic routing.
+_MODEL_LOAD_LOCK = threading.Lock()
+
+
+def _cuda_available_safely() -> bool:
+    """Check CUDA availability without emitting PyTorch driver warnings.
+
+    When the NVIDIA user-space libraries are newer than the running driver
+    (e.g. PyTorch 2.13 + cu130 on a driver that does not support CUDA 13.0),
+    ``torch.cuda.is_available()`` prints a long UserWarning on every call.
+    Local Lucy works fine on CPU, so we suppress that noise and return False.
+    """
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return torch.cuda.is_available()
+    except Exception:
+        return False
 
 
 # Reference texts for semantic disambiguation
@@ -123,7 +151,7 @@ class HybridRouterV2:
     ):
         # Auto-select CUDA if available; MiniLM-L6 is tiny (~80 MB) and leaves
         # plenty of headroom on a 12 GB RTX 3060 alongside the 8B q4 LLM.
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda" if _cuda_available_safely() else "cpu"
         self._initialized = False
 
         # Store params for lazy init
@@ -278,9 +306,21 @@ class HybridRouterV2:
         ]
 
     def _lazy_init(self) -> None:
-        """Load model, examples, embeddings, and disambiguation refs on first use."""
+        """Load model, examples, embeddings, and disambiguation refs on first use.
+
+        Uses a process-wide lock so multiple threads cannot simultaneously
+        instantiate SentenceTransformer models from the same checkpoint, which
+        can corrupt parameters and leave them on the meta device.
+        """
         if self._initialized:
             return
+        with _MODEL_LOAD_LOCK:
+            if self._initialized:
+                return
+            self._unsafe_lazy_init()
+
+    def _unsafe_lazy_init(self) -> None:
+        """Actual loader for _lazy_init (runs under _MODEL_LOAD_LOCK)."""
 
         _debug = os.environ.get("LUCY_DEBUG_TRANSFORMERS", "").lower() in {"1", "true", "yes"}
         _tf_logger = logging.getLogger("transformers")
@@ -291,21 +331,36 @@ class HybridRouterV2:
             _tf_logger.setLevel(logging.ERROR)
             _hf_logger.setLevel(logging.ERROR)
 
+        # Load with low_cpu_mem_usage disabled. Some transformers/sentence-
+        # transformers paths default to meta-device initialization when this is on,
+        # which breaks in the full test suite after earlier model loads. Keeping
+        # weights as real tensors from the start avoids order-dependent meta-tensor
+        # copy failures.
+        _target_device = self.device
+        _model_kwargs = {"low_cpu_mem_usage": False}
         try:
             with contextlib.redirect_stdout(io.StringIO() if not _debug else sys.stdout):
                 try:
-                    self.model = SentenceTransformer(self._base_model, device=self.device)
+                    self.model = SentenceTransformer(
+                        self._base_model,
+                        device=_target_device,
+                        model_kwargs=_model_kwargs,
+                    )
                 except (torch.OutOfMemoryError, RuntimeError) as exc:
-                    if self.device == "cuda" and "CUDA out of memory" in str(exc):
+                    if _target_device == "cuda" and "CUDA out of memory" in str(exc):
                         logger = logging.getLogger(__name__)
                         logger.warning(
                             "CUDA OOM loading router on %s; falling back to CPU. "
                             "This is safe but slightly slower.",
-                            self.device,
+                            _target_device,
                         )
                         torch.cuda.empty_cache()
                         self.device = "cpu"
-                        self.model = SentenceTransformer(self._base_model, device="cpu")
+                        self.model = SentenceTransformer(
+                            self._base_model,
+                            device="cpu",
+                            model_kwargs=_model_kwargs,
+                        )
                     else:
                         raise
         finally:
@@ -495,8 +550,11 @@ class HybridRouterV2:
             show_progress_bar=False,
             batch_size=batch_size,
         )
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        if _cuda_available_safely():
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
         print(f"Embeddings shape: {self.embeddings.shape}")
 
     def _load_classifier_head(self) -> None:

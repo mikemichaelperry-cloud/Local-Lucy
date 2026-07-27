@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# packaging/appimage/build_appimage.sh — Build an AppImage for Local Lucy v10.
+# packaging/appimage/build_appimage.sh — Build an AppImage for Local Lucy V11.
 #
 # This is a starter script. It expects appimagetool to be available:
 #   wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
@@ -24,12 +24,12 @@ else
     VERSION="$(cat "$VERSION_FILE")"
 fi
 
-APPIMAGE_NAME="local-lucy-${VERSION}-x86_64.AppImage"
+APPIMAGE_NAME="local-lucy-v11-${VERSION}-x86_64.AppImage"
 APPDIR="$REPO_ROOT/dist/AppDir"
 
 # Clean and create AppDir
 rm -rf "$APPDIR"
-mkdir -p "$APPDIR/opt/local-lucy"
+mkdir -p "$APPDIR/opt/local-lucy-v11"
 mkdir -p "$APPDIR/usr/share/applications"
 mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 
@@ -40,6 +40,14 @@ tar -c \
     --exclude='.github' \
     --exclude='packaging' \
     --exclude='dist' \
+    --exclude='backups' \
+    --exclude='cache' \
+    --exclude='logs' \
+    --exclude='memory' \
+    --exclude='state' \
+    --exclude='system_state' \
+    --exclude='.ruff_cache' \
+    --exclude='.superpowers' \
     --exclude='ui_debug.log' \
     --exclude='runtime/state' \
     --exclude='tmp' \
@@ -47,10 +55,10 @@ tar -c \
     --exclude='.pytest_cache' \
     --exclude='*.pyc' \
     --exclude='.env' \
-    . | tar -x -C "$APPDIR/opt/local-lucy"
+    . | tar -x -C "$APPDIR/opt/local-lucy-v11"
 
 # Ensure venv exists (caller should have run make install first)
-if [ ! -x "$APPDIR/opt/local-lucy/ui-v10/.venv/bin/python" ]; then
+if [ ! -x "$APPDIR/opt/local-lucy-v11/ui-v10/.venv/bin/python" ]; then
     echo "ERROR: venv not found. Run 'make install' before building the AppImage." >&2
     exit 1
 fi
@@ -58,11 +66,13 @@ fi
 # Install launcher metadata
 cp "$SCRIPT_DIR/AppRun" "$APPDIR/AppRun"
 chmod 0755 "$APPDIR/AppRun"
-cp "$SCRIPT_DIR/local-lucy.desktop" "$APPDIR/usr/share/applications/"
-cp "$APPDIR/usr/share/applications/local-lucy.desktop" "$APPDIR/local-lucy.desktop"
+cp "$SCRIPT_DIR/local-lucy-v11.desktop" "$APPDIR/usr/share/applications/"
+cp "$APPDIR/usr/share/applications/local-lucy-v11.desktop" "$APPDIR/local-lucy-v11.desktop"
 
 # Placeholder icon (replace with real icon when available)
-touch "$APPDIR/usr/share/icons/hicolor/256x256/apps/local-lucy.png"
+touch "$APPDIR/usr/share/icons/hicolor/256x256/apps/local-lucy-v11.png"
+# appimagetool also requires the icon at the AppDir root
+cp "$APPDIR/usr/share/icons/hicolor/256x256/apps/local-lucy-v11.png" "$APPDIR/local-lucy-v11.png"
 
 # Build AppImage
 mkdir -p "$REPO_ROOT/dist"

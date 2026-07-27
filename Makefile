@@ -1,4 +1,4 @@
-# Local Lucy v10 — Task Runner
+# Local Lucy V11 — Task Runner
 # ============================================
 
 .PHONY: help install test lint run clean check-env sha
@@ -7,7 +7,7 @@ PYTHON := ui-v10/.venv/bin/python3
 PIP := ui-v10/.venv/bin/pip
 
 help:
-	@echo "Local Lucy v10 — Available targets:"
+	@echo "Local Lucy V11 — Available targets:"
 	@echo "  make install      Create venv and install dependencies"
 	@echo "  make test         Run full pytest suite"
 	@echo "  make lint         Run ruff check and format validation"

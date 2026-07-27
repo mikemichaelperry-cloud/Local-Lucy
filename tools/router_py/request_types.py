@@ -15,8 +15,10 @@ Migration plan:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
+
+from router_py.request_constraints import RequestConstraints
 
 # ---------------------------------------------------------------------------
 # Enumerated literals (self-documenting, enables IDE autocomplete)
@@ -280,6 +282,7 @@ class PipelineContext:
 
     question: str
     session_id: str = ""
+    request_id: str = ""
     state_namespace: str = "default"
     augmentation_policy: str = "fallback_only"
     evidence_enabled: bool = False
@@ -289,14 +292,22 @@ class PipelineContext:
     memory_enabled: bool = False
     force_local: bool = False
 
+    # Request-scoped capability constraints extracted from the question text.
+    request_constraints: RequestConstraints | None = None
+
     # Extra key-value pairs for extensibility (mirrors old dict merge)
     extras: dict[str, Any] = field(default_factory=dict)
+
+    def with_constraints(self, constraints: RequestConstraints) -> PipelineContext:
+        """Return a new context with *constraints* attached."""
+        return replace(self, request_constraints=constraints)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to flat dict for legacy callers (ExecutionEngine, etc)."""
         base = {
             "question": self.question,
             "session_id": self.session_id,
+            "request_id": self.request_id,
             "state_namespace": self.state_namespace,
             "augmentation_policy": self.augmentation_policy,
             "evidence_enabled": self.evidence_enabled,

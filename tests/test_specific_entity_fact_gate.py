@@ -47,9 +47,10 @@ GATE_CASES = [
     # still route to AUGMENTED for verification.
     ("Who is Ada Lovelace?", "LOCAL", "policy:stable_knowledge"),
     ("History of the Roman Empire", "LOCAL", "policy:stable_knowledge"),
-    # Broad factual lookups -> AUGMENTED (unless they are stable science or
-    # historical war/conflict queries, which the embedding router handles locally).
-    ("What is the capital of France?", "AUGMENTED", "policy:factual_lookup"),
+    # Broad factual lookups -> AUGMENTED (unless they are stable science,
+    # historical war/conflict queries, or timeless geography such as country
+    # capitals, which the stable-knowledge gate keeps LOCAL).
+    ("What is the capital of France?", "LOCAL", "policy:stable_knowledge"),
     ("Why is the sky blue?", "AUGMENTED", "policy:factual_lookup"),
     ("How tall is Mount Everest?", "AUGMENTED", "policy:factual_lookup"),
     ("When did World War II end?", None, ""),

@@ -866,6 +866,78 @@ class TestCacheFactRevision(unittest.TestCase):
         self.assertIsNone(cached2)
 
 
+class TestGenerationBudget(unittest.TestCase):
+    """Test token-budget decisions for creative writing and thinking models."""
+
+    def setUp(self):
+        self.config = LocalAnswerConfig()
+        self.answer = LocalAnswer(self.config)
+
+    def tearDown(self):
+        try:
+            asyncio.run(self.answer.close())
+        except Exception:
+            pass
+
+    def test_gemma4_is_detected_as_thinking_model(self):
+        """Gemma 4 is tagged as thinking-capable and needs token headroom."""
+        for model in (
+            "local-lucy-gemma4",
+            "local-lucy-gemma4:latest",
+            "gemma4:12b-it-qat",
+        ):
+            with self.subTest(model=model):
+                self.answer.config.model = model
+                self.assertTrue(
+                    self.answer._is_thinking_model(),
+                    f"{model} should be treated as a thinking model",
+                )
+
+    def test_known_thinking_models_are_detected(self):
+        """Qwen3, DeepSeek-R1, and OpenAI reasoning models are thinking models."""
+        for model in (
+            "local-lucy-qwen3",
+            "qwen3:32b",
+            "local-lucy-deepseek-r1",
+            "deepseek-r1:14b",
+            "o3-mini",
+            "o1-preview",
+        ):
+            with self.subTest(model=model):
+                self.answer.config.model = model
+                self.assertTrue(
+                    self.answer._is_thinking_model(),
+                    f"{model} should be treated as a thinking model",
+                )
+
+    def test_creative_word_count_budget_uses_four_tokens_per_word(self):
+        """Creative word-count requests budget ~4 tokens per visible word."""
+        profile, num_predict, instruction = self.answer._set_generation_profile(
+            "LOCAL", "CHAT", "Write a 500 word story about a dog."
+        )
+        self.assertEqual(profile, "chat_long")
+        self.assertEqual(num_predict, 2000)
+        self.assertIn("500", instruction)
+
+    def test_creative_word_count_budget_respects_creative_max_tokens(self):
+        """The creative token ceiling caps very large word-count requests."""
+        self.answer.config.creative_max_tokens = 2048
+        profile, num_predict, _ = self.answer._set_generation_profile(
+            "LOCAL", "CHAT", "Write a 1000 word essay."
+        )
+        self.assertEqual(profile, "chat_long")
+        self.assertEqual(num_predict, 2048)
+
+    def test_non_creative_word_count_uses_num_predict_long(self):
+        """Non-creative word-count requests keep the normal long cap."""
+        self.answer.config.num_predict_long = 1536
+        profile, num_predict, _ = self.answer._set_generation_profile(
+            "LOCAL", "CHAT", "Write a 500 word summary of quantum physics."
+        )
+        self.assertEqual(profile, "chat_long")
+        self.assertEqual(num_predict, 1536)
+
+
 class TestVramHelper(unittest.TestCase):
     """Test GPU VRAM detection helper."""
 
@@ -898,6 +970,7 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
     suite.addTests(loader.loadTestsFromTestCase(TestPersonalFamilyFactResolver))
     suite.addTests(loader.loadTestsFromTestCase(TestCacheFactRevision))
+    suite.addTests(loader.loadTestsFromTestCase(TestGenerationBudget))
     suite.addTests(loader.loadTestsFromTestCase(TestVramHelper))
 
     runner = unittest.TextTestRunner(verbosity=2)

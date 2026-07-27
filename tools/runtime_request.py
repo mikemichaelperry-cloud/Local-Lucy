@@ -26,6 +26,7 @@ import hashlib
 import json
 import re
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -280,7 +281,9 @@ def resolve_chat_memory_file() -> Path:
     raw = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE", "").strip()
     if raw:
         return Path(raw).expanduser()
-    return Path(DEFAULT_CHAT_MEMORY_FILE)
+    # Resolve the default at call time so tests that set
+    # LUCY_RUNTIME_NAMESPACE_ROOT after import still land in the temp namespace.
+    return lucy_runtime_namespace_root() / "state" / "chat_session_memory.txt"
 
 
 # Memory-safety gate: a query is memory-unsafe only if it matches a small
@@ -410,7 +413,9 @@ def submit_request(
             context=context,
             model=model,
         )
-    if persist:
+    # The Python-native backend already persists via StateWriter.  Skip the
+    # wrapper-level write so history/result files have a single entry per request.
+    if persist and not payload.pop("_state_persisted", False):
         persist_payload(resolve_result_file(), payload)
         append_history_entry(resolve_history_file(), payload)
     return payload
@@ -531,6 +536,12 @@ def _run_backend_submit_python(
     if extra_env:
         env_overrides.update(extra_env)
 
+    # Pass the canonical request_id into the Python router so that the
+    # StateWriter-produced files share the same ID as the returned payload.
+    router_context = {"request_id": request_id}
+    if context:
+        router_context.update(context)
+
     original_environ = dict(os.environ)
     try:
         os.environ.update(env_overrides)
@@ -541,7 +552,7 @@ def _run_backend_submit_python(
             surface=surface,
             augmented_direct_once=augmented_direct_once,
             self_review=self_review,
-            context=context,
+            context=router_context,
             model=model,
         )
     except Exception as exc:
@@ -632,6 +643,9 @@ def _run_backend_submit_python(
         "route": build_route_payload(route_meta, outcome_meta, request_text=request_text),
         "status": outcome.status,
     }
+    # Signal to submit_request() that the Python backend already wrote the
+    # HMI-facing JSON state files (last_request_result.json / request_history.jsonl).
+    payload["_state_persisted"] = True
     return payload
 
 
@@ -1472,7 +1486,10 @@ def run_self_review_generation(state: dict[str, Any], execution_text: str) -> st
 
 
 def make_request_id() -> str:
-    return f"{iso_now()}-{os.getpid()}"
+    # Include nanoseconds so multiple requests in the same process second are
+    # still unique.  StateWriter receives this ID via context and uses it directly.
+    ns = time.time_ns() % 1_000_000_000
+    return f"{iso_now()[:-1]}.{ns:09d}Z-{os.getpid()}"
 
 
 def query_sha256(text: str) -> str:

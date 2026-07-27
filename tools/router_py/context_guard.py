@@ -24,9 +24,15 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import re
 from datetime import datetime, timezone
 from typing import Any
+
+# Suppress noisy transformers/sentence-transformers progress bars during model
+# load. Local Lucy loads several small embedding models at startup.
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 
 logger = logging.getLogger(__name__)
 

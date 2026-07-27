@@ -201,6 +201,29 @@ aa655d0 feat(self-analysis): include source code and guard large/non-file paths
   - Combined target run: 47 passed
   - `ruff check` and `ruff format --check` clean on all modified files.
 
+### Routing & Runtime Stability Fixes — 2026-07-24
+- **Root cause of lockdown:** HMI/state file had `evidence=on`, but the process env `LUCY_EVIDENCE_ENABLED` was stale/off. Queries such as the 2026-07-23 22:22 self-model correction test and the 05:47 "What time is it?" query were routed to `EVIDENCE`/`TIME` and then blocked with `operator_blocked` because the pipeline saw evidence as disabled.
+- **Fixes applied:**
+  - `ui-v10/app/services/runtime_bridge.py`: added `_OLLAMA_LOAD_LOCK` (RLock), wrapped all Ollama load/unload/warmup paths, made `_warmup_ollama_model` evict other Lucy models first, and added `_apply_state_to_env()` at bridge init and before every submit so HMI toggles reach the pipeline.
+  - `tools/router_py/request_types.py`: added `request_id` to `PipelineContext` and `to_dict()` so runtime-request IDs reach `StateWriter` and stop duplicate coarse IDs.
+  - `tools/router_py/execution_engine_state.py`: `_make_request_id()` now uses nanoseconds + question hash.
+  - `tools/router_py/local_answer.py`: added explicit self-knowledge instruction for fallback/evidence-provider questions, fixing the `capability_fallbacks` semantic regression.
+  - `tools/router_py/security_guard.py`: input limit raised from 4000 to 16000 characters; related tests updated.
+  - Test env leaks fixed in `tools/router_py/test_bypass_env.py`, `test_e2e_hmi_voice.py`, `test_voice_integration.py` using `monkeypatch.setenv`.
+- **Verification:**
+  - Full `python3 -m pytest`: **1225 passed, 12 skipped, 2 warnings** (0 failures).
+  - Target stress test `tools/tests/test_stress_e2e_both_models.py`: passed.
+  - Persona verification (prompt-level Michael):
+    - `local-lucy-llama31`: 6/9 (66.7%)
+    - `local-lucy-gemma4`: 7/9 (77.8%)
+  - Ollama `/api/ps` confirms only one Lucy model resident at a time after stress test.
+- **HMI state cleanup:** `request_history.jsonl` deduplicated (163 → 152 unique entries; backup preserved); stale `health.json` updated to `status=ok` with current timestamp; `last_request_result.json` now reflects successful completion after the green test run.
+- **Startup noise / CUDA 804 / multiple MiniLM loads / memory summarization timeouts:**
+  - Added `_cuda_available_safely()` in `models/router/hybrid_router_v2.py` and wrapped `torch.cuda.is_available()` calls in `tools/router_py/policy.py` and `tools/voice/backends/kokoro_backend.py` to suppress the PyTorch driver-mismatch UserWarning.
+  - Set `HF_HUB_DISABLE_PROGRESS_BARS=1` and `TRANSFORMERS_VERBOSITY=error` in `hybrid_router_v2.py`, `tools/router_py/context_guard.py`, `tools/router_py/policy.py`, and `tools/memory/memory_service.py` to reduce terminal spam from loading multiple sentence-transformer models.
+  - Increased default memory summarization timeout from 30 s → 60 s (configurable via `LUCY_MEMORY_SUMMARIZE_TIMEOUT_S`) and added `LUCY_MEMORY_SUMMARIZE_MODEL` so a small/fast Ollama model can be used for session summaries.
+- **SHA256SUMS:** regenerated with `make sha`; both root and `ui-v10` discipline tests pass.
+
 ---
 
 ## Architecture Summary
@@ -285,6 +308,13 @@ Live market-data fetcher with source citations:
 14. ~~Memory greeting hallucination fix~~ ✅ MiniLM embeddings now primary; `<think>` blocks stripped; greetings forced to shallow context; polluted DB cleaned; `LUCY_OLLAMA_MODEL` propagated
 15. ~~Automatic model selection (Phase 3)~~ ✅ `select_model()` policy, shadow-mode metrics, Auto HMI option, A/B harness
 16. ~~Self-Analysis Mode~~ ✅ `tools/router_py/self_analysis.py`, Engineering-panel toggle, state persistence, tests
+17. ~~HMI toggle → pipeline env propagation~~ ✅ `_apply_state_to_env()` in `runtime_bridge.py`
+18. ~~Ollama model load/unload race~~ ✅ `_OLLAMA_LOAD_LOCK` + evict-other-Lucy-models in `runtime_bridge.py`
+19. ~~Duplicate request history IDs~~ ✅ nanosecond + hash request IDs in `execution_engine_state.py`
+20. ~~4000-char input limit~~ ✅ raised to 16000 in `security_guard.py`; tests updated
+21. ~~Stale HMI health/alarm state~~ ✅ `health.json` refreshed; `last_request_result.json` reflects success after green test run
+22. ~~Startup CUDA 804 warning + MiniLM loading spam~~ ✅ `_cuda_available_safely()`, warning-filtered policy/kokoro checks, `HF_HUB_DISABLE_PROGRESS_BARS` + `TRANSFORMERS_VERBOSITY`
+23. ~~Memory summarization timeouts~~ ✅ timeout raised to 60 s, configurable model via `LUCY_MEMORY_SUMMARIZE_MODEL`
 
 ---
 
@@ -303,5 +333,5 @@ cd ~/lucy-v11 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-07-15T17:54:19Z*
-*Session: Implemented Self-Analysis large-file / large-response support. Added source-code inclusion, 5 MB TOCTOU-safe read cap, non-UTF-8 fallback, dedicated `SELF_REVIEW` route with 4096-token budget, payload-level budget regression test, local-repeat-cache bypass, and Q&A short-circuit bypass in `tools/router_py/self_analysis.py` and `tools/router_py/local_answer.py`. Unified truncation limit with `LocalAnswerConfig.self_review_context_chars`. Updated design spec and this file. Tests: `tools/router_py/test_self_analysis.py` 21 passed; `tools/router_py/test_local_answer.py` 58 passed; 79/79 combined. Pre-existing unrelated change remains in `models/router/comprehensive_examples.json`.*
+*Last updated: 2026-07-24T22:05:00Z*
+*Session: Fixed routing/lockdown issues, raised input limit to 16000 chars, fixed request-history duplication and model-load races, cleared semantic regression, verified Mike persona, regenerated SHA256SUMS. Then fixed startup noise: suppressed CUDA 804 warnings, reduced MiniLM loading spam, raised memory summarization timeout to 60 s. Full test suite: 1225 passed, 12 skipped, 0 failed.*

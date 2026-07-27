@@ -27,10 +27,17 @@ if str(ROOT_DIR / "tools") not in sys.path:
 
 from tools.xdg_paths import lucy_runtime_namespace_root
 
-# Persist in runtime namespace so it survives restarts
-RUNTIME_NS = lucy_runtime_namespace_root()
-BUFFER_PATH = RUNTIME_NS / "feedback_buffer.json"
 DEFAULT_MAX_TURNS = 5
+
+
+def _buffer_path() -> Path:
+    """Return the feedback-buffer path, resolved at call time.
+
+    Module-level constants capture the namespace too early for tests that
+    set LUCY_RUNTIME_NAMESPACE_ROOT after import. Re-evaluating on each
+    call keeps the buffer in the active runtime namespace.
+    """
+    return lucy_runtime_namespace_root() / "feedback_buffer.json"
 
 
 class Exchange:
@@ -83,17 +90,19 @@ class FeedbackBuffer:
         self._load()
 
     def _load(self) -> None:
-        if BUFFER_PATH.exists():
+        path = _buffer_path()
+        if path.exists():
             try:
-                with open(BUFFER_PATH) as f:
+                with open(path) as f:
                     data = json.load(f)
                 self._exchanges = [Exchange.from_dict(e) for e in data.get("exchanges", [])]
             except Exception:
                 self._exchanges = []
 
     def _save(self) -> None:
-        BUFFER_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(BUFFER_PATH, "w") as f:
+        path = _buffer_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
             json.dump(
                 {
                     "exchanges": [e.to_dict() for e in self._exchanges],

@@ -386,6 +386,14 @@ class OperatorConsoleWindow(QMainWindow):
             stop_whisper_worker()
         except Exception:
             pass
+
+        # Release Ollama VRAM held by Local Lucy models.
+        try:
+            self._append_ui_event("[info] shutdown: unloading Ollama models")
+            self._runtime_bridge.shutdown()
+        except Exception:
+            pass
+
         event.accept()
 
     def refresh_runtime_state(self) -> None:
@@ -712,6 +720,13 @@ class OperatorConsoleWindow(QMainWindow):
             self._action_task.cancel()
         if self._voice_action_task:
             self._voice_action_task.cancel()
+
+        # Release Ollama VRAM held by Local Lucy models.
+        try:
+            self._append_ui_event("[info] shutdown: unloading Ollama models")
+            self._runtime_bridge.shutdown()
+        except Exception:
+            pass
 
         # Close the window and then force-quit the application.
         # closeEvent() only accepts the close event; it does not terminate

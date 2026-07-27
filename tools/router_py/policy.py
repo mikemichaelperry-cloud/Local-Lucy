@@ -7,13 +7,29 @@ Deterministic policy decisions with no side effects.
 import os
 import re
 import threading
+import warnings
 from collections import OrderedDict
 from typing import Literal
 
+# Suppress noisy transformers/sentence-transformers progress bars during model
+# load. Policy module loads its own MiniLM instance if semantic checks are used.
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 
 # Valid augmentation policy values
 AugmentationPolicy = Literal["disabled", "fallback_only", "direct_allowed"]
 
+def _phrase_in_text(phrase: str, text: str) -> bool:
+    """Return True when *phrase* appears as a distinct phrase in *text*.
+
+    Uses word boundaries so short medical keywords such as "cut", "flu", or
+    "operation" do not match inside unrelated words like "execution",
+    "influence", or "operational". Multi-word phrases are matched as-is.
+    """
+    if not phrase or not text:
+        return False
+    pattern = r"\b" + re.escape(phrase) + r"\b"
+    return bool(re.search(pattern, text))
 
 # ---------------------------------------------------------------------------
 # Module-level compiled regexes — avoids recompiling on every policy call
@@ -339,14 +355,12 @@ _SEMANTIC_EMBEDDINGS: dict[str, "numpy.ndarray | None"] = {k: None for k in _SEM
 _EMBEDDING_CACHE: OrderedDict[str, "numpy.ndarray"] = OrderedDict()
 _EMBEDDING_CACHE_LOCK = threading.Lock()
 
-
 def _embedding_cache_size() -> int:
     """Return the configured LRU cache size."""
     try:
         return max(1, int(os.environ.get("LUCY_EMBEDDING_CACHE_SIZE", "1024")))
     except Exception:
         return 1024
-
 
 def _get_cached_embedding(query: str) -> "numpy.ndarray | None":
     """Return a cached normalized embedding if present; updates LRU order."""
@@ -357,7 +371,6 @@ def _get_cached_embedding(query: str) -> "numpy.ndarray | None":
             _EMBEDDING_CACHE.move_to_end(key)
         return embedding
 
-
 def _set_cached_embedding(query: str, embedding: "numpy.ndarray") -> None:
     """Store a normalized embedding in the LRU cache."""
     key = query.lower().strip()
@@ -367,7 +380,6 @@ def _set_cached_embedding(query: str, embedding: "numpy.ndarray") -> None:
         _EMBEDDING_CACHE.move_to_end(key)
         while len(_EMBEDDING_CACHE) > max_size:
             _EMBEDDING_CACHE.popitem(last=False)
-
 
 def _get_semantic_model():
     """Lazy-load the MiniLM model; returns None if unavailable.
@@ -382,7 +394,13 @@ def _get_semantic_model():
             from sentence_transformers import SentenceTransformer
             import torch
 
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    cuda_ok = torch.cuda.is_available()
+            except Exception:
+                cuda_ok = False
+            device = "cuda" if cuda_ok else "cpu"
             _SEMANTIC_MODEL = SentenceTransformer(
                 "sentence-transformers/all-MiniLM-L6-v2",
                 device=device,
@@ -391,7 +409,6 @@ def _get_semantic_model():
         except Exception:
             _SEMANTIC_MODEL = False
     return _SEMANTIC_MODEL if _SEMANTIC_MODEL is not False else None
-
 
 def _get_semantic_embeddings(category: str):
     """Return normalized reference embeddings for a category (cached)."""
@@ -409,7 +426,6 @@ def _get_semantic_embeddings(category: str):
     cache = embeddings / norms
     _SEMANTIC_EMBEDDINGS[category] = cache
     return cache
-
 
 def _semantic_classify(query: str) -> str | None:
     """
@@ -446,7 +462,6 @@ def _semantic_classify(query: str) -> str | None:
         return None
     return top_cat
 
-
 def normalize_augmentation_policy(raw: str) -> AugmentationPolicy:
     """
     Normalize augmentation policy string to canonical value.
@@ -481,7 +496,6 @@ def normalize_augmentation_policy(raw: str) -> AugmentationPolicy:
 
     # Default to disabled for unknown values
     return "disabled"
-
 
 def _is_personal_finance_reasoning(query: str) -> bool:
     """
@@ -591,7 +605,6 @@ def _is_personal_finance_reasoning(query: str) -> bool:
 
     return has_reasoning and has_financial
 
-
 def _is_historical_query(query: str) -> bool:
     """Detect whether a query is clearly about historical events.
 
@@ -638,7 +651,6 @@ def _is_historical_query(query: str) -> bool:
         return True
 
     return False
-
 
 def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[bool, str]:
     """
@@ -729,6 +741,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "pain",
         "fever",
         "cough",
+        "coughing",
         "vomit",
         "vomiting",
         "diarrhea",
@@ -806,8 +819,24 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "hyperthyroidism in cats",
         "cushing's disease in dogs",
         "addison's disease in dogs",
+        # Cognitive / neurological symptoms (human)
+        "memory loss",
+        "confusion",
+        "confused",
+        "forgetful",
+        "forgetting",
+        "dementia",
+        "alzheimer",
+        "alzheimer's",
+        "concentration",
+        "disoriented",
+        "lightheaded",
+        "fainting",
+        "syncope",
+        "tremor",
+        "trembling",
     ]
-    has_health_symptom = any(h in normalized for h in _HEALTH_SYMPTOM_QUICK)
+    has_health_symptom = any(_phrase_in_text(h, normalized) for h in _HEALTH_SYMPTOM_QUICK)
     if not has_health_symptom:
         semantic_reason = _semantic_classify(query)
         if semantic_reason == "personal_family_context":
@@ -881,6 +910,17 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         if any(ind in normalized for ind in recreational_pet_indicators):
             return False, "recreational_pet_context"
 
+        # Classic logic puzzles and riddles involving animals are not veterinary
+        # queries (e.g. the river-crossing puzzle with a fox, chicken, and grain).
+        puzzle_markers = ["riddle", "puzzle", "brain teaser", "logic puzzle"]
+        has_puzzle_marker = any(m in normalized for m in puzzle_markers)
+        has_river_crossing = "cross" in normalized and "river" in normalized
+        has_farmer_animals = ("farmer" in normalized or "cross" in normalized) and any(
+            a in normalized for a in ["fox", "chicken", "grain", "goat", "cabbage", "wolf"]
+        )
+        if has_puzzle_marker or has_river_crossing or has_farmer_animals:
+            return False, "puzzle_riddle_context"
+
         # Programming-language definition guard: "What is Python?", "Who created Java?"
         # should not trigger veterinary context even though "python" matches
         # the animal species list.
@@ -901,7 +941,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             "perl",
             "php",
         ]
-        if any(lang in normalized for lang in programming_languages):
+        if any(_phrase_in_text(lang, normalized) for lang in programming_languages):
             definition_phrases = [
                 "what is",
                 "who created",
@@ -922,6 +962,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         programming_context_terms = [
             "program",
             "programming",
+            "python",
             "function",
             "code",
             "coding",
@@ -1012,6 +1053,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
                 "vomiting",
                 "diarrhea",
                 "cough",
+                "coughing",
                 "sneeze",
                 "sneezing",
                 "fever",
@@ -1080,7 +1122,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
                 "worry",
                 "wrong",
             ]
-            if any(h in normalized for h in health_indicators):
+            if any(_phrase_in_text(h, normalized) for h in health_indicators):
                 return True, "veterinary_context"
 
         # Tier 3: Veterinary-specific procedures, sources, and medications
@@ -1178,7 +1220,9 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
                 "pain",
                 "fever",
                 "cough",
+                "coughing",
                 "vomit",
+                "vomiting",
                 "diarrhea",
                 "rash",
                 "swelling",
@@ -1190,8 +1234,24 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
                 "doctor",
                 "hospital",
                 "medicine",
+                # Cognitive / neurological symptoms
+                "memory loss",
+                "confusion",
+                "confused",
+                "forgetful",
+                "forgetting",
+                "dementia",
+                "alzheimer",
+                "alzheimer's",
+                "concentration",
+                "disoriented",
+                "lightheaded",
+                "fainting",
+                "syncope",
+                "tremor",
+                "trembling",
             ]
-            if not any(h in normalized for h in health_symptoms):
+            if not any(_phrase_in_text(h, normalized) for h in health_symptoms):
                 return False, "education_context"
 
     # Personal/family-context negation: queries about the user's own family
@@ -1267,7 +1327,9 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
                 "pain",
                 "fever",
                 "cough",
+                "coughing",
                 "vomit",
+                "vomiting",
                 "diarrhea",
                 "rash",
                 "swelling",
@@ -1289,8 +1351,24 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
                 "poison",
                 "toxic",
                 "bloat",
+                # Cognitive / neurological symptoms
+                "memory loss",
+                "confusion",
+                "confused",
+                "forgetful",
+                "forgetting",
+                "dementia",
+                "alzheimer",
+                "alzheimer's",
+                "concentration",
+                "disoriented",
+                "lightheaded",
+                "fainting",
+                "syncope",
+                "tremor",
+                "trembling",
             ]
-            if not any(h in normalized for h in health_symptoms):
+            if not any(_phrase_in_text(h, normalized) for h in health_symptoms):
                 return False, "personal_family_context"
 
     # Weather-context negation: "temperature" in a weather query should not
@@ -1328,7 +1406,9 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             "pain",
             "fever",
             "cough",
+            "coughing",
             "vomit",
+            "vomiting",
             "diarrhea",
             "rash",
             "swelling",
@@ -1346,8 +1426,24 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             "stomach",
             "throat",
             "my temperature",
+            # Cognitive / neurological symptoms
+            "memory loss",
+            "confusion",
+            "confused",
+            "forgetful",
+            "forgetting",
+            "dementia",
+            "alzheimer",
+            "alzheimer's",
+            "concentration",
+            "disoriented",
+            "lightheaded",
+            "fainting",
+            "syncope",
+            "tremor",
+            "trembling",
         ]
-        if not any(h in normalized for h in health_symptoms):
+        if not any(_phrase_in_text(h, normalized) for h in health_symptoms):
             return False, "weather_context"
 
     # Art-history context negation: "painted", "painting", "sculpture", etc.
@@ -1374,7 +1470,9 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             "hurt",
             "fever",
             "cough",
+            "coughing",
             "vomit",
+            "vomiting",
             "diarrhea",
             "rash",
             "swelling",
@@ -1390,8 +1488,24 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             "medication",
             "prescription",
             "diagnosis",
+            # Cognitive / neurological symptoms
+            "memory loss",
+            "confusion",
+            "confused",
+            "forgetful",
+            "forgetting",
+            "dementia",
+            "alzheimer",
+            "alzheimer's",
+            "concentration",
+            "disoriented",
+            "lightheaded",
+            "fainting",
+            "syncope",
+            "tremor",
+            "trembling",
         ]
-        if not any(h in normalized for h in health_symptoms):
+        if not any(_phrase_in_text(h, normalized) for h in health_symptoms):
             return False, "art_history_context"
 
     # Medical/health keywords — comprehensive coverage for safety-critical queries
@@ -1405,6 +1519,10 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "medication",
         "disease",
         "prescription",
+        "side effect",
+        "side effects",
+        "statin",
+        "statins",
         "drug",
         "vaccine",
         "vaccination",
@@ -1444,9 +1562,12 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "nausea",
         "nauseous",
         "vomit",
+        "vomiting",
         "dizzy",
         "cough",
+        "coughing",
         "sneeze",
+        "sneezing",
         "aches",
         "sore",
         "swelling",
@@ -1478,6 +1599,22 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "hallucination",
         "delusion",
         "panic",
+        # Cognitive / neurological symptoms
+        "memory loss",
+        "confusion",
+        "confused",
+        "forgetful",
+        "forgetting",
+        "dementia",
+        "alzheimer",
+        "alzheimer's",
+        "concentration",
+        "disoriented",
+        "lightheaded",
+        "fainting",
+        "syncope",
+        "tremor",
+        "trembling",
         # Pediatric indicators (age-only descriptors, NOT family relationship terms)
         "baby",
         "child",
@@ -1617,7 +1754,9 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             "pain",
             "fever",
             "cough",
+            "coughing",
             "vomit",
+            "vomiting",
             "diarrhea",
             "rash",
             "swelling",
@@ -1653,12 +1792,98 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
             "sprain",
             "swallowed",
             "choking",
+            # Cognitive / neurological symptoms
+            "memory loss",
+            "confusion",
+            "confused",
+            "forgetful",
+            "forgetting",
+            "dementia",
+            "alzheimer",
+            "alzheimer's",
+            "concentration",
+            "disoriented",
+            "lightheaded",
+            "fainting",
+            "syncope",
+            "tremor",
+            "trembling",
         ]
-        if not any(h in normalized for h in health_and_injury_indicators):
+        if not any(_phrase_in_text(h, normalized) for h in health_and_injury_indicators):
             return False, "age_statement"
 
+    # Science / physics / chemistry context guard: terms like "temperature",
+    # "boil", and "boiling point" are ordinary physics vocabulary, not medical
+    # symptoms, when no health indicator is present. Prevents stable science
+    # questions (e.g. "At what temperature does water boil at sea level?")
+    # from being misrouted to medical evidence.
+    science_context_terms = [
+        "boiling point",
+        "melting point",
+        "freezing point",
+        "sea level",
+        "thermodynamics",
+        "physics",
+        "chemistry",
+    ]
+    has_science_context = any(t in normalized for t in science_context_terms)
+    if has_science_context:
+        health_indicators = [
+            "sick",
+            "ill",
+            "hurt",
+            "pain",
+            "fever",
+            "cough",
+            "coughing",
+            "vomit",
+            "vomiting",
+            "diarrhea",
+            "rash",
+            "swelling",
+            "bleeding",
+            "wound",
+            "injury",
+            "injured",
+            "symptom",
+            "symptoms",
+            "doctor",
+            "hospital",
+            "medicine",
+            "medication",
+            "treatment",
+            "prescription",
+            "diagnosis",
+            "disease",
+            "condition",
+            "patient",
+            "my body",
+            "my head",
+            "my chest",
+            "my stomach",
+            # Cognitive / neurological symptoms keep science-context guard from
+            # misclassifying genuine health queries as physics/chemistry.
+            "memory loss",
+            "confusion",
+            "confused",
+            "forgetful",
+            "forgetting",
+            "dementia",
+            "alzheimer",
+            "alzheimer's",
+            "concentration",
+            "disoriented",
+            "lightheaded",
+            "fainting",
+            "syncope",
+            "tremor",
+            "trembling",
+        ]
+        if not any(_phrase_in_text(h, normalized) for h in health_indicators):
+            return False, "science_context"
+
     for keyword in medical_keywords:
-        if keyword in normalized:
+        if _phrase_in_text(keyword, normalized):
             return True, "medical_context"
 
     # Body-part + symptom pattern detection — catches novel phrasings like "my chest feels tight"
@@ -1738,9 +1963,9 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "flutter",
     ]
     for bp in body_parts:
-        if bp in normalized:
+        if _phrase_in_text(bp, normalized):
             for sym in symptoms:
-                if sym in normalized:
+                if _phrase_in_text(sym, normalized):
                     return True, "medical_body_symptom"
 
     # Live conflict/geopolitics keywords — real-time verification needed
@@ -1948,6 +2173,8 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "defamation",
         "libel",
         "slander",
+        "self-defense",
+        "self defense",
         # Litigation and remedies (NEW)
         "contract",
         "breach",
@@ -2088,7 +2315,6 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     # Default: no evidence required
     return False, "default_light"
 
-
 def provider_usage_class_for(provider: str) -> Literal["paid", "free", "local", "none"]:
     """
     Classify a provider by its usage/cost class.
@@ -2117,7 +2343,6 @@ def provider_usage_class_for(provider: str) -> Literal["paid", "free", "local", 
         return "local"
 
     return "none"
-
 
 def manifest_evidence_selection_label(
     evidence_mode: str | None, evidence_reason: str | None
@@ -2153,7 +2378,6 @@ def manifest_evidence_selection_label(
         return "policy-triggered"
 
     return "manifest-selected"
-
 
 if __name__ == "__main__":
     # Quick sanity checks

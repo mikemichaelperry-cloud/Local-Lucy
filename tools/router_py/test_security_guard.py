@@ -57,12 +57,12 @@ class TestInputValidator:
     def test_validate_length_cli_ok(self):
         ok, limit = InputValidator.validate_length("x" * 1000, "cli")
         assert ok is True
-        assert limit == 4000
+        assert limit == 16000
 
     def test_validate_length_cli_too_long(self):
-        ok, limit = InputValidator.validate_length("x" * 4001, "cli")
+        ok, limit = InputValidator.validate_length("x" * 16001, "cli")
         assert ok is False
-        assert limit == 4000
+        assert limit == 16000
 
     def test_validate_length_voice_stricter(self):
         ok, limit = InputValidator.validate_length("x" * 501, "voice")
@@ -183,7 +183,10 @@ class TestValidateInput:
         assert result.reason == "empty_query"
 
     def test_too_long_cli_rejected(self):
-        result = validate_input("x" * 4001, surface="cli")
+        # Use varied text so the repetition guard does not fire first.
+        # CLI/HMI limit is 16000 chars; 3000 varied words is well above it.
+        long_text = " ".join(f"word{i}" for i in range(3000))
+        result = validate_input(long_text, surface="cli")
         assert result.accepted is False
         assert "input_too_long" in result.reason
 
@@ -216,10 +219,11 @@ class TestValidateInput:
 
     def test_long_varied_input_accepted(self):
         # A long but non-repetitive input should be accepted
-        long_text = " ".join(f"w{i}" for i in range(500))
+        # CLI/HMI limit is 16000 chars; 2500 varied words stays just below it.
+        long_text = " ".join(f"w{i}" for i in range(2500))
         result = validate_input(long_text, surface="cli")
         assert result.accepted is True
-        assert len(result.sanitized) <= 4000
+        assert len(result.sanitized) <= 16000
 
 
 if __name__ == "__main__":

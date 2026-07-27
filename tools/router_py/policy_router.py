@@ -28,6 +28,7 @@ if str(ROOT_DIR / "tools") not in sys.path:
 
 from tools.xdg_paths import lucy_runtime_namespace_root
 
+from router_py.request_constraints import extract_request_constraints
 from router_py.request_types import ClassificationResult
 
 
@@ -604,6 +605,149 @@ def _looks_like_attachment_query(context: dict[str, Any] | None) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Explicit assistant-instruction guard
+# ---------------------------------------------------------------------------
+
+_EXPLICIT_ASSISTANT_INSTRUCTION_MARKERS = frozenset(
+    {
+        "self-model correction",
+        "self model correction",
+        "internal consistency exercise",
+        "diagnostic conversation",
+        "reflective diagnostic question",
+        "corrective self-model task",
+        "sanity, agency, and boundary test",
+        "boundary test",
+    }
+)
+
+
+def _is_explicit_assistant_instruction(query: str) -> bool:
+    """Detect explicit meta-instructions to the assistant.
+
+    These prompts are instructions *to* the assistant about how to behave or
+    what format to use (self-model tests, diagnostic exercises, boundary
+    tests). They should be answered locally rather than routed to evidence or
+    news because of spurious keyword matches.
+    """
+    if not query:
+        return False
+    q = query.lower().strip()
+    # Must be framed as an explicit instruction / test / task.
+    if not (
+        q.startswith("this is a ")
+        or q.startswith("this is an ")
+        or q.startswith("this is the ")
+    ):
+        return False
+    # Strong explicit markers.
+    if any(marker in q for marker in _EXPLICIT_ASSISTANT_INSTRUCTION_MARKERS):
+        return True
+    # Combined directive markers: a meta-instruction telling the assistant
+    # not to modify state and restricting the output format.
+    has_no_modify = "do not modify" in q
+    has_no_access = "do not access" in q or "do not use tools" in q
+    has_answer_only = "answer only" in q
+    if (has_no_modify or has_no_access) and has_answer_only:
+        return True
+    return False
+
+
+def gate_explicit_assistant_instruction(
+    query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
+) -> PolicyDecision | None:
+    """Explicit meta-instructions to the assistant should stay LOCAL.
+
+    Prevents self-model correction, diagnostic, and boundary-test prompts from
+    being misrouted to EVIDENCE by the semantic medical guard or to AUGMENTED
+    by the broad factual-lookup gate.
+    """
+    if _is_explicit_assistant_instruction(query):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:explicit_assistant_instruction",
+            matched_rule="explicit_assistant_instruction",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="explicit_assistant_instruction",
+        )
+    return None
+
+
+def _is_capability_restriction_instruction(query: str) -> bool:
+    """Detect messages whose primary content is a capability restriction.
+
+    Examples: "Do not store this message.", "No internet.", "Do not use tools."
+    These are instructions *about* the request, not substantive questions, and
+    should be handled locally rather than researched.
+
+    A message qualifies when it contains an explicit restriction and the text
+    left after stripping common restriction phrases is too short to be a
+    substantive question.
+    """
+    if not query:
+        return False
+    constraints = extract_request_constraints(query)
+    has_restriction = (
+        constraints.network is False
+        or constraints.tools is False
+        or constraints.file_read is False
+        or constraints.file_write is False
+        or constraints.memory_write is False
+        or constraints.local_only is True
+    )
+    if not has_restriction:
+        return False
+
+    q = query.lower()
+    # Strip the most common restriction phrases; what remains is the substantive
+    # content of the request.
+    removal_phrases = [
+        r"\bdo\s+not\s+(?:use|access)\s+(?:the\s+)?network\s+access\b",
+        r"\bdo\s+not\s+(?:use|access)\s+(?:the\s+)?internet\b",
+        r"\bdo\s+not\s+browse\s+(?:the\s+)?web\b",
+        r"\bno\s+(?:network\s+access|internet|web)\b",
+        r"\bdo\s+not\s+use\s+tools\b",
+        r"\bno\s+tools\b",
+        r"\bdo\s+not\s+(?:access|use|read|write)\b[^.]*?\bfiles?\b",
+        r"\bno\s+files?\b",
+        r"\bdo\s+not\s+(?:write|store|save)\b[^.]*?\bmemory\b",
+        r"\bdo\s+not\s+store\s+this\b",
+        r"\bmemory-writing\b",
+        r"\buse\s+only\s+(?:currently\s+available|the\s+information\s+already\s+available)\b[^.]*",
+        r"\banswer\s+only\s+from\s+(?:current\s+local\s+context|local\s+context)\b[^.]*",
+        r"\bforget\s+this\s+(?:message|request|turn)\b",
+    ]
+    for phrase in removal_phrases:
+        q = re.sub(phrase, "", q, flags=re.IGNORECASE)
+    q = re.sub(r"[^a-z0-9\s]", " ", q)
+    remaining_words = [w for w in q.split() if len(w) > 1]
+    return len(remaining_words) <= 4
+
+
+def gate_explicit_capability_restriction(
+    query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
+) -> PolicyDecision | None:
+    """Capability-restriction meta-instructions route locally.
+
+    When the user's message is primarily an explicit denial ("do not store",
+    "no network", etc.), it is not a factual lookup and must not be sent to
+    external providers.  Local handling lets the assistant acknowledge the
+    restriction and, if appropriate, act on it (e.g. skip memory persistence).
+    """
+    if _is_capability_restriction_instruction(query):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:capability_restriction",
+            matched_rule="capability_restriction",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="capability_restriction",
+        )
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Policy gates
 #
 # Each gate returns a PolicyDecision or None.  Gates are ordered by priority
@@ -726,6 +870,47 @@ def gate_recreational_pet(
             provider="local",
             provider_usage_class="local",
             policy_reason="recreational_pet_query",
+        )
+    return None
+
+
+# Stable science / physics / chemistry facts that the embedding classifier head
+# sometimes mislabels as WEATHER because they contain words like "temperature".
+# These are answered accurately from parametric knowledge and should stay LOCAL.
+_STABLE_SCIENCE_FACT_TERMS = frozenset(
+    {
+        "boiling point",
+        "melting point",
+        "freezing point",
+        "sea level",
+        "thermodynamics",
+        "speed of light",
+        "speed of sound",
+    }
+)
+
+
+def gate_science_fact(
+    query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
+) -> PolicyDecision | None:
+    """Stable physics/chemistry facts -> LOCAL.
+
+    Catches queries like "At what temperature does water boil at sea level?"
+    that the embedding router's classifier head misroutes to WEATHER because of
+    the word "temperature". These are stable scientific facts, not weather
+    forecasts or live data requests.
+    """
+    if not query:
+        return None
+    q_lower = query.lower()
+    if any(re.search(rf"\b{re.escape(term)}\b", q_lower) for term in _STABLE_SCIENCE_FACT_TERMS):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:science_fact",
+            matched_rule="science_fact",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="stable_science_fact",
         )
     return None
 
@@ -961,6 +1146,41 @@ def gate_stable_knowledge(
             provider="local",
             provider_usage_class="local",
             policy_reason="stable_knowledge_how_it_works",
+        )
+
+    # Stable geography: country capitals are timeless factual knowledge.
+    if re.search(r"\bcapital(s)?\s+of\b", q):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:stable_knowledge",
+            matched_rule="stable_knowledge",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="stable_knowledge_capital",
+        )
+
+    # Stable acronyms and abbreviations.
+    if re.search(r"\b(what does|what's|whats)\b.*\bstand for\b", q) or re.search(
+        r"\b(what is|what's|whats)\b.*\bshort for\b", q
+    ):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:stable_knowledge",
+            matched_rule="stable_knowledge",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="stable_knowledge_acronym",
+        )
+
+    # Stable math facts.
+    if re.search(r"\bprime number(s)?\b", q):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:stable_knowledge",
+            matched_rule="stable_knowledge",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="stable_knowledge_math",
         )
 
     # Stable science / technology / humanities terms (word-boundary match to
@@ -1549,6 +1769,16 @@ class PolicyRouter:
     DEFAULT_GATES = (
         gate_personal_family,
         gate_recreational_pet,
+        # Explicit assistant meta-instructions (self-model tests, diagnostic
+        # exercises) must stay LOCAL before medical/vet or factual-lookup gates
+        # can misroute them.
+        gate_explicit_assistant_instruction,
+        # Short capability-restriction messages ("do not store this", "no network")
+        # are meta-instructions, not factual lookups.
+        gate_explicit_capability_restriction,
+        # Stable science facts (boiling point, speed of light, etc.) must run
+        # before the weather gate so "temperature" does not force them outward.
+        gate_science_fact,
         gate_medical_vet,
         # Garbage / noise should not be routed outward by the embedding router.
         # Run it early so symbol-only or placeholder input does not accidentally

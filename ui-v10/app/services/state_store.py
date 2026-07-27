@@ -457,9 +457,12 @@ def load_recent_request_history(max_entries: int = 24) -> HistoryLoadResult:
     except OSError:
         return HistoryLoadResult(path=path, status="unavailable", entries=[])
 
-    entries: list[dict[str, Any]] = []
+    # Walk backwards so that if a request_id appears more than once, the most
+    # recent occurrence is kept and older duplicates are discarded.
+    entries_reversed: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
     invalid_lines = 0
-    for raw_line in raw_lines[-max(max_entries * 2, max_entries) :]:
+    for raw_line in reversed(raw_lines):
         line = raw_line.strip()
         if not line:
             continue
@@ -471,11 +474,19 @@ def load_recent_request_history(max_entries: int = 24) -> HistoryLoadResult:
         if not isinstance(parsed, dict):
             invalid_lines += 1
             continue
-        entries.append(parsed)
+        request_id = str(parsed.get("request_id", "")).strip()
+        if request_id and request_id in seen_ids:
+            continue
+        if request_id:
+            seen_ids.add(request_id)
+        entries_reversed.append(parsed)
+        if max_entries > 0 and len(entries_reversed) >= max_entries:
+            break
+
+    # Restore chronological order (oldest first within the window).
+    entries = list(reversed(entries_reversed))
 
     status = "ok" if invalid_lines == 0 else "partial"
-    if max_entries > 0:
-        entries = entries[-max_entries:]
     return HistoryLoadResult(path=path, status=status, entries=entries)
 
 

@@ -302,6 +302,9 @@ class TestMemoryServiceUnit(unittest.TestCase):
         self.assertIsNone(ms.detect_user_identity("I am going home"))
         self.assertIsNone(ms.detect_user_identity("What is your name?"))
 
+    def test_get_current_user_identity_defaults_to_michael(self):
+        self.assertEqual(ms.get_current_user_identity(), "Michael")
+
     def test_set_and_get_current_user_identity(self):
         ms.set_current_user_identity("Michael")
         self.assertEqual(ms.get_current_user_identity(), "Michael")
@@ -315,11 +318,11 @@ class TestMemoryServiceUnit(unittest.TestCase):
         self.assertEqual(len(identity_facts), 1)
         self.assertIn("Michael", identity_facts[0])
 
-    def test_clear_current_user_identity(self):
+    def test_clear_current_user_identity_reverts_to_default(self):
         ms.set_current_user_identity("Michael")
         self.assertEqual(ms.get_current_user_identity(), "Michael")
         ms.clear_current_user_identity()
-        self.assertIsNone(ms.get_current_user_identity())
+        self.assertEqual(ms.get_current_user_identity(), "Michael")
 
     def test_unrecognized_persona_raises(self):
         with self.assertRaises(ValueError):

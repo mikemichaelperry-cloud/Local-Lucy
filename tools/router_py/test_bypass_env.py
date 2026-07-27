@@ -30,20 +30,20 @@ def test_no_bypass_when_env_unset() -> None:
     assert request_pipeline._forced_route_from_env("What is aspirin?") is None
 
 
-def test_bypass_forces_news() -> None:
-    os.environ["LUCY_ROUTER_BYPASS"] = "1"
-    os.environ["LUCY_CHAT_FORCE_MODE"] = "NEWS"
+def test_bypass_forces_news(monkeypatch: Any) -> None:
+    monkeypatch.setenv("LUCY_ROUTER_BYPASS", "1")
+    monkeypatch.setenv("LUCY_CHAT_FORCE_MODE", "NEWS")
     assert request_pipeline._forced_route_from_env("anything") == "NEWS"
 
 
-def test_bypass_forces_evidence() -> None:
-    os.environ["LUCY_ROUTER_BYPASS"] = "1"
-    os.environ["LUCY_CHAT_FORCE_MODE"] = "EVIDENCE"
+def test_bypass_forces_evidence(monkeypatch: Any) -> None:
+    monkeypatch.setenv("LUCY_ROUTER_BYPASS", "1")
+    monkeypatch.setenv("LUCY_CHAT_FORCE_MODE", "EVIDENCE")
     assert request_pipeline._forced_route_from_env("anything") == "EVIDENCE"
 
 
-def test_bypass_infers_news_from_query() -> None:
-    os.environ["LUCY_ROUTER_BYPASS"] = "1"
+def test_bypass_infers_news_from_query(monkeypatch: Any) -> None:
+    monkeypatch.setenv("LUCY_ROUTER_BYPASS", "1")
     assert request_pipeline._forced_route_from_env("Whats the latest Australian news?") == "NEWS"
     assert request_pipeline._forced_route_from_env("breaking news headlines") == "NEWS"
 
@@ -104,6 +104,69 @@ def test_evidence_disabled_gate_blocks_evidence(tmp_path: Path, monkeypatch: Any
     assert outcome.outcome_code == "operator_blocked"
     assert decision is not None
     assert decision.route == "EVIDENCE"
+
+
+def _fake_execution_engine_class(response_text: str):
+    """Return an ExecutionEngine stub that returns a fixed local answer."""
+
+    class FakeExecutionEngine:
+        def __init__(self, config: dict[str, Any]) -> None:
+            pass
+
+        def execute(self, classification, decision, context):
+            from router_py.request_types import ExecutionResult
+
+            return ExecutionResult(
+                status="completed",
+                outcome_code="answered",
+                route=decision.route,
+                provider="local",
+                provider_usage_class="local",
+                response_text=response_text,
+                execution_time_ms=1,
+            )
+
+    return FakeExecutionEngine
+
+
+def test_evidence_disabled_fallback_for_augmented(tmp_path: Path, monkeypatch: Any) -> None:
+    """When evidence is disabled, AUGMENTED routes fall back to LOCAL."""
+    monkeypatch.setenv("LUCY_ROUTER_BYPASS", "1")
+    monkeypatch.setenv("LUCY_CHAT_FORCE_MODE", "AUGMENTED")
+    monkeypatch.setenv("LUCY_EVIDENCE_ENABLED", "0")
+    monkeypatch.setenv("LUCY_RUNTIME_NAMESPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(
+        request_pipeline,
+        "ExecutionEngine",
+        _fake_execution_engine_class("local fallback answer"),
+    )
+
+    outcome, _classification, decision = request_pipeline.process("who was ada lovelace")
+    assert outcome.outcome_code == "answered"
+    assert outcome.route == "LOCAL"
+    assert decision.route == "LOCAL"
+    assert decision.policy_reason.startswith("evidence_disabled_fallback_from_")
+    assert "local fallback answer" in outcome.response_text
+
+
+def test_evidence_disabled_fallback_for_time(tmp_path: Path, monkeypatch: Any) -> None:
+    """When evidence is disabled, TIME routes fall back to LOCAL."""
+    monkeypatch.setenv("LUCY_ROUTER_BYPASS", "1")
+    monkeypatch.setenv("LUCY_CHAT_FORCE_MODE", "TIME")
+    monkeypatch.setenv("LUCY_EVIDENCE_ENABLED", "0")
+    monkeypatch.setenv("LUCY_RUNTIME_NAMESPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(
+        request_pipeline,
+        "ExecutionEngine",
+        _fake_execution_engine_class("the current time"),
+    )
+
+    outcome, _classification, decision = request_pipeline.process("what time is it")
+    assert outcome.outcome_code == "answered"
+    assert outcome.route == "LOCAL"
+    assert decision.route == "LOCAL"
+    assert decision.policy_reason.startswith("evidence_disabled_fallback_from_")
+    assert "the current time" in outcome.response_text
 
 
 if __name__ == "__main__":

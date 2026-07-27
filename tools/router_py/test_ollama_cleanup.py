@@ -14,7 +14,10 @@ def test_is_lucy_model() -> None:
     assert oc.is_lucy_model("local-lucy-llama31:latest")
     assert oc.is_lucy_model("local-lucy-fast")
     assert oc.is_lucy_model("LOCAL-LUCY-MISTRAL")  # case-insensitive
+    assert oc.is_lucy_model("gemma4:12b-it-qat")
+    assert oc.is_lucy_model("gemma4:latest")
     assert not oc.is_lucy_model("llama3.1:latest")
+    assert not oc.is_lucy_model("mistral-nemo:latest")
     assert not oc.is_lucy_model("")
 
 
@@ -71,6 +74,8 @@ def test_unload_all_lucy_models_unloads_only_lucy_models() -> None:
             "local-lucy-llama31:latest",
             "llama3.1:latest",
             "local-lucy-fast:latest",
+            "gemma4:12b-it-qat",
+            "mistral-nemo:latest",
         ],
     ):
         with patch.object(oc, "unload_model", return_value=True) as mock_unload:
@@ -80,9 +85,10 @@ def test_unload_all_lucy_models_unloads_only_lucy_models() -> None:
         [
             "local-lucy-llama31:latest",
             "local-lucy-fast:latest",
+            "gemma4:12b-it-qat",
         ]
     )
-    assert mock_unload.call_count == 2
+    assert mock_unload.call_count == 3
 
 
 def test_shutdown_cleanup_logs_unloaded_models() -> None:

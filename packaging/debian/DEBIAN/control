@@ -1,4 +1,4 @@
-Package: local-lucy
+Package: local-lucy-v11
 Version: @VERSION@
 Section: misc
 Priority: optional
@@ -9,8 +9,8 @@ Suggests: ollama
 Installed-Size: @INSTALLED_SIZE@
 Maintainer: Mike Perry <mike@michaelperry.cloud>
 Homepage: https://github.com/mikemichaelperry-cloud/Local-Lucy
-Description: Local Lucy v10 — self-learning, privacy-first desktop AI assistant
+Description: Local Lucy V11 — self-learning, privacy-first desktop AI assistant
  Local Lucy is a privacy-first, locally-run AI assistant for Linux desktops.
  It combines a PySide6 HMI, Python intent router, local LLM integration via
  Ollama, and optional local voice/TTS.  This package installs the application
- to /opt/local-lucy and provides local-lucy / local-lucy-chat launchers.
+ to /opt/local-lucy-v11 and provides local-lucy-v11 / local-lucy-v11-chat launchers.

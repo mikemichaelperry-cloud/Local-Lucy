@@ -32,6 +32,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+# Suppress noisy transformers/sentence-transformers progress bars during MiniLM
+# load. Memory service loads its own MiniLM instance at startup if needed.
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+
 # Ensure project root is on sys.path so tools.xdg_paths resolves when this
 # script is executed directly from the tools/memory/ directory.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -271,6 +276,7 @@ def _load_fact_with_embeddings(conn: sqlite3.Connection, category: str | None = 
 # ---------------------------------------------------------------------------
 
 _CONN_CACHE: sqlite3.Connection | None = None
+_CONN_CACHE_PATH: Path | None = None
 
 
 def _connection_is_closed(conn: sqlite3.Connection) -> bool:
@@ -283,19 +289,31 @@ def _connection_is_closed(conn: sqlite3.Connection) -> bool:
 
 
 def _get_connection() -> sqlite3.Connection:
-    """Return a cached SQLite connection (per-process), reopening if it was closed."""
-    global _CONN_CACHE
-    if _CONN_CACHE is None or _connection_is_closed(_CONN_CACHE):
+    """Return a cached SQLite connection (per-process), reopening if it was closed
+    or if the resolved DB path has changed (e.g. tests switching namespaces)."""
+    global _CONN_CACHE, _CONN_CACHE_PATH
+    desired_path = _resolve_db_path()
+    cache_invalid = (
+        _CONN_CACHE is None
+        or _connection_is_closed(_CONN_CACHE)
+        or _CONN_CACHE_PATH != desired_path
+    )
+    if cache_invalid:
+        if _CONN_CACHE is not None:
+            try:
+                _CONN_CACHE.close()
+            except Exception:
+                pass
         _CONN_CACHE = None
-        db_path = _resolve_db_path()
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        _CONN_CACHE = sqlite3.connect(str(db_path), check_same_thread=False)
+        _CONN_CACHE_PATH = desired_path
+        desired_path.parent.mkdir(parents=True, exist_ok=True)
+        _CONN_CACHE = sqlite3.connect(str(desired_path), check_same_thread=False)
         _CONN_CACHE.execute("PRAGMA journal_mode=WAL")
         _CONN_CACHE.execute("PRAGMA synchronous=NORMAL")
         _ensure_schema(_CONN_CACHE)
         # Harden DB file permissions (production readiness)
         try:
-            os.chmod(db_path, 0o600)
+            os.chmod(desired_path, 0o600)
         except OSError:
             pass
     return _CONN_CACHE
@@ -303,13 +321,14 @@ def _get_connection() -> sqlite3.Connection:
 
 def _close_connection() -> None:
     """Close the cached connection (mainly useful for tests)."""
-    global _CONN_CACHE
+    global _CONN_CACHE, _CONN_CACHE_PATH
     if _CONN_CACHE is not None:
         try:
             _CONN_CACHE.close()
         except Exception:
             pass
         _CONN_CACHE = None
+    _CONN_CACHE_PATH = None
 
 
 # ---------------------------------------------------------------------------
@@ -566,6 +585,10 @@ _RECOGNIZED_PERSONAS: dict[str, set[str]] = {
     "Michael": {"michael", "mike", "mikey"},
 }
 
+# Identity used when no explicit identity fact has been set. This makes the
+# Michael persona active from a clean startup without persisting a fact.
+_DEFAULT_IDENTITY: str = "Michael"
+
 
 def _normalize_identity_name(raw_name: str) -> str | None:
     """Map a spoken name to a canonical persona name, or None if unknown."""
@@ -601,16 +624,20 @@ def detect_user_identity(query: str) -> str | None:
 
 
 def get_current_user_identity() -> str | None:
-    """Return the canonical name of the currently active user persona, or None."""
+    """Return the canonical name of the currently active user persona.
+
+    Falls back to _DEFAULT_IDENTITY when no identity fact has been set, so the
+    default persona is active from startup while still allowing an explicit
+    override or clear to revert to this default.
+    """
     facts = get_persistent_facts(category=_IDENTITY_CATEGORY)
-    if not facts:
-        return None
-    # The most recently stored identity fact is authoritative.
-    latest = facts[-1]
-    prefix = _IDENTITY_FACT_PREFIX
-    if latest.startswith(prefix):
-        return latest[len(prefix) :].strip() or None
-    return None
+    if facts:
+        # The most recently stored identity fact is authoritative.
+        latest = facts[-1]
+        prefix = _IDENTITY_FACT_PREFIX
+        if latest.startswith(prefix):
+            return latest[len(prefix) :].strip() or _DEFAULT_IDENTITY
+    return _DEFAULT_IDENTITY
 
 
 def set_current_user_identity(name: str) -> int:
@@ -744,20 +771,27 @@ def get_session_display_name(session_id: str = "default") -> str:
 
 def _summarize_turns_with_ollama(
     turns: list[dict[str, Any]],
-    timeout: float = 30.0,
+    timeout: float | None = None,
 ) -> str | None:
     """
     Call the local Ollama model to summarize a list of conversation turns.
 
     Args:
         turns: List of turn dicts (oldest first).
-        timeout: HTTP timeout in seconds.
+        timeout: HTTP timeout in seconds. Defaults to
+            ``LUCY_MEMORY_SUMMARIZE_TIMEOUT_S`` env var (60.0).
 
     Returns:
         Summary text, or None if the call fails.
     """
     if not turns:
         return None
+
+    if timeout is None:
+        try:
+            timeout = float(os.environ.get("LUCY_MEMORY_SUMMARIZE_TIMEOUT_S", "60.0"))
+        except ValueError:
+            timeout = 60.0
 
     conversation_text = format_turns_for_prompt(turns)
     prompt = (
@@ -768,8 +802,15 @@ def _summarize_turns_with_ollama(
         f"{conversation_text}"
     )
 
+    # Prefer a small/fast model for summarization if configured, otherwise fall
+    # back to the active Ollama model. This avoids timeouts when a large model
+    # is still loading or busy with the user's main request.
+    summary_model = os.environ.get("LUCY_MEMORY_SUMMARIZE_MODEL", "")
+    if not summary_model:
+        summary_model = os.environ.get("LUCY_OLLAMA_MODEL", "local-lucy")
+
     payload = {
-        "model": os.environ.get("LUCY_OLLAMA_MODEL", "local-lucy"),
+        "model": summary_model,
         "prompt": prompt,
         "stream": False,
         "options": {

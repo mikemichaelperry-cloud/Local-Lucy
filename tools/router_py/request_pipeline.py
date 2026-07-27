@@ -61,6 +61,7 @@ from router_py.request_types import (
 from router_py.classify import classify_intent, select_route
 from router_py.core.medical_query_heuristics import detect_human_medication_query
 from router_py.policy import normalize_augmentation_policy, provider_usage_class_for
+from router_py.request_constraints import RequestConstraints
 
 # ---------------------------------------------------------------------------
 # Provider resolution
@@ -432,22 +433,60 @@ def process(
     if _profiling:
         _profile["provider_resolve_ms"] = int((_time.time() - _t2) * 1000)
 
-    # 3d. Evidence-disabled operator gate
+    # 3d. Request-scoped capability constraints (override operator settings)
+    constraints = (context or {}).get("request_constraints")
+    if isinstance(constraints, RequestConstraints):
+        network_routes = {"NEWS", "EVIDENCE", "AUGMENTED", "FULL"}
+        tool_routes = {"TIME", "WEATHER", "FINANCE"}
+        if constraints.network is False and decision.route in network_routes:
+            logger.info(
+                "request_constraint_blocks_network",
+                extra={"route": decision.route, "request_id": (context or {}).get("request_id", "")},
+            )
+            # Fall back to LOCAL so the model can answer from parametric/local
+            # context rather than returning a generic denial.
+            decision = dataclasses.replace(
+                decision,
+                route="LOCAL",
+                mode="FALLBACK",
+                provider="local",
+                provider_usage_class="local",
+                evidence_mode="",
+                evidence_reason="",
+                requires_evidence=False,
+                ephemeral=False,
+                policy_reason="request_constraint_network_denied",
+                decision_stage="operator_fallback",
+                reason_code="request_constraint_network_denied",
+            )
+        elif constraints.tools is False and decision.route in tool_routes:
+            logger.info(
+                "request_constraint_blocks_tools",
+                extra={"route": decision.route, "request_id": (context or {}).get("request_id", "")},
+            )
+            decision = dataclasses.replace(
+                decision,
+                route="LOCAL",
+                mode="FALLBACK",
+                provider="local",
+                provider_usage_class="local",
+                evidence_mode="",
+                evidence_reason="",
+                requires_evidence=False,
+                ephemeral=False,
+                policy_reason="request_constraint_tools_denied",
+                decision_stage="operator_fallback",
+                reason_code="request_constraint_tools_denied",
+            )
+
+    # 3e. Evidence-disabled operator gate
     evidence_enabled = (
         os.environ.get("LUCY_EVIDENCE_ENABLED", os.environ.get("LUCY_ENABLE_INTERNET", "0"))
         .strip()
         .lower()
         in ("1", "true", "on", "yes")
     )
-    if not evidence_enabled and decision.route in (
-        "NEWS",
-        "EVIDENCE",
-        "AUGMENTED",
-        "FULL",
-        "WEATHER",
-        "TIME",
-        "FINANCE",
-    ):
+    if not evidence_enabled and decision.route in ("NEWS", "EVIDENCE"):
         execution_time = int((_time.time() - start_time) * 1000)
         logger.info("evidence_disabled_gate", extra={"route": decision.route})
         return (
@@ -469,6 +508,34 @@ def process(
             ),
             classification,
             decision,
+        )
+
+    if not evidence_enabled and decision.route in (
+        "AUGMENTED",
+        "FULL",
+        "WEATHER",
+        "TIME",
+        "FINANCE",
+    ):
+        # These routes can be answered from local parametric knowledge when
+        # external data is disabled. Degrade to LOCAL instead of blocking.
+        logger.info(
+            "evidence_disabled_local_fallback",
+            extra={"original_route": decision.route},
+        )
+        decision = dataclasses.replace(
+            decision,
+            route="LOCAL",
+            mode="FALLBACK",
+            provider="local",
+            provider_usage_class="local",
+            evidence_mode="",
+            evidence_reason="",
+            requires_evidence=False,
+            ephemeral=False,
+            policy_reason=f"evidence_disabled_fallback_from_{decision.route.lower()}",
+            decision_stage="operator_fallback",
+            reason_code="evidence_disabled_local_fallback",
         )
 
     # ------------------------------------------------------------------

@@ -15,7 +15,7 @@ Environment variables::
     LUCY_WEB_HOST         bind address (default: 127.0.0.1)
     LUCY_WEB_PORT         bind port (default: 8765)
     LUCY_WEB_AUTH_TOKEN   secret token/password (required for non-localhost binds)
-    LUCY_WEB_MAX_QUESTION max question length (default: 4000)
+    LUCY_WEB_MAX_QUESTION max question length (default: 16000)
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ logger = logging.getLogger("local_lucy.web_adapter")
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
-DEFAULT_MAX_QUESTION = 4000
+DEFAULT_MAX_QUESTION = 16000
 SUPPORTED_MODELS = frozenset(
     {
         "local-lucy-llama31",

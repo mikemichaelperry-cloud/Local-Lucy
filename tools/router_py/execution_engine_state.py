@@ -272,7 +272,7 @@ class StateWriter:
         session_id = str(context.get("session_id", "") or "").strip()
         request_id = str(context.get("request_id", "") or "").strip()
         if not request_id:
-            request_id = self._make_request_id()
+            request_id = self._make_request_id(question)
 
         # Control state: best-effort from context + env fallback
         control_state = self._build_control_state(context)
@@ -417,6 +417,9 @@ class StateWriter:
             context.get("evidence_enabled", os.environ.get("LUCY_EVIDENCE_ENABLED", "0"))
         )
         voice = _toggle(os.environ.get("LUCY_VOICE_ENABLED", "0"))
+        conversation = _toggle(
+            context.get("conversation_enabled", os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0"))
+        )
         augmentation_policy = str(
             context.get("augmentation_policy", "")
             or os.environ.get("LUCY_AUGMENTATION_POLICY", "disabled")
@@ -432,6 +435,7 @@ class StateWriter:
             "mode": mode,
             "memory": memory,
             "evidence": evidence,
+            "conversation": conversation,
             "voice": voice,
             "augmentation_policy": augmentation_policy,
             "augmented_provider": augmented_provider,
@@ -513,7 +517,9 @@ class StateWriter:
         includes a nanosecond timestamp (main.py), so every execution is
         unique.  Dedup was originally needed because runtime_bridge.py
         used to write the same entry with the same deterministic ID.
-        That dual-write has been removed; StateWriter is the sole writer.
+        For the Python-native backend, StateWriter is the sole writer;
+        runtime_request only persists for chat-bin/self-review paths that
+        do not write these files themselves.
         """
         entry = self._build_history_entry(payload)
         request_id = str(entry.get("request_id", "")).strip()
@@ -566,9 +572,16 @@ class StateWriter:
             pass
         return False
 
-    def _make_request_id(self) -> str:
-        """Generate a request ID matching runtime_request.py format."""
-        return f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}-{os.getpid()}"
+    def _make_request_id(self, question: str = "") -> str:
+        """Generate a unique request ID when the caller did not supply one.
+
+        Mirrors runtime_request.py's nanosecond suffix so multiple requests in
+        the same process second do not collide, and prefixes with a question
+        hash so reruns of the same query remain correlatable in logs.
+        """
+        ns = time.time_ns() % 1_000_000_000
+        prefix = hashlib.sha256((question or "").encode("utf-8", errors="ignore")).hexdigest()[:16]
+        return f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')}.{ns:09d}Z-{os.getpid()}-{prefix}"
 
     # ------------------------------------------------------------------
     # SQLite read

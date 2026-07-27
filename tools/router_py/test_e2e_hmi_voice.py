@@ -438,13 +438,13 @@ class TestMainRunVoiceSurface:
 
 
 class TestFullVoiceTurn:
-    def test_full_voice_turn_local(self, tmp_state_dir):
+    def test_full_voice_turn_local(self, tmp_state_dir, monkeypatch):
         """
         Full voice turn: instantiate real engine, execute LOCAL route,
         verify both file and SQLite state are consistent.
         """
-        os.environ["LUCY_EXEC_PY"] = "1"
-        os.environ["LUCY_UI_STATE_DIR"] = str(tmp_state_dir)
+        monkeypatch.setenv("LUCY_EXEC_PY", "1")
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
         engine = ExecutionEngine(
             config={
                 "state_dir": str(tmp_state_dir),
@@ -479,12 +479,12 @@ class TestFullVoiceTurn:
         engine.state_manager.read_last_route.return_value = {"strategy": "LOCAL"}
         assert engine.verify_state_consistency() is True
 
-    def test_full_voice_turn_weather(self, tmp_state_dir):
+    def test_full_voice_turn_weather(self, tmp_state_dir, monkeypatch):
         """
         Full voice turn: WEATHER route with evidence fetching mocked.
         """
-        os.environ["LUCY_EXEC_PY"] = "1"
-        os.environ["LUCY_UI_STATE_DIR"] = str(tmp_state_dir)
+        monkeypatch.setenv("LUCY_EXEC_PY", "1")
+        monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
         engine = ExecutionEngine(
             config={
                 "state_dir": str(tmp_state_dir),

@@ -17,7 +17,9 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 DEFAULT_OLLAMA_API_URL = "http://127.0.0.1:11434"
-LUCY_MODEL_PREFIXES = ("local-lucy",)
+# Local Lucy v11's allowed model universe: the Llama wrapper fleet and Gemma 4.
+# Other Ollama tags (e.g. chess models) are left untouched.
+LUCY_MODEL_PREFIXES = ("local-lucy", "gemma4")
 
 
 def _ollama_api_url() -> str:

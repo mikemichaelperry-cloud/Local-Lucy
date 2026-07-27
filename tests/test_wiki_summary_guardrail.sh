@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-J=$(~/lucy/tools/internet/tool_router.sh fetch_url_v1 \
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)"
+
+J=$("${ROOT}/tools/internet/tool_router.sh" fetch_url_v1 \
   '{"url":"https://en.wikipedia.org/api/rest_v1/page/summary/Ada_Lovelace","max_bytes":120000}')
 
 TXT=$(
@@ -10,7 +13,7 @@ TXT=$(
   | sed '1s/^/PARAGRAPH:\n/; $a\\nEND\n'
 )
 
-OUT=$(printf '%s\n' "$TXT" | ollama run local-lucy-mem \
+OUT=$(printf '%s\n' "$TXT" | ollama run local-lucy-llama31 \
   'Summarize the paragraph between PARAGRAPH and END in 1 sentence. Use only that text.')
 
 echo "$OUT"

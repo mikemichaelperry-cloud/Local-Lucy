@@ -119,6 +119,19 @@ class TestNormalizeAugmentationPolicy(unittest.TestCase):
 class TestRequiresEvidenceMode(unittest.TestCase):
     """Test requires_evidence_mode function."""
 
+    def test_science_facts_not_medical(self):
+        """Stable physics/chemistry questions must not trigger medical evidence."""
+        science_queries = [
+            "At what temperature does water boil at sea level?",
+            "What is the boiling point of water?",
+            "What is the melting point of ice?",
+        ]
+        for query in science_queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertFalse(requires)
+                self.assertEqual(reason, "science_context")
+
     def test_medical_keywords_trigger_evidence(self):
         """Test that medical keywords trigger evidence mode."""
         medical_queries = [

@@ -61,6 +61,11 @@ ROUTING_TEST_CASES = [
     ("Bitcoin price in 2010", "LOCAL", "ambiguous"),
     ("Tell me about the news industry", "LOCAL", "ambiguous"),
     ("Latest trends in interior design", "LOCAL", "ambiguous"),
+    (
+        "What would give you the biggest boost whilst taking into consideration my limited hardware?",
+        "LOCAL",
+        "hardware_advice",
+    ),
     # ---- Pronoun / context follow-ups ----
     ("What about it?", "LOCAL", "pronoun"),
     ("Should I keep it?", "LOCAL", "pronoun"),
@@ -112,7 +117,11 @@ ROUTING_TEST_CASES = [
         "metaphor",
     ),  # weather keyword "cold" + temporal context -> live weather data
     # ---- Capital city vs financial capital ----
-    ("What is the capital of France?", "AUGMENTED", "capital_ambiguity"),
+    (
+        "What is the capital of France?",
+        "LOCAL",
+        "capital_ambiguity",
+    ),  # country capitals are timeless factual knowledge -> stable_knowledge gate
     (
         "Capital of Japan",
         "LOCAL",

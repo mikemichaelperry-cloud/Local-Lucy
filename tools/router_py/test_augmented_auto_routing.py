@@ -93,9 +93,11 @@ class TestAugmentedAutoRouting(unittest.TestCase):
             route, "AUGMENTED", f"Expected AUGMENTED for historical figure, got {route}"
         )
 
-    def test_geography_augmented(self):
+    def test_geography_capital_france_local(self):
         route, _ = self._route("What is the capital of France?")
-        self.assertEqual(route, "AUGMENTED", f"Expected AUGMENTED for geography, got {route}")
+        self.assertEqual(
+            route, "LOCAL", f"Expected LOCAL for country capital (stable knowledge), got {route}"
+        )
 
     def test_population_augmented(self):
         route, _ = self._route("What is the population of Tokyo?")
@@ -103,9 +105,11 @@ class TestAugmentedAutoRouting(unittest.TestCase):
             route, "AUGMENTED", f"Expected AUGMENTED for population query, got {route}"
         )
 
-    def test_capital_germany_augmented(self):
+    def test_capital_germany_local(self):
         route, _ = self._route("What is the capital of Germany?")
-        self.assertEqual(route, "AUGMENTED", f"Expected AUGMENTED for geography, got {route}")
+        self.assertEqual(
+            route, "LOCAL", f"Expected LOCAL for country capital (stable knowledge), got {route}"
+        )
 
     # ------------------------------------------------------------------
     # Personal / family — must stay LOCAL, not AUGMENTED

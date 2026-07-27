@@ -427,17 +427,19 @@ class ConversationPanel(QFrame):
         return "\n".join(lines)
 
     def _list_label(self, entry: dict[str, object]) -> str:
-        request_id = self._request_id(entry) or "unknown"
         status = self._entry_text(entry, "status") or "unknown"
         completed_at = self._entry_text(entry, "completed_at") or "unknown"
         request_text = self._entry_text(entry, "request_text") or "unknown"
         preview = request_text if len(request_text) <= 56 else f"{request_text[:53]}..."
-        # Show processing/responding status more prominently
+        # Single-line list items avoid the visual duplication that made each
+        # request look like multiple entries (status line + preview + request-id
+        # line all rendered as separate rows).  The full request_id is still
+        # stored on the item's UserRole and shown in the detail view.
         if status == "processing":
-            return f"⏳ PROCESSING...\n{preview}\n{request_id}"
+            return f"⏳ PROCESSING... | {preview}"
         if status == "responding":
-            return f"🗣️ RESPONDING...\n{preview}\n{request_id}"
-        return f"{status.upper()}  {completed_at}\n{preview}\n{request_id}"
+            return f"🗣️ RESPONDING... | {preview}"
+        return f"{status.upper()}  {completed_at}  |  {preview}"
 
     def _request_id(self, entry: dict[str, object]) -> str:
         return self._entry_text(entry, "request_id")

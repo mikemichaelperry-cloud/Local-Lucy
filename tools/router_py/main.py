@@ -50,6 +50,7 @@ sys.path.insert(0, str(ROOT_DIR / "tools"))
 from router_py import request_pipeline
 from router_py.execution_engine import DEFAULT_CHAT_MEMORY_FILE
 from router_py.logging_config import setup_logging
+from router_py.request_constraints import extract_request_constraints
 from router_py.request_types import RouterOutcome
 from router_py.security_guard import validate_input
 from router_py.shutdown_handler import install as install_shutdown_handler
@@ -291,8 +292,28 @@ def ensure_control_env() -> None:
         )
 
 
-def _persist_memory_turn(question: str, response_text: str, session_id: str = "default") -> None:
-    """Persist a conversation turn to chat memory (SQLite + text file)."""
+def _persist_memory_turn(
+    question: str,
+    response_text: str,
+    session_id: str = "default",
+    *,
+    constraints: "RequestConstraints | None" = None,
+) -> None:
+    """Persist a conversation turn to chat memory (SQLite + text file).
+
+    Args:
+        question: User query text.
+        response_text: Assistant response text.
+        session_id: Session identifier.
+        constraints: Optional request-scoped capability constraints. When
+            ``memory_write`` is explicitly ``False``, persistence is skipped.
+    """
+    from router_py.request_constraints import RequestConstraints
+
+    if isinstance(constraints, RequestConstraints) and constraints.memory_write is False:
+        logging.debug("Skipping memory persistence: memory_write denied by request constraints")
+        return
+
     # Dual-write: SQLite first (best effort)
     try:
         from memory.memory_service import maybe_summarize_session, store_turn
@@ -308,7 +329,7 @@ def _persist_memory_turn(question: str, response_text: str, session_id: str = "d
         if not mem_file:
             mem_file = os.environ.get("LUCY_CHAT_MEMORY_FILE", "").strip()
         if not mem_file:
-            mem_file = DEFAULT_CHAT_MEMORY_FILE
+            mem_file = str(lucy_runtime_namespace_root() / "state" / "chat_session_memory.txt")
         mem_path = Path(mem_file).expanduser()
         mem_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -381,7 +402,11 @@ def execute_plan_python(
     # request_id must be unique per execution so the StateWriter does not
     # deduplicate reruns of the same question.  Prefix with question hash
     # so logs remain correlatable; suffix with nanoseconds for uniqueness.
-    request_id = f"{sha256_text(question)[:16]}_{time.time_ns()}"
+    # If the caller supplied a request_id (e.g. runtime_request), reuse it so
+    # StateWriter-produced files share the same ID as the canonical payload.
+    request_id = (context or {}).get("request_id")
+    if not request_id:
+        request_id = f"{sha256_text(question)[:16]}_{time.time_ns()}"
 
     # --- Input validation / prompt injection guard ---
     validation = validate_input(question, surface=surface)
@@ -402,6 +427,14 @@ def execute_plan_python(
             policy_reason="input_rejected",
         )
     question = validation.sanitized
+
+    # --- Request-scoped capability constraints ---
+    # Extract explicit user restrictions ("do not use network access", etc.) and
+    # pass them into the pipeline so they are enforced before route selection or
+    # evidence planning. Callers can also supply request_constraints directly.
+    request_constraints = (context or {}).get("request_constraints")
+    if request_constraints is None:
+        request_constraints = extract_request_constraints(question)
 
     # --- Structured logger ---
     logger = get_structured_logger("router_py.main").bind(
@@ -545,6 +578,7 @@ def execute_plan_python(
         pipeline_context = dict(context or {})
         pipeline_context["_logger"] = logger
         pipeline_context["request_id"] = request_id
+        pipeline_context.setdefault("request_constraints", request_constraints)
         result, classification, decision = request_pipeline.process(
             question,
             policy=policy,
@@ -559,7 +593,12 @@ def execute_plan_python(
         # --- Memory persistence ---
         if os.environ.get("LUCY_SESSION_MEMORY") == "1" and result.response_text:
             session_id = os.environ.get("LUCY_SESSION_ID", "default") or "default"
-            _persist_memory_turn(question, result.response_text, session_id=session_id)
+            _persist_memory_turn(
+                question,
+                result.response_text,
+                session_id=session_id,
+                constraints=request_constraints,
+            )
 
         # --- Record exchange in feedback buffer for future attribution ---
         if classification:

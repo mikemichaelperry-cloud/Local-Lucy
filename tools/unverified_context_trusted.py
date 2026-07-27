@@ -44,6 +44,16 @@ try:
 except Exception:
     HAS_FETCH_GATE = False
 
+# URL provenance validation so prompt words cannot become fetchable URLs.
+try:
+    _ROUTER_DIR = str(Path(__file__).resolve().parent / "router_py")
+    sys.path.insert(0, _ROUTER_DIR)
+    from url_provenance import URLProvenance, validate_fetch_url
+
+    HAS_URL_PROVENANCE = True
+except Exception:
+    HAS_URL_PROVENANCE = False
+
 
 def _print_fail(reason: str) -> int:
     print(json.dumps({"ok": False, "provider": "trusted", "reason": reason}))
@@ -475,45 +485,68 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
     }
     words = [w for w in re.findall(r"[a-z]+", q_lower) if w not in stop_words and len(w) > 2]
 
-    candidates: list[tuple[str, str]] = []
+    candidates: list[tuple[str, str, URLProvenance]] = []
 
     if category == "medical":
         # --- MedlinePlus (primary US gov health source) ---
+        # Keyword-derived URLs are model-invented and must not be fetched.
         for word in words:
-            candidates.append((f"https://medlineplus.gov/{word}.html", "MedlinePlus"))
+            candidates.append(
+                (f"https://medlineplus.gov/{word}.html", "MedlinePlus", URLProvenance.INVENTED_KEYWORD)
+            )
         for word in words:
-            candidates.append((f"https://medlineplus.gov/ency/article/{word}.htm", "MedlinePlus"))
-        # MedlinePlus search
-        candidates.append((f"https://medlineplus.gov/search.html?query={q_encoded}", "MedlinePlus"))
+            candidates.append(
+                (
+                    f"https://medlineplus.gov/ency/article/{word}.htm",
+                    "MedlinePlus",
+                    URLProvenance.INVENTED_KEYWORD,
+                )
+            )
+        # MedlinePlus search endpoint is predefined and allowed.
+        candidates.append(
+            (f"https://medlineplus.gov/search.html?query={q_encoded}", "MedlinePlus", URLProvenance.PREDEFINED_ENDPOINT)
+        )
 
         # --- DailyMed (FDA drug labels) ---
         candidates.append(
             (
                 f"https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query={q_encoded}",
                 "DailyMed",
+                URLProvenance.PREDEFINED_ENDPOINT,
             )
         )
 
         # --- Mayo Clinic ---
         candidates.append(
-            (f"https://www.mayoclinic.org/search/search-results?q={q_encoded}", "Mayo Clinic")
+            (
+                f"https://www.mayoclinic.org/search/search-results?q={q_encoded}",
+                "Mayo Clinic",
+                URLProvenance.PREDEFINED_ENDPOINT,
+            )
         )
-        # Try direct Mayo topic pages for each keyword
+        # Keyword-derived topic pages are invented and rejected.
         for word in words:
             candidates.append(
                 (
                     f"https://www.mayoclinic.org/diseases-conditions/{word}/symptoms-causes/syc-20300000",
                     "Mayo Clinic",
+                    URLProvenance.INVENTED_KEYWORD,
                 )
             )
 
         # --- CDC ---
         candidates.append(
-            (f"https://search.cdc.gov/search/?query={q_encoded}&affiliate=cdc-main", "CDC")
+            (
+                f"https://search.cdc.gov/search/?query={q_encoded}&affiliate=cdc-main",
+                "CDC",
+                URLProvenance.PREDEFINED_ENDPOINT,
+            )
         )
 
         # --- WHO ---
-        candidates.append((f"https://www.who.int/search?q={q_encoded}", "WHO"))
+        candidates.append(
+            (f"https://www.who.int/search?q={q_encoded}", "WHO", URLProvenance.PREDEFINED_ENDPOINT)
+        )
 
     elif category == "vet":
         # --- Merck Veterinary Manual ---
@@ -609,11 +642,15 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
 
         if detected_animal:
             animal_token = detected_animal.replace("-owners", "")
-            # Owner landing page
+            # Owner landing page is a predefined high-level endpoint.
             candidates.append(
-                (f"https://www.merckvetmanual.com/{detected_animal}", "Merck Veterinary Manual")
+                (
+                    f"https://www.merckvetmanual.com/{detected_animal}",
+                    "Merck Veterinary Manual",
+                    URLProvenance.PREDEFINED_ENDPOINT,
+                )
             )
-            # Condition-specific pages (only if both condition and animal known)
+            # Condition-specific pages come from a curated map.
             for w in words:
                 if w in _MERCK_CONDITION_SECTIONS:
                     section = _MERCK_CONDITION_SECTIONS[w].format(animal=animal_token)
@@ -621,6 +658,7 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
                         (
                             f"https://www.merckvetmanual.com/{detected_animal}/{section}",
                             "Merck Veterinary Manual",
+                            URLProvenance.PREDEFINED_ENDPOINT,
                         )
                     )
             # Two-word condition phrases (e.g., "ear infection")
@@ -632,32 +670,70 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
                         (
                             f"https://www.merckvetmanual.com/{detected_animal}/{section}",
                             "Merck Veterinary Manual",
+                            URLProvenance.PREDEFINED_ENDPOINT,
                         )
                     )
 
         # Merck search (homepage with query param)
         candidates.append(
-            (f"https://www.merckvetmanual.com/?q={q_encoded}", "Merck Veterinary Manual")
+            (
+                f"https://www.merckvetmanual.com/?q={q_encoded}",
+                "Merck Veterinary Manual",
+                URLProvenance.PREDEFINED_ENDPOINT,
+            )
         )
         # Merck home page as last resort
-        candidates.append(("https://www.merckvetmanual.com/home", "Merck Veterinary Manual"))
+        candidates.append(
+            (
+                "https://www.merckvetmanual.com/home",
+                "Merck Veterinary Manual",
+                URLProvenance.PREDEFINED_ENDPOINT,
+            )
+        )
 
         # --- VCA Hospitals ---
-        # Try direct "know-your-pet" topic URLs for common conditions
+        # Keyword-derived topic URLs are invented and rejected.
         for word in words:
             candidates.append(
-                (f"https://vcahospitals.com/know-your-pet/{word}-in-dogs", "VCA Hospitals")
+                (
+                    f"https://vcahospitals.com/know-your-pet/{word}-in-dogs",
+                    "VCA Hospitals",
+                    URLProvenance.INVENTED_KEYWORD,
+                )
             )
             candidates.append(
-                (f"https://vcahospitals.com/know-your-pet/{word}-in-cats", "VCA Hospitals")
+                (
+                    f"https://vcahospitals.com/know-your-pet/{word}-in-cats",
+                    "VCA Hospitals",
+                    URLProvenance.INVENTED_KEYWORD,
+                )
             )
-        # VCA search
-        candidates.append((f"https://vcahospitals.com/search?query={q_encoded}", "VCA Hospitals"))
+        # VCA search endpoint is predefined.
+        candidates.append(
+            (
+                f"https://vcahospitals.com/search?query={q_encoded}",
+                "VCA Hospitals",
+                URLProvenance.PREDEFINED_ENDPOINT,
+            )
+        )
 
         # --- AVMA ---
-        candidates.append(("https://www.avma.org/resources-tools/pet-owners/petcare", "AVMA"))
+        candidates.append(
+            (
+                "https://www.avma.org/resources-tools/pet-owners/petcare",
+                "AVMA",
+                URLProvenance.PREDEFINED_ENDPOINT,
+            )
+        )
 
-    for url, name in candidates:
+    for url, name, provenance in candidates:
+        # Reject URLs invented from arbitrary prompt words.
+        if provenance == URLProvenance.INVENTED_KEYWORD:
+            continue
+        if HAS_URL_PROVENANCE:
+            fetch_url = validate_fetch_url(url, provenance)
+            if fetch_url is None:
+                continue
         try:
             content = extract_webpage(url, max_chars=2500, timeout=15)
             # Reject "sorry" / error / redirect pages

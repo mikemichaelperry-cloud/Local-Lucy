@@ -9,6 +9,7 @@ import fcntl
 import importlib
 import io
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -19,6 +20,10 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
+
+# Serialise all Ollama load/unload operations so that warmup/switch/submit
+# threads cannot accidentally load two models at the same time on a 12 GB GPU.
+_OLLAMA_LOAD_LOCK = threading.RLock()
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
@@ -138,9 +143,28 @@ class RuntimeBridge:
         self.request_capability = self._discover_request_capability()
         self.voice_capability = self._discover_voice_capability()
         self._last_used_model: str | None = None
+        # Make sure the launcher's env reflects the current state file before
+        # any background warmup or submit starts.
+        self._apply_state_to_env()
         self._prime_voice_state()
-        threading.Thread(target=self._background_warmup_ollama, daemon=True).start()
-        threading.Thread(target=self._background_warmup_router, daemon=True).start()
+        if self._background_warmup_enabled():
+            threading.Thread(target=self._background_warmup_ollama, daemon=True).start()
+            threading.Thread(target=self._background_warmup_router, daemon=True).start()
+
+    @staticmethod
+    def _background_warmup_enabled() -> bool:
+        """Return False during pytest runs to avoid background model-loading
+        threads racing with test-created HybridRouterV2 instances.
+
+        Concurrent SentenceTransformer initialization from the same checkpoint
+        can leave model parameters on the meta device, causing downstream
+        router loads to fail or route erratically.
+        """
+        if os.environ.get("LUCY_DISABLE_BACKGROUND_WARMUP", "").lower() in {"1", "true", "yes", "on"}:
+            return False
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            return False
+        return True
 
     def _load_project_dotenv(self) -> None:
         """Load lucy-v11/.env so API keys are available to HMI subprocesses.
@@ -267,8 +291,13 @@ class RuntimeBridge:
         # Python Voice Pipeline toggle (V8)
         # Set LUCY_VOICE_PY=1 to use Python-native voice pipeline instead of shell
         env.setdefault("LUCY_VOICE_PY", os.environ.get("LUCY_VOICE_PY", "0"))
-        # Propagate evidence/control settings from HMI to voice subprocesses
-        env.setdefault("LUCY_EVIDENCE_ENABLED", os.environ.get("LUCY_EVIDENCE_ENABLED", "0"))
+        # Propagate evidence/control settings from HMI to voice subprocesses.
+        # Fall back to the legacy LUCY_ENABLE_INTERNET flag so START_LUCY.sh's
+        # default export is not silently overridden by a missing LUCY_EVIDENCE_ENABLED.
+        env.setdefault(
+            "LUCY_EVIDENCE_ENABLED",
+            os.environ.get("LUCY_EVIDENCE_ENABLED", os.environ.get("LUCY_ENABLE_INTERNET", "0")),
+        )
         env.setdefault(
             "LUCY_AUGMENTATION_POLICY", os.environ.get("LUCY_AUGMENTATION_POLICY", "fallback_only")
         )
@@ -276,6 +305,13 @@ class RuntimeBridge:
             "LUCY_CONVERSATION_MODE_FORCE", os.environ.get("LUCY_CONVERSATION_MODE_FORCE", "0")
         )
         env.setdefault("LUCY_SESSION_MEMORY", os.environ.get("LUCY_SESSION_MEMORY", "0"))
+        # Default Ollama keep-alive to 0 in the HMI so models unload after each
+        # request. This prevents Gemma and Llama from piling up in VRAM on the
+        # user's limited hardware when Auto mode switches between them. Users can
+        # override via LUCY_LOCAL_KEEP_ALIVE if they prefer caching.
+        env.setdefault(
+            "LUCY_LOCAL_KEEP_ALIVE", os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "0")
+        )
         env.setdefault("LUCY_AUGMENTED_PROVIDER", self._resolve_augmented_provider())
         # Propagate model selection so subprocess paths match direct-Python path
         # Default to the single allowed fast Llama wrapper.
@@ -604,6 +640,29 @@ class RuntimeBridge:
 
     def _run_control_action_direct(self, action: str, requested_value: str) -> CommandResult:
         command_name, field = self._CONTROL_ACTION_MAP[action]
+
+        # For model selection, evict every other loaded model BEFORE saving the
+        # new state so a follow-up request cannot start loading the new model
+        # while the old one is still resident. This action runs in a background
+        # worker thread, so the synchronous unload does not block the UI.
+        if action == "model_selection" and requested_value:
+            if requested_value.lower() == "auto":
+                # Switching to Auto means the router will pick per-request. Evict
+                # any manually-selected model (and any other resident Lucy model)
+                # so Auto does not inherit a stale manual resident.
+                try:
+                    from router_py.main import load_state_from_file
+
+                    previous_model = load_state_from_file().get("model", "")
+                except Exception:
+                    previous_model = ""
+                if previous_model and previous_model.lower() != "auto":
+                    self._unload_ollama_model(previous_model)
+                # Also evict any other Lucy models that may be resident.
+                self.unload_all_lucy_models()
+            else:
+                self._unload_other_ollama_models(requested_value)
+
         try:
             with self._runtime_env():
                 runtime_control = self._import_tool("runtime_control")
@@ -639,14 +698,8 @@ class RuntimeBridge:
         self._apply_state_to_env()
 
         if action == "model_selection":
-            # Evict every other loaded model immediately so the user does not
-            # see stale Ollama state. Warm up the selected model afterwards.
-            if requested_value and requested_value.lower() != "auto":
-                threading.Thread(
-                    target=self._unload_other_ollama_models,
-                    args=(requested_value,),
-                    daemon=True,
-                ).start()
+            # Warm up the selected model in the background now that competing
+            # models have been evicted.
             threading.Thread(
                 target=self._warmup_ollama_model,
                 args=(requested_value,),
@@ -727,41 +780,51 @@ class RuntimeBridge:
     def _background_warmup_ollama(self) -> None:
         """Send a dummy prompt to Ollama to pre-load the model and reduce first-token latency."""
         model = self._resolve_current_model()
-        self._warmup_ollama_model(model)
+        with _OLLAMA_LOAD_LOCK:
+            self._warmup_ollama_model(model)
 
     def _warmup_ollama_model(self, model: str) -> None:
         """Send a lightweight generate request to load the given model into Ollama.
 
         This is used both at startup and after a model switch so the HMI's
         active-model probe reflects the newly selected model as quickly as
-        possible instead of lingering on the previously loaded model.
+        possible instead of lingering on the previously loaded model. The call
+        is serialised with all other load/unload operations and evicts any
+        other resident Lucy model first.
         """
-        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate")
-        keep_alive = os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "10m")
-        body = {
-            "model": model,
-            "prompt": "",
-            "stream": False,
-            "keep_alive": keep_alive,
-            "options": {"num_predict": 0},
-        }
-        try:
-            request = urllib.request.Request(
-                api_url,
-                data=json.dumps(body).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=60.0) as response:
-                response.read()
-        except (urllib.error.URLError, TimeoutError, OSError):
-            pass
+        with _OLLAMA_LOAD_LOCK:
+            if not model or str(model).lower() == "auto":
+                return
 
-        # Keep the background keep-alive threads in sync with the newly selected
-        # model. Without this, the previous heartbeat/warmup threads continue to
-        # ping the old model and re-load it after _unload_other_ollama_models()
-        # evicted it, causing the HMI to show a stale "still loaded" status.
-        if model and str(model).lower() != "auto":
+            # Evict every other Lucy model before loading this one so we never
+            # keep two local models resident at the same time on 12 GB VRAM.
+            self._unload_other_ollama_models(model)
+
+            api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate")
+            keep_alive = os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "10m")
+            body = {
+                "model": model,
+                "prompt": "",
+                "stream": False,
+                "keep_alive": keep_alive,
+                "options": {"num_predict": 0},
+            }
+            try:
+                request = urllib.request.Request(
+                    api_url,
+                    data=json.dumps(body).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=60.0) as response:
+                    response.read()
+            except (urllib.error.URLError, TimeoutError, OSError):
+                pass
+
+            # Keep the background keep-alive threads in sync with the newly selected
+            # model. Without this, the previous heartbeat/warmup threads continue to
+            # ping the old model and re-load it after _unload_other_ollama_models()
+            # evicted it, causing the HMI to show a stale "still loaded" status.
             try:
                 from router_py.local_answer import (
                     LocalAnswer,
@@ -781,50 +844,51 @@ class RuntimeBridge:
         confirm the model is gone. Failures are ignored — the model may already
         be unloaded or Ollama may not be running.
         """
-        if not model or model.lower() == "auto":
-            return
-
-        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434")
-
-        # Primary: generate request with keep_alive=0. Some Ollama versions
-        # unload more reliably via the API, especially while a model is busy.
-        body = {
-            "model": model,
-            "prompt": "",
-            "stream": False,
-            "keep_alive": 0,
-            "options": {"num_predict": 0},
-        }
-        try:
-            request = urllib.request.Request(
-                f"{api_url}/api/generate",
-                data=json.dumps(body).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=15.0) as response:
-                response.read()
-        except (urllib.error.URLError, TimeoutError, OSError):
-            pass
-
-        # Verify: poll /api/ps for a few seconds until the model disappears.
-        # This prevents the HMI from reporting stale loaded state.
-        deadline = time.monotonic() + 5.0
-        while time.monotonic() < deadline:
-            try:
-                with urllib.request.urlopen(f"{api_url}/api/ps", timeout=5.0) as response:
-                    data = json.loads(response.read().decode("utf-8"))
-                still_loaded = any(
-                    self._is_same_ollama_model(
-                        model, entry.get("name", "") or entry.get("model", "")
-                    )
-                    for entry in data.get("models", [])
-                )
-                if not still_loaded:
-                    return
-            except Exception:
+        with _OLLAMA_LOAD_LOCK:
+            if not model or model.lower() == "auto":
                 return
-            time.sleep(0.5)
+
+            api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434")
+
+            # Primary: generate request with keep_alive=0. Some Ollama versions
+            # unload more reliably via the API, especially while a model is busy.
+            body = {
+                "model": model,
+                "prompt": "",
+                "stream": False,
+                "keep_alive": 0,
+                "options": {"num_predict": 0},
+            }
+            try:
+                request = urllib.request.Request(
+                    f"{api_url}/api/generate",
+                    data=json.dumps(body).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=15.0) as response:
+                    response.read()
+            except (urllib.error.URLError, TimeoutError, OSError):
+                pass
+
+            # Verify: poll /api/ps for a few seconds until the model disappears.
+            # This prevents the HMI from reporting stale loaded state.
+            deadline = time.monotonic() + 5.0
+            while time.monotonic() < deadline:
+                try:
+                    with urllib.request.urlopen(f"{api_url}/api/ps", timeout=5.0) as response:
+                        data = json.loads(response.read().decode("utf-8"))
+                    still_loaded = any(
+                        self._is_same_ollama_model(
+                            model, entry.get("name", "") or entry.get("model", "")
+                        )
+                        for entry in data.get("models", [])
+                    )
+                    if not still_loaded:
+                        return
+                except Exception:
+                    return
+                time.sleep(0.5)
 
     @staticmethod
     def _is_same_ollama_model(a: str, b: str) -> bool:
@@ -842,21 +906,51 @@ class RuntimeBridge:
 
     def _unload_other_ollama_models(self, keep_model: str) -> None:
         """Query Ollama for loaded models and unload any that are not *keep_model*."""
-        if not keep_model or keep_model.lower() == "auto":
-            return
-        api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434")
-        try:
-            with urllib.request.urlopen(f"{api_url}/api/ps", timeout=5.0) as response:
-                data = json.loads(response.read().decode("utf-8"))
-        except Exception:
-            return
-        for entry in data.get("models", []):
-            name = entry.get("name", "") or entry.get("model", "")
-            if not name:
-                continue
-            if self._is_same_ollama_model(keep_model, name):
-                continue
-            self._unload_ollama_model(name)
+        with _OLLAMA_LOAD_LOCK:
+            if not keep_model or keep_model.lower() == "auto":
+                return
+            api_url = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434")
+            try:
+                with urllib.request.urlopen(f"{api_url}/api/ps", timeout=5.0) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+            except Exception:
+                return
+            for entry in data.get("models", []):
+                name = entry.get("name", "") or entry.get("model", "")
+                if not name:
+                    continue
+                if self._is_same_ollama_model(keep_model, name):
+                    continue
+                self._unload_ollama_model(name)
+
+    def unload_all_lucy_models(self) -> list[str]:
+        """Unload every Local Lucy model Ollama currently has resident.
+
+        Returns the list of model names that were attempted. Failures are
+        ignored — Ollama may not be running or models may already be unloaded.
+        """
+        with _OLLAMA_LOAD_LOCK:
+            try:
+                oc = self._import_tool("router_py.ollama_cleanup")
+                return oc.unload_all_lucy_models()
+            except Exception as exc:
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Unload all Lucy models failed: {exc}")
+                return []
+
+    def shutdown(self) -> list[str]:
+        """Best-effort unload of all Local Lucy Ollama models on HMI shutdown.
+
+        This is called from the HMI close/shutdown path so VRAM is released
+        when the user exits Local Lucy.
+
+        Returns the list of model names that were attempted.
+        """
+        unloaded = self.unload_all_lucy_models()
+        if unloaded:
+            logger = logging.getLogger(__name__)
+            logger.info(f"HMI shutdown unloaded Ollama models: {unloaded}")
+        return unloaded
 
     def _background_warmup_router(self) -> None:
         """Eagerly load the embedding router (ModernBERT) so first query isn't penalized.
@@ -996,6 +1090,12 @@ class RuntimeBridge:
                 timed_out=False,
                 payload=None,
             )
+
+        # Sync current state file toggles into the process environment before
+        # every submit. Otherwise a stale LUCY_EVIDENCE_ENABLED default from the
+        # launcher can override the HMI's evidence/memory toggles and cause
+        # NEWS/EVIDENCE/TIME routes to be rejected as "disabled by operator".
+        self._apply_state_to_env()
 
         # Phase 3: shadow-mode automatic model selection.
         try:

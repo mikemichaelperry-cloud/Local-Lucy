@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# packaging/debian/build_deb.sh — Build a Debian package for Local Lucy v10.
+# packaging/debian/build_deb.sh — Build a Debian package for Local Lucy V11.
 #
-# The package installs the application source to /opt/local-lucy/ and provides
-# /usr/local/bin/local-lucy and /usr/local/bin/local-lucy-chat symlinks.
+# The package installs the application source to /opt/local-lucy-v11/ and provides
+# /usr/local/bin/local-lucy-v11 and /usr/local/bin/local-lucy-v11-chat symlinks.
 # The Python venv is created on the target machine by the postinst script to
 # keep the .deb artifact small enough for GitHub Releases.
 
@@ -28,7 +28,7 @@ fi
 # Use sed for the substitution to avoid bash tilde-expansion in the replacement.
 VERSION="$(printf '%s' "$VERSION" | sed 's/-/~/g')"
 
-PACKAGE="local-lucy"
+PACKAGE="local-lucy-v11"
 ARCH="amd64"
 DEB_NAME="${PACKAGE}_${VERSION}_${ARCH}.deb"
 
@@ -40,11 +40,14 @@ trap 'rm -rf "$STAGING"' EXIT
 
 PKGROOT="$STAGING/${PACKAGE}_${VERSION}_${ARCH}"
 mkdir -p "$PKGROOT/DEBIAN"
-mkdir -p "$PKGROOT/opt/local-lucy"
+mkdir -p "$PKGROOT/opt/local-lucy-v11"
 mkdir -p "$PKGROOT/usr/local/bin"
+mkdir -p "$PKGROOT/usr/share/applications"
+mkdir -p "$PKGROOT/usr/share/icons/hicolor/256x256/apps"
 
 # -----------------------------------------------------------------------------
-# Copy source tree (excluding build/runtime artifacts and the venv)
+# Copy source tree (excluding build/runtime artifacts, the venv, development
+# backups, and per-user runtime data that belongs in XDG directories).
 # -----------------------------------------------------------------------------
 echo "[build_deb] Copying source tree to staging area..."
 cd "$REPO_ROOT"
@@ -52,6 +55,15 @@ tar -c \
     --exclude='.git' \
     --exclude='.github' \
     --exclude='packaging' \
+    --exclude='dist' \
+    --exclude='backups' \
+    --exclude='cache' \
+    --exclude='logs' \
+    --exclude='memory' \
+    --exclude='state' \
+    --exclude='system_state' \
+    --exclude='.ruff_cache' \
+    --exclude='.superpowers' \
     --exclude='ui_debug.log' \
     --exclude='ui-v10/.venv' \
     --exclude='runtime/state' \
@@ -60,18 +72,24 @@ tar -c \
     --exclude='.pytest_cache' \
     --exclude='*.pyc' \
     --exclude='.env' \
-    . | tar -x -C "$PKGROOT/opt/local-lucy"
+    . | tar -x -C "$PKGROOT/opt/local-lucy-v11"
 
 # Ensure launchers are executable
-chmod 0755 "$PKGROOT/opt/local-lucy/START_LUCY.sh"
-chmod 0755 "$PKGROOT/opt/local-lucy/lucy_chat.sh"
+chmod 0755 "$PKGROOT/opt/local-lucy-v11/START_LUCY.sh"
+chmod 0755 "$PKGROOT/opt/local-lucy-v11/lucy_chat.sh"
 
 # -----------------------------------------------------------------------------
-# Symlinks and Debian metadata
+# Symlinks, desktop file, icon and Debian metadata
 # -----------------------------------------------------------------------------
-echo "[build_deb] Creating symlinks..."
-ln -sf /opt/local-lucy/START_LUCY.sh "$PKGROOT/usr/local/bin/local-lucy"
-ln -sf /opt/local-lucy/lucy_chat.sh "$PKGROOT/usr/local/bin/local-lucy-chat"
+echo "[build_deb] Creating symlinks and desktop entry..."
+ln -sf /opt/local-lucy-v11/START_LUCY.sh "$PKGROOT/usr/local/bin/local-lucy-v11"
+ln -sf /opt/local-lucy-v11/lucy_chat.sh "$PKGROOT/usr/local/bin/local-lucy-v11-chat"
+
+# Distinct V11 desktop entry
+cp "$REPO_ROOT/packaging/appimage/local-lucy-v11.desktop" \
+    "$PKGROOT/usr/share/applications/local-lucy-v11.desktop"
+# Placeholder icon (replace with real icon when available)
+touch "$PKGROOT/usr/share/icons/hicolor/256x256/apps/local-lucy-v11.png"
 
 cp "$REPO_ROOT/packaging/debian/DEBIAN/postinst" "$PKGROOT/DEBIAN/postinst"
 chmod 0755 "$PKGROOT/DEBIAN/postinst"

@@ -5047,7 +5047,7 @@
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
-      "route": "WEATHER",
+      "route": "LOCAL",
       "policy_override": "none"
     },
     "metadata": {
@@ -6220,7 +6220,7 @@
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
-      "route": "WEATHER",
+      "route": "LOCAL",
       "policy_override": "none"
     },
     "metadata": {

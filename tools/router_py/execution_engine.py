@@ -211,6 +211,7 @@ from tools.xdg_paths import lucy_runtime_namespace_root
 
 from router_py.classify import ClassificationResult, RoutingDecision
 from router_py.policy import requires_evidence_mode
+from router_py.request_constraints import RequestConstraints
 from router_py.request_types import ExecutionResult
 from router_py import response_formatter
 from router_py.self_analysis import SelfAnalysisEngine
@@ -400,7 +401,8 @@ def _load_session_memory_context_with_telemetry(
     if not mem_file:
         mem_file = os.environ.get("LUCY_CHAT_MEMORY_FILE", "").strip()
     if not mem_file:
-        mem_file = DEFAULT_CHAT_MEMORY_FILE
+        # Resolve default at call time so namespace overrides are honoured.
+        mem_file = str(lucy_runtime_namespace_root() / "state" / "chat_session_memory.txt")
 
     mem_path = Path(mem_file).expanduser()
 
@@ -782,6 +784,31 @@ class ExecutionEngine:
             f"ExecutionEngine initialized with namespace: {self._execution_namespace}, "
             f"state_dir: {self._state_dir}, sqlite_state: {self.use_sqlite_state}"
         )
+
+    def is_capability_allowed(
+        self,
+        route: str,
+        constraints: RequestConstraints | None,
+    ) -> bool:
+        """Return whether *route* is allowed under *constraints*.
+
+        Request-scoped constraints override normal routing decisions. For
+        example, ``network=False`` blocks routes that require external fetches,
+        and ``tools=False`` blocks tool-based routes such as TIME or WEATHER.
+        Local-only routes are always permitted.
+        """
+        if constraints is None:
+            return True
+
+        network_routes = {"NEWS", "EVIDENCE", "AUGMENTED", "FULL"}
+        tool_routes = {"TIME", "WEATHER", "FINANCE"}
+
+        if constraints.network is False and route in network_routes:
+            return False
+        if constraints.tools is False and route in tool_routes:
+            return False
+
+        return True
 
     def _resolve_state_dir(self) -> Path:
         """

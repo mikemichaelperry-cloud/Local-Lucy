@@ -95,7 +95,7 @@ async def test_ask_question_too_long(app_no_auth):
     async with TestClient(TestServer(app_no_auth)) as client:
         resp = await client.post(
             "/api/ask",
-            json={"question": "x" * 10000},
+            json={"question": "x" * 16001},
         )
         assert resp.status == 400
         data = await resp.json()

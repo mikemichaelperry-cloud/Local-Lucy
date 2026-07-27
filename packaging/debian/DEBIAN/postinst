@@ -1,5 +1,5 @@
 #!/bin/bash
-# DEBIAN/postinst — Finalize Local Lucy v10 installation.
+# DEBIAN/postinst — Finalize Local Lucy V11 installation.
 #
 # The application is shipped without its Python venv to keep the .deb small.
 # This script creates the venv on the target machine and installs the
@@ -7,7 +7,7 @@
 
 set -e
 
-APP_DIR="/opt/local-lucy"
+APP_DIR="/opt/local-lucy-v11"
 VENV_DIR="${APP_DIR}/ui-v10/.venv"
 
 # Ensure the launchers are executable
@@ -31,12 +31,12 @@ fi
 
 # Defensive symlink creation (the package already provides these, but ensure
 # they exist after upgrades or manual removals)
-if [ ! -e "/usr/local/bin/local-lucy" ]; then
-    ln -sf "${APP_DIR}/START_LUCY.sh" "/usr/local/bin/local-lucy"
+if [ ! -e "/usr/local/bin/local-lucy-v11" ]; then
+    ln -sf "${APP_DIR}/START_LUCY.sh" "/usr/local/bin/local-lucy-v11"
 fi
 
-if [ ! -e "/usr/local/bin/local-lucy-chat" ]; then
-    ln -sf "${APP_DIR}/lucy_chat.sh" "/usr/local/bin/local-lucy-chat"
+if [ ! -e "/usr/local/bin/local-lucy-v11-chat" ]; then
+    ln -sf "${APP_DIR}/lucy_chat.sh" "/usr/local/bin/local-lucy-v11-chat"
 fi
 
 exit 0

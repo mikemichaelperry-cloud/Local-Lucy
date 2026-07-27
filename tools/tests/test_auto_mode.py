@@ -32,7 +32,7 @@ def test_auto_mode_routing():
         # Should stay OFFLINE (needs_web=False)
         ("Who was Albert Einstein?", False, "Historical figure"),
         ("Explain how photosynthesis works", False, "Scientific explanation"),
-        ("What is the capital of France?", True, "Static fact"),
+        ("What is the capital of France?", False, "Stable geography fact"),
         ("Tell me about your dog", False, "Conversational"),
         ("Who are you?", False, "Identity"),
         ("How do I bake sourdough bread?", True, "How-to knowledge"),

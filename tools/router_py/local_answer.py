@@ -357,7 +357,11 @@ _SELF_KNOWLEDGE_TEMPLATE = (
     "Safety: medical/vet/legal → AUGMENTED with citations; stories/poems → LOCAL.\n"
     "If asked who you are or what version you are, say 'I am Local Lucy {version_label}.' "
     "If asked about capabilities, list them truthfully. If asked about your architecture, "
-    "describe the {version_label} stack above. Do not claim to be a different AI."
+    "describe the {version_label} stack above. "
+    "If asked about fallback providers or evidence sources (e.g., OpenAI, Kimi, Wikipedia), "
+    "say that Wikipedia is the primary augmented source, OpenAI/Kimi may synthesize evidence "
+    "when the router activates AUGMENTED mode, and your default knowledge source is the local "
+    "Ollama LLM's parametric knowledge. Do not claim to be a different AI."
 )
 
 # Model-specific identity strings. Add new models here.
@@ -564,7 +568,7 @@ class LocalAnswerConfig:
     local_max_tokens: int = 2048
     augmented_max_tokens: int = 1536
     evidence_max_tokens: int = 1536
-    creative_max_tokens: int = 2048
+    creative_max_tokens: int = 4096
     self_review_max_tokens: int = 4096
     self_review_context_chars: int = 32768
     # Code-review specialist model settings
@@ -645,7 +649,7 @@ class LocalAnswerConfig:
             local_max_tokens=int(os.environ.get("LUCY_LOCAL_MAX_TOKENS", "2048")),
             augmented_max_tokens=int(os.environ.get("LUCY_AUGMENTED_MAX_TOKENS", "1536")),
             evidence_max_tokens=int(os.environ.get("LUCY_EVIDENCE_MAX_TOKENS", "1536")),
-            creative_max_tokens=int(os.environ.get("LUCY_CREATIVE_MAX_TOKENS", "2048")),
+            creative_max_tokens=int(os.environ.get("LUCY_CREATIVE_MAX_TOKENS", "4096")),
             self_review_max_tokens=int(os.environ.get("LUCY_SELF_REVIEW_MAX_TOKENS", "4096")),
             self_review_context_chars=int(
                 os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "32768")
@@ -1558,14 +1562,16 @@ class LocalAnswer:
         word_match = re.search(r"(\d+)[\s\-]*(?:word|words)", q)
         if word_match:
             requested_words = int(word_match.group(1))
-            # Token estimate: ~2.5x headroom for visible + thinking tokens.
+            # Token estimate: ~4x headroom for visible output. Some models (e.g.
+            # Gemma 4) use a richer tokenizer or emit formatting tokens, so the
+            # previous 2.5x estimate was insufficient for creative writing.
             if route in {"AUGMENTED", "EVIDENCE"}:
                 max_tokens = evidence_budget if route == "EVIDENCE" else augmented_budget
             elif is_creative:
                 max_tokens = creative_budget
             else:
                 max_tokens = self.config.num_predict_long
-            num_predict = min(int(requested_words * 2.5), max_tokens)
+            num_predict = min(int(requested_words * 4.0), max_tokens)
             return ("chat_long", num_predict, f"- Write approximately {requested_words} words.")
 
         detail_patterns = [
@@ -2035,7 +2041,10 @@ class LocalAnswer:
         return "Which person or company do you mean?"
 
     # Exact tags known to emit an internal 'thinking' block. Substring checks
-    # below catch families such as qwen3, deepseek-r1, and gemma4.
+    # below catch families such as qwen3, deepseek-r1, and gemma4. Gemma 4 is
+    # tagged by Ollama as a thinking-capable model and can consume part of its
+    # output budget on internal reasoning before emitting visible text, so it
+    # needs the thinking-model token headroom.
     _THINKING_MODEL_TAGS: frozenset[str] = frozenset()
 
     def _is_thinking_model(self) -> bool:
@@ -2046,7 +2055,10 @@ class LocalAnswer:
         model = (self.config.model or "").lower().split(":")[0]
         if model in self._THINKING_MODEL_TAGS:
             return True
-        return any(name in model for name in ("qwen3", "deepseek-r1", "gemma4", "o3", "o1"))
+        return any(
+            name in model
+            for name in ("qwen3", "deepseek-r1", "o3", "o1", "gemma4", "gemma-4")
+        )
 
     def _thinking_model_token_multiplier(self) -> int:
         """Return multiplier for num_predict on thinking models."""
@@ -2063,13 +2075,11 @@ class LocalAnswer:
         start_time = time.time()
         # Thinking models need extra token headroom so reasoning does not swallow
         # the visible response. Cap at a sane maximum to protect latency, but do
-        # not reduce a deliberately large request (e.g. SELF_REVIEW) below what
-        # the caller asked for. Only SELF_REVIEW is allowed to exceed the usual
-        # num_predict_long cap; normal routes keep the existing ceiling.
-        if route_mode.upper() == "SELF_REVIEW":
-            max_num_predict = max(self.config.num_predict_long, num_predict)
-        else:
-            max_num_predict = self.config.num_predict_long
+        # not reduce a deliberately large request below what the caller asked
+        # for. SELF_REVIEW and explicit word-count routes (e.g. creative writing)
+        # may exceed the usual num_predict_long cap when the generation profile
+        # deliberately requested a larger budget.
+        max_num_predict = max(self.config.num_predict_long, num_predict)
         effective_num_predict = min(
             num_predict * self._thinking_model_token_multiplier(),
             max_num_predict,

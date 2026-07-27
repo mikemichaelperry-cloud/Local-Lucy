@@ -126,6 +126,24 @@ def _load_cases() -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Pytest fixtures
 # ---------------------------------------------------------------------------
+@pytest.fixture(scope="session", autouse=True)
+def _isolated_runtime_namespace():
+    """Use a temporary runtime namespace so feedback-buffer state from prior
+    runs or live usage does not leak into routing decisions."""
+    import os
+    import tempfile
+
+    tmpdir = tempfile.TemporaryDirectory(prefix="lucy_synthetic_")
+    old = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
+    os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = tmpdir.name
+    yield
+    if old is None:
+        os.environ.pop("LUCY_RUNTIME_NAMESPACE_ROOT", None)
+    else:
+        os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = old
+    tmpdir.cleanup()
+
+
 @pytest.fixture(scope="session")
 def all_cases() -> List[Dict[str, Any]]:
     return _load_cases()

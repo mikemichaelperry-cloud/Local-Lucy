@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import threading
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -670,12 +671,25 @@ def classify_intent(query: str, surface: str = "cli") -> ClassificationResult:
 # ============================================================================
 
 _ROUTER = None
+_ROUTER_LOCK = threading.Lock()
 
 
 def _get_router():
-    """Lazy-load the embedding router (v2)."""
+    """Lazy-load the embedding router (v2).
+
+    Uses a lock so background prewarm threads (e.g. from the HMI) cannot race
+    with foreground test code loading HybridRouterV2 instances concurrently.
+    Concurrent SentenceTransformer initialization can corrupt model parameters,
+    leading to meta-tensor errors or all-queries-misrouted-to-NEWS symptoms.
+    """
     global _ROUTER
-    if _ROUTER is None:
+    if _ROUTER is not None:
+        return _ROUTER if _ROUTER is not False else None
+
+    with _ROUTER_LOCK:
+        if _ROUTER is not None:
+            return _ROUTER if _ROUTER is not False else None
+
         try:
             router_dir = Path(__file__).resolve().parent.parent.parent / "models" / "router"
             if str(router_dir) not in sys.path:
@@ -1455,7 +1469,11 @@ def _is_news_query_typos(query: str) -> bool:
         "now",
     ]
     has_news_context = any(c in q for c in news_context)
-    wat_pattern = any(p in q for p in ["wats ", "wat ", "wut ", "whats ", "what's "])
+    # Only treat heavily misspelled "what" as a news signal. "whats" (no
+    # apostrophe) in normal phrasing like "Whats your opinion of your current
+    # state?" is not a typo; "what's" is a legitimate contraction used in news
+    # questions (e.g. "What's happening today?") and is handled here.
+    wat_pattern = any(p in q for p in ["wats ", "wat ", "wut ", "what's "])
     return has_news_typo or (wat_pattern and has_news_context)
 
 
@@ -1541,6 +1559,13 @@ def _is_weather_query(query: str) -> bool:
         "average weather",
         "weather history",
         "historical weather",
+        "boiling point",
+        "melting point",
+        "freezing point",
+        "boil",
+        "boiling",
+        "sea level",
+        "thermodynamics",
     ]
     if any(t in q for t in weather_science_terms):
         return False
@@ -1975,6 +2000,37 @@ def _is_capability_query(query: str) -> bool:
             ]
         ):
             return True
+
+    # Explicit web-search capability questions (e.g. "Can you search the web?")
+    # These are distinct from requests like "Search the web for X".
+    if any(
+        p in q
+        for p in [
+            "can you search the web",
+            "can you search online",
+            "can you browse the web",
+            "do you search the web",
+            "do you search online",
+            "are you able to search",
+            "are you able to browse",
+        ]
+    ):
+        return True
+
+    # Capability-overview questions (e.g. "What can you do?", "What can Local Lucy do?")
+    if any(
+        p in q
+        for p in [
+            "what can you do",
+            "what can local lucy do",
+            "what can lucy do",
+            "what do you do",
+            "what are you able to do",
+            "what are your capabilities",
+            "what are your abilities",
+        ]
+    ):
+        return True
 
     # Provider / backend / model / policy / mode questions
     if any(

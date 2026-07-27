@@ -28,10 +28,12 @@ from typing import Literal
 # ---------------------------------------------------------------------------
 
 SURFACE_LIMITS: dict[str, int] = {
-    "cli": 4000,
-    "hmi": 4000,
+    # Raised from 4000 to allow longer diagnostic / self-model / boundary tests
+    # without hitting the input-length guard. Voice stays short for TTS/ASR.
+    "cli": 16000,
+    "hmi": 16000,
     "voice": 500,
-    "api": 8000,
+    "api": 16000,
 }
 
 # ---------------------------------------------------------------------------

@@ -238,7 +238,9 @@ def cuda_available() -> bool:
     except Exception:
         return False
     try:
-        return bool(torch.cuda.is_available())
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return bool(torch.cuda.is_available())
     except Exception:
         return False
 

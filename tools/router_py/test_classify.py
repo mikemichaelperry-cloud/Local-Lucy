@@ -19,6 +19,8 @@ from router_py.classify import (
     RoutingDecision,
     _call_llm_arbiter,
     _is_capability_query,
+    _is_clear_news_query,
+    _is_news_query_typos,
     _map_to_intent_family,
     _make_local_decision,
     _make_augmented_decision,
@@ -283,6 +285,28 @@ class TestSelfKnowledgeRouting(unittest.TestCase):
         classification = self._background_classification()
         decision = select_route(classification, query="What version of Local Lucy are you?")
         self.assertEqual(decision.route, "LOCAL")
+
+
+class TestNewsTypoDetection(unittest.TestCase):
+    """Test typo-heavy news detection does not catch normal phrasing."""
+
+    def test_real_typos_trigger_news(self):
+        """Genuine typo-laden news phrasing is still detected."""
+        self.assertTrue(_is_news_query_typos("wats teh latest newz abot teh war"))
+        self.assertTrue(_is_news_query_typos("hedlines today"))
+
+    def test_normal_what_is_current_not_news_typo(self):
+        """'whats' (no apostrophe) in normal phrasing is not a news typo."""
+        self.assertFalse(_is_news_query_typos("Whats your opinion of your current state?"))
+
+    def test_what_is_contraction_still_news_typo(self):
+        """'what's' is a legitimate contraction used in news questions."""
+        self.assertTrue(_is_news_query_typos("What's the latest news today?"))
+
+    def test_clear_news_regex_still_catches_legitimate_news(self):
+        """Legitimate news phrasing is caught by the clear-news regex."""
+        self.assertTrue(_is_clear_news_query("What's the latest news today?"))
+        self.assertTrue(_is_clear_news_query("Latest world news headlines"))
 
 
 class TestDataClasses(unittest.TestCase):

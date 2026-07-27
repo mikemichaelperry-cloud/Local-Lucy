@@ -69,6 +69,56 @@ class TestRecreationalPetGate:
         assert decision.reason_code in {"policy:recreational_pet", "policy:personal_family"}
 
 
+class TestExplicitAssistantInstructionGate:
+    def test_self_model_correction_is_local(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "This is a self-model correction test. Do not modify memory or files. Answer only with four short sections.",
+            _clf(),
+        )
+        assert decision is not None
+        assert decision.route == "LOCAL"
+        assert decision.reason_code == "policy:explicit_assistant_instruction"
+
+    def test_internal_consistency_exercise_is_local(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "This is an internal consistency exercise. Use only the information already available to you. Do not use tools.",
+            _clf(),
+        )
+        assert decision is not None
+        assert decision.route == "LOCAL"
+        assert decision.reason_code == "policy:explicit_assistant_instruction"
+
+    def test_diagnostic_conversation_is_local(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "This is a diagnostic conversation only. Do not modify files, memory, code, settings, permissions, or external systems.",
+            _clf(),
+        )
+        assert decision is not None
+        assert decision.route == "LOCAL"
+        assert decision.reason_code == "policy:explicit_assistant_instruction"
+
+    def test_plain_factual_query_not_caught(self, router: PolicyRouter) -> None:
+        # A normal question starting with "This is a" should not be forced LOCAL.
+        decision = router.apply("This is a question about the moon.", _clf())
+        assert decision is None
+
+
+class TestScienceFactGate:
+    def test_water_boiling_is_local(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "At what temperature does water boil at sea level?", _clf()
+        )
+        assert decision is not None
+        assert decision.route == "LOCAL"
+        assert decision.reason_code == "policy:science_fact"
+
+    def test_speed_of_light_is_local(self, router: PolicyRouter) -> None:
+        decision = router.apply("What is the speed of light?", _clf())
+        assert decision is not None
+        assert decision.route == "LOCAL"
+        assert decision.reason_code == "policy:science_fact"
+
+
 class TestFinanceGate:
     def test_stock_price_is_finance(self, router: PolicyRouter) -> None:
         decision = router.apply("Current stock price of Apple", _clf())

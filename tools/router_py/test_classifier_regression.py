@@ -24,7 +24,9 @@ from router_py.classify import classify_intent, prewarm_router, select_route
 # Phase 4 baseline measured after classifier hardening, hard negatives,
 # stable-knowledge policy gate, and classifier threshold calibration.
 BASELINE_RECALL = {
-    "AUGMENTED": 0.38,
+    # Country capitals now route LOCAL under stable_knowledge, lowering the
+    # AUGMENTED recall compared to the previous baseline.
+    "AUGMENTED": 0.35,
     "EPHEMERAL": 0.0,
     "EVIDENCE": 0.61,
     "FINANCE": 0.80,
