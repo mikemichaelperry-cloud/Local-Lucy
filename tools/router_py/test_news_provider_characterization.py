@@ -15,7 +15,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 
 from news_provider import (
-    NewsAPIProvider,
     NewsProvider,
     NewsResult,
     RSSNewsProvider,
@@ -31,20 +30,7 @@ def test_news_result_dataclass():
 
 
 @pytest.mark.asyncio
-async def test_news_provider_fetch_news_prefers_newsapi_when_key_set(monkeypatch):
-    monkeypatch.setenv("NEWSAPI_API_KEY", "fake-key")
-    expected = NewsResult(ok=True, text="newsapi news", source="newsapi")
-    with patch.object(
-        NewsAPIProvider, "fetch_world_news", return_value=expected
-    ):
-        result = await NewsProvider.fetch_news("latest", for_voice=False)
-    assert result.ok is True
-    assert result.source == "newsapi"
-
-
-@pytest.mark.asyncio
-async def test_news_provider_fetch_news_falls_back_to_rss(monkeypatch):
-    monkeypatch.delenv("NEWSAPI_API_KEY", raising=False)
+async def test_news_provider_fetch_news_uses_rss_directly():
     expected = NewsResult(ok=True, text="rss news", source="rss")
     with patch.object(
         RSSNewsProvider, "fetch_world_news_async", return_value=expected

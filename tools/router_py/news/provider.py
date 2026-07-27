@@ -55,11 +55,7 @@ class NewsProvider:
     @classmethod
     async def fetch_news(cls, query: str = "", for_voice: bool = False) -> NewsResult:
         """
-        Fetch news using best available source.
-
-        Priority:
-        1. NewsAPI (if API key configured)
-        2. RSS feeds (no API key needed)
+        Fetch news from RSS feeds (async, parallel, always fresh).
 
         Args:
             query: Search query (e.g., "world news", "technology", "sports")
@@ -68,15 +64,6 @@ class NewsProvider:
         Returns:
             NewsResult with news articles
         """
-        # Try NewsAPI first if key is available
-        if os.environ.get("NEWSAPI_API_KEY"):
-            from router_py.news.api import NewsAPIProvider
-
-            result = NewsAPIProvider.fetch_world_news(query, for_voice=for_voice)
-            if result.ok:
-                return result
-
-        # Fallback to RSS feeds (async, parallel, always fresh)
         return await RSSNewsProvider.fetch_world_news_async(query, for_voice=for_voice)
 
     @classmethod
