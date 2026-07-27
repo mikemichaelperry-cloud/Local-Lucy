@@ -101,7 +101,11 @@ filterwarnings = [
     "ignore::ResourceWarning:asyncio.base_events",
     "ignore::ResourceWarning:pytest.unraisableexception",
 ]
-addopts = "--ignore=tools/router_py/test_synthetic_adversarial.py"
+addopts = "--ignore=tools/router_py/test_synthetic_adversarial.py -m 'not slow and not live'"
+markers = [
+    "slow: tests that take more than a few seconds (burn-in, regression, heavy model loads)",
+    "live: tests that require a running external service such as Ollama or the network",
+]
 
 [tool.ruff]
 line-length = 100
