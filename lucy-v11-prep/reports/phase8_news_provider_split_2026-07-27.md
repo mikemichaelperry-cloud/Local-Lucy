@@ -1,7 +1,7 @@
 # Phase 8b Completion Report — Split `tools/router_py/news_provider.py`
 
 **Date:** 2026-07-27  
-**Branch:** `phase8-news-provider-split` (HEAD `d116326`, ahead of `main` at `d2e5a51`)  
+**Branch:** `phase8-news-provider-split` (HEAD `433cfa4`, ahead of `main` at `d2e5a51`)  
 **Scope:** `tools/router_py/news_provider.py` → `tools/router_py/news/` package  
 **V10 preservation:** The `lucy-v10/` tree is untouched; this refactor applies only to V11 (`lucy-v11/`).
 
@@ -25,7 +25,7 @@ Split the monolithic `tools/router_py/news_provider.py` into a focused `tools/ro
 ### Deleted file
 
 - `tools/router_py/news_provider.py`
-- `tools/router_py/news/api.py` (created during the split but removed after review because `NewsAPIProvider` was dead code — no API key is installed and the app uses RSS feeds).
+- `tools/router_py/news/api.py` (created during the split but removed after review because `NewsAPIProvider` was dead code — no API key is installed and the app uses RSS feeds exclusively).
 
 ### Callers migrated
 
@@ -86,6 +86,7 @@ Result: `693 passed, 7 skipped, 261 deselected, 169 subtests passed in 145.35s`
 
 ## Notes
 
+- **Intentional behavior change:** `NewsAPIProvider` was removed as a user-approved functional simplification. No NewsAPI key is installed in this environment, and the application relies on RSS feeds exclusively for news. This is not an accidental regression; it is a deliberate reduction in scope that eliminates dead code while keeping the public `NewsProvider.fetch_news(...)` API unchanged.
 - The `.env` loading side effect was preserved in `provider.py` so any future news configuration is discovered on import.
 - The split follows the same pattern as `state_manager.py`: characterization tests → package → migrate callers → delete old file.
 

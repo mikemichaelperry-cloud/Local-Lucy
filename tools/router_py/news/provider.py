@@ -7,8 +7,6 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Any
-
 try:
     from dotenv import load_dotenv
 
@@ -23,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def _load_project_dotenv() -> None:
-    """Load lucy-v11/.env so NEWSAPI_API_KEY is available."""
+    """Load lucy-v11/.env so news-related environment variables are available."""
     if not _dotenv_available:
         return
     for root in (
