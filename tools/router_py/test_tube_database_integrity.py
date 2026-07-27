@@ -12,6 +12,10 @@ These tests verify:
   - The integration into local_answer.py works end-to-end
 """
 
+import pytest
+
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 import sys
 from pathlib import Path
 

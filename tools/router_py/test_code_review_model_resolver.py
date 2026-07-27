@@ -4,6 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 from router_py.code_review_model_resolver import CodeReviewModelResolver
 
 

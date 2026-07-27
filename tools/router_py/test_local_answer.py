@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Tests for local_answer.py module."""
 
+import pytest
+
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 import asyncio
 import json
 import os

@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 import json
 import urllib.error
 from unittest.mock import MagicMock, patch

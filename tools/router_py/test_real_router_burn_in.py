@@ -14,6 +14,10 @@ Run:
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 import sys
 import unittest
 from pathlib import Path

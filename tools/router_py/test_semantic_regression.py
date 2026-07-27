@@ -43,6 +43,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
+
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 from local_answer import LocalAnswer, LocalAnswerConfig, _MODEL_IDENTITIES
 
 # ---------------------------------------------------------------------------

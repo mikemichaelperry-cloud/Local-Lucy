@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 import sys
 import threading
 import time

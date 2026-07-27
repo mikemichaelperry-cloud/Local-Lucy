@@ -34,6 +34,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pytest
 
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 from router_py.execution_engine import ExecutionEngine
 from router_py.request_types import ClassificationResult, ExecutionResult, RoutingDecision
 

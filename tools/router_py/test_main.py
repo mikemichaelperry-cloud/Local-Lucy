@@ -3,6 +3,10 @@
 Unit tests for main router orchestrator (Phase 4 Strangler Fig).
 """
 
+import pytest
+
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 import sys
 import time
 import unittest

@@ -12,6 +12,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 import health_check as hc
 
 

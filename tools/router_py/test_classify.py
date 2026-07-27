@@ -3,6 +3,10 @@
 Unit tests for classification integration functions.
 """
 
+import pytest
+
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 import json
 import os
 import sys

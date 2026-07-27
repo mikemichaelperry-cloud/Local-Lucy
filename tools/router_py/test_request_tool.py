@@ -8,6 +8,8 @@ import os
 
 import pytest
 
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 

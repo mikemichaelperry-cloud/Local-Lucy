@@ -6,6 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+pytestmark = [pytest.mark.slow, pytest.mark.live]
+
 from router_py.execution_engine import ExecutionEngine
 from router_py.request_types import ClassificationResult, RoutingDecision
 from router_py.self_analysis import FileAnalysis, SelfAnalysisEngine, _MAX_FILE_SIZE_BYTES
