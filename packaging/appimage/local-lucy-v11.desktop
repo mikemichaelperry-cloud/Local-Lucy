@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Local Lucy V11
+Comment=Self-learning, privacy-first desktop AI assistant (V11)
+Exec=local-lucy-v11
+Icon=local-lucy-v11
+Type=Application
+Categories=Utility;Network;Chat;X-AI;
+Terminal=false
+StartupWMClass=LocalLucyV11

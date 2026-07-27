@@ -1,0 +1,500 @@
+{
+  "suite_path": "/home/mike/lucy-v11/data/evaluation/v10_v11_accuracy_suite.jsonl",
+  "total_cases": 32,
+  "agreement": {
+    "count": 26,
+    "pct": 81.25
+  },
+  "v11_accuracy": {
+    "count": 31,
+    "pct": 96.875
+  },
+  "per_category": {
+    "local_knowledge": {
+      "total": 4,
+      "agree": 4,
+      "v11_correct": 4
+    },
+    "stable_knowledge": {
+      "total": 1,
+      "agree": 1,
+      "v11_correct": 1
+    },
+    "medical": {
+      "total": 4,
+      "agree": 3,
+      "v11_correct": 4
+    },
+    "medical_or_safety": {
+      "total": 1,
+      "agree": 1,
+      "v11_correct": 1
+    },
+    "software_false_positive": {
+      "total": 2,
+      "agree": 1,
+      "v11_correct": 1
+    },
+    "news": {
+      "total": 2,
+      "agree": 2,
+      "v11_correct": 2
+    },
+    "finance": {
+      "total": 1,
+      "agree": 1,
+      "v11_correct": 1
+    },
+    "finance_or_evidence": {
+      "total": 1,
+      "agree": 1,
+      "v11_correct": 1
+    },
+    "time": {
+      "total": 1,
+      "agree": 1,
+      "v11_correct": 1
+    },
+    "weather": {
+      "total": 1,
+      "agree": 1,
+      "v11_correct": 1
+    },
+    "augmented": {
+      "total": 3,
+      "agree": 3,
+      "v11_correct": 3
+    },
+    "evidence": {
+      "total": 1,
+      "agree": 1,
+      "v11_correct": 1
+    },
+    "constraint_no_network": {
+      "total": 1,
+      "agree": 0,
+      "v11_correct": 1
+    },
+    "constraint_no_tools": {
+      "total": 1,
+      "agree": 0,
+      "v11_correct": 1
+    },
+    "constraint_no_memory": {
+      "total": 1,
+      "agree": 0,
+      "v11_correct": 1
+    },
+    "constraint_local_only": {
+      "total": 1,
+      "agree": 1,
+      "v11_correct": 1
+    },
+    "voice_surface": {
+      "total": 2,
+      "agree": 2,
+      "v11_correct": 2
+    },
+    "voice_constraint": {
+      "total": 1,
+      "agree": 0,
+      "v11_correct": 1
+    },
+    "short_query": {
+      "total": 2,
+      "agree": 2,
+      "v11_correct": 2
+    },
+    "ambiguous": {
+      "total": 1,
+      "agree": 1,
+      "v11_correct": 1
+    }
+  },
+  "results": [
+    {
+      "id": "local_math",
+      "category": "local_knowledge",
+      "query": "What is 2+2?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "local_history",
+      "category": "local_knowledge",
+      "query": "Who was Ada Lovelace and why is she important?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "local_creative",
+      "category": "local_knowledge",
+      "query": "Create a dialogue between Shakespeare and Einstein.",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "local_opinion",
+      "category": "local_knowledge",
+      "query": "What are the pros and cons of remote work?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "AUGMENTED",
+      "v11_route": "AUGMENTED",
+      "expected_v11": "AUGMENTED",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "stable_knowledge",
+      "category": "stable_knowledge",
+      "query": "Tell me a story about the stock market crash of 1929.",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "medical_cognitive",
+      "category": "medical",
+      "query": "I am experiencing worsening memory loss and confusion. What medical causes should be considered?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "AUGMENTED",
+      "v11_route": "EVIDENCE",
+      "expected_v11": "EVIDENCE",
+      "v10_matches_v11": false,
+      "v11_correct": true
+    },
+    {
+      "id": "medical_vomiting",
+      "category": "medical",
+      "query": "I have been vomiting and coughing for three days.",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "EVIDENCE",
+      "v11_route": "EVIDENCE",
+      "expected_v11": "EVIDENCE",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "medical_statin",
+      "category": "medical",
+      "query": "What are the side effects of statins?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "EVIDENCE",
+      "v11_route": "EVIDENCE",
+      "expected_v11": "EVIDENCE",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "medical_side_effect",
+      "category": "medical",
+      "query": "Can this medication cause muscle pain as a side effect?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "EVIDENCE",
+      "v11_route": "EVIDENCE",
+      "expected_v11": "EVIDENCE",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "medical_self_defense",
+      "category": "medical_or_safety",
+      "query": "What self-defense techniques are legal in my state?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "AUGMENTED",
+      "v11_route": "AUGMENTED",
+      "expected_v11": "AUGMENTED",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "software_memory",
+      "category": "software_false_positive",
+      "query": "My SQLite database is running out of memory. How do I optimize it?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "software_confusion",
+      "category": "software_false_positive",
+      "query": "I am confused about Python list versus tuple memory layout.",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "EVIDENCE",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": false,
+      "v11_correct": false
+    },
+    {
+      "id": "news_headlines",
+      "category": "news",
+      "query": "What are the latest headlines?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "NEWS",
+      "v11_route": "NEWS",
+      "expected_v11": "NEWS",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "news_israel",
+      "category": "news",
+      "query": "What is the latest Israeli news?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "NEWS",
+      "v11_route": "NEWS",
+      "expected_v11": "NEWS",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "finance_tsla",
+      "category": "finance",
+      "query": "What is the current TSLA stock price?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "FINANCE",
+      "v11_route": "FINANCE",
+      "expected_v11": "FINANCE",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "finance_cpi",
+      "category": "finance_or_evidence",
+      "query": "Give me sources for the latest CPI data.",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "FINANCE",
+      "v11_route": "FINANCE",
+      "expected_v11": "FINANCE",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "time_tokyo",
+      "category": "time",
+      "query": "What time is it in Tokyo?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "TIME",
+      "v11_route": "TIME",
+      "expected_v11": "TIME",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "weather_nyc",
+      "category": "weather",
+      "query": "What is the weather in New York?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "WEATHER",
+      "v11_route": "WEATHER",
+      "expected_v11": "WEATHER",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "augmented_shah",
+      "category": "augmented",
+      "query": "Who is considered the latest Shah of Iran?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "AUGMENTED",
+      "v11_route": "AUGMENTED",
+      "expected_v11": "AUGMENTED",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "augmented_lookup",
+      "category": "augmented",
+      "query": "What does Wikipedia have to say about raising a dog?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "EVIDENCE",
+      "v11_route": "EVIDENCE",
+      "expected_v11": "EVIDENCE",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "augmented_current_fact",
+      "category": "augmented",
+      "query": "What is the latest US inflation rate?",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "FINANCE",
+      "v11_route": "FINANCE",
+      "expected_v11": "FINANCE",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "evidence_aspirin",
+      "category": "evidence",
+      "query": "Search current trusted sources for recent evidence about aspirin use during a suspected heart attack.",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "EVIDENCE",
+      "v11_route": "EVIDENCE",
+      "expected_v11": "EVIDENCE",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "constraint_no_network_news",
+      "category": "constraint_no_network",
+      "query": "Do not use network access. What is the latest news?",
+      "surface": "cli",
+      "use_pipeline": true,
+      "v10_route": "NEWS",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": false,
+      "v11_correct": true
+    },
+    {
+      "id": "constraint_no_tools_time",
+      "category": "constraint_no_tools",
+      "query": "What time is it in Tokyo? Do not use tools.",
+      "surface": "cli",
+      "use_pipeline": true,
+      "v10_route": "TIME",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": false,
+      "v11_correct": true
+    },
+    {
+      "id": "constraint_no_memory",
+      "category": "constraint_no_memory",
+      "query": "Do not store this message.",
+      "surface": "cli",
+      "use_pipeline": true,
+      "v10_route": "AUGMENTED",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": false,
+      "v11_correct": true
+    },
+    {
+      "id": "constraint_local_only",
+      "category": "constraint_local_only",
+      "query": "Answer only from current local context. What is the capital of France?",
+      "surface": "cli",
+      "use_pipeline": true,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "voice_local",
+      "category": "voice_surface",
+      "query": "What is 2+2?",
+      "surface": "voice",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "voice_news",
+      "category": "voice_surface",
+      "query": "Latest news about Israel",
+      "surface": "voice",
+      "use_pipeline": false,
+      "v10_route": "NEWS",
+      "v11_route": "NEWS",
+      "expected_v11": "NEWS",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "voice_no_network",
+      "category": "voice_constraint",
+      "query": "Do not use network access. What is the latest news?",
+      "surface": "voice",
+      "use_pipeline": true,
+      "v10_route": "NEWS",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": false,
+      "v11_correct": true
+    },
+    {
+      "id": "short_yes",
+      "category": "short_query",
+      "query": "yes",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "short_thanks",
+      "category": "short_query",
+      "query": "thanks",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    },
+    {
+      "id": "ambiguous",
+      "category": "ambiguous",
+      "query": "Tell me about it.",
+      "surface": "cli",
+      "use_pipeline": false,
+      "v10_route": "LOCAL",
+      "v11_route": "LOCAL",
+      "expected_v11": "LOCAL",
+      "v10_matches_v11": true,
+      "v11_correct": true
+    }
+  ]
+}

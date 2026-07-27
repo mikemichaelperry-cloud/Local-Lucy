@@ -1,0 +1,32 @@
+{"id": "local_math", "query": "What is 2+2?", "expected_v11": "LOCAL", "category": "local_knowledge"}
+{"id": "local_history", "query": "Who was Ada Lovelace and why is she important?", "expected_v11": "LOCAL", "category": "local_knowledge"}
+{"id": "local_creative", "query": "Create a dialogue between Shakespeare and Einstein.", "expected_v11": "LOCAL", "category": "local_knowledge"}
+{"id": "local_opinion", "query": "What are the pros and cons of remote work?", "expected_v11": "AUGMENTED", "category": "local_knowledge"}
+{"id": "stable_knowledge", "query": "Tell me a story about the stock market crash of 1929.", "expected_v11": "LOCAL", "category": "stable_knowledge"}
+{"id": "medical_cognitive", "query": "I am experiencing worsening memory loss and confusion. What medical causes should be considered?", "expected_v11": "EVIDENCE", "category": "medical"}
+{"id": "medical_vomiting", "query": "I have been vomiting and coughing for three days.", "expected_v11": "EVIDENCE", "category": "medical"}
+{"id": "medical_statin", "query": "What are the side effects of statins?", "expected_v11": "EVIDENCE", "category": "medical"}
+{"id": "medical_side_effect", "query": "Can this medication cause muscle pain as a side effect?", "expected_v11": "EVIDENCE", "category": "medical"}
+{"id": "medical_self_defense", "query": "What self-defense techniques are legal in my state?", "expected_v11": "AUGMENTED", "category": "medical_or_safety"}
+{"id": "software_memory", "query": "My SQLite database is running out of memory. How do I optimize it?", "expected_v11": "LOCAL", "category": "software_false_positive"}
+{"id": "software_confusion", "query": "I am confused about Python list versus tuple memory layout.", "expected_v11": "LOCAL", "category": "software_false_positive"}
+{"id": "news_headlines", "query": "What are the latest headlines?", "expected_v11": "NEWS", "category": "news"}
+{"id": "news_israel", "query": "What is the latest Israeli news?", "expected_v11": "NEWS", "category": "news"}
+{"id": "finance_tsla", "query": "What is the current TSLA stock price?", "expected_v11": "FINANCE", "category": "finance"}
+{"id": "finance_cpi", "query": "Give me sources for the latest CPI data.", "expected_v11": "FINANCE", "category": "finance_or_evidence"}
+{"id": "time_tokyo", "query": "What time is it in Tokyo?", "expected_v11": "TIME", "category": "time"}
+{"id": "weather_nyc", "query": "What is the weather in New York?", "expected_v11": "WEATHER", "category": "weather"}
+{"id": "augmented_shah", "query": "Who is considered the latest Shah of Iran?", "expected_v11": "AUGMENTED", "category": "augmented"}
+{"id": "augmented_lookup", "query": "What does Wikipedia have to say about raising a dog?", "expected_v11": "EVIDENCE", "category": "augmented"}
+{"id": "augmented_current_fact", "query": "What is the latest US inflation rate?", "expected_v11": "FINANCE", "category": "augmented"}
+{"id": "evidence_aspirin", "query": "Search current trusted sources for recent evidence about aspirin use during a suspected heart attack.", "expected_v11": "EVIDENCE", "category": "evidence"}
+{"id": "constraint_no_network_news", "query": "Do not use network access. What is the latest news?", "expected_v11": "LOCAL", "category": "constraint_no_network", "use_pipeline": true}
+{"id": "constraint_no_tools_time", "query": "What time is it in Tokyo? Do not use tools.", "expected_v11": "LOCAL", "category": "constraint_no_tools", "use_pipeline": true}
+{"id": "constraint_no_memory", "query": "Do not store this message.", "expected_v11": "LOCAL", "category": "constraint_no_memory", "use_pipeline": true}
+{"id": "constraint_local_only", "query": "Answer only from current local context. What is the capital of France?", "expected_v11": "LOCAL", "category": "constraint_local_only", "use_pipeline": true}
+{"id": "voice_local", "query": "What is 2+2?", "expected_v11": "LOCAL", "category": "voice_surface", "surface": "voice"}
+{"id": "voice_news", "query": "Latest news about Israel", "expected_v11": "NEWS", "category": "voice_surface", "surface": "voice"}
+{"id": "voice_no_network", "query": "Do not use network access. What is the latest news?", "expected_v11": "LOCAL", "category": "voice_constraint", "surface": "voice", "use_pipeline": true}
+{"id": "short_yes", "query": "yes", "expected_v11": "LOCAL", "category": "short_query"}
+{"id": "short_thanks", "query": "thanks", "expected_v11": "LOCAL", "category": "short_query"}
+{"id": "ambiguous", "query": "Tell me about it.", "expected_v11": "LOCAL", "category": "ambiguous"}
