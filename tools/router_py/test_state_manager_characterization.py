@@ -18,7 +18,7 @@ def tmp_state_manager(tmp_path):
     old = os.environ.get("LUCY_STATE_DB")
     os.environ["LUCY_STATE_DB"] = str(db_path)
     try:
-        from router_py.state_manager import StateManager, get_state_manager, init_database
+        from router_py.state import StateManager, get_state_manager, init_database
 
         assert init_database(db_path) is True
         sm = get_state_manager("characterization")
@@ -117,7 +117,7 @@ def test_context_manager(tmp_path):
     old = os.environ.get("LUCY_STATE_DB")
     os.environ["LUCY_STATE_DB"] = str(db_path)
     try:
-        from router_py.state_manager import StateManager
+        from router_py.state import StateManager
 
         with StateManager("ctx") as sm:
             assert sm.health_check()["connected"] is True

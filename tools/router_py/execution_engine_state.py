@@ -35,7 +35,7 @@ sys.path.insert(0, str(ROOT_DIR / "tools"))
 from tools.xdg_paths import lucy_runtime_namespace_root, lucy_state_dir
 
 from router_py.request_types import ExecutionResult, RoutingDecision
-from router_py.state_manager import StateManager
+from router_py.state import StateManager
 
 
 # ---------------------------------------------------------------------------
