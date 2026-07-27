@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sqlite3
-import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -473,7 +471,7 @@ def delete_session(
 
 
 def acquire_lock(
-    conn: sqlite3.Connection, namespace_id: int, lock_name: str, timeout: float = 5.0
+    conn: sqlite3.Connection, namespace_id: int, lock_name: str, owner: str
 ) -> bool:
     """Attempt to acquire a distributed lock within a single transaction.
 
@@ -484,12 +482,11 @@ def acquire_lock(
         conn: SQLite connection.
         namespace_id: Namespace ID.
         lock_name: Name of the lock to acquire.
-        timeout: Unused; present for API compatibility with the manager.
+        owner: Owner identifier for the lock.
 
     Returns:
         bool: True if lock acquired, False if already held.
     """
-    owner = f"{os.getpid()}_{threading.current_thread().ident}"
     # Clean up expired locks
     conn.execute("DELETE FROM locks WHERE expires_at < datetime('now')")
 
@@ -609,6 +606,7 @@ def record_telemetry(
 def get_telemetry_summary(
     conn: sqlite3.Connection,
     namespace_id: int,
+    namespace: str,
     event_type: Optional[str] = None,
     since: Optional[float] = None,
 ) -> dict:
@@ -617,6 +615,7 @@ def get_telemetry_summary(
     Args:
         conn: SQLite connection.
         namespace_id: Namespace ID.
+        namespace: Namespace name to include in the result.
         event_type: Filter by event type.
         since: Unix timestamp to filter events after.
 
@@ -654,8 +653,8 @@ def get_telemetry_summary(
         return {
             "total_count": total_count,
             "event_breakdown": breakdown,
-            "namespace": None,
+            "namespace": namespace,
         }
     except Exception as e:
         logger.error(f"Failed to get telemetry summary: {e}")
-        return {"total_count": 0, "event_breakdown": {}, "namespace": None}
+        return {"total_count": 0, "event_breakdown": {}, "namespace": namespace}
