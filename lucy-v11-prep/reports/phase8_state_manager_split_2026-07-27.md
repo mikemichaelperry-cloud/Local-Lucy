@@ -1,7 +1,7 @@
 # Phase 8 Completion Report — Split `tools/router_py/state_manager.py`
 
 **Date:** 2026-07-27  
-**Branch:** detached HEAD, `5c72615` (ahead of `main` at `917e8ec`)  
+**Branch:** detached HEAD, `17edfbc` (ahead of `main` at `917e8ec`)  
 **Scope:** `tools/router_py/state_manager.py` → `tools/router_py/state/` package  
 **V10 preservation:** The `lucy-v10/` tree is untouched; this refactor applies only to V11 (`lucy-v11/`).
 
