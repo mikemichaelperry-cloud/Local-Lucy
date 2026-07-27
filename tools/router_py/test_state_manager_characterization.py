@@ -5,10 +5,7 @@ They use a temporary namespace root so they do not pollute global state.
 """
 from __future__ import annotations
 
-import json
 import os
-import tempfile
-from pathlib import Path
 
 import pytest
 
