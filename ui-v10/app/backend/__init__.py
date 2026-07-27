@@ -85,7 +85,7 @@ try:
     )
 
     # Voice tools
-    from router_py.voice_tool import (
+    from router_py.voice import (
         VoicePipeline,
         VoiceResult,
         VADConfig,

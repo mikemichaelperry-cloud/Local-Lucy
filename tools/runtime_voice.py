@@ -65,7 +65,7 @@ try:
     if str(router_py_path) not in sys.path:
         sys.path.insert(0, str(router_py_path.parent))
 
-    from router_py.voice_tool import VoicePipeline
+    from router_py.voice import VoicePipeline
 
     _VOICE_TOOL_AVAILABLE = True
 except ImportError:
@@ -2592,7 +2592,7 @@ def handle_ptt_stop_python(
     # augmented, telemetry all preserved).
     try:
         _sys.path.insert(0, str(Path(__file__).parent / "router_py"))
-        from voice_tool import AudioBuffer, VoicePipeline
+        from router_py.voice import AudioBuffer, VoicePipeline
 
         audio = AudioBuffer.from_file(capture_path)
         pipeline = VoicePipeline()
