@@ -12,7 +12,10 @@ if str(ROOT_DIR) not in sys.path:
 if str(ROOT_DIR / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT_DIR / "tools"))
 
-from router_py.policy_router import requires_evidence_mode
+try:
+    from router_py.policy import requires_evidence_mode
+except ImportError:
+    from policy import requires_evidence_mode
 from router_py.request_types import ClassificationResult
 
 from router_py.classify_core.guards import (
