@@ -18,16 +18,8 @@ burn_in_logs/
 # Local / runtime state (generated during execution)
 cache/
 memory.db*
-state/*.db
-state/evidence_session_*.json
-state/voice_runtime.json
-state/namespaces/
-state/*.jsonl
-state/*.jsonl.lock
-state/state_ARCHIVE_*/
-state/voice_audio_levels.json
-state/current_state.json
-state/*.json.lock
+state/
+tools/state/
 feedback_buffer.json
 runtime/
 
