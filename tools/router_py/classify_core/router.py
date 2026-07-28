@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import sys
 import threading
@@ -16,9 +15,10 @@ if str(ROOT_DIR) not in sys.path:
 if str(ROOT_DIR / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT_DIR / "tools"))
 
+from router_py.logging_config import get_logger
 from router_py.request_types import RoutingDecision
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger("router_py.classify")
 
 _ROUTER = None
 _ROUTER_LOCK = threading.Lock()

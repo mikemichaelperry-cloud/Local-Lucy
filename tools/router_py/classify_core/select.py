@@ -40,7 +40,7 @@ from router_py.request_types import ClassificationResult, RoutingDecision
 from tools.xdg_paths import lucy_runtime_namespace_root
 from router_py import provider_resolver
 
-_LOGGER = get_logger("router_py.classify_core.select")
+_LOGGER = get_logger("router_py.classify")
 
 _POLICY_ROUTER = PolicyRouter()
 

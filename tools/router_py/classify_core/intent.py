@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import sys
 from pathlib import Path
 
@@ -16,6 +15,7 @@ try:
     from router_py.policy import requires_evidence_mode
 except ImportError:
     from policy import requires_evidence_mode
+from router_py.logging_config import get_logger
 from router_py.request_types import ClassificationResult
 
 from router_py.classify_core.guards import (
@@ -24,7 +24,7 @@ from router_py.classify_core.guards import (
     _is_news_query_typos,
 )
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger("router_py.classify")
 
 classify_question = None
 try:
