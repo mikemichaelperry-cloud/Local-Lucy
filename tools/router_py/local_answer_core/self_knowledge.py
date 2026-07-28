@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sys
@@ -18,6 +19,42 @@ if str(ROOT_DIR / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from tools.xdg_paths import lucy_memory_db_path, lucy_runtime_namespace_root
+
+logger = logging.getLogger(__name__)
+
+# Import persistent facts and active identity from SQL memory service (with fallback)
+try:
+    from memory.memory_service import (
+        get_current_user_identity as _get_current_user_identity,
+        get_persistent_facts_revision as _get_persistent_facts_revision,
+        get_relevant_persistent_facts as _get_relevant_persistent_facts,
+    )
+
+    logger.info("[FACTS] Imported memory service helpers from memory.memory.service")
+except ImportError as _e1:
+    logger.warning(f"[FACTS] Failed to import from memory.memory_service: {_e1}")
+    try:
+        from tools.memory.memory_service import (
+            get_current_user_identity as _get_current_user_identity,
+            get_persistent_facts_revision as _get_persistent_facts_revision,
+            get_relevant_persistent_facts as _get_relevant_persistent_facts,
+        )
+
+        logger.info("[FACTS] Imported memory service helpers from tools.memory.memory_service")
+    except ImportError as _e2:
+        logger.error(
+            f"[FACTS] Failed to import memory service helpers: {_e2}. Using fallback no-ops."
+        )
+
+        def _get_relevant_persistent_facts(query, category=None, limit=3, threshold=0.35):  # type: ignore[misc]
+            return []
+
+        def _get_persistent_facts_revision(category=None):  # type: ignore[misc]
+            return ""
+
+        def _get_current_user_identity() -> str | None:  # type: ignore[misc]
+            return None
+
 
 def _load_family_facts_direct() -> list[str]:
     """Direct SQLite fallback: load all family-category persistent facts.

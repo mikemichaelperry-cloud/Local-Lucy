@@ -27,11 +27,27 @@ if str(ROOT_DIR / "tools") not in sys.path:
 
 from router_py.local_answer_core.config import AnswerResult, LatencyMetrics, LocalAnswerConfig
 from router_py.local_answer_core.self_knowledge import (
+    FIXED_POLICY_RESPONSES,
     WATER_WET_RESPONSE,
     _MODEL_IDENTITIES,
+    _get_active_persona_fragment,
+    _get_current_context,
+    _get_current_user_identity,
+    _is_personal_fact_query,
+    _load_family_facts_direct,
     get_self_knowledge,
 )
 from router_py.local_answer_core.utils import _OllamaWarmupThread, get_gpu_free_vram_mb
+
+try:
+    from router_py.context_guard import filter_memory_context
+except ImportError:
+    try:
+        from context_guard import filter_memory_context
+    except ImportError:
+
+        def filter_memory_context(question: str, memory_text: str, threshold: float = 0.3) -> str:  # type: ignore[misc]
+            return memory_text
 
 
 def _logger():
@@ -52,6 +68,21 @@ def _start_heartbeat(model: str) -> None:
     if la is None:
         import router_py.local_answer as la
     la.start_ollama_heartbeat(model)
+
+
+logger = logging.getLogger(__name__)
+
+# Import tube database (with fallback for standalone execution)
+_tube_db = None
+try:
+    _TUBES_PATH = str(Path(__file__).resolve().parents[2] / "data" / "tubes")
+    if _TUBES_PATH not in sys.path:
+        sys.path.insert(0, _TUBES_PATH)
+    import tube_database
+
+    _tube_db = tube_database
+except Exception:
+    _tube_db = None
 
 try:
     import aiohttp
