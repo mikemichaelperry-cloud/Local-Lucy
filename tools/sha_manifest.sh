@@ -44,6 +44,7 @@ _collect_root_files() {
       ! -path "./tools/tests/governor_migration/artifacts/*" \
       ! -path "./models/router/.venv/*" \
       ! -path "./models/router/__pycache__/*" \
+      ! -path "./models/router/versions/*" \
       ! -path "*/build/*" \
       ! -path "*/vendor/*" \
       ! -path "*/.git/*" \
