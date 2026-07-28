@@ -25,7 +25,12 @@ LUCY_MODEL_PREFIXES = ("local-lucy", "gemma4")
 def _ollama_api_url() -> str:
     import os
 
-    return os.environ.get("LUCY_OLLAMA_API_URL", DEFAULT_OLLAMA_API_URL).strip().rstrip("/")
+    raw = os.environ.get("LUCY_OLLAMA_API_URL", DEFAULT_OLLAMA_API_URL).strip().rstrip("/")
+    # Some callers set LUCY_OLLAMA_API_URL to the full generate endpoint.
+    # Normalize to the base Ollama API URL so /api/ps and /api/generate work.
+    if raw.endswith("/api/generate"):
+        raw = raw[: -len("/api/generate")]
+    return raw.rstrip("/")
 
 
 def list_loaded_models() -> list[str]:
@@ -80,6 +85,32 @@ def unload_model(name: str) -> bool:
     except Exception as e:
         logger.debug(f"Ollama API unload for {name} failed: {e}")
     return False
+
+
+def _base_name(name: str) -> str:
+    """Strip Ollama tag suffix (e.g. ':latest') for comparison."""
+    if not name:
+        return ""
+    return name.strip().split(":", 1)[0].lower()
+
+
+def unload_other_lucy_models(except_model: str | None = None) -> list[str]:
+    """Unload every Local Lucy model except *except_model*.
+
+    This prevents two large local models from being resident simultaneously
+    on a 12 GB GPU. The comparison uses base model names so tags such as
+    ``:latest`` do not interfere.
+    """
+    attempted: list[str] = []
+    keep_base = _base_name(except_model)
+    for name in list_loaded_models():
+        if not is_lucy_model(name):
+            continue
+        if keep_base and _base_name(name) == keep_base:
+            continue
+        attempted.append(name)
+        unload_model(name)
+    return attempted
 
 
 def unload_all_lucy_models() -> list[str]:

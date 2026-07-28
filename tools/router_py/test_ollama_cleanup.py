@@ -8,6 +8,7 @@ import pytest
 pytestmark = [pytest.mark.slow, pytest.mark.live]
 
 import json
+import os
 import urllib.error
 from unittest.mock import MagicMock, patch
 
@@ -93,6 +94,48 @@ def test_unload_all_lucy_models_unloads_only_lucy_models() -> None:
         ]
     )
     assert mock_unload.call_count == 3
+
+
+def test_unload_other_lucy_models_keeps_requested_model() -> None:
+    with patch.object(
+        oc,
+        "list_loaded_models",
+        return_value=[
+            "local-lucy-llama31:latest",
+            "local-lucy-gemma4:latest",
+            "llama3.1:latest",
+        ],
+    ):
+        with patch.object(oc, "unload_model", return_value=True) as mock_unload:
+            attempted = oc.unload_other_lucy_models("local-lucy-gemma4")
+
+    assert attempted == ["local-lucy-llama31:latest"]
+    mock_unload.assert_called_once_with("local-lucy-llama31:latest")
+
+
+def test_unload_other_lucy_models_unloads_all_when_no_exception() -> None:
+    with patch.object(
+        oc,
+        "list_loaded_models",
+        return_value=["local-lucy-llama31:latest", "local-lucy-gemma4:latest"],
+    ):
+        with patch.object(oc, "unload_model", return_value=True) as mock_unload:
+            attempted = oc.unload_other_lucy_models(None)
+
+    assert sorted(attempted) == sorted(
+        ["local-lucy-llama31:latest", "local-lucy-gemma4:latest"]
+    )
+    assert mock_unload.call_count == 2
+
+
+def test_ollama_api_url_normalizes_generate_endpoint() -> None:
+    with patch.dict(os.environ, {"LUCY_OLLAMA_API_URL": "http://ollama:11434/api/generate"}):
+        assert oc._ollama_api_url() == "http://ollama:11434"
+
+
+def test_ollama_api_url_preserves_base_url() -> None:
+    with patch.dict(os.environ, {"LUCY_OLLAMA_API_URL": "http://ollama:11434"}):
+        assert oc._ollama_api_url() == "http://ollama:11434"
 
 
 def test_shutdown_cleanup_logs_unloaded_models() -> None:

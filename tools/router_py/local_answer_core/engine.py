@@ -38,6 +38,7 @@ from router_py.local_answer_core.self_knowledge import (
     get_self_knowledge,
 )
 from router_py.local_answer_core.utils import _OllamaWarmupThread, get_gpu_free_vram_mb
+from router_py.ollama_cleanup import unload_other_lucy_models
 
 try:
     from router_py.context_guard import filter_memory_context
@@ -1388,6 +1389,13 @@ class LocalAnswer:
             "keep_alive": self.config.keep_alive,
             "options": options,
         }
+        # On a 12 GB GPU two large local models cannot both be resident.
+        # Unload any other Local Lucy model before loading the target.
+        try:
+            await asyncio.to_thread(unload_other_lucy_models, self.config.model)
+        except Exception:
+            pass
+
         # Retry with exponential backoff for model-load transitions.
         max_attempts = 3
         base_delay = 0.5
