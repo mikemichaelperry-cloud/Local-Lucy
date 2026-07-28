@@ -214,9 +214,16 @@ show_memory() {
 
     if echo "$tables" | grep -qi "archived_turns"; then
         echo "🗃️ Recently Archived Turns (full text preserved in DB; previews shown):"
-        sqlite3 "$DB3" "SELECT role, length(text) AS chars, substr(text,1,120) AS preview, substr(archived_at,1,19) AS archived FROM archived_turns ORDER BY archived_at DESC LIMIT 6;" -line 2>/dev/null || echo "(Could not read archived_turns table)"
+        sqlite3 "$DB3" "SELECT id, role, length(text) AS chars, substr(text,1,120) AS preview, substr(archived_at,1,19) AS archived FROM archived_turns ORDER BY archived_at DESC LIMIT 6;" -line 2>/dev/null || echo "(Could not read archived_turns table)"
         echo ""
-        echo "Tip: run custom SQL here to read the full text of any archived row."
+        read -rp "Enter an archived turn id to view its FULL TEXT, or press Enter to skip: " arch_id
+        if [[ "$arch_id" =~ ^[0-9]+$ ]]; then
+            echo ""
+            echo "--- FULL ARCHIVED TURN ---"
+            sqlite3 "$DB3" "SELECT role, text FROM archived_turns WHERE id = ${arch_id};" -line 2>/dev/null || echo "(Could not read archived turn id ${arch_id})"
+            echo ""
+            read -rp "Press Enter to continue..."
+        fi
     else
         echo "No 'archived_turns' table found."
     fi
