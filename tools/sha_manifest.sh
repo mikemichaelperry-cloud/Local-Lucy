@@ -42,6 +42,7 @@ _collect_root_files() {
       -type f \
       ! -path "./tools/tmp/*" \
       ! -path "./tools/tests/governor_migration/artifacts/*" \
+      ! -path "./tools/state/*" \
       ! -path "./models/router/.venv/*" \
       ! -path "./models/router/__pycache__/*" \
       ! -path "./models/router/versions/*" \
