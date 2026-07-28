@@ -105,6 +105,8 @@ addopts = "--ignore=tools/router_py/test_synthetic_adversarial.py -m 'not slow a
 markers = [
     "slow: tests that take more than a few seconds (burn-in, regression, heavy model loads)",
     "live: tests that require a running external service such as Ollama or the network",
+    "static: tests that do not import or start Ollama and do not touch the network",
+    "deterministic: tests that use temporary databases, mocks, or synthetic data and do not require Ollama",
 ]
 
 [tool.ruff]
