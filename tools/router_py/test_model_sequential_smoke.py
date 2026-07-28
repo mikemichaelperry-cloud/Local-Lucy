@@ -3,6 +3,7 @@
 This test loads one model, verifies it, unloads it, then loads the other.
 It requires a running Ollama instance with both Local Lucy models installed.
 """
+
 from __future__ import annotations
 
 import json
@@ -125,7 +126,5 @@ def test_unload_all_lucy_models_clears_vram():
     shutdown_cleanup()
 
     # Give Ollama a moment to actually release the model.
-    assert _wait_for_unload(LLAMA_MODEL), (
-        f"{LLAMA_MODEL} should be unloaded by shutdown_cleanup"
-    )
+    assert _wait_for_unload(LLAMA_MODEL), f"{LLAMA_MODEL} should be unloaded by shutdown_cleanup"
     assert not _lucy_models_loaded(), f"No Local Lucy models should remain loaded: {_api_ps()}"

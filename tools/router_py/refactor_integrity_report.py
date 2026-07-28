@@ -156,9 +156,7 @@ def generate_report() -> dict:
             "modules_checked": len(split_results),
             "modules_ok": sum(1 for m in split_results if m["ok"]),
             "modules_failed": sum(1 for m in split_results if not m["ok"]),
-            "api_surface_complete": not any(
-                _check_public_api_surface().values()
-            ),
+            "api_surface_complete": not any(_check_public_api_surface().values()),
         },
     }
 

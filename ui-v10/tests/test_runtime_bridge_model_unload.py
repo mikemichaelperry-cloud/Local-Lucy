@@ -177,10 +177,7 @@ def test_model_selection_auto_unloads_previous_manual_model():
                 {"name": "local-lucy-llama31:latest"},
                 {"name": "local-lucy-gemma4:latest"},
             ]
-            remaining = [
-                m for m in remaining
-                if m["name"] not in generate_models
-            ]
+            remaining = [m for m in remaining if m["name"] not in generate_models]
             return FakeResponse(json.dumps({"models": remaining}).encode("utf-8"))
 
         if url.endswith("/api/generate"):
@@ -285,7 +282,9 @@ def test_shutdown_unloads_all_lucy_models():
     unloaded_names = set(unloaded)
     assert "local-lucy-llama31:latest" in unloaded_names, f"expected llama31, got {unloaded}"
     assert "local-lucy-gemma4:latest" in unloaded_names, f"expected gemma4, got {unloaded}"
-    assert "llama3.1:latest" not in unloaded_names, f"non-Lucy model must not be unloaded: {unloaded}"
+    assert "llama3.1:latest" not in unloaded_names, (
+        f"non-Lucy model must not be unloaded: {unloaded}"
+    )
 
 
 if __name__ == "__main__":

@@ -1337,8 +1337,7 @@ class LocalAnswer:
         if model in self._THINKING_MODEL_TAGS:
             return True
         return any(
-            name in model
-            for name in ("qwen3", "deepseek-r1", "o3", "o1", "gemma4", "gemma-4")
+            name in model for name in ("qwen3", "deepseek-r1", "o3", "o1", "gemma4", "gemma-4")
         )
 
     def _thinking_model_token_multiplier(self) -> int:
@@ -1469,9 +1468,7 @@ class LocalAnswer:
         policy_response_id: str = "",
     ) -> AnswerResult:
         """Generate answer for query."""
-        _logger().info(
-            f"local_answer.py called: query='{query[:50]}...' mode={route_mode}"
-        )
+        _logger().info(f"local_answer.py called: query='{query[:50]}...' mode={route_mode}")
         start_time = time.time()
         self._total_start_time = start_time
 

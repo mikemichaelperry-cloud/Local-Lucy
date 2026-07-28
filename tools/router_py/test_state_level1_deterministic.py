@@ -3,6 +3,7 @@
 These tests exercise the low-level schema, queries, and manager layers using
 temporary SQLite databases. They do not import Ollama or touch the network.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -135,9 +136,7 @@ def test_session_expiration_deletes_stale_row(fresh_conn, queries):
     assert queries.read_session(fresh_conn, ns_id, "expired") is None
 
     # Verify the row was actually deleted, not just returned as None.
-    cursor = fresh_conn.execute(
-        "SELECT COUNT(*) FROM sessions WHERE session_key = ?", ("expired",)
-    )
+    cursor = fresh_conn.execute("SELECT COUNT(*) FROM sessions WHERE session_key = ?", ("expired",))
     assert cursor.fetchone()[0] == 0
 
 

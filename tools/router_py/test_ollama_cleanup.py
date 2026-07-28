@@ -122,9 +122,7 @@ def test_unload_other_lucy_models_unloads_all_when_no_exception() -> None:
         with patch.object(oc, "unload_model", return_value=True) as mock_unload:
             attempted = oc.unload_other_lucy_models(None)
 
-    assert sorted(attempted) == sorted(
-        ["local-lucy-llama31:latest", "local-lucy-gemma4:latest"]
-    )
+    assert sorted(attempted) == sorted(["local-lucy-llama31:latest", "local-lucy-gemma4:latest"])
     assert mock_unload.call_count == 2
 
 
