@@ -29,86 +29,69 @@ collect_files() {
 _collect_root_files() {
   (
     cd "$ROOT"
-    # Source, configuration, and project-metadata directories.
-    find \
-      ./config \
-      ./tools \
-      ./scripts \
-      ./data \
-      ./models \
-      ./web_adapter \
-      ./tests \
-      ./.github \
-      -type f \
-      ! -path "./tools/tmp/*" \
-      ! -path "./tools/tests/governor_migration/artifacts/*" \
-      ! -path "./tools/state/*" \
-      ! -path "./models/router/.venv/*" \
-      ! -path "./models/router/__pycache__/*" \
-      ! -path "./models/router/versions/*" \
-      ! -path "*/build/*" \
-      ! -path "*/vendor/*" \
-      ! -path "*/.git/*" \
-      ! -path "*/.devops/*" \
-      ! -path "*/.idea/*" \
-      ! -path "*/.venv/*" \
-      ! -path "*/.pytest_cache/*" \
-      ! -path "*/__pycache__/*" \
-      ! -name "*.pyc" \
-      ! -name "*.bak" \
-      ! -name "*.bak*" \
-      ! -name "*.BROKEN.*" \
-      ! -name "*.fixbak.*" \
-      ! -name "*.tmp" \
-      ! -name ".DS_Store" \
-      ! -name "SHA256SUMS.clean" \
-      ! -name "SHA256SUMS" \
-      ! -name "SHA256SUMS.txt" \
-      ! -name "CHECKSUMS_SHA256.txt" \
-      -print0
-    # Top-level project files.
-    find . -maxdepth 1 -type f \
-      \( -name "lucy_chat.sh" -o -name "README.md" -o -name "Architecture.md" -o -name "ARCHITECTURE.md" -o -name "pyproject.toml" -o -name "Makefile" -o -name "CONTRIBUTING.md" -o -name "LICENSE" \) \
-      -print0
+    # Use git ls-files so the manifest tracks only committed source files and
+    # automatically respects .gitignore. This prevents locally-generated runtime
+    # artifacts from drifting between developer machines and CI runners.
+    git ls-files \
+      config/ \
+      tools/ \
+      scripts/ \
+      data/ \
+      models/ \
+      web_adapter/ \
+      tests/ \
+      .github/ \
+      lucy_chat.sh \
+      README.md \
+      Architecture.md \
+      ARCHITECTURE.md \
+      pyproject.toml \
+      Makefile \
+      CONTRIBUTING.md \
+      LICENSE \
+      2>/dev/null \
+      | grep -vE '^SHA256SUMS(\.clean)?$' \
+      | grep -vE '\.pyc$' \
+      | grep -vE '\.(bak|tmp| fixbak)\.' \
+      | grep -vE '\.BROKEN\.' \
+      | grep -v '__pycache__/' \
+      | grep -v '/\.venv/' \
+      | grep -v '/\.pytest_cache/' \
+      | grep -v '/build/' \
+      | grep -v '/vendor/' \
+      | grep -v '/\.git/' \
+      | grep -v '/\.devops/' \
+      | grep -v '/\.idea/' \
+      | grep -v '\.DS_Store$'
   ) \
-    | sort -z \
-    | xargs -0 -n1 printf '%s\n' \
-    | sed 's#^\.\/##'
+    | sort
 }
 
 _collect_ui_v10_files() {
   (
     cd "$ROOT"
-    find \
-      ./ui-v10/app \
-      ./ui-v10/tests \
-      ./ui-v10/tools \
-      -type f \
-      ! -path "*/build/*" \
-      ! -path "*/vendor/*" \
-      ! -path "*/.git/*" \
-      ! -path "*/.github/*" \
-      ! -path "*/.devops/*" \
-      ! -path "*/.idea/*" \
-      ! -path "*/.venv/*" \
-      ! -path "*/.pytest_cache/*" \
-      ! -path "*/__pycache__/*" \
-      ! -name "*.pyc" \
-      ! -name "*.bak" \
-      ! -name "*.bak*" \
-      ! -name "*.BROKEN.*" \
-      ! -name "*.fixbak.*" \
-      ! -name "*.tmp" \
-      ! -name ".DS_Store" \
-      ! -name "SHA256SUMS.clean" \
-      ! -name "SHA256SUMS" \
-      ! -name "SHA256SUMS.txt" \
-      ! -name "CHECKSUMS_SHA256.txt" \
-      -print0 \
-      | sort -z \
-      | xargs -0 -n1 printf '%s\n' \
-      | sed 's#^\.\/##'
-  )
+    # Track only committed UI source/test/tool files.
+    git ls-files \
+      ui-v10/app/ \
+      ui-v10/tests/ \
+      ui-v10/tools/ \
+      2>/dev/null \
+      | grep -vE '^ui-v10/SHA256SUMS(\.clean)?$' \
+      | grep -vE '\.pyc$' \
+      | grep -vE '\.(bak|tmp| fixbak)\.' \
+      | grep -vE '\.BROKEN\.' \
+      | grep -v '__pycache__/' \
+      | grep -v '/\.venv/' \
+      | grep -v '/\.pytest_cache/' \
+      | grep -v '/build/' \
+      | grep -v '/vendor/' \
+      | grep -v '/\.git/' \
+      | grep -v '/\.github/' \
+      | grep -v '/\.devops/' \
+      | grep -v '/\.idea/' \
+      | grep -v '\.DS_Store$'
+  ) \
+    | sort
 }
 
 regen_manifest() {
