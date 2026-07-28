@@ -14,8 +14,6 @@ if str(ROOT_DIR) not in sys.path:
 if str(ROOT_DIR / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT_DIR / "tools"))
 
-from tools.xdg_paths import lucy_runtime_namespace_root
-
 _FEEDBACK_BUF_CACHE: dict | None = None
 _FEEDBACK_BUF_MTIME: float = 0.0
 _FEEDBACK_BUF_PATH: Path | None = None
@@ -85,19 +83,22 @@ _LIVE_DATA_KEYWORDS = (
 
 
 def _load_feedback_buffer(path: Path) -> dict:
-    """Load and cache feedback buffer JSON by mtime."""
+    """Load feedback buffer with mtime-based caching."""
     global _FEEDBACK_BUF_CACHE, _FEEDBACK_BUF_MTIME, _FEEDBACK_BUF_PATH
     try:
         mtime = path.stat().st_mtime
-        if (
-            _FEEDBACK_BUF_CACHE is not None
-            and _FEEDBACK_BUF_PATH == path
-            and _FEEDBACK_BUF_MTIME == mtime
-        ):
-            return _FEEDBACK_BUF_CACHE
-
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    except Exception:
+        _FEEDBACK_BUF_CACHE = None
+        _FEEDBACK_BUF_MTIME = 0.0
+        return {}
+    if (
+        _FEEDBACK_BUF_CACHE is not None
+        and _FEEDBACK_BUF_PATH == path
+        and mtime == _FEEDBACK_BUF_MTIME
+    ):
+        return _FEEDBACK_BUF_CACHE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
         _FEEDBACK_BUF_CACHE = data
         _FEEDBACK_BUF_MTIME = mtime
         _FEEDBACK_BUF_PATH = path
