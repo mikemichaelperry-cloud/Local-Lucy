@@ -69,9 +69,7 @@ def test_bypass_decision_news() -> None:
 
 
 def test_bypass_decision_local() -> None:
-    classification, decision = request_pipeline._bypass_classification_decision(
-        "hello", "LOCAL"
-    )
+    classification, decision = request_pipeline._bypass_classification_decision("hello", "LOCAL")
     assert classification.intent_family == "local_knowledge"
     assert decision.route == "LOCAL"
     assert decision.provider == "local"

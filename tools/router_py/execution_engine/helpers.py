@@ -20,10 +20,13 @@ if str(ROOT_DIR / "tools") not in sys.path:
 
 from tools.xdg_paths import lucy_runtime_namespace_root
 
+
 def _get_root():
     """Return the current execution_engine ROOT_DIR dynamically."""
     import router_py.execution_engine as _ee
+
     return _ee.ROOT_DIR
+
 
 _MEDICAL_DOMAINS_CACHE: list[str] | None = None
 _MEDICAL_DOMAINS_MTIME: float = 0.0
@@ -42,6 +45,7 @@ _TRUSTED_EVIDENCE_DEFAULTS = {
 }
 
 _CURRENT_FACT_MARKERS = {"current", "latest", "now", "today", "price"}
+
 
 def _load_medical_domains(path: Path) -> list[str]:
     """Load medical domains with mtime-based caching."""
@@ -182,6 +186,7 @@ def _trusted_evidence_metadata(
             or _TRUSTED_EVIDENCE_DEFAULTS["DEGRADED_REASON"]
         ).strip(),
     }
+
 
 def _is_current_fact_query(question: str) -> bool:
     """Return True when the query asks for current/latest/real-time information."""

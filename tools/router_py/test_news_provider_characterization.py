@@ -4,6 +4,7 @@
 These tests must pass before and after the news_provider.py split.
 They mock external network calls so they remain fast and deterministic.
 """
+
 from __future__ import annotations
 
 import sys
@@ -32,9 +33,7 @@ def test_news_result_dataclass():
 @pytest.mark.asyncio
 async def test_news_provider_fetch_news_uses_rss_directly():
     expected = NewsResult(ok=True, text="rss news", source="rss")
-    with patch.object(
-        RSSNewsProvider, "fetch_world_news_async", return_value=expected
-    ):
+    with patch.object(RSSNewsProvider, "fetch_world_news_async", return_value=expected):
         result = await NewsProvider.fetch_news("latest", for_voice=False)
     assert result.ok is True
     assert result.source == "rss"

@@ -4,6 +4,7 @@ These tests enforce that explicit user restrictions ("do not use network access"
 "do not use tools", etc.) become deterministic capability constraints before
 route selection or evidence planning, and that fabricated URLs cannot be fetched.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -299,7 +300,6 @@ class TestTrustedFetchURLValidation:
         )
         # Search endpoints are predefined and allowed.
         assert any("medlineplus.gov/search" in u for u in calls)
-
 
 
 class TestMedicalCognitiveSymptomRouting:

@@ -98,7 +98,9 @@ try:
     BACKEND_AVAILABLE = True
 
 except ImportError as e:
-    print(f"[Backend] CRITICAL ERROR: Failed to import from local v11 backend: {e}", file=sys.stderr)
+    print(
+        f"[Backend] CRITICAL ERROR: Failed to import from local v11 backend: {e}", file=sys.stderr
+    )
     print(f"[Backend] Path attempted: {ROUTER_PY_PATH}", file=sys.stderr)
     BACKEND_AVAILABLE = False
     raise

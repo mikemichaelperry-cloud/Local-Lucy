@@ -19,9 +19,9 @@ from typing import Any
 # script is executed directly from the tools/ directory.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.xdg_paths import lucy_runtime_namespace_root
-
 from runtime_control import enforce_authority_contract, iso_now, locked_state_file
+
+from tools.xdg_paths import lucy_runtime_namespace_root
 
 DEFAULT_START_TIMEOUT_SECONDS = 8.0
 DEFAULT_STOP_TIMEOUT_SECONDS = 10.0

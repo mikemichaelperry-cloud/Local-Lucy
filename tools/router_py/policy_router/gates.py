@@ -600,9 +600,7 @@ def _is_explicit_assistant_instruction(query: str) -> bool:
     q = query.lower().strip()
     # Must be framed as an explicit instruction / test / task.
     if not (
-        q.startswith("this is a ")
-        or q.startswith("this is an ")
-        or q.startswith("this is the ")
+        q.startswith("this is a ") or q.startswith("this is an ") or q.startswith("this is the ")
     ):
         return False
     # Strong explicit markers.

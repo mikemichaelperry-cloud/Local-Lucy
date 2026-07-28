@@ -1358,7 +1358,6 @@ class VoicePipeline(BaseToolWrapper):
         return recorder_ok and stt_ok
 
 
-
 async def quick_voice_interaction(
     max_duration: float = 30.0,
     use_tts: bool = True,
@@ -1379,7 +1378,6 @@ async def quick_voice_interaction(
     """
     pipeline = VoicePipeline()
     return await pipeline.voice_interaction(max_duration=max_duration, use_tts=use_tts)
-
 
 
 # Fix: VoicePipeline needs to have its abstract methods cleared

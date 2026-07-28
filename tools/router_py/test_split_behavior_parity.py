@@ -45,9 +45,7 @@ def _make_classification(scenario_classification: dict) -> object:
         "clarify_required": scenario_classification.get("clarify_required", False),
         "evidence_mode": scenario_classification.get("evidence_mode", ""),
         "evidence_reason": scenario_classification.get("evidence_reason", ""),
-        "augmentation_recommended": scenario_classification.get(
-            "augmentation_recommended", False
-        ),
+        "augmentation_recommended": scenario_classification.get("augmentation_recommended", False),
         "force_local": scenario_classification.get("force_local", False),
         "manifest_version": scenario_classification.get("manifest_version", ""),
         "selected_route": scenario_classification.get("selected_route", ""),

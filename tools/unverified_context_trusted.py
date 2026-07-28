@@ -492,7 +492,11 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
         # Keyword-derived URLs are model-invented and must not be fetched.
         for word in words:
             candidates.append(
-                (f"https://medlineplus.gov/{word}.html", "MedlinePlus", URLProvenance.INVENTED_KEYWORD)
+                (
+                    f"https://medlineplus.gov/{word}.html",
+                    "MedlinePlus",
+                    URLProvenance.INVENTED_KEYWORD,
+                )
             )
         for word in words:
             candidates.append(
@@ -504,7 +508,11 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
             )
         # MedlinePlus search endpoint is predefined and allowed.
         candidates.append(
-            (f"https://medlineplus.gov/search.html?query={q_encoded}", "MedlinePlus", URLProvenance.PREDEFINED_ENDPOINT)
+            (
+                f"https://medlineplus.gov/search.html?query={q_encoded}",
+                "MedlinePlus",
+                URLProvenance.PREDEFINED_ENDPOINT,
+            )
         )
 
         # --- DailyMed (FDA drug labels) ---

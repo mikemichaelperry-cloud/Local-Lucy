@@ -179,9 +179,8 @@ DEFAULT_TIMEOUT = 130
 DEFAULT_POLICY_CONFIDENCE_THRESHOLD = 0.60
 
 # Default chat memory file path (matches runtime_request.py)
-DEFAULT_CHAT_MEMORY_FILE = str(
-    lucy_runtime_namespace_root() / "state" / "chat_session_memory.txt"
-)
+DEFAULT_CHAT_MEMORY_FILE = str(lucy_runtime_namespace_root() / "state" / "chat_session_memory.txt")
+
 
 class ExecutionEngine:
     """

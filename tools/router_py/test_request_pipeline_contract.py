@@ -44,8 +44,7 @@ class TestSingleAuthoritativePath:
         )
         source_text = source.read_text()
         assert (
-            "runtime_request.submit_request(" in source_text
-            or "submit_request(" in source_text
+            "runtime_request.submit_request(" in source_text or "submit_request(" in source_text
         ), "HMI bridge must use the canonical runtime_request.submit_request() entry point"
         assert "ExecutionEngine(" not in source_text, (
             "HMI bridge must not instantiate ExecutionEngine directly"

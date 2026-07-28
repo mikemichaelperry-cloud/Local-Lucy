@@ -5,9 +5,9 @@ import json
 import os
 import statistics
 import subprocess
+import sys
 import time
 from pathlib import Path
-import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 UI_ROOT = ROOT / "ui-v10"
@@ -17,12 +17,9 @@ if str(ROOT) not in sys.path:
 if str(ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT / "tools"))
 
-from tools.xdg_paths import lucy_runtime_namespace_root
+from tools.xdg_paths import lucy_runtime_namespace_root  # noqa: E402
 
-RUNTIME_NS = Path(
-    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    or lucy_runtime_namespace_root()
-)
+RUNTIME_NS = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT") or lucy_runtime_namespace_root())
 
 PROMPTS = [
     "What is Ohm's law?",

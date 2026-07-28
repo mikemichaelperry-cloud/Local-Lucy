@@ -10,6 +10,7 @@ Usage:
     source ui-v10/.venv/bin/activate
     python compare_v10_v11_accuracy.py
 """
+
 from __future__ import annotations
 
 import json
@@ -187,7 +188,9 @@ def main() -> int:
     total_v11_correct = 0
     deltas = []
 
-    print(f"{'ID':<30} {'CATEGORY':<22} {'V10':<10} {'V11':<10} {'EXPECTED':<10} {'AGREE':<5} {'V11_OK':<6}")
+    print(
+        f"{'ID':<30} {'CATEGORY':<22} {'V10':<10} {'V11':<10} {'EXPECTED':<10} {'AGREE':<5} {'V11_OK':<6}"
+    )
     print("=" * 105)
     for r in results:
         cat = r["category"]
@@ -220,8 +223,12 @@ def main() -> int:
     print("-" * 105)
     print(f"{'TOTAL':<22} {len(results):>6} {total_agree:>6} {total_v11_correct:>12}")
 
-    print(f"\nOverall agreement: {total_agree}/{len(results)} ({100*total_agree/len(results):.1f}%)")
-    print(f"V11 accuracy vs expected: {total_v11_correct}/{len(results)} ({100*total_v11_correct/len(results):.1f}%)")
+    print(
+        f"\nOverall agreement: {total_agree}/{len(results)} ({100 * total_agree / len(results):.1f}%)"
+    )
+    print(
+        f"V11 accuracy vs expected: {total_v11_correct}/{len(results)} ({100 * total_v11_correct / len(results):.1f}%)"
+    )
 
     if deltas:
         print("\nDeltas / failures:")
@@ -231,7 +238,9 @@ def main() -> int:
             if key in seen:
                 continue
             seen.add(key)
-            print(f"  - {r['id']} ({r['category']}): V10={r['v10_route']} V11={r['v11_route']} expected={r['expected_v11']}")
+            print(
+                f"  - {r['id']} ({r['category']}): V10={r['v10_route']} V11={r['v11_route']} expected={r['expected_v11']}"
+            )
             print(f"    Query: {r['query']}")
 
     # Write machine-readable report
@@ -243,7 +252,10 @@ def main() -> int:
                 "suite_path": str(SUITE_PATH),
                 "total_cases": len(results),
                 "agreement": {"count": total_agree, "pct": 100 * total_agree / len(results)},
-                "v11_accuracy": {"count": total_v11_correct, "pct": 100 * total_v11_correct / len(results)},
+                "v11_accuracy": {
+                    "count": total_v11_correct,
+                    "pct": 100 * total_v11_correct / len(results),
+                },
                 "per_category": {k: dict(v) for k, v in stats.items()},
                 "results": results,
             },

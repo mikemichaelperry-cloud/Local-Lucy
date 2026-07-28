@@ -160,7 +160,17 @@ def _forced_route_from_env(question: str) -> str | None:
     if not _is_truthy_env("LUCY_ROUTER_BYPASS"):
         return None
     forced = os.environ.get("LUCY_CHAT_FORCE_MODE", "").strip().upper()
-    if forced in ("LOCAL", "NEWS", "EVIDENCE", "AUGMENTED", "FULL", "TIME", "WEATHER", "FINANCE", "CLARIFY"):
+    if forced in (
+        "LOCAL",
+        "NEWS",
+        "EVIDENCE",
+        "AUGMENTED",
+        "FULL",
+        "TIME",
+        "WEATHER",
+        "FINANCE",
+        "CLARIFY",
+    ):
         return forced
     # Infer from query when bypass is requested without an explicit mode.
     q = (question or "").lower()
@@ -178,8 +188,10 @@ def _bypass_classification_decision(
         "LOCAL": "local",
         "NEWS": "news",
         "EVIDENCE": "trusted",
-        "AUGMENTED": os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia").strip().lower() or "wikipedia",
-        "FULL": os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia").strip().lower() or "wikipedia",
+        "AUGMENTED": os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia").strip().lower()
+        or "wikipedia",
+        "FULL": os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia").strip().lower()
+        or "wikipedia",
         "TIME": "time",
         "WEATHER": "weather",
         "FINANCE": "finance",
@@ -441,7 +453,10 @@ def process(
         if constraints.network is False and decision.route in network_routes:
             logger.info(
                 "request_constraint_blocks_network",
-                extra={"route": decision.route, "request_id": (context or {}).get("request_id", "")},
+                extra={
+                    "route": decision.route,
+                    "request_id": (context or {}).get("request_id", ""),
+                },
             )
             # Fall back to LOCAL so the model can answer from parametric/local
             # context rather than returning a generic denial.
@@ -462,7 +477,10 @@ def process(
         elif constraints.tools is False and decision.route in tool_routes:
             logger.info(
                 "request_constraint_blocks_tools",
-                extra={"route": decision.route, "request_id": (context or {}).get("request_id", "")},
+                extra={
+                    "route": decision.route,
+                    "request_id": (context or {}).get("request_id", ""),
+                },
             )
             decision = dataclasses.replace(
                 decision,
@@ -480,12 +498,9 @@ def process(
             )
 
     # 3e. Evidence-disabled operator gate
-    evidence_enabled = (
-        os.environ.get("LUCY_EVIDENCE_ENABLED", os.environ.get("LUCY_ENABLE_INTERNET", "0"))
-        .strip()
-        .lower()
-        in ("1", "true", "on", "yes")
-    )
+    evidence_enabled = os.environ.get(
+        "LUCY_EVIDENCE_ENABLED", os.environ.get("LUCY_ENABLE_INTERNET", "0")
+    ).strip().lower() in ("1", "true", "on", "yes")
     if not evidence_enabled and decision.route in ("NEWS", "EVIDENCE"):
         execution_time = int((_time.time() - start_time) * 1000)
         logger.info("evidence_disabled_gate", extra={"route": decision.route})
@@ -499,8 +514,7 @@ def process(
                 intent_family=classification.intent_family,
                 confidence=classification.confidence,
                 response_text=(
-                    "Evidence disabled by operator control.\n"
-                    "Enable evidence to allow news routes."
+                    "Evidence disabled by operator control.\nEnable evidence to allow news routes."
                 ),
                 execution_time_ms=execution_time,
                 evidence_reason=decision.evidence_reason,

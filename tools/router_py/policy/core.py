@@ -171,6 +171,7 @@ _SHORT_FINANCIAL_RE = re.compile(
     r"\b(?:" + "|".join(map(re.escape, _SHORT_FINANCIAL_KEYWORDS)) + r")\b"
 )
 
+
 def normalize_augmentation_policy(raw: str) -> AugmentationPolicy:
     """
     Normalize augmentation policy string to canonical value.
@@ -1870,6 +1871,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
     # Default: no evidence required
     return False, "default_light"
 
+
 def provider_usage_class_for(provider: str) -> Literal["paid", "free", "local", "none"]:
     """
     Classify a provider by its usage/cost class.
@@ -1898,6 +1900,7 @@ def provider_usage_class_for(provider: str) -> Literal["paid", "free", "local", 
         return "local"
 
     return "none"
+
 
 def manifest_evidence_selection_label(
     evidence_mode: str | None, evidence_reason: str | None
@@ -1933,6 +1936,7 @@ def manifest_evidence_selection_label(
         return "policy-triggered"
 
     return "manifest-selected"
+
 
 if __name__ == "__main__":
     # Quick sanity checks

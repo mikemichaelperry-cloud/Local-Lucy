@@ -245,4 +245,3 @@ from router_py.local_answer_core.utils import (
 )
 
 _local_answer_logger = LocalAnswerLogger()
-

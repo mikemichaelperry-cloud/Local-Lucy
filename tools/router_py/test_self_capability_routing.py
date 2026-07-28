@@ -4,6 +4,7 @@ These tests ensure that questions about Lucy itself — its identity, version,
 capabilities, providers, and configuration — route LOCAL with SELF_KNOWLEDGE
 injected rather than being sent to external providers.
 """
+
 from __future__ import annotations
 
 import pytest

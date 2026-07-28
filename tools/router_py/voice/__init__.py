@@ -33,6 +33,7 @@ except ImportError:
     def quick_voice_interaction(*args, **kwargs):  # type: ignore
         raise ImportError("Voice pipeline dependencies are not available")
 
+
 __all__ = [
     "AudioBuffer",
     "TranscriptionResult",

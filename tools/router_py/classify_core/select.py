@@ -55,6 +55,7 @@ _LLM_ARBITER_ROUTES = (
     "CLARIFY",
 )
 
+
 def _call_llm_arbiter(query: str) -> str | None:
     """Ask a small local Ollama model to resolve a low-confidence route.
 
@@ -103,6 +104,7 @@ def _call_llm_arbiter(query: str) -> str | None:
     except Exception:
         return None
 
+
 def _routing_decision_from_policy(
     classification: ClassificationResult,
     policy_decision: PolicyDecision,
@@ -131,6 +133,7 @@ def _routing_decision_from_policy(
         trace=policy_decision.trace,
     )
     return decision
+
 
 def _make_local_decision(classification: ClassificationResult, query: str = "") -> RoutingDecision:
     """Create a local-only routing decision."""
@@ -269,6 +272,7 @@ def _make_weather_decision(classification: ClassificationResult) -> RoutingDecis
         policy_reason="weather_provider",
         ephemeral=True,
     )
+
 
 def select_route(
     classification: ClassificationResult,
@@ -701,7 +705,6 @@ def select_route(
                     **embedding_meta,
                 )
             else:  # AUGMENTED or EVIDENCE
-
                 provider = provider_resolver.resolve_provider(classification)
                 usage_class = provider_usage_class_for(provider)
 
@@ -879,4 +882,3 @@ def select_route(
         guards_fired=["router_failure"],
     )
     return decision
-

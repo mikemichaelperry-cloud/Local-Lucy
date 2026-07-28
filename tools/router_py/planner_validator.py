@@ -75,9 +75,7 @@ class PlannerValidator:
             try:
                 parsed = json.loads(text)
             except json.JSONDecodeError:
-                return PlannerValidationResult(
-                    valid=False, error_code="malformed_json"
-                )
+                return PlannerValidationResult(valid=False, error_code="malformed_json")
             return self.validate(parsed)
 
         return PlannerValidationResult(valid=False, error_code="invalid_structure")

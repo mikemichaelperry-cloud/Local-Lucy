@@ -160,7 +160,12 @@ class RuntimeBridge:
         can leave model parameters on the meta device, causing downstream
         router loads to fail or route erratically.
         """
-        if os.environ.get("LUCY_DISABLE_BACKGROUND_WARMUP", "").lower() in {"1", "true", "yes", "on"}:
+        if os.environ.get("LUCY_DISABLE_BACKGROUND_WARMUP", "").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
             return False
         if "PYTEST_CURRENT_TEST" in os.environ:
             return False
@@ -309,9 +314,7 @@ class RuntimeBridge:
         # request. This prevents Gemma and Llama from piling up in VRAM on the
         # user's limited hardware when Auto mode switches between them. Users can
         # override via LUCY_LOCAL_KEEP_ALIVE if they prefer caching.
-        env.setdefault(
-            "LUCY_LOCAL_KEEP_ALIVE", os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "0")
-        )
+        env.setdefault("LUCY_LOCAL_KEEP_ALIVE", os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "0"))
         env.setdefault("LUCY_AUGMENTED_PROVIDER", self._resolve_augmented_provider())
         # Propagate model selection so subprocess paths match direct-Python path
         # Default to the single allowed fast Llama wrapper.

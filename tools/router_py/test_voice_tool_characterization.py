@@ -4,6 +4,7 @@
 These tests exercise symbols that are always available (no heavy voice deps).
 They must pass before and after the voice_tool.py split.
 """
+
 from __future__ import annotations
 
 import sys

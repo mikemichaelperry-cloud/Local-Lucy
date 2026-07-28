@@ -100,7 +100,9 @@ _MEMORY_WRITE_DENIALS = [
 ]
 
 _LOCAL_ONLY_MARKERS = [
-    re.compile(r"\buse\s+only\s+(?:currently\s+available|the\s+information\s+already\s+available)\b"),
+    re.compile(
+        r"\buse\s+only\s+(?:currently\s+available|the\s+information\s+already\s+available)\b"
+    ),
     re.compile(r"\banswer\s+only\s+from\s+(?:current\s+local\s+context|local\s+context)\b"),
     re.compile(r"\bonly\s+currently\s+available\s+information\b"),
 ]

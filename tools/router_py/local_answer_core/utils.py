@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+
 class _OllamaWarmupThread(threading.Thread):
     """Daemon thread that pings Ollama periodically to keep the model loaded.
 
@@ -107,5 +108,3 @@ def get_gpu_free_vram_mb() -> int | None:
     except Exception:
         pass
     return None
-
-

@@ -22,9 +22,7 @@ def ensure_namespace(conn: sqlite3.Connection, namespace: str) -> int:
     Returns:
         int: Namespace ID for foreign key references.
     """
-    cursor = conn.execute(
-        "INSERT OR IGNORE INTO namespaces (name) VALUES (?)", (namespace,)
-    )
+    cursor = conn.execute("INSERT OR IGNORE INTO namespaces (name) VALUES (?)", (namespace,))
     cursor = conn.execute("SELECT id FROM namespaces WHERE name = ?", (namespace,))
     row = cursor.fetchone()
     namespace_id = row[0]
@@ -403,9 +401,7 @@ def write_session(
         return False
 
 
-def read_session(
-    conn: sqlite3.Connection, namespace_id: int, session_key: str
-) -> Optional[dict]:
+def read_session(conn: sqlite3.Connection, namespace_id: int, session_key: str) -> Optional[dict]:
     """Read session data if not expired.
 
     Args:
@@ -443,9 +439,7 @@ def read_session(
         return None
 
 
-def delete_session(
-    conn: sqlite3.Connection, namespace_id: int, session_key: str
-) -> bool:
+def delete_session(conn: sqlite3.Connection, namespace_id: int, session_key: str) -> bool:
     """Delete a session.
 
     Args:
@@ -470,9 +464,7 @@ def delete_session(
         return False
 
 
-def acquire_lock(
-    conn: sqlite3.Connection, namespace_id: int, lock_name: str, owner: str
-) -> bool:
+def acquire_lock(conn: sqlite3.Connection, namespace_id: int, lock_name: str, owner: str) -> bool:
     """Attempt to acquire a distributed lock within a single transaction.
 
     This is a single-shot acquisition attempt; the polling loop lives in the
@@ -513,9 +505,7 @@ def acquire_lock(
     return False
 
 
-def release_lock(
-    conn: sqlite3.Connection, namespace_id: int, lock_name: str, owner: str
-) -> bool:
+def release_lock(conn: sqlite3.Connection, namespace_id: int, lock_name: str, owner: str) -> bool:
     """Release a previously acquired lock.
 
     Args:

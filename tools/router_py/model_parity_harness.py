@@ -16,6 +16,7 @@ Usage:
 This is intentionally a standalone script rather than a pytest test because
 live model calls are slow and require Ollama to be running.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -268,7 +269,9 @@ def main() -> int:
 
     cases = TEST_CASES
     if args.case:
-        requested = {cid for group in args.case for cid in (group if isinstance(group, list) else [group])}
+        requested = {
+            cid for group in args.case for cid in (group if isinstance(group, list) else [group])
+        }
         cases = [c for c in cases if c["id"] in requested]
         if not cases:
             print(f"Unknown cases: {requested}", file=sys.stderr)
@@ -299,7 +302,9 @@ def main() -> int:
             )
             for note in r.notes:
                 print(f"       {note}", flush=True)
-        print(f"\nTotal: {summary['total']}, Passed: {summary['passed']}, Failed: {summary['failed']}")
+        print(
+            f"\nTotal: {summary['total']}, Passed: {summary['passed']}, Failed: {summary['failed']}"
+        )
 
     return 0 if summary["failed"] == 0 else 1
 

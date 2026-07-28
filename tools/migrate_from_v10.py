@@ -238,9 +238,7 @@ def _load_report(state_dir: Path) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _discover_sources(
-    v10_root: Path | None, v10_runtime: Path | None
-) -> list[dict[str, Any]]:
+def _discover_sources(v10_root: Path | None, v10_runtime: Path | None) -> list[dict[str, Any]]:
     """Build the canonical list of source -> destination mappings.
 
     Warns about expected source files that are missing, but still only returns
@@ -251,10 +249,20 @@ def _discover_sources(
 
     expected_dbs: list[tuple[Path | None, Path, str]] = []
     if v10_root is not None:
-        expected_dbs.append((v10_root / "state" / "lucy_state.db", state_dir / "lucy_state.db", "lucy_state.db"))
+        expected_dbs.append(
+            (v10_root / "state" / "lucy_state.db", state_dir / "lucy_state.db", "lucy_state.db")
+        )
     if v10_runtime is not None:
-        expected_dbs.append((v10_runtime / "state" / "memory.db", state_dir / "memory.db", "memory.db"))
-        expected_dbs.append((v10_runtime / "session_memory.db", state_dir / "session_memory.db", "session_memory.db"))
+        expected_dbs.append(
+            (v10_runtime / "state" / "memory.db", state_dir / "memory.db", "memory.db")
+        )
+        expected_dbs.append(
+            (
+                v10_runtime / "session_memory.db",
+                state_dir / "session_memory.db",
+                "session_memory.db",
+            )
+        )
 
     for src_db, dst_db, name in expected_dbs:
         if src_db is not None and src_db.is_file():
@@ -380,9 +388,7 @@ def cmd_migrate(args: argparse.Namespace) -> int:
     # Non-interactive safety: refuse to overwrite existing V11 state unless --force.
     existing_v11 = [item for item in sources if item["dst"].exists()]
     if existing_v11 and not args.force:
-        print(
-            "Refusing to overwrite existing V11 state without --force:", file=sys.stderr
-        )
+        print("Refusing to overwrite existing V11 state without --force:", file=sys.stderr)
         for item in existing_v11:
             print(f"  {item['dst']}", file=sys.stderr)
         return 1

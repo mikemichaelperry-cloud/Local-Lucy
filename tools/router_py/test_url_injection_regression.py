@@ -72,9 +72,7 @@ class TestPlannerValidatorRejectsFabricatedUrls:
         from router_py.planner_validator import PlannerValidator
 
         validator = PlannerValidator()
-        result = validator.validate(
-            "This is an internal consistency exercise. Do not use tools."
-        )
+        result = validator.validate("This is an internal consistency exercise. Do not use tools.")
         assert not result.valid
 
     def test_partial_json_rejected(self):

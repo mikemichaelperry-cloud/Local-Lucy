@@ -56,6 +56,7 @@ _FINANCIAL_ANCHOR_RE = tuple(
 
 # Pre-compiled historical query regexes for _is_historical_query
 
+
 def _is_personal_finance_reasoning(query: str) -> bool:
     """
     Detect whether a query is asking for personal-finance *reasoning/advice*

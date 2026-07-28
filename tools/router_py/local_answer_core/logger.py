@@ -16,6 +16,7 @@ if str(ROOT_DIR / "tools") not in sys.path:
 
 from tools.xdg_paths import lucy_runtime_namespace_root
 
+
 class LocalAnswerLogger:
     """Logger for LocalAnswer operations.
 

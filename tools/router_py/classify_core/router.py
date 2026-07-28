@@ -35,9 +35,7 @@ def _get_router():
             return _ROUTER if _ROUTER is not False else None
 
         try:
-            router_dir = (
-                Path(__file__).resolve().parent.parent.parent.parent / "models" / "router"
-            )
+            router_dir = Path(__file__).resolve().parent.parent.parent.parent / "models" / "router"
             if str(router_dir) not in sys.path:
                 sys.path.insert(0, str(router_dir))
             from hybrid_router_v2 import HybridRouterV2

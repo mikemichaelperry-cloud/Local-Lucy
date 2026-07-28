@@ -34,9 +34,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "voice" / "backends"))
 def _get_audio_levels_file() -> Path:
     """Get path to audio levels file for VU meter."""
     runtime_dir = Path(
-        os.environ.get(
-            "LUCY_RUNTIME_NAMESPACE_ROOT", str(lucy_runtime_namespace_root())
-        )
+        os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(lucy_runtime_namespace_root()))
     )
     return runtime_dir / "state" / "voice_audio_levels.json"
 

@@ -162,10 +162,12 @@ def _run_stress_for_model(model: str, isolated_namespace):
     if not history_file.exists():
         failures.append(("history", "request_history.jsonl not created"))
     else:
-        lines = [l for l in history_file.read_text(encoding="utf-8").splitlines() if l.strip()]
+        lines = [
+            line for line in history_file.read_text(encoding="utf-8").splitlines() if line.strip()
+        ]
         if len(lines) != len(queries):
             failures.append(("history", f"expected {len(queries)} entries, got {len(lines)}"))
-        hist_ids = [json.loads(l).get("request_id") for l in lines]
+        hist_ids = [json.loads(line).get("request_id") for line in lines]
         if len(hist_ids) != len(set(hist_ids)):
             failures.append(("history", "duplicate request_ids in history file"))
 
@@ -175,16 +177,22 @@ def _run_stress_for_model(model: str, isolated_namespace):
     return failures
 
 
-@pytest.mark.skipif(not _model_present("local-lucy-gemma4"), reason="local-lucy-gemma4 not in Ollama")
+@pytest.mark.skipif(
+    not _model_present("local-lucy-gemma4"), reason="local-lucy-gemma4 not in Ollama"
+)
 def test_stress_gemma4(isolated_namespace):
     failures = _run_stress_for_model("local-lucy-gemma4", isolated_namespace)
     assert not failures, "Gemma4 stress failures:\n" + "\n".join(f"  {t}: {m}" for t, m in failures)
 
 
-@pytest.mark.skipif(not _model_present("local-lucy-llama31"), reason="local-lucy-llama31 not in Ollama")
+@pytest.mark.skipif(
+    not _model_present("local-lucy-llama31"), reason="local-lucy-llama31 not in Ollama"
+)
 def test_stress_llama31(isolated_namespace):
     failures = _run_stress_for_model("local-lucy-llama31", isolated_namespace)
-    assert not failures, "Llama31 stress failures:\n" + "\n".join(f"  {t}: {m}" for t, m in failures)
+    assert not failures, "Llama31 stress failures:\n" + "\n".join(
+        f"  {t}: {m}" for t, m in failures
+    )
 
 
 if __name__ == "__main__":

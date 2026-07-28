@@ -425,6 +425,7 @@ _CREATIVE_RE = tuple(
     )
 )
 
+
 def _is_conflict_analysis_query(query: str) -> bool:
     """Detect prediction/analysis questions about live conflicts.
 
@@ -1491,4 +1492,3 @@ def _is_creative_writing(query: str) -> bool:
     has_verb = any(v in q for v in creative_verbs)
     has_noun = any(n in q for n in creative_nouns)
     return has_verb and has_noun
-

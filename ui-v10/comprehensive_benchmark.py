@@ -7,10 +7,10 @@ Runs all automated benchmarks and generates unified report
 import json
 import os
 import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
-import sys
 
 # Configuration
 SNAPSHOT_ROOT = Path(__file__).resolve().parent.parent
@@ -21,12 +21,9 @@ if str(SNAPSHOT_ROOT) not in sys.path:
 if str(SNAPSHOT_ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(SNAPSHOT_ROOT / "tools"))
 
-from tools.xdg_paths import lucy_runtime_namespace_root
+from tools.xdg_paths import lucy_runtime_namespace_root  # noqa: E402
 
-RUNTIME_NS = Path(
-    os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT")
-    or lucy_runtime_namespace_root()
-)
+RUNTIME_NS = Path(os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT") or lucy_runtime_namespace_root())
 
 # Environment setup
 os.environ["LUCY_RUNTIME_AUTHORITY_ROOT"] = str(SNAPSHOT_ROOT)

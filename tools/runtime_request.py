@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: E402
 from __future__ import annotations
 
 import os
@@ -35,8 +36,6 @@ from typing import Any
 # script is executed directly from the tools/ directory.
 sys.path.insert(0, str(_SCRIPT.parents[1]))
 
-from tools.xdg_paths import lucy_runtime_namespace_root
-
 from runtime_control import (
     RuntimeControlError,
     enforce_authority_contract,
@@ -45,6 +44,8 @@ from runtime_control import (
     locked_state_file,
     resolve_state_file,
 )
+
+from tools.xdg_paths import lucy_runtime_namespace_root
 
 # Add router_py to path for imports
 ROUTER_PY_PATH = Path(__file__).parent / "router_py"
@@ -265,9 +266,7 @@ def legacy_runtime_namespace_status(
 
 DEFAULT_RESULT_FILE = str(lucy_runtime_namespace_root() / "state" / "last_request_result.json")
 DEFAULT_HISTORY_FILE = str(lucy_runtime_namespace_root() / "state" / "request_history.jsonl")
-DEFAULT_CHAT_MEMORY_FILE = str(
-    lucy_runtime_namespace_root() / "state" / "chat_session_memory.txt"
-)
+DEFAULT_CHAT_MEMORY_FILE = str(lucy_runtime_namespace_root() / "state" / "chat_session_memory.txt")
 
 
 def resolve_ui_state_dir() -> Path:
@@ -596,7 +595,9 @@ def _run_backend_submit_python(
         "OUTCOME_CODE": outcome.outcome_code,
         "REQUESTED_MODE": outcome.route if outcome.route and outcome.route != "LOCAL" else "",
         "FINAL_MODE": outcome.route if outcome.route and outcome.route != "LOCAL" else "",
-        "TRUST_CLASS": outcome.provider_usage_class if outcome.provider_usage_class and outcome.provider_usage_class != "local" else "",
+        "TRUST_CLASS": outcome.provider_usage_class
+        if outcome.provider_usage_class and outcome.provider_usage_class != "local"
+        else "",
         "INTENT_FAMILY": outcome.intent_family or "unknown",
         "MANIFEST_INTENT_FAMILY": outcome.intent_family or "unknown",
         "CONFIDENCE": str(outcome.confidence),

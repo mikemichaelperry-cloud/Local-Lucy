@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 import sys
+
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -197,5 +198,3 @@ class LatencyMetrics:
     api_parse_ms: int = 0
     post_processing_ms: int = 0
     total_ms: int = 0
-
-

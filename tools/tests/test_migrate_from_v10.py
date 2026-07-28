@@ -7,11 +7,9 @@ temporary directories so the real V10 and V11 installations are never touched.
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -82,7 +80,10 @@ def _make_state_db(path: Path) -> None:
             )
             """
         )
-        conn.execute("INSERT INTO sessions (session_id, created_at) VALUES (?, datetime('now'))", ("test-session",))
+        conn.execute(
+            "INSERT INTO sessions (session_id, created_at) VALUES (?, datetime('now'))",
+            ("test-session",),
+        )
         conn.commit()
     finally:
         conn.close()
@@ -124,7 +125,9 @@ def test_dry_run_discovers_all_sources(isolated_v10_v11: dict[str, Path]) -> Non
     _make_memory_db(v10_runtime / "state" / "memory.db", facts=[("Mike is 66", "identity")])
     (v10_runtime / "state" / "current_state.json").write_text(json.dumps({"mode": "offline"}))
     (v10_runtime / "state" / "request_history.jsonl").write_text('{"request_id":"r1"}\n')
-    (v10_runtime / "state" / "request_history.20260607-174407.jsonl").write_text('{"request_id":"r2"}\n{"request_id":"r3"}\n')
+    (v10_runtime / "state" / "request_history.20260607-174407.jsonl").write_text(
+        '{"request_id":"r2"}\n{"request_id":"r3"}\n'
+    )
 
     ret = migrate_from_v10.main(["dry-run"])
     assert ret == 0
@@ -144,7 +147,9 @@ def test_migrate_copies_databases_and_json_and_history_archives(
     )
     (v10_runtime / "state" / "current_state.json").write_text(json.dumps({"mode": "offline"}))
     (v10_runtime / "state" / "request_history.jsonl").write_text('{"request_id":"r1"}\n')
-    (v10_runtime / "state" / "request_history.20260607-174407.jsonl").write_text('{"request_id":"r2"}\n{"request_id":"r3"}\n')
+    (v10_runtime / "state" / "request_history.20260607-174407.jsonl").write_text(
+        '{"request_id":"r2"}\n{"request_id":"r3"}\n'
+    )
 
     ret = migrate_from_v10.main(["migrate", "--force"])
     assert ret == 0

@@ -161,5 +161,3 @@ class VADConfig:
     silence_timeout_ms: int = 1500
     min_speech_ms: int = 200
     max_silence_ms: int = 3000
-
-

@@ -105,9 +105,7 @@ class TestExplicitAssistantInstructionGate:
 
 class TestScienceFactGate:
     def test_water_boiling_is_local(self, router: PolicyRouter) -> None:
-        decision = router.apply(
-            "At what temperature does water boil at sea level?", _clf()
-        )
+        decision = router.apply("At what temperature does water boil at sea level?", _clf())
         assert decision is not None
         assert decision.route == "LOCAL"
         assert decision.reason_code == "policy:science_fact"

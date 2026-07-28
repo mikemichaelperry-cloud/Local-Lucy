@@ -39,6 +39,7 @@ _HIST_PHRASES_RE = tuple(
     )
 )
 
+
 def _is_historical_query(query: str) -> bool:
     """Detect whether a query is clearly about historical events.
 

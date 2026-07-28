@@ -37,7 +37,6 @@ from pathlib import Path
 from typing import Any
 
 # Ensure tools package is importable when this script is run directly.
-import sys
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:

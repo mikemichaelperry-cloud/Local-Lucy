@@ -250,9 +250,7 @@ def ensure_control_env() -> None:
 
     evidence = state.get("evidence", "off")
     if env_overrides.get("LUCY_EVIDENCE_ENABLED") is None:
-        os.environ["LUCY_EVIDENCE_ENABLED"] = (
-            "1" if evidence in ("on", "true", "1") else "0"
-        )
+        os.environ["LUCY_EVIDENCE_ENABLED"] = "1" if evidence in ("on", "true", "1") else "0"
     if env_overrides.get("LUCY_ENABLE_INTERNET") is None:
         # Mirror evidence for the legacy internet flag.
         os.environ["LUCY_ENABLE_INTERNET"] = os.environ.get("LUCY_EVIDENCE_ENABLED", "0")
@@ -267,9 +265,7 @@ def ensure_control_env() -> None:
 
     conv = state.get("conversation", "off")
     if env_overrides.get("LUCY_CONVERSATION_MODE_FORCE") is None:
-        os.environ["LUCY_CONVERSATION_MODE_FORCE"] = (
-            "1" if conv in ("on", "true", "1") else "0"
-        )
+        os.environ["LUCY_CONVERSATION_MODE_FORCE"] = "1" if conv in ("on", "true", "1") else "0"
 
     mem = state.get("memory", "off")
     if env_overrides.get("LUCY_SESSION_MEMORY") is None:

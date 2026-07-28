@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """MiniLM semantic guard for policy decisions."""
 
-
 import os
 import re
 import threading
@@ -88,12 +87,14 @@ _SEMANTIC_EMBEDDINGS: dict[str, "numpy.ndarray | None"] = {k: None for k in _SEM
 _EMBEDDING_CACHE: OrderedDict[str, "numpy.ndarray"] = OrderedDict()
 _EMBEDDING_CACHE_LOCK = threading.Lock()
 
+
 def _embedding_cache_size() -> int:
     """Return the configured LRU cache size."""
     try:
         return max(1, int(os.environ.get("LUCY_EMBEDDING_CACHE_SIZE", "1024")))
     except Exception:
         return 1024
+
 
 def _get_cached_embedding(query: str) -> "numpy.ndarray | None":
     """Return a cached normalized embedding if present; updates LRU order."""
@@ -104,6 +105,7 @@ def _get_cached_embedding(query: str) -> "numpy.ndarray | None":
             _EMBEDDING_CACHE.move_to_end(key)
         return embedding
 
+
 def _set_cached_embedding(query: str, embedding: "numpy.ndarray") -> None:
     """Store a normalized embedding in the LRU cache."""
     key = query.lower().strip()
@@ -113,6 +115,7 @@ def _set_cached_embedding(query: str, embedding: "numpy.ndarray") -> None:
         _EMBEDDING_CACHE.move_to_end(key)
         while len(_EMBEDDING_CACHE) > max_size:
             _EMBEDDING_CACHE.popitem(last=False)
+
 
 def _get_semantic_model():
     """Lazy-load the MiniLM model; returns None if unavailable.
@@ -143,6 +146,7 @@ def _get_semantic_model():
             _SEMANTIC_MODEL = False
     return _SEMANTIC_MODEL if _SEMANTIC_MODEL is not False else None
 
+
 def _get_semantic_embeddings(category: str):
     """Return normalized reference embeddings for a category (cached)."""
     global _SEMANTIC_EMBEDDINGS
@@ -159,6 +163,7 @@ def _get_semantic_embeddings(category: str):
     cache = embeddings / norms
     _SEMANTIC_EMBEDDINGS[category] = cache
     return cache
+
 
 def _semantic_classify(query: str) -> str | None:
     """

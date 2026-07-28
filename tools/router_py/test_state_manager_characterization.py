@@ -3,6 +3,7 @@
 These tests must pass before and after the state_manager.py split.
 They use a temporary namespace root so they do not pollute global state.
 """
+
 from __future__ import annotations
 
 import os
@@ -44,9 +45,7 @@ def test_write_and_read_last_route(tmp_state_manager):
 
 def test_read_routes_pagination(tmp_state_manager):
     for i in range(3):
-        assert tmp_state_manager.write_route(
-            {"intent": f"intent_{i}", "confidence": 0.5 + i * 0.1}
-        )
+        assert tmp_state_manager.write_route({"intent": f"intent_{i}", "confidence": 0.5 + i * 0.1})
     routes = tmp_state_manager.read_routes(limit=2, offset=0)
     assert len(routes) == 2
     assert routes[0]["intent"] == "intent_2"

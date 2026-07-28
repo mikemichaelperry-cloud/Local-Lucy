@@ -164,6 +164,7 @@ def _is_personal_fact_query(query: str) -> bool:
 # model has a 2048-token context window and long system blocks get ignored.
 # This is now a function so the identity string adapts to the active model.
 
+
 def _lucy_version_label() -> str:
     """Return the version label injected into the local model self-knowledge prompt."""
     return os.environ.get("LUCY_VERSION_LABEL", "V11").strip() or "V11"
