@@ -370,7 +370,8 @@ def store_turn(role: str, text: str, *, session_id: str = "default") -> None:
 
 def get_recent_turns(session_id: str = "default", limit: int = 6) -> list[dict[str, Any]]:
     """
-    Return recent conversation turns for a session.
+    Return recent conversation turns for a session, including any turns that
+    were archived after summarization. Full text is preserved for both models.
 
     Args:
         session_id: Session identifier.
@@ -382,8 +383,12 @@ def get_recent_turns(session_id: str = "default", limit: int = 6) -> list[dict[s
     """
     conn = _get_connection()
     cursor = conn.execute(
-        "SELECT role, text, created_at FROM conversation_turns WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
-        (session_id, limit),
+        "SELECT role, text, created_at FROM ("
+        "  SELECT role, text, created_at, id, 0 AS source FROM conversation_turns WHERE session_id = ?"
+        "  UNION ALL"
+        "  SELECT role, text, archived_at AS created_at, id, 1 AS source FROM archived_turns WHERE session_id = ?"
+        ") ORDER BY created_at DESC, source ASC, id DESC LIMIT ?",
+        (session_id, session_id, limit),
     )
     rows = cursor.fetchall()
     # Reverse to restore oldest-first ordering
