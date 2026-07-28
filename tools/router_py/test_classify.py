@@ -422,9 +422,19 @@ class TestContinuationFollowUpInheritance(unittest.TestCase):
 class TestLLMArbiter(unittest.TestCase):
     """Confidence-triggered LLM arbiter path."""
 
+    def setUp(self):
+        """Disable deterministic policy gates so the embedding/arbiter path is exercised."""
+        self._policy_router_patch = patch(
+            "router_py.policy_router.PolicyRouter.apply", return_value=None
+        )
+        self._policy_router_patch.start()
+
+    def tearDown(self):
+        self._policy_router_patch.stop()
+
     def test_arbiter_overrides_low_confidence_route(self):
         """When confidence < 0.60 and margin < 0.15, arbiter route wins."""
-        with patch("router_py.classify._call_llm_arbiter", return_value="NEWS"):
+        with patch("router_py.classify_core.select._call_llm_arbiter", return_value="NEWS"):
             classification = classify_intent("Who won the World Cup final?")
             decision = select_route(classification, query="Who won the World Cup final?")
             self.assertEqual(decision.route, "NEWS")
@@ -433,7 +443,7 @@ class TestLLMArbiter(unittest.TestCase):
 
     def test_arbiter_unavailable_marks_low_confidence(self):
         """If Ollama is unavailable the router decision is kept but flagged."""
-        with patch("router_py.classify._call_llm_arbiter", return_value=None):
+        with patch("router_py.classify_core.select._call_llm_arbiter", return_value=None):
             classification = classify_intent("Who won the World Cup final?")
             decision = select_route(classification, query="Who won the World Cup final?")
             self.assertTrue(decision.low_confidence)
