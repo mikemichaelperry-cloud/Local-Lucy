@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${LUCY_UI_ROOT:-$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)}"
+REPO_ROOT="$(CDPATH= cd -- "$ROOT/.." && pwd)"
 MANIFEST="${LUCY_UI_SHA_MANIFEST:-$ROOT/SHA256SUMS.clean}"
 
 usage() {
@@ -17,33 +18,38 @@ EOF
 
 collect_files() {
   (
-    cd "$ROOT"
-    find \
-      ./app \
-      ./tests \
-      ./tools \
-      -type f \
-      ! -path "*/__pycache__/*" \
-      ! -path "*/.venv/*" \
-      ! -path "*/.git/*" \
-      ! -name "*.pyc" \
-      ! -name "*.tmp" \
-      ! -name "*.bak" \
-      ! -name "SHA256SUMS.clean" \
-      ! -name "SHA256SUMS" \
-      -print0
-    find \
-      . \
-      -maxdepth 1 \
-      -type f \
-      \( -name "*.md" -o -name "*.py" -o -name "*.sh" \) \
-      ! -name "SHA256SUMS.clean" \
-      ! -name "SHA256SUMS" \
-      -print0
+    cd "$REPO_ROOT"
+    # Track only committed files under the UI tree so generated runtime
+    # artifacts do not drift between local development and CI.
+    git ls-files \
+      ui-v10/app/ \
+      ui-v10/tests/ \
+      ui-v10/tools/ \
+      2>/dev/null \
+      | sed 's#^ui-v10/##' \
+      | grep -vE '^SHA256SUMS(\.clean)?$' \
+      | grep -vE '\.pyc$' \
+      | grep -vE '\.(bak|tmp|fixbak)\.' \
+      | grep -vE '\.BROKEN\.' \
+      | grep -v '__pycache__/' \
+      | grep -v '/\.venv/' \
+      | grep -v '/\.pytest_cache/' \
+      | grep -v '/build/' \
+      | grep -v '/vendor/' \
+      | grep -v '/\.git/' \
+      | grep -v '/\.devops/' \
+      | grep -v '/\.idea/' \
+      | grep -v '\.DS_Store$' \
+      | while IFS= read -r rel; do
+          # Exclude symlinks (e.g. tools/router -> app/backend/router) so
+          # sha256sum does not try to hash a directory link.
+          if [ -L "ui-v10/$rel" ]; then
+            continue
+          fi
+          printf '%s\n' "$rel"
+        done
   ) \
-    | sort -z \
-    | xargs -0 -n1 printf '%s\n' \
-    | sed 's#^\./##'
+    | sort
 }
 
 regen_manifest() {
