@@ -250,10 +250,16 @@ def process(
     # thin, and the request is not in a critical category. Fetched sources are
     # explicitly labelled untrusted and never replace the local answer.
     if _capability_flags.auto_web_general_knowledge:
-        attribution = router_outcome.source_attribution
+        # Web fetch is independent of the source_attribution capability flag.
+        # When attribution is disabled, treat the basis as "none" so the
+        # auto_web_general_knowledge flag can still trigger.
+        attribution_basis = (
+            router_outcome.source_attribution.basis
+            if router_outcome.source_attribution is not None
+            else "none"
+        )
         if (
-            attribution is not None
-            and (attribution.basis == "none" or attribution.confidence == "low")
+            attribution_basis in ("none", "low")
             and not critical_guard.is_critical_category(classification)
         ):
             fetched = fetcher.fetch_general_knowledge(question)

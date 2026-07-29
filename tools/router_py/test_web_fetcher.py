@@ -415,5 +415,157 @@ def test_process_skips_web_fetch_when_attribution_is_strong():
     assert outcome.escalation_suggestion == ""
 
 
+def test_process_fetches_when_source_attribution_flag_disabled():
+    """auto_web_general_knowledge must work even when source_attribution is off."""
+    classification = ClassificationResult(
+        intent="general",
+        intent_family="factual",
+        category="general",
+        confidence=0.5,
+    )
+    decision = RoutingDecision(
+        route="LOCAL",
+        mode="AUTO",
+        intent_family="factual",
+        confidence=0.5,
+        provider="local",
+        provider_usage_class="local",
+        evidence_mode="",
+    )
+    fetched = FetchResult(
+        url="https://example.com/found",
+        title="Found It",
+        snippet="snippet",
+        source_type="web_untrusted",
+    )
+    no_attribution_outcome = replace(
+        _fake_local_outcome(), source_attribution=None, trust_label=""
+    )
+
+    with patch(
+        "router_py.request_pipeline.load_capability_flags",
+        return_value=CapabilityFlags(
+            source_attribution=False,
+            auto_web_general_knowledge=True,
+        ),
+    ):
+        with patch(
+            "router_py.request_pipeline.outcome.build_outcome",
+            return_value=no_attribution_outcome,
+        ):
+            with patch(
+                "router_py.request_pipeline.fetcher.fetch_general_knowledge",
+                return_value=fetched,
+            ):
+                outcome, _, _ = process(
+                    "what is the capital of france",
+                    classification=classification,
+                    decision=decision,
+                )
+
+    assert "Found It" in outcome.escalation_suggestion
+    assert "example.com/found" in outcome.escalation_suggestion
+
+
+def test_process_fetches_when_attribution_basis_is_low():
+    """The brief condition is basis in ("none", "low"); basis="low" must fetch."""
+    low_basis_outcome = replace(
+        _fake_local_outcome(),
+        source_attribution=SourceAttribution(basis="low", confidence="unknown"),
+        trust_label="unknown",
+    )
+    classification = ClassificationResult(
+        intent="general",
+        intent_family="factual",
+        category="general",
+        confidence=0.5,
+    )
+    decision = RoutingDecision(
+        route="LOCAL",
+        mode="AUTO",
+        intent_family="factual",
+        confidence=0.5,
+        provider="local",
+        provider_usage_class="local",
+        evidence_mode="",
+    )
+    fetched = FetchResult(
+        url="https://example.com/found",
+        title="Found It",
+        snippet="snippet",
+        source_type="web_untrusted",
+    )
+
+    with patch(
+        "router_py.request_pipeline.load_capability_flags",
+        return_value=CapabilityFlags(
+            source_attribution=True,
+            auto_web_general_knowledge=True,
+        ),
+    ):
+        with patch(
+            "router_py.request_pipeline.outcome.build_outcome",
+            return_value=low_basis_outcome,
+        ):
+            with patch(
+                "router_py.request_pipeline.fetcher.fetch_general_knowledge",
+                return_value=fetched,
+            ):
+                outcome, _, _ = process(
+                    "what is the capital of france",
+                    classification=classification,
+                    decision=decision,
+                )
+
+    assert "Found It" in outcome.escalation_suggestion
+
+
+def test_process_skips_fetch_when_only_confidence_is_low():
+    """Low confidence alone must not trigger fetch; basis must be checked."""
+    local_low_confidence_outcome = replace(
+        _fake_local_outcome(),
+        source_attribution=SourceAttribution(basis="local", confidence="low"),
+        trust_label="local_only",
+    )
+    classification = ClassificationResult(
+        intent="general",
+        intent_family="factual",
+        category="general",
+        confidence=0.5,
+    )
+    decision = RoutingDecision(
+        route="LOCAL",
+        mode="AUTO",
+        intent_family="factual",
+        confidence=0.5,
+        provider="local",
+        provider_usage_class="local",
+        evidence_mode="",
+    )
+
+    with patch(
+        "router_py.request_pipeline.load_capability_flags",
+        return_value=CapabilityFlags(
+            source_attribution=True,
+            auto_web_general_knowledge=True,
+        ),
+    ):
+        with patch(
+            "router_py.request_pipeline.outcome.build_outcome",
+            return_value=local_low_confidence_outcome,
+        ):
+            with patch(
+                "router_py.request_pipeline.fetcher.fetch_general_knowledge",
+            ) as mock_fetch:
+                outcome, _, _ = process(
+                    "what is the capital of france",
+                    classification=classification,
+                    decision=decision,
+                )
+                mock_fetch.assert_not_called()
+
+    assert outcome.escalation_suggestion == ""
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
