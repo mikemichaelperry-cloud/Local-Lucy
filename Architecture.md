@@ -159,8 +159,8 @@ Each split preserves the original import path via a thin `__init__.py` facade or
 
 The request pipeline has two layers:
 
-- **`main.run()` wrapper** handles ingest, feedback detection, and the optional Gemma 4 smart-routing bypass, then calls `request_pipeline.process()`.
-- **`request_pipeline.process()`** runs the canonical 10-stage flow described in §4.1.
+- **`main.run()` wrapper** handles ingest, feedback detection, and surface-level setup, then calls `request_pipeline.process()`.
+- **`request_pipeline.process()`** runs the canonical 10-stage flow described in §4.1, including the Gemma 4 smart-routing bypass through `pipeline.classify.classify_question()`.
 
 ### 4.1 Pipeline Facade (`tools/router_py/request_pipeline.py`)
 
@@ -168,8 +168,8 @@ The request pipeline has two layers:
 
 The `process()` flow is:
 
-1. **Environment bypass** — `LUCY_ROUTER_BYPASS` / `LUCY_CHAT_FORCE_MODE` short-circuit to a forced route.
-2. **Classify** — `pipeline.classify.classify_question()` runs intent classification and the Gemma 4 smart-routing bypass.
+1. **Environment bypass** — `process()` orchestrates the env bypass by calling helpers in `pipeline/classify.py` (`_forced_route_from_env`, `_bypass_classification_decision`); `LUCY_ROUTER_BYPASS` / `LUCY_CHAT_FORCE_MODE` short-circuit to a forced route.
+2. **Classify** — `process()` calls `pipeline.classify.classify_question()`, which runs intent classification and the Gemma 4 smart-routing bypass. The bypass can set a `route_prefix` (e.g., `NEWS`, `EVIDENCE`) or produce a bypass `RoutingDecision` for ordinary queries.
 3. **Route** — `pipeline.route.select_route_for_question()` produces a raw `RoutingDecision`.
 4. **Resolve provider** — `pipeline.resolve_provider.resolve_provider()` applies route prefixes, `augmented_direct_once`, centralized provider resolution, and request-scoped constraints.
 5. **Critical-source policy** — `pipeline.route.apply_critical_source_policy()` restricts critical categories to trusted sources.
@@ -183,7 +183,7 @@ The `process()` flow is:
 
 | Module | Responsibility |
 |---|---|
-| `pipeline/classify.py` | Intent classification wrapper, Gemma 4 smart-routing bypass, legacy env-bypass helpers, self-analysis pre-check. |
+| `pipeline/classify.py` | Intent classification wrapper, Gemma 4 smart-routing bypass, legacy env-bypass helpers (called by `process()`), self-analysis pre-check. |
 | `pipeline/route.py` | Raw route selection via `select_route()`, evidence-disabled operator gate, critical-source trusted-source policy. |
 | `pipeline/resolve_provider.py` | Route normalization: prefix override, `augmented_direct_once`, provider resolution, request constraints. |
 | `pipeline/build_context.py` | `PipelineContext` assembly from environment variables and caller extras. |
@@ -266,10 +266,15 @@ Routing is **deterministic-first, semantic-second**.
 
 ### 5.0 Gemma 4 Smart-Routing Bypass
 
-When the HMI toggle `gemma4_smart_routing` is on and the selected model is `local-lucy-gemma4` (or any `gemma4:*` tag), `tools/router_py/request_pipeline.py` constructs a minimal `LOCAL` `RoutingDecision` directly. This skips the policy router, embedding router, and intent classifier for ordinary queries. It preserves:
+When the HMI toggle `gemma4_smart_routing` is on and the selected model is `local-lucy-gemma4` (or any `gemma4:*` tag), `request_pipeline.process()` calls `pipeline.classify.classify_question()`, which checks for Gemma 4 smart routing and can either:
+
+- Set a `route_prefix` for news/evidence keyword patterns (`latest news about ...`, `evidence for ...`), leaving normal route selection to run with that prefix.
+- Produce a minimal `LOCAL` bypass `RoutingDecision` directly for ordinary queries, skipping the policy router, embedding router, and intent classifier.
+
+This preserves:
 
 - Explicit route prefixes (`news:`, `evidence:`, `augmented:`).
-- Existing news/evidence pattern fast paths (`latest news about ...`, `evidence for ...`).
+- Existing news/evidence pattern fast paths.
 - Execution-engine guardrails (tool authorization, permissions, etc.).
 
 The bypass is off by default; non-Gemma models always use the full router stack.
