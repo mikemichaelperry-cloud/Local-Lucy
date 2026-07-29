@@ -1,14 +1,8 @@
-#!/usr/bin/env python3
-"""Streaming voice pipeline for Local Lucy.
+"""Streaming voice pipeline for Local Lucy."""
 
-Streams TTS audio chunks as text is generated, eliminating delays.
-Manages Kokoro TTS worker as a subprocess for optimal performance.
-"""
+from __future__ import annotations
 
 import asyncio
-import audioop
-import json
-import math
 import os
 import re
 import subprocess
@@ -18,241 +12,9 @@ import time
 from pathlib import Path
 from typing import AsyncIterator, Optional
 
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
-if str(ROOT_DIR / "tools") not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR / "tools"))
-
-from tools.xdg_paths import lucy_runtime_namespace_root
-
-sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "voice" / "backends"))
-
-
-def _get_audio_levels_file() -> Path:
-    """Get path to audio levels file for VU meter."""
-    runtime_dir = Path(
-        os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", str(lucy_runtime_namespace_root()))
-    )
-    return runtime_dir / "state" / "voice_audio_levels.json"
-
-
-def _read_existing_input_level(levels_file: Path) -> int:
-    """Read existing input_level from file if present."""
-    try:
-        if levels_file.exists():
-            with open(levels_file, "r") as f:
-                data = json.load(f)
-                return int(data.get("input_level", 0))
-    except Exception:
-        pass
-    return 0
-
-
-def _write_output_level(level: int, levels_file: Path) -> None:
-    """Write output audio level to file (preserves input_level)."""
-    import logging
-
-    logger = logging.getLogger("streaming_voice")
-    try:
-        # Ensure parent directory exists
-        levels_file.parent.mkdir(parents=True, exist_ok=True)
-
-        input_level = _read_existing_input_level(levels_file)
-        data = {
-            "input_level": input_level,
-            "output_level": level,
-            "timestamp": time.time(),
-            "playing": level > 0,
-        }
-        # Atomic write
-        tmp_file = levels_file.with_suffix(".tmp")
-        with open(tmp_file, "w") as f:
-            json.dump(data, f)
-        tmp_file.rename(levels_file)
-        logger.debug(f"Wrote output_level={level} to {levels_file}")
-    except Exception as e:
-        logger.debug(f"Level write error: {e}")
-
-
-def _calculate_pcm_level(pcm_data: bytes) -> int:
-    """Calculate audio level (0-100) from PCM data using peak detection."""
-    if not pcm_data:
-        return 0
-    try:
-        # Use max (peak) level instead of RMS for more dynamic response
-        # This better follows speech patterns as it catches transients
-        sample_count = len(pcm_data) // 2  # 16-bit samples
-        max_val = 0
-        for i in range(sample_count):
-            # Extract 16-bit signed sample
-            sample = pcm_data[i * 2] | (pcm_data[i * 2 + 1] << 8)
-            if sample > 32767:
-                sample -= 65536
-            abs_sample = abs(sample)
-            if abs_sample > max_val:
-                max_val = abs_sample
-
-        if max_val > 0:
-            # Convert to dB scale 0-100
-            # 16-bit max is 32767, map -60dB to 0% and 0dB to 100%
-            db = 20 * math.log10(max_val / 32767.0)
-            level = int((db + 60) / 60 * 100)
-            return max(0, min(100, level))
-    except Exception:
-        pass
-    return 0
-
-
-def _analyze_pcm_levels(
-    pcm_data: bytes, sample_rate: int = 22050, chunk_duration_ms: float = 30.0
-) -> list[int]:
-    """Analyze PCM data into level chunks for VU meter.
-
-    Args:
-        pcm_data: Raw PCM data (16-bit mono)
-        sample_rate: Sample rate in Hz
-        chunk_duration_ms: Duration of each chunk in milliseconds
-
-    Returns:
-        List of audio levels (0-100) for each chunk
-    """
-    if not pcm_data:
-        return []
-
-    levels = []
-    sample_width = 2  # 16-bit = 2 bytes
-    chunk_samples = int(sample_rate * chunk_duration_ms / 1000)
-    chunk_bytes = chunk_samples * sample_width
-
-    # Process PCM data in chunks
-    offset = 0
-    while offset < len(pcm_data):
-        chunk = pcm_data[offset : offset + chunk_bytes]
-        if len(chunk) < sample_width:
-            break
-
-        level = _calculate_pcm_level(chunk)
-        levels.append(level)
-        offset += chunk_bytes
-
-    return levels
-
-
-def _get_ui_v10_python() -> str:
-    """Get path to ui-v10 Python which has Kokoro installed."""
-    root = Path(__file__).parent.parent.parent.parent.parent
-    return str(root / "ui-v10" / ".venv" / "bin" / "python3")
-
-
-def _detect_kokoro_availability() -> bool:
-    """Check if Kokoro is available in current Python."""
-    try:
-        import kokoro
-        from kokoro_backend import get_pipeline
-
-        return True
-    except ImportError:
-        return False
-
-
-class KokoroWorkerManager:
-    """Manages Kokoro TTS worker subprocess lifecycle."""
-
-    def __init__(self, socket_path: Path):
-        self.socket_path = socket_path
-        self.process: Optional[subprocess.Popen] = None
-        self._lock = asyncio.Lock()
-
-    async def ensure_running(self, timeout: float = 10.0) -> bool:
-        """Start worker if not running."""
-        async with self._lock:
-            # Check if already running and responsive
-            if self._is_responsive():
-                return True
-
-            # Clean up stale socket
-            if self.socket_path.exists():
-                self.socket_path.unlink()
-
-            # Start worker using ui-v10 Python which has Kokoro installed
-            worker_script = Path(__file__).parent.parent / "voice" / "kokoro_session_worker.py"
-            python_exe = _get_ui_v10_python()
-
-            self.process = subprocess.Popen(
-                [python_exe, str(worker_script), "serve", "--socket", str(self.socket_path)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-
-            # Wait for socket to become responsive
-            start = asyncio.get_event_loop().time()
-            while asyncio.get_event_loop().time() - start < timeout:
-                if self._is_responsive():
-                    return True
-                await asyncio.sleep(0.05)
-
-            # Failed to start
-            self._kill()
-            return False
-
-    def _is_responsive(self) -> bool:
-        """Quick check if worker is responsive."""
-        import json
-        import socket
-
-        if not self.socket_path.exists():
-            return False
-
-        try:
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(0.5)
-            sock.connect(str(self.socket_path))
-            sock.send(json.dumps({"cmd": "prewarm"}).encode() + b"\n")
-            response = json.loads(sock.recv(4096).decode())
-            sock.close()
-            return response.get("ok", False)
-        except Exception:
-            return False
-
-    def _kill(self):
-        """Kill worker process."""
-        if self.process and self.process.poll() is None:
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=1.0)
-            except:
-                try:
-                    self.process.kill()
-                except:
-                    pass
-        self.process = None
-        if self.socket_path.exists():
-            try:
-                self.socket_path.unlink()
-            except:
-                pass
-
-    def stop(self):
-        """Stop worker cleanly."""
-        if self.process and self.process.poll() is None:
-            # Try graceful shutdown via socket
-            try:
-                import json
-                import socket
-
-                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                sock.settimeout(1.0)
-                sock.connect(str(self.socket_path))
-                sock.send(json.dumps({"cmd": "quit"}).encode() + b"\n")
-                sock.close()
-                self.process.wait(timeout=2.0)
-                return
-            except:
-                pass
-        self._kill()
+from .levels import _analyze_pcm_levels, _get_audio_levels_file, _write_output_level
+from .text import _clean_for_tts, _strip_html_for_tts
+from .worker import KokoroWorkerManager, _detect_kokoro_availability
 
 
 class StreamingVoicePipeline:
@@ -268,7 +30,9 @@ class StreamingVoicePipeline:
         self.voice = voice or os.environ.get("LUCY_VOICE_KOKORO_VOICE", "af_bella")
 
         # Initialize worker manager
-        socket_path = Path(__file__).parent.parent.parent / "tmp" / "run" / "kokoro_tts_worker.sock"
+        socket_path = (
+            Path(__file__).resolve().parent.parent.parent.parent / "tmp" / "run" / "kokoro_tts_worker.sock"
+        )
         self._worker = KokoroWorkerManager(socket_path)
 
     async def start(self) -> bool:
@@ -388,142 +152,11 @@ class StreamingVoicePipeline:
 
     def _strip_html_for_tts(self, text: str) -> str:
         """Strip HTML tags from text for TTS synthesis."""
-
-        if not text:
-            return ""
-
-        # Remove script and style elements
-        text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.DOTALL | re.IGNORECASE)
-        text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
-
-        # Replace <br>, <p> etc with newlines
-        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-        text = re.sub(r"</p>", "\n", text, flags=re.IGNORECASE)
-        text = re.sub(r"<p[^>]*>", "", text, flags=re.IGNORECASE)
-
-        # Replace <li> with bullet points
-        text = re.sub(r"<li[^>]*>", "\n• ", text, flags=re.IGNORECASE)
-        text = re.sub(r"</li>", "", text, flags=re.IGNORECASE)
-
-        # Replace <a href="...">text</a> with just "text"
-        # Use lambda to avoid backreference interpretation issues with $ in content
-        text = re.sub(
-            r'<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>',
-            lambda m: m.group(2),
-            text,
-            flags=re.IGNORECASE,
-        )
-        text = re.sub(r"<a[^>]*>([^<]*)</a>", lambda m: m.group(1), text, flags=re.IGNORECASE)
-
-        # Remove all remaining HTML tags
-        text = re.sub(r"<[^>]+>", "", text)
-
-        # Decode common HTML entities
-        text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-        text = text.replace("&quot;", '"').replace("&#39;", "'").replace("&#x27;", "'")
-        text = text.replace("&nbsp;", " ").replace("&#160;", " ")
-        text = text.replace("&#8211;", "–").replace("&#8212;", "—")
-        text = text.replace("&#8216;", """).replace('&#8217;', """)
-        text = text.replace("&#8220;", '"').replace("&#8221;", '"')
-
-        # Normalize whitespace
-        text = re.sub(r"\n\s*\n", "\n\n", text)
-        text = re.sub(r"[ \t]+", " ", text)
-
-        return text.strip()
+        return _strip_html_for_tts(text)
 
     def _clean_for_tts(self, text: str) -> str:
         """Clean text for TTS - strip HTML, news first, sources at the end."""
-
-        # Strip HTML tags first
-        text = self._strip_html_for_tts(text)
-
-        # Remove common filler phrases at the start
-        filler_patterns = [
-            r"^(?:According to|Based on|From what I can see|It appears that)\s+",
-            r"^(?:I found that|I see that|It seems)\s+",
-        ]
-
-        cleaned = text
-        for pattern in filler_patterns:
-            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
-
-        # Handle evidence source catalogs
-        if "From current sources:" in cleaned or "Latest items extracted" in cleaned:
-            lines = cleaned.split("\n")
-            news_items = []
-            sources = []
-
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-
-                # Skip header/metadata lines
-                if line.startswith("From current sources:"):
-                    continue
-                if line.startswith("Latest items extracted"):
-                    continue
-                if line.startswith("Key items:"):
-                    continue
-                if line.startswith("Conflicts/uncertainty:"):
-                    continue
-                if "None assessed" in line and len(line) < 50:
-                    continue
-
-                # Extract news from bullet points
-                if line.startswith("- ["):
-                    match = re.match(r"- \[([^\]]+)\]\s*(?:\([^)]+\))?:?\s*(.+)", line)
-                    if match:
-                        source = match.group(1)
-                        content = match.group(2)
-                        content = re.sub(r"\s+", " ", content).strip()
-                        if content:
-                            news_items.append(content)
-                            if source not in sources:
-                                sources.append(source)
-                elif line.startswith("• "):
-                    content = line[2:].strip()
-                    if content:
-                        news_items.append(content)
-                elif line.startswith("Sources:") or line.startswith("Source:"):
-                    # Skip source lines - extract domain for tracking but don't speak it
-                    if line.startswith("Source: "):
-                        domain = line[8:].strip()
-                        if domain and domain not in sources:
-                            sources.append(domain)
-                    continue
-                elif line.startswith("- ") and "." not in line:
-                    domain = line[2:].strip()
-                    if domain and " " not in domain and domain not in sources:
-                        sources.append(domain)
-                else:
-                    if len(line) > 10 and not line.startswith("-"):
-                        news_items.append(line)
-
-            result_parts = news_items
-            # Sources intentionally omitted from TTS - only show in display text
-            # if sources:
-            #     result_parts.append(f"Sources: {', '.join(sources)}")
-
-            cleaned = ". ".join(result_parts)
-
-        # Remove evidence disabled messages
-        cleaned = re.sub(
-            r"Evidence disabled by operator control\.?\s*", "", cleaned, flags=re.IGNORECASE
-        )
-        cleaned = re.sub(
-            r"Enable evidence to allow evidence routes\.?\s*", "", cleaned, flags=re.IGNORECASE
-        )
-        cleaned = re.sub(
-            r"Best-effort recovery \(not source-backed answer\):\s*",
-            "",
-            cleaned,
-            flags=re.IGNORECASE,
-        )
-        cleaned = re.sub(r"From this unverified background,\s*", "", cleaned, flags=re.IGNORECASE)
-
-        return cleaned.strip()
+        return _clean_for_tts(text)
 
     async def _transcribe_async(self, audio) -> str:
         from router_py.voice import VoicePipeline
@@ -764,7 +397,7 @@ class StreamingVoicePipeline:
             # This is critical - aplay needs enough silence to flush its buffer
             TRAILING_MS = 2000
             trailing_samples = int(self.sample_rate * (TRAILING_MS / 1000.0))
-            trailing_silence = struct.pack(f"<{trailing_samples}h", *([0] * trailing_samples))
+            trailing_silence = struct.pack(f"<{trailing_samples}h", *([0] * trailing_silence))
             # Mark level 0 for trailing silence period
             level_map.append((current_time_ms, 0))
             aplay_proc.stdin.write(trailing_silence)
@@ -905,7 +538,7 @@ class StreamingVoicePipeline:
 
     async def _synthesize_subprocess_to_pcm(self, text: str) -> bytes:
         """Fallback subprocess synthesis."""
-        helper_path = Path(__file__).parent / "streaming_tts_helper.py"
+        helper_path = Path(__file__).resolve().parent.parent / "streaming_tts_helper.py"
         voice_python = _get_ui_v10_python()
 
         pcm_data = b""
@@ -938,32 +571,3 @@ class StreamingVoicePipeline:
             print(f"TTS subprocess error: {e}")
 
         return pcm_data
-
-
-async def main():
-    if len(sys.argv) < 2:
-        print("Usage: streaming_voice.py <audio.wav>")
-        return
-
-    audio_path = Path(sys.argv[1])
-    if not audio_path.exists():
-        print(f"Audio file not found: {audio_path}")
-        return
-
-    pipeline = StreamingVoicePipeline()
-
-    def on_transcript(text):
-        print(f"Transcript: {text}")
-
-    def on_chunk(chunk):
-        print(chunk, end="", flush=True)
-
-    result = await pipeline.stream_voice_interaction(
-        audio_path, on_transcription=on_transcript, on_response_chunk=on_chunk
-    )
-
-    print(f"\n\nSuccess: {result['success']}")
-
-
-if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
