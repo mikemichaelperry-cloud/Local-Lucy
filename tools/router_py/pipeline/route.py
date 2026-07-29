@@ -33,6 +33,7 @@ if str(ROOT_DIR / "tools") not in sys.path:
 
 from router_py.request_types import ClassificationResult, RouterOutcome, RoutingDecision
 from router_py.classify import select_route
+from router_py.escalation.critical_guard import apply_critical_source_policy
 from router_py.policy import normalize_augmentation_policy
 
 logger = logging.getLogger(__name__)

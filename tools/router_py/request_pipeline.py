@@ -199,7 +199,17 @@ def process(
         _profile["provider_resolve_ms"] = int((_time.time() - _t2) * 1000)
 
     # ------------------------------------------------------------------
-    # 4. Evidence-disabled operator gate
+    # 4. Critical-category trusted-source policy
+    # ------------------------------------------------------------------
+    policy_result = critical_guard.apply_critical_source_policy(
+        decision, classification, context
+    )
+    if isinstance(policy_result, RouterOutcome):
+        return policy_result, classification, decision
+    decision = policy_result
+
+    # ------------------------------------------------------------------
+    # 5. Evidence-disabled operator gate
     # ------------------------------------------------------------------
     gate_outcome, decision = route.apply_evidence_disabled_gate(
         decision, classification, start_time
@@ -208,7 +218,7 @@ def process(
         return gate_outcome, classification, decision
 
     # ------------------------------------------------------------------
-    # 5. Build PipelineContext
+    # 6. Build PipelineContext
     # ------------------------------------------------------------------
     _t3 = _time.time()
     pipeline_ctx = build_context.build_pipeline_context(
@@ -218,7 +228,7 @@ def process(
         _profile["context_build_ms"] = int((_time.time() - _t3) * 1000)
 
     # ------------------------------------------------------------------
-    # 6. Execute
+    # 7. Execute
     # ------------------------------------------------------------------
     _t4 = _time.time()
     result = execute.execute_request(
@@ -232,7 +242,7 @@ def process(
         _profile["execute_ms"] = int((_time.time() - _t4) * 1000)
 
     # ------------------------------------------------------------------
-    # 7. Convert ExecutionResult → RouterOutcome
+    # 8. Convert ExecutionResult → RouterOutcome
     # ------------------------------------------------------------------
     router_outcome = outcome.build_outcome(
         result,
@@ -244,7 +254,7 @@ def process(
     )
 
     # ------------------------------------------------------------------
-    # 8. Optional general-knowledge web fetch (conservative expansion)
+    # 9. Optional general-knowledge web fetch (conservative expansion)
     # ------------------------------------------------------------------
     # Only run when the capability flag is enabled, the answer attribution is
     # thin, and the request is not in a critical category. Fetched sources are
