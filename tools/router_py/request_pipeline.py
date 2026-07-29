@@ -170,8 +170,6 @@ def process(
                 question=question,
                 policy=policy,
                 context=context,
-                route_prefix=route_prefix,
-                augmented_direct_once=augmented_direct_once,
             )
             if isinstance(route_result, RouterOutcome):
                 return route_result, classification, None
@@ -180,7 +178,24 @@ def process(
                 _profile["route_ms"] = int((_time.time() - _t1) * 1000)
 
     # ------------------------------------------------------------------
-    # 3. Evidence-disabled operator gate
+    # 3. Normalize decision — applies to router, bypass, and smart-routing
+    #    decisions so route_prefix, augmented_direct_once, provider resolution,
+    #    and request constraints always run unconditionally.
+    # ------------------------------------------------------------------
+    _t2 = _time.time()
+    decision = route.normalize_decision(
+        decision,
+        classification=classification,
+        question=question,
+        context=context,
+        route_prefix=route_prefix,
+        augmented_direct_once=augmented_direct_once,
+    )
+    if _profiling:
+        _profile["provider_resolve_ms"] = int((_time.time() - _t2) * 1000)
+
+    # ------------------------------------------------------------------
+    # 4. Evidence-disabled operator gate
     # ------------------------------------------------------------------
     gate_outcome, decision = route.apply_evidence_disabled_gate(
         decision, classification, start_time
@@ -264,6 +279,7 @@ def process(
     execution_time = int((_time.time() - start_time) * 1000)
     if _profiling:
         _profile["total_ms"] = execution_time
+        _profile["overhead_ms"] = max(0, execution_time - _profile.get("execute_ms", 0))
 
     _meta = dict(result.metadata) if result.metadata else {}
     if _profiling:

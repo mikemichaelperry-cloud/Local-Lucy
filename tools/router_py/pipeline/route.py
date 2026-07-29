@@ -151,28 +151,75 @@ def _apply_request_constraints(
     return decision
 
 
+def normalize_decision(
+    decision: RoutingDecision,
+    *,
+    classification: ClassificationResult,
+    question: str,
+    context: dict[str, Any] | None,
+    route_prefix: str,
+    augmented_direct_once: bool,
+) -> RoutingDecision:
+    """
+    Apply all route-normalization steps to a preliminary decision.
+
+    This runs unconditionally in the facade on every decision, whether it came
+    from the embedding router, an env bypass, or Gemma 4 smart-routing bypass.
+    Normalization steps (in order):
+
+    1. Caller-supplied route prefix override.
+    2. Explicit one-shot ``augmented_direct_once`` override.
+    3. Centralized provider resolution.
+    4. Request-scoped capability constraints.
+
+    Args:
+        decision: Preliminary routing decision.
+        classification: The classified intent.
+        question: The user's query text.
+        context: Extra execution context from caller.
+        route_prefix: Pre-parsed route prefix or empty string.
+        augmented_direct_once: Force augmented route for this query.
+
+    Returns:
+        Normalized ``RoutingDecision``.
+    """
+    # Caller-supplied route prefix takes precedence.
+    decision = _apply_route_prefix_override(decision, route_prefix)
+
+    # Explicit one-shot augmented override.
+    decision = _apply_augmented_direct_once(decision, augmented_direct_once)
+
+    # Centralized provider resolution (single source of truth).
+    decision = provider_resolver.apply_provider(decision, classification, context)
+
+    # Request-scoped capability constraints (override operator settings).
+    decision = _apply_request_constraints(decision, classification, context)
+
+    return decision
+
+
 def select_route_for_question(
     classification: ClassificationResult,
     question: str,
     policy: str,
     context: dict[str, Any] | None,
-    route_prefix: str,
-    augmented_direct_once: bool,
 ) -> RoutingDecision | RouterOutcome:
     """
-    Select and normalize the route for a classified question.
+    Select the raw route for a classified question.
+
+    Normalization (route prefix, augmented_direct_once, provider resolution,
+    request constraints) is intentionally applied by the facade so that bypass
+    decisions receive the same treatment as router-produced decisions.
 
     Args:
         classification: The classified intent.
         question: The user's query text.
         policy: Augmentation policy name (e.g. ``fallback_only``).
         context: Extra execution context from caller.
-        route_prefix: Pre-parsed route prefix or empty string.
-        augmented_direct_once: Force augmented route for this query.
 
     Returns:
-        A ``RoutingDecision`` on success, or a ``RouterOutcome`` when routing
-        itself raises an exception.
+        A raw ``RoutingDecision`` on success, or a ``RouterOutcome`` when
+        routing itself raises an exception.
     """
     import time as _time
 
@@ -202,18 +249,6 @@ def select_route_for_question(
             evidence_reason=classification.evidence_reason,
             policy_reason="routing_failed",
         )
-
-    # Caller-supplied route prefix takes precedence.
-    decision = _apply_route_prefix_override(decision, route_prefix)
-
-    # Explicit one-shot augmented override.
-    decision = _apply_augmented_direct_once(decision, augmented_direct_once)
-
-    # Centralized provider resolution (single source of truth).
-    decision = provider_resolver.apply_provider(decision, classification, context)
-
-    # Request-scoped capability constraints (override operator settings).
-    decision = _apply_request_constraints(decision, classification, context)
 
     return decision
 

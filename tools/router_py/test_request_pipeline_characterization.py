@@ -24,6 +24,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from router_py.request_pipeline import process
+from router_py.request_constraints import RequestConstraints
 from router_py.request_types import ExecutionResult
 
 
@@ -164,6 +165,66 @@ def test_augmented_direct_once():
     assert decision.mode == "AUTO"
     assert decision.policy_reason == "augmented_direct_once"
     assert classification.intent_family == "local_answer"
+
+
+def test_env_bypass_network_constraint_fallback(monkeypatch: Any) -> None:
+    """Env bypass NEWS with network constraint falls back to LOCAL."""
+    monkeypatch.setenv("LUCY_ROUTER_BYPASS", "1")
+    monkeypatch.setenv("LUCY_CHAT_FORCE_MODE", "NEWS")
+    outcome, classification, decision = _run_case(
+        "latest news",
+        context={"request_constraints": RequestConstraints(network=False)},
+    )
+    assert outcome.status == "completed"
+    assert outcome.outcome_code == "answered"
+    assert outcome.route == "LOCAL"
+    assert outcome.provider == "local"
+    assert decision.route == "LOCAL"
+    assert decision.policy_reason == "request_constraint_network_denied"
+
+
+def test_env_bypass_augmented_direct_once(monkeypatch: Any) -> None:
+    """Env bypass LOCAL with augmented_direct_once upgrades to AUGMENTED."""
+    monkeypatch.setenv("LUCY_ROUTER_BYPASS", "1")
+    monkeypatch.setenv("LUCY_CHAT_FORCE_MODE", "LOCAL")
+    outcome, classification, decision = _run_case(
+        "who was ada lovelace",
+        augmented_direct_once=True,
+    )
+    assert outcome.status == "completed"
+    assert outcome.outcome_code == "answered"
+    assert outcome.route == "AUGMENTED"
+    assert decision.route == "AUGMENTED"
+    assert decision.policy_reason == "augmented_direct_once"
+
+
+def test_gemma4_bypass_augmented_direct_once(monkeypatch: Any) -> None:
+    """Gemma 4 smart-routing bypass with augmented_direct_once upgrades to AUGMENTED."""
+    monkeypatch.setenv("LUCY_GEMMA4_SMART_ROUTING", "1")
+    monkeypatch.setenv("LUCY_MODEL", "gemma4")
+    outcome, classification, decision = _run_case(
+        "what is 2+2",
+        augmented_direct_once=True,
+    )
+    assert outcome.status == "completed"
+    assert outcome.outcome_code == "answered"
+    assert outcome.route == "AUGMENTED"
+    assert decision.route == "AUGMENTED"
+    assert decision.policy_reason == "augmented_direct_once"
+    assert classification.intent_family == "general"
+
+
+def test_env_bypass_news_provider_resolution(monkeypatch: Any) -> None:
+    """Forced NEWS bypass receives resolved provider, not the raw 'news' placeholder."""
+    monkeypatch.setenv("LUCY_ROUTER_BYPASS", "1")
+    monkeypatch.setenv("LUCY_CHAT_FORCE_MODE", "NEWS")
+    outcome, classification, decision = _run_case("latest news")
+    assert outcome.status == "completed"
+    assert outcome.outcome_code == "answered"
+    assert outcome.route == "NEWS"
+    assert outcome.provider != "news"
+    assert outcome.provider in {"kimi", "wikipedia", "openai"}
+    assert decision.provider != "news"
 
 
 if __name__ == "__main__":
