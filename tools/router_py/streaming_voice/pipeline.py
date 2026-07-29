@@ -6,7 +6,6 @@ import asyncio
 import os
 import re
 import subprocess
-import sys
 import threading
 import time
 from pathlib import Path
@@ -14,7 +13,7 @@ from typing import AsyncIterator, Optional
 
 from .levels import _analyze_pcm_levels, _get_audio_levels_file, _write_output_level
 from .text import _clean_for_tts, _strip_html_for_tts
-from .worker import KokoroWorkerManager, _detect_kokoro_availability
+from .worker import KokoroWorkerManager, _detect_kokoro_availability, _get_ui_v10_python
 
 
 class StreamingVoicePipeline:
@@ -397,7 +396,7 @@ class StreamingVoicePipeline:
             # This is critical - aplay needs enough silence to flush its buffer
             TRAILING_MS = 2000
             trailing_samples = int(self.sample_rate * (TRAILING_MS / 1000.0))
-            trailing_silence = struct.pack(f"<{trailing_samples}h", *([0] * trailing_silence))
+            trailing_silence = struct.pack(f"<{trailing_samples}h", *([0] * trailing_samples))
             # Mark level 0 for trailing silence period
             level_map.append((current_time_ms, 0))
             aplay_proc.stdin.write(trailing_silence)

@@ -11,7 +11,7 @@ from typing import Optional
 
 def _get_ui_v10_python() -> str:
     """Get path to ui-v10 Python which has Kokoro installed."""
-    root = Path(__file__).resolve().parent.parent.parent.parent.parent
+    root = Path(__file__).resolve().parent.parent.parent.parent
     return str(root / "ui-v10" / ".venv" / "bin" / "python3")
 
 
@@ -46,7 +46,7 @@ class KokoroWorkerManager:
                 self.socket_path.unlink()
 
             # Start worker using ui-v10 Python which has Kokoro installed
-            worker_script = Path(__file__).parent.parent / "voice" / "kokoro_session_worker.py"
+            worker_script = Path(__file__).resolve().parent.parent.parent / "voice" / "kokoro_session_worker.py"
             python_exe = _get_ui_v10_python()
 
             self.process = subprocess.Popen(
