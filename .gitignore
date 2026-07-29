@@ -106,3 +106,4 @@ generate_test_report.py
 # Do not ignore the state Python package under router_py
 !tools/router_py/state/
 !tools/router_py/state/**
+.worktrees/
