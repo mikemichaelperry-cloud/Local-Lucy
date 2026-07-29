@@ -27,6 +27,7 @@ if str(ROOT_DIR) not in sys.path:
 if str(ROOT_DIR / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT_DIR / "tools"))
 
+from router_py.escalation import suggest_escalation
 from router_py.pipeline.attribution import (
     build_source_attribution,
     build_trust_label,
@@ -73,6 +74,9 @@ def build_outcome(
 
     source_attribution = build_source_attribution(decision, result, flags=flags)
     trust_label = build_trust_label(source_attribution) if source_attribution is not None else ""
+    escalation_suggestion = suggest_escalation(
+        classification, decision, source_attribution, flags=flags
+    )
 
     return RouterOutcome(
         status=result.status,
@@ -90,4 +94,5 @@ def build_outcome(
         policy_reason=result.policy_reason or decision.policy_reason,
         source_attribution=source_attribution,
         trust_label=trust_label,
+        escalation_suggestion=escalation_suggestion,
     )
