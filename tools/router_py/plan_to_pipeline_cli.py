@@ -162,7 +162,6 @@ def main() -> int:
         "route_prefix_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
     )
 
-    stage_start = time.perf_counter()
     (
         plan,
         effective_plan,
@@ -173,6 +172,7 @@ def main() -> int:
         knowledge_path,
         local_response_id_hint,
         proven_local_capability,
+        _policy_timings,
     ) = apply_contextual_policies(
         plan=plan,
         effective_plan=effective_plan,
@@ -183,18 +183,12 @@ def main() -> int:
         route_reason_override=route_reason_override,
         outcome_code_override=outcome_code_override,
     )
+    _append_latency("contextual_plan_patch", _policy_timings.get("contextual_plan_patch", 1))
     _append_latency(
-        "contextual_plan_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
+        "local_context_resolution", _policy_timings.get("local_context_resolution", 1)
     )
-    _append_latency(
-        "local_context_resolution", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
-    )
-    _append_latency(
-        "pet_food_policy", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
-    )
-    _append_latency(
-        "local_response_match", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
-    )
+    _append_latency("pet_food_policy", _policy_timings.get("pet_food_policy", 1))
+    _append_latency("local_response_match", _policy_timings.get("local_response_match", 1))
 
     router_input = dict(plan)
     router_input["legacy_plan"] = dict(effective_plan)

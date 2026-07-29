@@ -20,14 +20,11 @@ from pathlib import Path
 from typing import Dict, List
 
 # Ensure tools package is importable when this module is loaded directly.
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+TOOLS_DIR = Path(__file__).resolve().parent.parent.parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
 
-if str(ROOT_DIR / "tools") not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR / "tools"))
-
-from router_py.core.intent_classifier import _legacy_plan_from_classification, classify_question
+from router_py.core.intent_classifier import _legacy_plan_from_classification
 from router_py.core.routing_signals import should_use_israel_news_region
 
 

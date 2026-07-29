@@ -14,16 +14,14 @@ in ``plan_to_pipeline_cli.py``:
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 # Ensure tools package is importable when this module is loaded directly.
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
-if str(ROOT_DIR / "tools") not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR / "tools"))
+TOOLS_DIR = Path(__file__).resolve().parent.parent.parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
 
 from router_py.core.contextual_policy import resolve_contextual_followup
 from router_py.core.local_context_policy import resolve_local_context_response
@@ -96,6 +94,7 @@ def apply_contextual_policies(
     str,
     str,
     bool,
+    Dict[str, int],
 ]:
     """Apply local-context, pet-food, and local-response policies.
 
@@ -113,16 +112,26 @@ def apply_contextual_policies(
         A tuple of
         ``(plan, effective_plan, route_reason_override, outcome_code_override,
            local_response_text, local_response_operator_override, knowledge_path,
-           local_response_id_hint, proven_local_capability)``.
+           local_response_id_hint, proven_local_capability, timings)``.
+        ``timings`` maps stage names to elapsed milliseconds for the four
+        previously-inline timed stages now grouped in this helper.
     """
+
+    def _elapsed_ms(start: float) -> int:
+        return max(1, int(round((time.perf_counter() - start) * 1000)))
+
     local_response_text = None
     local_response_operator_override = ""
     knowledge_path = ""
+    timings: Dict[str, int] = {}
 
+    stage_start = time.perf_counter()
     if contextual_followup_kind == "media_reliability":
         effective_plan = _media_reliability_local_plan()
         plan = _patch_classification_for_effective_plan(plan, effective_plan)
+    timings["contextual_plan_patch"] = _elapsed_ms(stage_start)
 
+    stage_start = time.perf_counter()
     if original_question:
         local_context_resolution = resolve_local_context_response(original_question, root_dir)
         if local_context_resolution:
@@ -137,7 +146,9 @@ def apply_contextual_policies(
                 local_context_resolution.get("operator_override")
                 or "governor_local_context_response"
             )
+    timings["local_context_resolution"] = _elapsed_ms(stage_start)
 
+    stage_start = time.perf_counter()
     if original_question and str(effective_plan.get("intent") or "") == "PET_FOOD":
         pet_food_resolution = resolve_pet_food_policy(root_dir, question_for_execution)
         if pet_food_resolution:
@@ -152,11 +163,14 @@ def apply_contextual_policies(
             else:
                 effective_plan = _pet_food_medical_plan()
                 plan = _patch_classification_for_effective_plan(plan, effective_plan)
+    timings["pet_food_policy"] = _elapsed_ms(stage_start)
 
+    stage_start = time.perf_counter()
     local_response_id_hint = match_local_response_id(
         question_for_execution or original_question,
         str(effective_plan.get("intent") or plan.get("intent") or ""),
     )
+    timings["local_response_match"] = _elapsed_ms(stage_start)
 
     proven_local_capability = bool(
         local_response_text
@@ -175,4 +189,5 @@ def apply_contextual_policies(
         knowledge_path,
         local_response_id_hint or "",
         proven_local_capability,
+        timings,
     )
