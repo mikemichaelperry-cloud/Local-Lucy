@@ -201,8 +201,8 @@ def process(
     # ------------------------------------------------------------------
     # 4. Critical-category trusted-source policy
     # ------------------------------------------------------------------
-    policy_result = critical_guard.apply_critical_source_policy(
-        decision, classification, context
+    policy_result = route.apply_critical_source_policy(
+        decision, classification, context, start_time=start_time
     )
     if isinstance(policy_result, RouterOutcome):
         return policy_result, classification, decision

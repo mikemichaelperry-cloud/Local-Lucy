@@ -11,10 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pytest
 
-from router_py.escalation.critical_guard import (
-    apply_critical_source_policy,
-    is_critical_category,
-)
+from router_py.escalation.critical_guard import is_critical_category
+from router_py.pipeline.route import apply_critical_source_policy
 from router_py.pipeline.config import CapabilityFlags
 from router_py.request_pipeline import process
 from router_py.request_types import ClassificationResult, RouterOutcome, RoutingDecision
@@ -82,7 +80,7 @@ def test_non_critical_query_unchanged():
     flags = _trusted_flags()
     decision = _decision("AUGMENTED", provider="wikipedia")
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(decision, _classification("factual"))
@@ -95,7 +93,7 @@ def test_critical_query_unchanged_when_flag_disabled():
     flags = CapabilityFlags(trusted_sources_only_critical=False)
     decision = _decision("AUGMENTED", provider="wikipedia")
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(decision, _classification("medical"))
@@ -107,7 +105,7 @@ def test_medical_news_converted_to_evidence_with_trusted_provider():
     flags = _trusted_flags()
     decision = _decision("NEWS", provider="news", evidence_reason="news_query")
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(decision, _classification("medical"))
@@ -123,7 +121,7 @@ def test_financial_augmented_restricted_to_trusted():
     flags = _trusted_flags()
     decision = _decision("AUGMENTED", provider="wikipedia")
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(
@@ -142,7 +140,7 @@ def test_medical_evidence_kept_with_trusted_provider():
         "EVIDENCE", provider="kimi", evidence_mode="required", evidence_reason="medical_context"
     )
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(decision, _classification("medical"))
@@ -155,7 +153,7 @@ def test_safety_without_trusted_source_blocked():
     flags = _trusted_flags()
     decision = _decision("AUGMENTED", provider="wikipedia")
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(decision, _classification("safety"))
@@ -168,7 +166,7 @@ def test_identity_without_trusted_source_blocked():
     flags = _trusted_flags()
     decision = _decision("EVIDENCE", provider="kimi", evidence_mode="required")
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(decision, _classification("identity_personal"))
@@ -181,7 +179,7 @@ def test_context_allow_domains_file_set_for_medical():
     decision = _decision("EVIDENCE", provider="kimi", evidence_mode="required")
     context: dict[str, object] = {}
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(
@@ -196,7 +194,7 @@ def test_context_allow_domains_file_set_for_finance():
     decision = _decision("AUGMENTED", provider="wikipedia")
     context: dict[str, object] = {}
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(
@@ -208,12 +206,30 @@ def test_context_allow_domains_file_set_for_finance():
     assert context.get("allow_domains_file").endswith("finance_runtime.txt")
 
 
+def test_pre_trusted_evidence_sets_default_allow_domains_file():
+    """Critical EVIDENCE with provider='trusted' but no category allowlist still gets a trusted file."""
+    flags = _trusted_flags()
+    decision = _decision(
+        "EVIDENCE", provider="trusted", evidence_mode="required"
+    )
+    context: dict[str, object] = {}
+    with patch(
+        "router_py.pipeline.route.load_capability_flags",
+        return_value=flags,
+    ):
+        result = apply_critical_source_policy(
+            decision, _classification("identity_personal"), context
+        )
+    assert isinstance(result, RoutingDecision)
+    assert context.get("allow_domains_file").endswith("allowlist_tier1.txt")
+
+
 def test_local_critical_route_unchanged():
     """LOCAL routes for critical categories should not be blocked or altered."""
     flags = _trusted_flags()
     decision = _decision("LOCAL", provider="local")
     with patch(
-        "router_py.escalation.critical_guard.load_capability_flags",
+        "router_py.pipeline.route.load_capability_flags",
         return_value=flags,
     ):
         result = apply_critical_source_policy(decision, _classification("medical"))
