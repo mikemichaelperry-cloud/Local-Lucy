@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from router_py.pipeline.config import CapabilityFlags, load_capability_flags
+from router_py.pipeline.config import CapabilityFlags
 from router_py.request_types import ExecutionResult, RoutingDecision, SourceAttribution
 
 
@@ -27,28 +27,37 @@ def build_source_attribution(
 
     Rules:
         * route LOCAL + no evidence → basis "local", confidence "medium"
+        * route LOCAL + evidence → basis "local", confidence "high"
         * route AUGMENTED → basis "augmented", confidence "medium"
-        * route EVIDENCE with trusted-domain metadata → basis "evidence",
+        * route EVIDENCE with trusted sources → basis "evidence",
           confidence "high"
         * route NEWS → basis "evidence", confidence "medium"
         * no source metadata → basis "none", confidence "unknown"
+
+    The caller is expected to pass ``CapabilityFlags`` (loaded once by
+    ``request_pipeline.process()``) so this function does not re-read disk
+    config on every outcome build.
     """
-    if flags is None:
-        flags = load_capability_flags()
-    if not flags.source_attribution:
+    if flags is None or not flags.source_attribution:
         return None
 
     metadata: dict[str, Any] = result.metadata or {}
     route = decision.route
     trust_class = metadata.get("trust_class", "")
     sources = _extract_sources(metadata)
+    has_evidence = bool(metadata.get("evidence_fetched") or sources)
 
     if route == "LOCAL":
-        return SourceAttribution(basis="local", sources=sources, confidence="medium")
+        confidence = "high" if has_evidence else "medium"
+        return SourceAttribution(basis="local", sources=sources, confidence=confidence)
 
     if route == "AUGMENTED":
         return SourceAttribution(basis="augmented", sources=sources, confidence="medium")
 
+    # ``trust_class == "trusted"`` is the execution engine's existing signal
+    # that the fetched evidence came from a trusted-domain allowlist (e.g.
+    # bounded medical/veterinary responses).  It is therefore equivalent to
+    # "EVIDENCE with trusted sources" in the brief.
     if route == "EVIDENCE" and trust_class == "trusted":
         return SourceAttribution(basis="evidence", sources=sources, confidence="high")
 

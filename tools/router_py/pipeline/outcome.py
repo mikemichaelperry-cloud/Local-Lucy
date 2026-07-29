@@ -31,6 +31,7 @@ from router_py.pipeline.attribution import (
     build_source_attribution,
     build_trust_label,
 )
+from router_py.pipeline.config import CapabilityFlags
 from router_py.request_types import (
     ClassificationResult,
     ExecutionResult,
@@ -45,6 +46,7 @@ def build_outcome(
     decision: RoutingDecision,
     start_time: float,
     profile: dict[str, int] | None,
+    flags: CapabilityFlags | None = None,
 ) -> RouterOutcome:
     """
     Convert an ``ExecutionResult`` into a ``RouterOutcome``.
@@ -69,7 +71,7 @@ def build_outcome(
     if profile is not None:
         metadata["latency_profile"] = profile
 
-    source_attribution = build_source_attribution(decision, result)
+    source_attribution = build_source_attribution(decision, result, flags=flags)
     trust_label = build_trust_label(source_attribution) if source_attribution is not None else ""
 
     return RouterOutcome(

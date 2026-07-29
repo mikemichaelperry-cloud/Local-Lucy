@@ -58,14 +58,21 @@ def test_local_no_evidence_is_local_medium():
     assert attribution == SourceAttribution(basis="local", sources=[], confidence="medium")
 
 
-def test_local_with_evidence_is_still_local():
-    """LOCAL route should be reported as local even if evidence metadata exists."""
+def test_local_with_evidence_is_local_high():
+    """LOCAL route with evidence metadata is still local but higher confidence."""
     flags = CapabilityFlags(source_attribution=True)
     decision = _decision("LOCAL")
     result = _result("LOCAL", metadata={"evidence_fetched": True, "trust_class": "unverified"})
     attribution = build_source_attribution(decision, result, flags=flags)
     assert attribution.basis == "local"
-    assert attribution.confidence == "medium"
+    assert attribution.confidence == "high"
+
+
+def test_no_flags_returns_none_without_disk_load():
+    """When flags are not provided the feature is treated as off."""
+    decision = _decision("LOCAL")
+    result = _result("LOCAL")
+    assert build_source_attribution(decision, result) is None
 
 
 def test_augmented_is_augmented_medium():
@@ -77,6 +84,7 @@ def test_augmented_is_augmented_medium():
 
 
 def test_evidence_trusted_is_evidence_high():
+    """trust_class == "trusted" is the engine's signal for trusted-domain sources."""
     flags = CapabilityFlags(source_attribution=True)
     decision = _decision("EVIDENCE", evidence_reason="medical")
     result = _result(

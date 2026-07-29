@@ -58,6 +58,7 @@ from router_py.pipeline import resolve_provider
 from router_py.pipeline import build_context
 from router_py.pipeline import execute
 from router_py.pipeline import outcome
+from router_py.pipeline.config import load_capability_flags
 from router_py.policy import normalize_augmentation_policy
 
 # Re-export for tests/code that patch the pipeline's classifier reference.
@@ -127,6 +128,10 @@ def process(
     _profiling = os.environ.get("LUCY_LATENCY_PROFILE", "").lower() in {"1", "true", "yes"}
     _profile: dict[str, int] = {}
     start_time = _time.time()
+
+    # Load capability flags once per request; attribution/escalation logic
+    # reads this instead of re-loading config from disk.
+    _capability_flags = load_capability_flags()
 
     # ------------------------------------------------------------------
     # 0. Environment bypass (LUCY_ROUTER_BYPASS / LUCY_CHAT_FORCE_MODE)
@@ -227,5 +232,10 @@ def process(
     # 7. Convert ExecutionResult → RouterOutcome
     # ------------------------------------------------------------------
     return outcome.build_outcome(
-        result, classification, decision, start_time, _profile if _profiling else None
+        result,
+        classification,
+        decision,
+        start_time,
+        _profile if _profiling else None,
+        flags=_capability_flags,
     ), classification, decision
