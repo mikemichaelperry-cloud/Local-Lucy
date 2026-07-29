@@ -15,7 +15,7 @@ Migration plan:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Literal
 
 from router_py.request_constraints import RequestConstraints
@@ -194,6 +194,15 @@ class ExecutionResult:
 
 
 @dataclass(frozen=True)
+class SourceAttribution:
+    """Provenance metadata describing how an answer was sourced."""
+
+    basis: str = "none"  # local, augmented, evidence, web_untrusted, none
+    sources: list[str] = field(default_factory=list)
+    confidence: str = "unknown"  # high, medium, low, unknown
+
+
+@dataclass(frozen=True)
 class RouterOutcome:
     """Structured outcome from the full pipeline (Stage 4: outcome)."""
 
@@ -215,6 +224,11 @@ class RouterOutcome:
     evidence_reason: str = ""
     policy_reason: str = ""
 
+    # Source attribution and trust signals for pipeline escalation decisions
+    source_attribution: SourceAttribution | None = None
+    trust_label: str = ""  # e.g. "verified", "untrusted", "local_only"
+    escalation_suggestion: str = ""  # e.g. "Enable web search for more current sources."
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
@@ -230,6 +244,13 @@ class RouterOutcome:
             "request_id": self.request_id,
             "evidence_reason": self.evidence_reason,
             "policy_reason": self.policy_reason,
+            "source_attribution": (
+                asdict(self.source_attribution)
+                if self.source_attribution is not None
+                else None
+            ),
+            "trust_label": self.trust_label,
+            "escalation_suggestion": self.escalation_suggestion,
         }
 
     def with_execution_time(self, ms: int) -> RouterOutcome:
@@ -249,6 +270,9 @@ class RouterOutcome:
             metadata=dict(self.metadata),
             evidence_reason=self.evidence_reason,
             policy_reason=self.policy_reason,
+            source_attribution=self.source_attribution,
+            trust_label=self.trust_label,
+            escalation_suggestion=self.escalation_suggestion,
         )
 
     def with_request_id(self, request_id: str) -> RouterOutcome:
@@ -268,6 +292,9 @@ class RouterOutcome:
             metadata=dict(self.metadata),
             evidence_reason=self.evidence_reason,
             policy_reason=self.policy_reason,
+            source_attribution=self.source_attribution,
+            trust_label=self.trust_label,
+            escalation_suggestion=self.escalation_suggestion,
         )
 
 
