@@ -34,13 +34,33 @@ os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 logger = logging.getLogger(__name__)
 
 from .config import (
+    ANSWERABILITY_PENALTY,
+    CURRENT_MARKERS,
+    ENTITY_COLLISION_PENALTY,
     EVIDENCE_CROSS_ENCODER,
     EVIDENCE_THRESHOLD,
     MEMORY_BI_ENCODER,
     MEMORY_THRESHOLD,
+    STALE_DAYS,
+    TEMPORAL_PENALTY,
+    TRUSTED_PROVENANCES,
 )
 from .evidence import is_evidence_relevant, score_evidence_relevance
 from .memory import filter_memory_context, score_memory_relevance
+
+# Backward-compatible aliases for the private constants that the original
+# monolithic context_guard module exposed. Split callers that reached for
+# these underscore-prefixed names can continue to do so.
+_EVIDENCE_THRESHOLD = EVIDENCE_THRESHOLD
+_MEMORY_THRESHOLD = MEMORY_THRESHOLD
+_EVIDENCE_CROSS_ENCODER = EVIDENCE_CROSS_ENCODER
+_MEMORY_BI_ENCODER = MEMORY_BI_ENCODER
+_CURRENT_MARKERS = CURRENT_MARKERS
+_STALE_DAYS = STALE_DAYS
+_ANSWERABILITY_PENALTY = ANSWERABILITY_PENALTY
+_ENTITY_COLLISION_PENALTY = ENTITY_COLLISION_PENALTY
+_TEMPORAL_PENALTY = TEMPORAL_PENALTY
+_TRUSTED_PROVENANCES = TRUSTED_PROVENANCES
 
 # Lazy-loaded singletons. A truthy value means "loaded", False means
 # "tried and failed" so we don't retry on every call.
