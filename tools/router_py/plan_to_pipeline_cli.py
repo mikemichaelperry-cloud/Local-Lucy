@@ -5,16 +5,18 @@ Behavior in this module is frozen except for demonstrated defect fixes.
 New heuristics require targeted test coverage first.
 Authority boundaries must not be weakened, and semantic-interpreter routing
 authority must not be expanded casually.
+
+This module is now a thin facade: plan construction, policy resolution, and
+news-query rewriting live in ``router_py.planner`` submodules.
 """
 
 import argparse
 import json
 import os
-import re
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 
 MODULE_IMPORT_START = time.perf_counter()
 
@@ -24,17 +26,25 @@ TOOLS_DIR = THIS_DIR.parent.parent / "tools"
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from router_py.core.contextual_policy import resolve_contextual_followup
-from router_py.core.intent_classifier import _legacy_plan_from_classification, classify_question
-from router_py.core.local_context_policy import resolve_local_context_response
-from router_py.core.local_policy import match_local_response_id
+from router_py.core.intent_classifier import classify_question
 from router_py.core.medical_query_heuristics import detect_human_medication_query
-from router_py.core.pet_food_policy import resolve_pet_food_policy
 from router_py.core.policy_router import route_intent
 from router_py.core.route_manifest import build_route_manifest
-from router_py.core.routing_signals import should_use_israel_news_region
 from router_py.core.runtime_governor import build_execution_contract
 from router_py.core.semantic_interpreter import maybe_interpret_question
+
+from router_py.planner.news_rewriter import rewrite_news_query
+from router_py.planner.plan_builder import (
+    _apply_semantic_interpretation,
+    _json_array,
+    _legacy_plan,
+    _semantic_trace,
+    build_effective_plan,
+)
+from router_py.planner.policy_resolver import (
+    apply_contextual_policies,
+    resolve_contextual_followup_for_question,
+)
 
 
 def _append_latency(stage: str, ms: int, component: str = "plan_to_pipeline") -> None:
@@ -52,366 +62,11 @@ def _append_latency(stage: str, ms: int, component: str = "plan_to_pipeline") ->
         return
 
 
-def _legacy_plan(plan: Dict[str, object]) -> Dict[str, object]:
-    legacy = plan.get("legacy_plan")
-    if isinstance(legacy, dict):
-        return dict(legacy)
-    return {
-        "intent": plan.get("intent"),
-        "category": plan.get("category"),
-        "needs_web": plan.get("needs_web"),
-        "needs_citations": plan.get("needs_citations"),
-        "min_sources": plan.get("min_sources"),
-        "output_mode": plan.get("output_mode"),
-        "prefer_domains": plan.get("prefer_domains"),
-        "allow_domains_file": plan.get("allow_domains_file"),
-        "region_filter": plan.get("region_filter"),
-        "one_clarifying_question": plan.get("one_clarifying_question"),
-        "confidence_policy": plan.get("confidence_policy"),
-    }
-
-
 def _root_dir() -> str:
     override = (os.environ.get(AUTHORITY_ROOT_ENV) or "").strip()
     if override:
         return str(Path(override).expanduser().resolve())
     return str(THIS_DIR.parent.parent)
-
-
-def _has_re(text: str, pattern: str) -> bool:
-    return re.search(pattern, text or "", flags=re.IGNORECASE) is not None
-
-
-def _rewrite_news_query(question: str) -> str:
-    rewritten = (question or "").strip()
-    if not rewritten or _has_re(rewritten, r"\b(news|headline|headlines|breaking)\b"):
-        return rewritten
-    if _has_re(rewritten, r"\bwhat happened in\b"):
-        rewritten = re.sub(
-            r"(?i)\bwhat happened in\b",
-            "What are the latest news and developments in",
-            rewritten,
-            count=1,
-        )
-    elif _has_re(rewritten, r"\blatest developments?\b"):
-        rewritten = re.sub(
-            r"(?i)\blatest developments?\b", "latest news and developments", rewritten, count=1
-        )
-    elif _has_re(rewritten, r"\b(most significant|major|key)\s+developments?\b"):
-        rewritten = re.sub(
-            r"(?i)\b(most significant|major|key)\s+developments?\b",
-            "latest news and developments",
-            rewritten,
-            count=1,
-        )
-    elif _has_re(rewritten, r"\blatest on\b"):
-        rewritten = re.sub(
-            r"(?i)\blatest on\b", "the latest news and developments on", rewritten, count=1
-        )
-    elif _has_re(rewritten, r"\b(today|latest|recent|right now|now)\b"):
-        rewritten = rewritten.rstrip("?.! ")
-        rewritten = f"{rewritten}. Focus on the latest news and developments."
-    else:
-        topic = rewritten.rstrip("?.! ")
-        topic = re.sub(r"(?i)^\s*what\s+(?:are|is)\s+", "", topic).strip()
-        topic = re.sub(r"(?i)^\s*(?:tell me|give me|summarize|update me on)\s+", "", topic).strip()
-        if not topic:
-            topic = rewritten.rstrip("?.! ")
-        rewritten = f"What are the latest news and developments about {topic}?"
-    if _has_re(rewritten, r"^what\b") and not rewritten.endswith("?"):
-        rewritten = f"{rewritten}?"
-    return rewritten
-
-
-def _news_region_filter_for_question(question: str) -> str:
-    if should_use_israel_news_region(question or ""):
-        return "IL"
-    return ""
-
-
-def _pet_food_medical_plan() -> Dict[str, object]:
-    return {
-        "intent": "MEDICAL_INFO",
-        "category": "medical",
-        "needs_web": True,
-        "needs_citations": True,
-        "min_sources": 2,
-        "output_mode": "VALIDATED",
-        "prefer_domains": [],
-        "allow_domains_file": "config/trust/generated/vet_runtime.txt",
-        "region_filter": None,
-        "one_clarifying_question": None,
-        "confidence_policy": "high_stakes",
-    }
-
-
-def _media_reliability_local_plan() -> Dict[str, object]:
-    return {
-        "intent": "LOCAL_KNOWLEDGE",
-        "category": "general",
-        "needs_web": False,
-        "needs_citations": False,
-        "min_sources": 1,
-        "output_mode": "CHAT",
-        "prefer_domains": [],
-        "allow_domains_file": None,
-        "region_filter": None,
-        "one_clarifying_question": None,
-        "confidence_policy": "normal",
-    }
-
-
-def _patch_classification_for_effective_plan(
-    plan: Dict[str, object], effective_plan: Dict[str, object]
-) -> Dict[str, object]:
-    patched = dict(plan)
-    patched["legacy_plan"] = dict(effective_plan)
-    patched["intent"] = effective_plan.get("intent")
-    patched["category"] = effective_plan.get("category")
-    patched["needs_web"] = effective_plan.get("needs_web")
-    patched["needs_citations"] = effective_plan.get("needs_citations")
-    patched["min_sources"] = effective_plan.get("min_sources")
-    patched["output_mode"] = effective_plan.get("output_mode")
-    patched["prefer_domains"] = effective_plan.get("prefer_domains")
-    patched["allow_domains_file"] = effective_plan.get("allow_domains_file")
-    patched["region_filter"] = effective_plan.get("region_filter")
-    patched["one_clarifying_question"] = effective_plan.get("one_clarifying_question")
-    patched["confidence_policy"] = effective_plan.get("confidence_policy")
-    if effective_plan.get("intent") == "LOCAL_KNOWLEDGE":
-        patched["intent_class"] = "local_knowledge"
-        patched["needs_current_info"] = False
-        patched["needs_clarification"] = False
-        patched["clarification_question"] = None
-        patched["mixed_intent"] = False
-        routing_signals = dict(patched.get("routing_signals") or {})
-        for signal_name in (
-            "temporal",
-            "news",
-            "source_request",
-            "url",
-            "current_product_recommendation",
-            "ambiguity_followup",
-        ):
-            routing_signals[signal_name] = False
-        patched["routing_signals"] = routing_signals
-    if effective_plan.get("intent") == "MEDICAL_INFO":
-        patched["intent_class"] = "evidence_check"
-        patched["needs_clarification"] = False
-        patched["clarification_question"] = None
-        patched["mixed_intent"] = False
-        patched["needs_current_info"] = bool(patched.get("needs_current_info"))
-        patched["confidence"] = max(float(patched.get("confidence") or 0.0), 0.9)
-    return patched
-
-
-def _json_array(values: List[str]) -> str:
-    return json.dumps(values, separators=(",", ":"))
-
-
-def _semantic_trace(question: str) -> Dict[str, object]:
-    return {
-        "original_query": question,
-        "resolved_execution_query": question,
-        "interpreter_fired": False,
-        "inferred_domain": "unknown",
-        "inferred_intent_family": "unknown",
-        "normalized_candidates": [],
-        "retrieval_candidates": [],
-        "ambiguity_flag": False,
-        "confidence": 0.0,
-        "provenance_notes": [],
-        "use_reason": "not_invoked",
-        "used_for_routing": False,
-        "forward_candidates": False,
-        "selected_normalized_query": question,
-        "selected_retrieval_query": "",
-    }
-
-
-def _medical_detector_trace(question: str) -> Dict[str, object]:
-    return {
-        "detector_fired": False,
-        "original_query": question,
-        "resolved_execution_query": question,
-        "normalized_query": "",
-        "detection_source": "not_detected",
-        "pattern_family": "",
-        "candidate_medication": "",
-        "normalized_candidate": "",
-        "confidence": "none",
-        "confidence_score": 0.0,
-        "provenance_notes": [],
-    }
-
-
-def _patch_plan_with_classification(
-    plan: Dict[str, object],
-    intent_class: str,
-    subcategory: str,
-    confidence: float,
-    candidate_routes: List[str],
-    *,
-    needs_current_info: bool = False,
-    needs_clarification: bool = False,
-    clarification_question: str = "",
-    style_mode: str = "informational",
-    mixed_intent: bool = False,
-    region_filter: str = "",
-) -> Dict[str, object]:
-    classification = {
-        "intent_class": intent_class,
-        "confidence": round(max(0.0, min(1.0, confidence)), 2),
-        "needs_current_info": bool(needs_current_info),
-        "needs_personal_context": False,
-        "style_mode": style_mode,
-        "mixed_intent": mixed_intent,
-        "candidate_routes": candidate_routes,
-        "needs_clarification": needs_clarification,
-        "clarification_question": clarification_question or None,
-        "subcategory": subcategory,
-        "identity_variant": "",
-    }
-    if region_filter:
-        classification["region_filter"] = region_filter
-    patched = dict(plan)
-    patched.update(classification)
-    legacy_plan = _legacy_plan_from_classification(classification, patched)
-    patched["legacy_plan"] = legacy_plan
-    patched.update(legacy_plan)
-    return patched
-
-
-def _semantic_use_allowed(plan: Dict[str, object], semantic_trace: Dict[str, object]) -> bool:
-    if not semantic_trace.get("interpreter_fired"):
-        return False
-    if (
-        semantic_trace.get("ambiguity_flag")
-        and float(semantic_trace.get("confidence") or 0.0) < 0.7
-    ):
-        return False
-    try:
-        semantic_confidence = float(semantic_trace.get("confidence") or 0.0)
-    except (TypeError, ValueError):
-        semantic_confidence = 0.0
-    if semantic_confidence < 0.78:
-        return False
-    intent_class = str(plan.get("intent_class") or "").strip().lower()
-    subcategory = str(plan.get("subcategory") or "").strip().lower()
-    if intent_class == "technical_explanation" and float(plan.get("confidence") or 0.0) >= 0.86:
-        return False
-    if intent_class == "evidence_check" and subcategory in {
-        "medical",
-        "url_reference",
-        "primary_doc",
-    }:
-        return False
-    if intent_class == "current_fact" and subcategory.startswith("news"):
-        return False
-    return True
-
-
-def _apply_semantic_interpretation(
-    plan: Dict[str, object],
-    question: str,
-    semantic_trace: Dict[str, object],
-) -> Dict[str, object]:
-    if not _semantic_use_allowed(plan, semantic_trace):
-        return plan
-
-    intent_class = str(plan.get("intent_class") or "").strip().lower()
-    inferred_domain = str(semantic_trace.get("inferred_domain") or "unknown").strip().lower()
-    inferred_intent_family = (
-        str(semantic_trace.get("inferred_intent_family") or "unknown").strip().lower()
-    )
-    confidence = max(
-        float(plan.get("confidence") or 0.0), float(semantic_trace.get("confidence") or 0.0)
-    )
-    question_lower = (question or "").strip().lower()
-
-    if inferred_intent_family == "url_reference":
-        semantic_trace["used_for_routing"] = True
-        semantic_trace["use_reason"] = "upgrade_to_url_reference"
-        return _patch_plan_with_classification(
-            plan,
-            "evidence_check",
-            "url_reference",
-            confidence,
-            ["EVIDENCE"],
-        )
-
-    if inferred_domain == "medical" or (
-        inferred_intent_family == "evidence_check"
-        and re.search(r"\b(medical|medication|drug|blood pressure|hypertension)\b", question_lower)
-    ):
-        semantic_trace["used_for_routing"] = True
-        semantic_trace["use_reason"] = "upgrade_to_medical_evidence"
-        return _patch_plan_with_classification(
-            plan,
-            "evidence_check",
-            "medical",
-            max(confidence, 0.9),
-            ["EVIDENCE"],
-        )
-
-    if inferred_domain == "travel":
-        semantic_trace["used_for_routing"] = True
-        semantic_trace["use_reason"] = "upgrade_to_travel_evidence"
-        return _patch_plan_with_classification(
-            plan,
-            "evidence_check",
-            "travel_advisory",
-            confidence,
-            ["EVIDENCE"],
-            needs_current_info=True,
-        )
-
-    if inferred_domain == "news" or inferred_intent_family == "current_fact":
-        region_filter = _news_region_filter_for_question(question_lower)
-        subcategory = "news_israel" if region_filter == "IL" else "news_world"
-        semantic_trace["used_for_routing"] = True
-        semantic_trace["use_reason"] = "upgrade_to_news"
-        return _patch_plan_with_classification(
-            plan,
-            "current_fact",
-            subcategory,
-            max(confidence, 0.86),
-            ["NEWS", "EVIDENCE"],
-            needs_current_info=True,
-            style_mode="brief",
-            region_filter=region_filter,
-        )
-
-    if inferred_intent_family == "technical_explanation":
-        semantic_trace["used_for_routing"] = True
-        semantic_trace["use_reason"] = "upgrade_to_technical_local"
-        return _patch_plan_with_classification(
-            plan,
-            "technical_explanation",
-            "technical_explanation",
-            max(confidence, 0.82),
-            ["LOCAL"],
-            style_mode="technical",
-        )
-
-    if inferred_intent_family == "clarify" or (
-        semantic_trace.get("ambiguity_flag")
-        and float(semantic_trace.get("confidence") or 0.0) < 0.82
-        and intent_class in {"mixed", "local_knowledge"}
-    ):
-        semantic_trace["used_for_routing"] = True
-        semantic_trace["use_reason"] = "prefer_clarify_over_speculation"
-        return _patch_plan_with_classification(
-            plan,
-            "mixed",
-            "ambiguous_interpretation",
-            min(float(semantic_trace.get("confidence") or 0.0), 0.6),
-            ["CLARIFY", "EVIDENCE", "LOCAL"],
-            needs_clarification=True,
-            clarification_question="What specific topic do you want me to continue with?",
-            mixed_intent=True,
-        )
-
-    return plan
 
 
 def main() -> int:
@@ -459,7 +114,7 @@ def main() -> int:
 
     stage_start = time.perf_counter()
     if not route_prefix:
-        followup = resolve_contextual_followup(original_question, root_dir)
+        followup = resolve_contextual_followup_for_question(original_question, root_dir)
         if followup:
             question_for_execution = str(followup.get("resolved_question") or original_question)
             route_reason_override = str(followup.get("route_reason_override") or "")
@@ -500,81 +155,45 @@ def main() -> int:
     )
 
     base_plan = _legacy_plan(plan)
-    effective_plan = dict(base_plan)
+
     stage_start = time.perf_counter()
-    if route_prefix == "news":
-        effective_plan["intent"] = "WEB_NEWS"
-        effective_plan["needs_web"] = True
-        effective_plan["min_sources"] = max(1, int(base_plan.get("min_sources", 2) or 2))
-        effective_plan["output_mode"] = "LIGHT_EVIDENCE"
-    elif route_prefix == "local" and str(base_plan.get("intent") or "") != "MEDICAL_INFO":
-        effective_plan["intent"] = "LOCAL_KNOWLEDGE"
-        effective_plan["needs_web"] = False
-        effective_plan["min_sources"] = 1
-        effective_plan["output_mode"] = "CHAT"
+    effective_plan = build_effective_plan(plan, route_prefix)
     _append_latency(
         "route_prefix_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
     )
 
     stage_start = time.perf_counter()
-    if contextual_followup_kind == "media_reliability":
-        effective_plan = _media_reliability_local_plan()
-        plan = _patch_classification_for_effective_plan(plan, effective_plan)
+    (
+        plan,
+        effective_plan,
+        route_reason_override,
+        outcome_code_override,
+        local_response_text,
+        local_response_operator_override,
+        knowledge_path,
+        local_response_id_hint,
+        proven_local_capability,
+    ) = apply_contextual_policies(
+        plan=plan,
+        effective_plan=effective_plan,
+        original_question=original_question,
+        question_for_execution=question_for_execution,
+        root_dir=root_dir,
+        contextual_followup_kind=contextual_followup_kind,
+        route_reason_override=route_reason_override,
+        outcome_code_override=outcome_code_override,
+    )
     _append_latency(
         "contextual_plan_patch", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
     )
-
-    stage_start = time.perf_counter()
-    if original_question and not local_response_text:
-        local_context_resolution = resolve_local_context_response(original_question, root_dir)
-        if local_context_resolution:
-            route_reason_override = str(
-                local_context_resolution.get("route_reason_override") or route_reason_override
-            )
-            outcome_code_override = str(
-                local_context_resolution.get("outcome_code_override") or outcome_code_override
-            )
-            local_response_text = str(local_context_resolution.get("local_response_text") or "")
-            local_response_operator_override = str(
-                local_context_resolution.get("operator_override")
-                or "governor_local_context_response"
-            )
     _append_latency(
         "local_context_resolution", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
     )
-
-    stage_start = time.perf_counter()
-    if original_question and str(effective_plan.get("intent") or "") == "PET_FOOD":
-        pet_food_resolution = resolve_pet_food_policy(root_dir, question_for_execution)
-        if pet_food_resolution:
-            knowledge_path = str(pet_food_resolution.get("knowledge_path") or "")
-            route_reason_override = str(
-                pet_food_resolution.get("route_reason_override") or route_reason_override
-            )
-            outcome_code_override = str(pet_food_resolution.get("outcome_code_override") or "")
-            if pet_food_resolution.get("matched"):
-                local_response_text = str(pet_food_resolution.get("local_response_text") or "")
-                local_response_operator_override = "governor_pet_food_knowledge"
-            else:
-                effective_plan = _pet_food_medical_plan()
-                plan = _patch_classification_for_effective_plan(plan, effective_plan)
     _append_latency(
         "pet_food_policy", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
     )
-
-    stage_start = time.perf_counter()
-    local_response_id_hint = match_local_response_id(
-        question_for_execution or original_question,
-        str(effective_plan.get("intent") or plan.get("intent") or ""),
-    )
     _append_latency(
         "local_response_match", max(1, int(round((time.perf_counter() - stage_start) * 1000)))
-    )
-    proven_local_capability = bool(
-        local_response_text
-        or local_response_id_hint
-        or str(plan.get("intent_class") or "").strip().lower()
-        in {"conversational", "identity_personal"}
     )
 
     router_input = dict(plan)
@@ -607,7 +226,7 @@ def main() -> int:
     )
     semantic_trace["forward_candidates"] = semantic_forward_candidates
     if str(route_decision.get("route_mode") or "").upper() == "NEWS":
-        rewritten_news_question = _rewrite_news_query(question_for_execution)
+        rewritten_news_question = rewrite_news_query(question_for_execution)
         if rewritten_news_question and rewritten_news_question != question_for_execution:
             question_for_execution = rewritten_news_question
             route_reason_override = route_reason_override or "governor_news_query_rewrite"
