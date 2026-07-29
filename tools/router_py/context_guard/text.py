@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from .config import KEYWORD_RE, PLACE_TAIL_RE, STOP_WORDS
 
@@ -20,7 +19,7 @@ def extract_keywords(text: str) -> set[str]:
     return keywords
 
 
-def extract_place_tail(text: str) -> Optional[str]:
+def extract_place_tail(text: str) -> str | None:
     match = PLACE_TAIL_RE.search(text)
     if not match:
         return None

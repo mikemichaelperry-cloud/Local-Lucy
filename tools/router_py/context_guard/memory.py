@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
-
 from .config import MEMORY_THRESHOLD
 from .text import contains_tail, extract_keywords, extract_place_tail, normalize
 
@@ -73,7 +71,7 @@ def filter_memory_context(
     question: str,
     memory_text: str,
     threshold: float = MEMORY_THRESHOLD,
-    request_id: Optional[str] = None,
+    request_id: str | None = None,
 ) -> str:
     """Return only memory turns plausibly relevant to *question*.
 

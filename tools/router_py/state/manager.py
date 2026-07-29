@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional
 
-from router_py.state import queries, schema
+from . import queries, schema
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,6 @@ class StateManager:
             ...     conn.execute("INSERT ...")
         """
         conn = self._get_connection()
-        cursor = conn.cursor()
         try:
             yield conn
             conn.commit()
