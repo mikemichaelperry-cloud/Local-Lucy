@@ -59,7 +59,7 @@ def test_gemma4_bypass_skips_classifier_for_general_query():
         "LUCY_GEMMA4_SMART_ROUTING": "on",
     }
     with patch.dict(os.environ, env, clear=True):
-        with patch("router_py.request_pipeline.classify_intent") as mock_classify:
+        with patch("router_py.pipeline.classify.classify_intent") as mock_classify:
             process("what is 2+2")
             mock_classify.assert_not_called()
 
@@ -92,7 +92,7 @@ def test_non_gemma_model_runs_classifier():
         "LUCY_GEMMA4_SMART_ROUTING": "on",
     }
     with patch.dict(os.environ, env, clear=True):
-        with patch("router_py.request_pipeline.classify_intent") as mock_classify:
+        with patch("router_py.pipeline.classify.classify_intent") as mock_classify:
             mock_classify.return_value.type = "general"
             process("what is 2+2")
             mock_classify.assert_called_once()
@@ -119,7 +119,7 @@ def test_gemma4_bypass_yields_to_self_analysis_mode(tmp_path, monkeypatch):
     with patch.dict(os.environ, env, clear=True):
         with patch("router_py.execution_engine.ROOT_DIR", tmp_path):
             with patch("router_py.request_pipeline._gemma4_bypass_decision") as mock_bypass:
-                with patch("router_py.request_pipeline.classify_intent") as mock_classify:
+                with patch("router_py.pipeline.classify.classify_intent") as mock_classify:
                     with patch(
                         "router_py.request_pipeline.ExecutionEngine.execute_self_analysis"
                     ) as mock_execute:
