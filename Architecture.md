@@ -83,8 +83,6 @@ lucy-v11/
 │   └── pending_review.jsonl
 ├── tools/router_py/           # Core execution engine (Python-native)
 │   ├── main.py
-│   ├── request_pipeline.py
-│   ├── main.py
 │   ├── request_pipeline.py    # thin orchestration facade → pipeline/
 │   ├── pipeline/              # classify → route → resolve → execute → outcome
 │   ├── classify.py            # thin facade → classify_core/
@@ -159,15 +157,10 @@ Each split preserves the original import path via a thin `__init__.py` facade or
 
 ## 4. Request Pipeline
 
-1. **Ingest** — `main.run(query, attachments, session_id, overrides)`
-2. **Feedback detection** — Corrections and thumbs-up/down short-circuit to the feedback buffer / background learner.
-3. **Gemma 4 smart-routing bypass (optional)** — If `gemma4_smart_routing` is enabled and the active model is `local-lucy-gemma4` (or any `gemma4:*` tag), ordinary queries short-circuit to `LOCAL` without running `classify_intent()` or `select_route()`. Explicit route prefixes and existing news/evidence pattern fast paths still win.
-4. **Classify & route** — `classify.classify_intent()` + `select_route()` produce a `RoutingDecision`.
-5. **Resolve provider** — `provider_resolver` maps the route to a concrete provider plan.
-6. **Execute** — `execution_engine` runs the plan in a sandboxed Python namespace.
-7. **Guard context** — `context_guard` filters evidence and memory for relevance.
-8. **Generate answer** — `local_answer` streams the final response from Ollama (or formats external provider output).
-9. **Persist** — Turn is written to SQLite; feedback/state files are updated.
+The request pipeline has two layers:
+
+- **`main.run()` wrapper** handles ingest, feedback detection, and the optional Gemma 4 smart-routing bypass, then calls `request_pipeline.process()`.
+- **`request_pipeline.process()`** runs the canonical 10-stage flow described in §4.1.
 
 ### 4.1 Pipeline Facade (`tools/router_py/request_pipeline.py`)
 
