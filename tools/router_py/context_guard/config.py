@@ -1,0 +1,150 @@
+"""Configuration constants for the context relevance guard."""
+
+from __future__ import annotations
+
+import re
+
+# Relevance thresholds
+EVIDENCE_THRESHOLD = 0.50
+MEMORY_THRESHOLD = 0.30
+
+# Semantic model names
+EVIDENCE_CROSS_ENCODER = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+MEMORY_BI_ENCODER = "sentence-transformers/all-MiniLM-L6-v2"
+
+# Hardening constants
+CURRENT_MARKERS = {"current", "latest", "now", "today", "price"}
+STALE_DAYS = 30
+ANSWERABILITY_PENALTY = 0.1
+ENTITY_COLLISION_PENALTY = 0.5
+TEMPORAL_PENALTY = 0.7
+
+# Provenance labels ordered from most to least trustworthy for evidence.
+TRUSTED_PROVENANCES = {"wikipedia", "medical", "finance", "weather", "news"}
+
+STOP_WORDS = {
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "must",
+    "shall",
+    "can",
+    "need",
+    "used",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "by",
+    "for",
+    "with",
+    "about",
+    "from",
+    "up",
+    "down",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "any",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "no",
+    "nor",
+    "not",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "just",
+    "now",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "whose",
+    "this",
+    "that",
+    "these",
+    "those",
+    "i",
+    "you",
+    "he",
+    "she",
+    "it",
+    "we",
+    "they",
+    "me",
+    "him",
+    "her",
+    "us",
+    "them",
+    "my",
+    "your",
+    "his",
+    "its",
+    "our",
+    "their",
+    "and",
+    "but",
+    "or",
+    "yet",
+    "so",
+    "if",
+    "because",
+    "although",
+    "though",
+    "while",
+    "whereas",
+    "main",
+    "popular",
+    "famous",
+    "best",
+    "top",
+    "list",
+    "tell",
+    "give",
+}
+
+KEYWORD_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9]*")
+PLACE_TAIL_RE = re.compile(r"\b(?:in|of)\s+([A-Za-z][A-Za-z\s]*?)\s*(?:[?.!])?\s*$")
