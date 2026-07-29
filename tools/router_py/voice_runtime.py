@@ -20,10 +20,9 @@ from typing import Optional
 # Add paths for imports
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR / "tools"))
-sys.path.insert(0, str(ROOT_DIR / "tools" / "router_py"))
 
 try:
-    from streaming_voice import StreamingVoicePipeline
+    from router_py.streaming_voice import StreamingVoicePipeline
     from router_py.voice import VoicePipeline, AudioBuffer
 
     HAS_VOICE = True
