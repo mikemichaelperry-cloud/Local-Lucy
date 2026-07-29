@@ -1,0 +1,4 @@
+source_attribution: false
+suggest_web_escalation: false
+auto_web_general_knowledge: false
+trusted_sources_only_critical: true
