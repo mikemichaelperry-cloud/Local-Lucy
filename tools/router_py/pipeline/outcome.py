@@ -27,6 +27,10 @@ if str(ROOT_DIR) not in sys.path:
 if str(ROOT_DIR / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT_DIR / "tools"))
 
+from router_py.pipeline.attribution import (
+    build_source_attribution,
+    build_trust_label,
+)
 from router_py.request_types import (
     ClassificationResult,
     ExecutionResult,
@@ -65,6 +69,9 @@ def build_outcome(
     if profile is not None:
         metadata["latency_profile"] = profile
 
+    source_attribution = build_source_attribution(decision, result)
+    trust_label = build_trust_label(source_attribution) if source_attribution is not None else ""
+
     return RouterOutcome(
         status=result.status,
         outcome_code=result.outcome_code,
@@ -79,4 +86,6 @@ def build_outcome(
         metadata=metadata,
         evidence_reason=result.evidence_reason or decision.evidence_reason,
         policy_reason=result.policy_reason or decision.policy_reason,
+        source_attribution=source_attribution,
+        trust_label=trust_label,
     )
