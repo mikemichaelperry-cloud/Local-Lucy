@@ -99,3 +99,6 @@ bin/
 # Generated benchmark / test scripts at root
 run_all_tests.py
 generate_test_report.py
+
+# Worktrees
+.worktrees/
