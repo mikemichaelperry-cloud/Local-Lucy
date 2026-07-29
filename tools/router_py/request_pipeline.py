@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +61,8 @@ from router_py.pipeline import execute
 from router_py.pipeline import outcome
 from router_py.pipeline.config import load_capability_flags
 from router_py.policy import normalize_augmentation_policy
+from router_py.escalation import critical_guard
+from router_py.escalation import fetcher
 
 # Re-export for tests/code that patch the pipeline's classifier reference.
 classify_intent = classify.classify_intent
@@ -231,11 +234,35 @@ def process(
     # ------------------------------------------------------------------
     # 7. Convert ExecutionResult → RouterOutcome
     # ------------------------------------------------------------------
-    return outcome.build_outcome(
+    router_outcome = outcome.build_outcome(
         result,
         classification,
         decision,
         start_time,
         _profile if _profiling else None,
         flags=_capability_flags,
-    ), classification, decision
+    )
+
+    # ------------------------------------------------------------------
+    # 8. Optional general-knowledge web fetch (conservative expansion)
+    # ------------------------------------------------------------------
+    # Only run when the capability flag is enabled, the answer attribution is
+    # thin, and the request is not in a critical category. Fetched sources are
+    # explicitly labelled untrusted and never replace the local answer.
+    if _capability_flags.auto_web_general_knowledge:
+        attribution = router_outcome.source_attribution
+        if (
+            attribution is not None
+            and (attribution.basis == "none" or attribution.confidence == "low")
+            and not critical_guard.is_critical_category(classification)
+        ):
+            fetched = fetcher.fetch_general_knowledge(question)
+            if fetched.url:
+                router_outcome = replace(
+                    router_outcome,
+                    escalation_suggestion=(
+                        f"Web sources found (untrusted): {fetched.title} — {fetched.url}"
+                    ),
+                )
+
+    return router_outcome, classification, decision

@@ -9,6 +9,7 @@ from __future__ import annotations
 CRITICAL_CATEGORIES: tuple[str, ...] = (
     "medical",
     "financial",
+    "finance",
     "market",
     "economic",
     "legal",
