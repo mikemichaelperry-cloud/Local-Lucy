@@ -141,6 +141,19 @@ def test_fetch_general_knowledge_parses_first_result():
     assert "first snippet" in result.snippet.lower()
 
 
+def test_fetch_general_knowledge_refuses_critical_classification():
+    classification = ClassificationResult(
+        intent="general", intent_family="factual", category="medical"
+    )
+    with patch("urllib.request.urlopen", _mock_urlopen(_sample_ddg_html())):
+        result = fetch_general_knowledge(
+            "capital of france", classification=classification
+        )
+
+    assert result.url == ""
+    assert result.title == "No web sources found"
+
+
 def test_fetch_general_knowledge_filters_by_allowed_domains():
     with patch("urllib.request.urlopen", _mock_urlopen(_sample_ddg_html())):
         result = fetch_general_knowledge(
@@ -275,13 +288,18 @@ def test_process_attaches_web_suggestion_when_flag_enabled():
             with patch(
                 "router_py.request_pipeline.fetcher.fetch_general_knowledge",
                 return_value=fetched,
-            ):
+            ) as mock_fetch:
                 outcome, _, _ = process(
                     "what is the capital of france",
                     classification=classification,
                     decision=decision,
                 )
 
+    mock_fetch.assert_called_once_with(
+        "what is the capital of france",
+        allowed_domains=[],
+        classification=classification,
+    )
     assert "Found It" in outcome.escalation_suggestion
     assert "example.com/found" in outcome.escalation_suggestion
     assert "untrusted" in outcome.escalation_suggestion.lower()
@@ -317,13 +335,18 @@ def test_process_skips_web_fetch_for_critical_category():
         ):
             with patch(
                 "router_py.request_pipeline.fetcher.fetch_general_knowledge",
+                return_value=FetchResult(url="", title="No web sources found", snippet=""),
             ) as mock_fetch:
                 outcome, _, _ = process(
                     "what are symptoms of flu",
                     classification=classification,
                     decision=decision,
                 )
-                mock_fetch.assert_not_called()
+                mock_fetch.assert_called_once_with(
+                    "what are symptoms of flu",
+                    allowed_domains=[],
+                    classification=classification,
+                )
 
     assert outcome.escalation_suggestion == ""
 
@@ -456,19 +479,24 @@ def test_process_fetches_when_source_attribution_flag_disabled():
             with patch(
                 "router_py.request_pipeline.fetcher.fetch_general_knowledge",
                 return_value=fetched,
-            ):
+            ) as mock_fetch:
                 outcome, _, _ = process(
                     "what is the capital of france",
                     classification=classification,
                     decision=decision,
                 )
 
+    mock_fetch.assert_called_once_with(
+        "what is the capital of france",
+        allowed_domains=[],
+        classification=classification,
+    )
     assert "Found It" in outcome.escalation_suggestion
     assert "example.com/found" in outcome.escalation_suggestion
 
 
-def test_process_fetches_when_attribution_basis_is_low():
-    """The brief condition is basis in ("none", "low"); basis="low" must fetch."""
+def test_process_skips_fetch_when_attribution_basis_is_low():
+    """basis='low' is not a real production basis; it must not trigger a fetch."""
     low_basis_outcome = replace(
         _fake_local_outcome(),
         source_attribution=SourceAttribution(basis="low", confidence="unknown"),
@@ -489,12 +517,6 @@ def test_process_fetches_when_attribution_basis_is_low():
         provider_usage_class="local",
         evidence_mode="",
     )
-    fetched = FetchResult(
-        url="https://example.com/found",
-        title="Found It",
-        snippet="snippet",
-        source_type="web_untrusted",
-    )
 
     with patch(
         "router_py.request_pipeline.load_capability_flags",
@@ -509,15 +531,15 @@ def test_process_fetches_when_attribution_basis_is_low():
         ):
             with patch(
                 "router_py.request_pipeline.fetcher.fetch_general_knowledge",
-                return_value=fetched,
-            ):
+            ) as mock_fetch:
                 outcome, _, _ = process(
                     "what is the capital of france",
                     classification=classification,
                     decision=decision,
                 )
+                mock_fetch.assert_not_called()
 
-    assert "Found It" in outcome.escalation_suggestion
+    assert outcome.escalation_suggestion == ""
 
 
 def test_process_skips_fetch_when_only_confidence_is_low():

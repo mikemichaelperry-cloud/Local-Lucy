@@ -79,11 +79,9 @@ def test_is_critical_category_non_critical():
 def test_non_critical_query_unchanged():
     flags = _trusted_flags()
     decision = _decision("AUGMENTED", provider="wikipedia")
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(decision, _classification("factual"))
+    result = apply_critical_source_policy(
+        decision, _classification("factual"), flags=flags
+    )
     assert isinstance(result, RoutingDecision)
     assert result.route == "AUGMENTED"
     assert result.provider == "wikipedia"
@@ -92,11 +90,9 @@ def test_non_critical_query_unchanged():
 def test_critical_query_unchanged_when_flag_disabled():
     flags = CapabilityFlags(trusted_sources_only_critical=False)
     decision = _decision("AUGMENTED", provider="wikipedia")
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(decision, _classification("medical"))
+    result = apply_critical_source_policy(
+        decision, _classification("medical"), flags=flags
+    )
     assert isinstance(result, RoutingDecision)
     assert result.provider == "wikipedia"
 
@@ -104,11 +100,9 @@ def test_critical_query_unchanged_when_flag_disabled():
 def test_medical_news_converted_to_evidence_with_trusted_provider():
     flags = _trusted_flags()
     decision = _decision("NEWS", provider="news", evidence_reason="news_query")
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(decision, _classification("medical"))
+    result = apply_critical_source_policy(
+        decision, _classification("medical"), flags=flags
+    )
     assert isinstance(result, RoutingDecision)
     assert result.route == "EVIDENCE"
     assert result.provider == "trusted"
@@ -120,13 +114,11 @@ def test_medical_news_converted_to_evidence_with_trusted_provider():
 def test_financial_augmented_restricted_to_trusted():
     flags = _trusted_flags()
     decision = _decision("AUGMENTED", provider="wikipedia")
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(
-            decision, _classification("financial", evidence_reason="financial_data")
-        )
+    result = apply_critical_source_policy(
+        decision,
+        _classification("financial", evidence_reason="financial_data"),
+        flags=flags,
+    )
     assert isinstance(result, RoutingDecision)
     assert result.route == "AUGMENTED"
     assert result.provider == "trusted"
@@ -139,11 +131,9 @@ def test_medical_evidence_kept_with_trusted_provider():
     decision = _decision(
         "EVIDENCE", provider="kimi", evidence_mode="required", evidence_reason="medical_context"
     )
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(decision, _classification("medical"))
+    result = apply_critical_source_policy(
+        decision, _classification("medical"), flags=flags
+    )
     assert isinstance(result, RoutingDecision)
     assert result.route == "EVIDENCE"
     assert result.provider == "trusted"
@@ -152,11 +142,9 @@ def test_medical_evidence_kept_with_trusted_provider():
 def test_safety_without_trusted_source_blocked():
     flags = _trusted_flags()
     decision = _decision("AUGMENTED", provider="wikipedia")
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(decision, _classification("safety"))
+    result = apply_critical_source_policy(
+        decision, _classification("safety"), flags=flags
+    )
     assert isinstance(result, RouterOutcome)
     assert result.outcome_code == "operator_blocked"
     assert result.status == "completed"
@@ -165,11 +153,9 @@ def test_safety_without_trusted_source_blocked():
 def test_identity_without_trusted_source_blocked():
     flags = _trusted_flags()
     decision = _decision("EVIDENCE", provider="kimi", evidence_mode="required")
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(decision, _classification("identity_personal"))
+    result = apply_critical_source_policy(
+        decision, _classification("identity_personal"), flags=flags
+    )
     assert isinstance(result, RouterOutcome)
     assert result.outcome_code == "operator_blocked"
 
@@ -178,13 +164,12 @@ def test_context_allow_domains_file_set_for_medical():
     flags = _trusted_flags()
     decision = _decision("EVIDENCE", provider="kimi", evidence_mode="required")
     context: dict[str, object] = {}
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(
-            decision, _classification("medical", evidence_reason="medical_context"), context
-        )
+    result = apply_critical_source_policy(
+        decision,
+        _classification("medical", evidence_reason="medical_context"),
+        context,
+        flags=flags,
+    )
     assert isinstance(result, RoutingDecision)
     assert context.get("allow_domains_file").endswith("medical_runtime.txt")
 
@@ -193,15 +178,12 @@ def test_context_allow_domains_file_set_for_finance():
     flags = _trusted_flags()
     decision = _decision("AUGMENTED", provider="wikipedia")
     context: dict[str, object] = {}
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(
-            decision,
-            _classification("financial", evidence_reason="financial_data"),
-            context,
-        )
+    result = apply_critical_source_policy(
+        decision,
+        _classification("financial", evidence_reason="financial_data"),
+        context,
+        flags=flags,
+    )
     assert isinstance(result, RoutingDecision)
     assert context.get("allow_domains_file").endswith("finance_runtime.txt")
 
@@ -213,13 +195,9 @@ def test_pre_trusted_evidence_sets_default_allow_domains_file():
         "EVIDENCE", provider="trusted", evidence_mode="required"
     )
     context: dict[str, object] = {}
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(
-            decision, _classification("identity_personal"), context
-        )
+    result = apply_critical_source_policy(
+        decision, _classification("identity_personal"), context, flags=flags
+    )
     assert isinstance(result, RoutingDecision)
     assert context.get("allow_domains_file").endswith("allowlist_tier1.txt")
 
@@ -228,18 +206,16 @@ def test_local_critical_route_unchanged():
     """LOCAL routes for critical categories should not be blocked or altered."""
     flags = _trusted_flags()
     decision = _decision("LOCAL", provider="local")
-    with patch(
-        "router_py.pipeline.route.load_capability_flags",
-        return_value=flags,
-    ):
-        result = apply_critical_source_policy(decision, _classification("medical"))
+    result = apply_critical_source_policy(
+        decision, _classification("medical"), flags=flags
+    )
     assert isinstance(result, RoutingDecision)
     assert result.route == "LOCAL"
     assert result.provider == "local"
 
 
-def test_pipeline_blocks_critical_safety_augmented_query():
-    """Full pipeline returns operator_blocked for safety with no trusted source."""
+def test_pipeline_preserves_decision_in_parity_mode():
+    """When caller supplies both classification and decision, critical-source policy is skipped."""
     classification = ClassificationResult(
         intent="general",
         intent_family="factual",
@@ -256,17 +232,32 @@ def test_pipeline_blocks_critical_safety_augmented_query():
         provider_usage_class="free",
         evidence_mode="",
     )
-    outcome, _, _ = process(
-        "safety recall for baby stroller",
-        classification=classification,
-        decision=decision,
-    )
-    assert outcome.outcome_code == "operator_blocked"
-    assert "trusted" in outcome.policy_reason or "trusted" in outcome.response_text.lower()
+    with patch.dict("os.environ", {"LUCY_EVIDENCE_ENABLED": "1"}):
+        with patch("router_py.request_pipeline.execute.execute_request") as mock_execute:
+            from router_py.request_types import ExecutionResult
+
+            mock_execute.return_value = ExecutionResult(
+                status="completed",
+                outcome_code="augmented_answer",
+                route="AUGMENTED",
+                provider="kimi",
+                provider_usage_class="free",
+                response_text="answer",
+            )
+            outcome, _, final_decision = process(
+                "safety recall for baby stroller",
+                classification=classification,
+                decision=decision,
+            )
+    assert final_decision is not None
+    # Provider resolution still runs in parity mode; critical-source policy is skipped.
+    assert final_decision.provider == "kimi"
+    assert final_decision.route == "AUGMENTED"
+    assert outcome.outcome_code != "operator_blocked"
 
 
-def test_pipeline_restricts_critical_medical_to_trusted():
-    """Full pipeline restricts a critical medical AUGMENTED query to trusted provider."""
+def test_pipeline_skips_critical_source_policy_in_parity_mode():
+    """In parity mode the critical-source policy is skipped; provider resolution still runs."""
     classification = ClassificationResult(
         intent="general",
         intent_family="factual",
@@ -294,7 +285,7 @@ def test_pipeline_restricts_critical_medical_to_trusted():
                 route="AUGMENTED",
                 provider="trusted",
                 provider_usage_class="free",
-                response_text="trusted answer",
+                response_text="answer",
             )
             outcome, _, final_decision = process(
                 "what is lisinopril",
@@ -302,8 +293,12 @@ def test_pipeline_restricts_critical_medical_to_trusted():
                 decision=decision,
             )
     assert final_decision is not None
+    # Provider resolution maps medical AUGMENTED to the trusted provider; the
+    # outcome is not operator_blocked, confirming the critical-source policy did
+    # not reject the already-trusted route in parity mode.
     assert final_decision.provider == "trusted"
     assert final_decision.route == "AUGMENTED"
+    assert outcome.outcome_code != "operator_blocked"
     assert outcome.provider == "trusted"
 
 

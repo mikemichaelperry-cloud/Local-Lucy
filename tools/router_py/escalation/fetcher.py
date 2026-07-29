@@ -17,6 +17,9 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from typing import Any
 
+from router_py.escalation.critical_guard import is_critical_category
+from router_py.request_types import ClassificationResult
+
 logger = logging.getLogger(__name__)
 
 _DUCKDUCKGO_HTML_URL = "https://html.duckduckgo.com/html/"
@@ -157,7 +160,10 @@ def _build_search_url(query: str) -> str:
 
 
 def fetch_general_knowledge(
-    query: str, allowed_domains: list[str] | None = None
+    query: str,
+    allowed_domains: list[str] | None = None,
+    *,
+    classification: ClassificationResult | None = None,
 ) -> FetchResult:
     """Fetch the first DuckDuckGo HTML result for *query*.
 
@@ -166,12 +172,19 @@ def fetch_general_knowledge(
         allowed_domains: Optional list of domains to restrict results to.
             When provided, only results whose URL matches one of these
             domains are returned. Subdomains are accepted.
+        classification: Optional classification for defense-in-depth
+            critical-category blocking. When provided and the category is
+            critical, the fetch is refused and an empty result is returned.
 
     Returns:
         A ``FetchResult`` describing the first matching result. On failure or
         when no results match, a result with empty URL/title is returned so
         callers do not crash.
     """
+    if classification is not None and is_critical_category(classification):
+        logger.warning("Web fetch refused for critical category: %s", classification.category)
+        return _empty_result()
+
     try:
         url = _build_search_url(query)
         request = urllib.request.Request(

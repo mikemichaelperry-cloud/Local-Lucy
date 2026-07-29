@@ -34,12 +34,12 @@ if str(ROOT_DIR / "tools") not in sys.path:
 from router_py.request_types import ClassificationResult, RouterOutcome, RoutingDecision
 from router_py.classify import select_route
 from router_py.escalation.critical_guard import (
-    _operator_blocked_outcome,
     get_default_trusted_domains_file,
     get_trusted_domains_file,
     is_critical_category,
+    operator_blocked_outcome,
 )
-from router_py.pipeline.config import load_capability_flags
+from router_py.pipeline.config import CapabilityFlags
 from router_py.policy import normalize_augmentation_policy
 
 logger = logging.getLogger(__name__)
@@ -105,6 +105,7 @@ def apply_critical_source_policy(
     classification: ClassificationResult,
     context: dict[str, Any] | None = None,
     *,
+    flags: CapabilityFlags,
     start_time: float | None = None,
 ) -> RoutingDecision | RouterOutcome:
     """
@@ -128,7 +129,8 @@ def apply_critical_source_policy(
         classification: The classified intent.
         context: Optional execution context. When provided and a trusted
             allowlist exists, ``context["allow_domains_file"]`` is set to the
-            trusted list path.
+            trusted list path. This is a side effect on the caller's dict.
+        flags: Capability flags loaded once by the pipeline facade.
         start_time: Pipeline start time used for blocked-outcome timing. When
             omitted, the current time is used (primarily for unit tests).
 
@@ -138,7 +140,6 @@ def apply_critical_source_policy(
         available.
     """
     policy_start = start_time if start_time is not None else time.time()
-    flags = load_capability_flags()
 
     if not flags.trusted_sources_only_critical:
         return decision
@@ -174,7 +175,7 @@ def apply_critical_source_policy(
         return decision
 
     if not has_trusted_source:
-        return _operator_blocked_outcome(decision, classification, policy_start)
+        return operator_blocked_outcome(decision, classification, policy_start)
 
     if decision.route == "NEWS":
         # Untrusted web news is not acceptable for critical categories; require

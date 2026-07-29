@@ -77,12 +77,16 @@ def get_default_trusted_domains_file() -> Path | None:
     return path if path.exists() else None
 
 
-def _operator_blocked_outcome(
+def operator_blocked_outcome(
     decision: RoutingDecision,
     classification: ClassificationResult,
     start_time: float,
 ) -> RouterOutcome:
-    """Return a clear ``operator_blocked`` outcome for a critical query."""
+    """Return a clear ``operator_blocked`` outcome for a critical query.
+
+    This helper is used across modules (``escalation`` and ``pipeline.route``),
+    so it is public despite the earlier underscore prefix.
+    """
     execution_time = int((time.time() - start_time) * 1000)
     logger.info(
         "critical_source_policy_blocked",

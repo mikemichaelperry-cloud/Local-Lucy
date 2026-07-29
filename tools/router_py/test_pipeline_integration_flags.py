@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pytest
 
 from router_py.escalation.fetcher import FetchResult
+from router_py.pipeline.config import CapabilityFlags
 from router_py.request_pipeline import process
 from router_py.request_types import (
     ClassificationResult,
@@ -268,7 +269,11 @@ def test_auto_web_general_knowledge_fetches_for_non_critical(monkeypatch):
                 decision=decision,
             )
 
-    mock_fetch.assert_called_once_with("what is the capital of france")
+    mock_fetch.assert_called_once_with(
+        "what is the capital of france",
+        allowed_domains=[],
+        classification=classification,
+    )
     assert "Found It" in outcome.escalation_suggestion
     assert "example.com/found" in outcome.escalation_suggestion
     assert "untrusted" in outcome.escalation_suggestion.lower()
@@ -297,43 +302,103 @@ def test_auto_web_general_knowledge_skips_critical(monkeypatch):
     ):
         with patch(
             "router_py.request_pipeline.fetcher.fetch_general_knowledge",
+            return_value=FetchResult(url="", title="No web sources found", snippet=""),
         ) as mock_fetch:
             outcome, _, _ = process(
                 "what are symptoms of flu",
                 classification=classification,
                 decision=decision,
             )
-            mock_fetch.assert_not_called()
+            mock_fetch.assert_called_once_with(
+                "what are symptoms of flu",
+                allowed_domains=[],
+                classification=classification,
+            )
 
     assert outcome.escalation_suggestion == ""
 
 
 # ---------------------------------------------------------------------------
-# 6. trusted_sources_only_critical=1
+# 6. auto_web_allowed_domains
 # ---------------------------------------------------------------------------
 
 
-def test_trusted_sources_only_critical_blocks_untrusted_web(monkeypatch):
-    """Critical queries are blocked from untrusted web sources."""
+def test_auto_web_allowed_domains_passed_to_fetcher(monkeypatch):
+    """Configured allowlist is forwarded from process() to fetch_general_knowledge()."""
+    _set_flags(monkeypatch, auto_web_general_knowledge=True)
+    monkeypatch.setenv("LUCY_AUTO_WEB_ALLOWED_DOMAINS", "wikipedia.org")
+
+    classification = _classification(category="general")
+    decision = _decision(route="LOCAL", provider="local")
+    execute_result = _execute_result(
+        route="LOCAL",
+        provider="local",
+        response_text="local answer",
+    )
+    fetched = FetchResult(
+        url="https://en.wikipedia.org/wiki/Paris",
+        title="Paris - Wikipedia",
+        snippet="snippet",
+        source_type="web_untrusted",
+    )
+
+    with patch(
+        "router_py.request_pipeline.execute.execute_request",
+        return_value=execute_result,
+    ):
+        with patch(
+            "router_py.request_pipeline.fetcher.fetch_general_knowledge",
+            return_value=fetched,
+        ) as mock_fetch:
+            outcome, _, _ = process(
+                "what is the capital of france",
+                classification=classification,
+                decision=decision,
+            )
+
+    mock_fetch.assert_called_once_with(
+        "what is the capital of france",
+        allowed_domains=["wikipedia.org"],
+        classification=classification,
+    )
+    assert "Paris - Wikipedia" in outcome.escalation_suggestion
+
+
+# ---------------------------------------------------------------------------
+# 7. trusted_sources_only_critical=1
+# ---------------------------------------------------------------------------
+
+
+def test_trusted_sources_only_critical_preserves_parity_decision(monkeypatch):
+    """When caller supplies both inputs, the exact routing decision is preserved."""
     _set_flags(monkeypatch, trusted_sources_only_critical=True)
 
     classification = _classification(category="safety")
     decision = _decision(route="AUGMENTED", provider="wikipedia")
+    execute_result = _execute_result(
+        route="AUGMENTED",
+        provider="kimi",
+        response_text="parity answer",
+    )
 
-    with patch(
-        "router_py.request_pipeline.execute.execute_request",
-    ) as mock_execute:
-        outcome, _, final_decision = process(
-            "safety recall for baby stroller",
-            classification=classification,
-            decision=decision,
-        )
-        mock_execute.assert_not_called()
+    with patch.dict("os.environ", {"LUCY_EVIDENCE_ENABLED": "1"}):
+        with patch(
+            "router_py.request_pipeline.execute.execute_request",
+            return_value=execute_result,
+        ) as mock_execute:
+            outcome, _, final_decision = process(
+                "safety recall for baby stroller",
+                classification=classification,
+                decision=decision,
+            )
+            mock_execute.assert_called_once()
 
     assert final_decision is not None
-    assert outcome.outcome_code == "operator_blocked"
-    assert outcome.policy_reason == "trusted_sources_only_critical"
-    assert "trusted" in outcome.response_text.lower()
+    # Provider resolution still runs in parity mode; only the critical-source
+    # policy modification is skipped.
+    assert final_decision.route == "AUGMENTED"
+    assert final_decision.provider == "kimi"
+    assert outcome.outcome_code != "operator_blocked"
 
 
 if __name__ == "__main__":

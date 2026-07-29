@@ -217,20 +217,22 @@ The `process()` flow is:
 
 ### 4.5 Capability Flags (`config/capability_flags.yaml`)
 
-The `config/capability_flags.yaml` file controls conservative v11 pipeline features. Every flag defaults to off (or to the safest setting) so the default runtime behaviour is unchanged.
+The `config/capability_flags.yaml` file controls conservative v11 pipeline features. Every flag defaults to off **except** `trusted_sources_only_critical`, which is intentionally default-on as a safety exception requested by the user: critical information must use only trusted sources. Disable it explicitly if you need the previous behaviour.
 
 | Flag | Default | Effect when enabled |
 |---|---|---|
 | `source_attribution` | `false` | `RouterOutcome` receives `source_attribution` and `trust_label` fields describing the provenance/confidence of the answer. |
 | `suggest_web_escalation` | `false` | Thin `LOCAL` answers may include a suggestion to enable web search for more sources/current information. |
 | `auto_web_general_knowledge` | `false` | After a thin local answer, the pipeline fetches one DuckDuckGo result and reports it as an untrusted web source in `escalation_suggestion`. The local answer is never replaced. |
-| `trusted_sources_only_critical` | `true` | Critical categories (medical, financial, legal, safety, identity, travel advisory) are restricted to trusted-domain allowlists. Untrusted web routes are blocked or redirected to trusted evidence. |
+| `auto_web_allowed_domains` | `[]` | Optional domain allowlist for `auto_web_general_knowledge`. When non-empty, only results whose registered domain matches one of these entries are returned. Subdomains are accepted. |
+| `trusted_sources_only_critical` | `true` | Critical categories (see below) are restricted to trusted-domain allowlists. Untrusted web routes are blocked or redirected to trusted evidence. Default-on as an intentional safety exception. |
 
 Each flag can also be overridden via environment variables:
 
 - `LUCY_SOURCE_ATTRIBUTION=1`
 - `LUCY_SUGGEST_WEB_ESCALATION=1`
 - `LUCY_AUTO_WEB_GENERAL_KNOWLEDGE=1`
+- `LUCY_AUTO_WEB_ALLOWED_DOMAINS=example.com,wikipedia.org`
 - `LUCY_TRUSTED_SOURCES_ONLY_CRITICAL=1`
 
 Set the env var to `0` to disable the corresponding feature.
@@ -239,13 +241,15 @@ Set the env var to `0` to disable the corresponding feature.
 
 The critical-source policy enforces a trusted-sources-only rule for sensitive categories. It is applied by `pipeline.route.apply_critical_source_policy()` after provider resolution and before execution.
 
-- Critical categories include: medical, veterinary, financial/market/economic, legal, regulatory, safety, identity, and travel advisory.
+- Critical categories (expanded list): medical, veterinary/vet, financial/finance/market/economic, legal, regulatory, safety, identity/personal identity, and travel advisory.
 - For critical queries, untrusted web routes are converted:
   - `NEWS` → `EVIDENCE` with provider `trusted`.
   - `AUGMENTED` → provider `trusted` with evidence required.
   - `EVIDENCE` → provider forced to `trusted` if it was not already.
 - `LOCAL`, `CLARIFY`, `SELF_REVIEW`, and `MEMORY_RECALL` routes are unaffected.
 - If no trusted-domain allowlist is configured for the category, the request returns an `operator_blocked` outcome rather than allowing untrusted sources.
+- The policy is skipped when the caller supplies both `classification` and `decision` (parity/comparison mode), so the exact routing decision is preserved.
+- When a trusted allowlist is available, `apply_critical_source_policy()` mutates the caller's `context` dict to set `context["allow_domains_file"]`; callers should expect this side effect.
 
 Trusted-domain files are resolved from `config/trust/generated/` (e.g. `medical_runtime.txt`, `vet_runtime.txt`, `finance_runtime.txt`).
 

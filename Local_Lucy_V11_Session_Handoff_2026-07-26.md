@@ -11,6 +11,8 @@
 
 Local Lucy V11 is a **provisional runnable checkpoint**. This session completed Phase 7 and consolidated all prior uncommitted Phase 9/10/11/12 work onto `main`.
 
+> **Intentional safety exception:** The `trusted_sources_only_critical` capability flag defaults to `true` in `config/capability_flags.yaml`, contrary to the plan's default-off language. This is a deliberate safety exception: critical information must use only trusted sources. Disable it explicitly (`trusted_sources_only_critical: false` or `LUCY_TRUSTED_SOURCES_ONLY_CRITICAL=0`) if you need the previous behaviour.
+
 - Branch `main` is active with 74 commits ahead of `origin/main`.
 - **Phase 7 complete:** `StateManager` legacy `.env` wrappers (`migrate_from_env()`, `write_env_backup()`) removed.
 - **Phases 9/10/11/12 artifacts committed:** regression tests, harnesses, accuracy suite, reports, plans, packaging identity files, and the supporting production changes that make them pass.

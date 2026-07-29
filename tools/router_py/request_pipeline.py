@@ -61,7 +61,6 @@ from router_py.pipeline import execute
 from router_py.pipeline import outcome
 from router_py.pipeline.config import load_capability_flags
 from router_py.policy import normalize_augmentation_policy
-from router_py.escalation import critical_guard
 from router_py.escalation import fetcher
 
 # Re-export for tests/code that patch the pipeline's classifier reference.
@@ -136,6 +135,11 @@ def process(
     # reads this instead of re-loading config from disk.
     _capability_flags = load_capability_flags()
 
+    # Remember whether the caller supplied both classification and decision.
+    # In parity/comparison mode we preserve the exact routing decision and
+    # skip the request-scoped critical-source policy modification.
+    _caller_supplied_both = classification is not None and decision is not None
+
     # ------------------------------------------------------------------
     # 0. Environment bypass (LUCY_ROUTER_BYPASS / LUCY_CHAT_FORCE_MODE)
     # ------------------------------------------------------------------
@@ -201,12 +205,15 @@ def process(
     # ------------------------------------------------------------------
     # 4. Critical-category trusted-source policy
     # ------------------------------------------------------------------
-    policy_result = route.apply_critical_source_policy(
-        decision, classification, context, start_time=start_time
-    )
-    if isinstance(policy_result, RouterOutcome):
-        return policy_result, classification, decision
-    decision = policy_result
+    # Skip the policy when the caller already provided both classification and
+    # decision (parity mode), so comparison runs use the exact same decision.
+    if not _caller_supplied_both:
+        policy_result = route.apply_critical_source_policy(
+            decision, classification, context, flags=_capability_flags, start_time=start_time
+        )
+        if isinstance(policy_result, RouterOutcome):
+            return policy_result, classification, decision
+        decision = policy_result
 
     # ------------------------------------------------------------------
     # 5. Evidence-disabled operator gate
@@ -256,9 +263,10 @@ def process(
     # ------------------------------------------------------------------
     # 9. Optional general-knowledge web fetch (conservative expansion)
     # ------------------------------------------------------------------
-    # Only run when the capability flag is enabled, the answer attribution is
-    # thin, and the request is not in a critical category. Fetched sources are
-    # explicitly labelled untrusted and never replace the local answer.
+    # Only run when the capability flag is enabled and the answer attribution is
+    # thin. The fetcher performs its own critical-category guard (defense in
+    # depth). Fetched sources are explicitly labelled untrusted and never
+    # replace the local answer.
     if _capability_flags.auto_web_general_knowledge:
         # Web fetch is independent of the source_attribution capability flag.
         # When attribution is disabled, treat the basis as "none" so the
@@ -268,11 +276,12 @@ def process(
             if router_outcome.source_attribution is not None
             else "none"
         )
-        if (
-            attribution_basis in ("none", "low")
-            and not critical_guard.is_critical_category(classification)
-        ):
-            fetched = fetcher.fetch_general_knowledge(question)
+        if attribution_basis == "none":
+            fetched = fetcher.fetch_general_knowledge(
+                question,
+                allowed_domains=list(_capability_flags.auto_web_allowed_domains),
+                classification=classification,
+            )
             if fetched.url:
                 router_outcome = replace(
                     router_outcome,
