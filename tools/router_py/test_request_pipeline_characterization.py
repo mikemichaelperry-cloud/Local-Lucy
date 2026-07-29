@@ -67,7 +67,7 @@ def _stub_execution_engine(monkeypatch: Any) -> None:
             )
 
     monkeypatch.setattr(
-        "router_py.request_pipeline.ExecutionEngine", FakeExecutionEngine
+        "router_py.pipeline.execute.ExecutionEngine", FakeExecutionEngine
     )
 
 

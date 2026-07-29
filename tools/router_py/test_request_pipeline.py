@@ -121,7 +121,7 @@ def test_gemma4_bypass_yields_to_self_analysis_mode(tmp_path, monkeypatch):
             with patch("router_py.request_pipeline._gemma4_bypass_decision") as mock_bypass:
                 with patch("router_py.pipeline.classify.classify_intent") as mock_classify:
                     with patch(
-                        "router_py.request_pipeline.ExecutionEngine.execute_self_analysis"
+                        "router_py.execution_engine.ExecutionEngine.execute_self_analysis"
                     ) as mock_execute:
                         mock_execute.return_value = ExecutionResult(
                             status="completed",

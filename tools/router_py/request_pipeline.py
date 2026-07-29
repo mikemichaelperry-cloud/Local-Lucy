@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""
-Request Pipeline — Single choke point for classify → route → execute.
+"""Request Pipeline — thin facade for classify → route → execute.
 
 Stage 3 of the Kimi Architecture Refactor.
 
 All surfaces (HMI, CLI, voice) should eventually call `process()` instead of
 reimplementing classify/route/execute inline.
 
-Responsibilities:
-1. Classify intent (delegated to pipeline.classify)
-2. Select route with policy + constraints (delegated to pipeline.route)
-3. Centralize provider resolution (inside pipeline.route)
-4. Build PipelineContext
-5. Execute via ExecutionEngine
-6. Convert ExecutionResult → RouterOutcome
+This module is a thin orchestration facade. The actual work is delegated to
+sub-modules under ``router_py.pipeline``:
+
+* ``pipeline.classify`` — intent classification and smart-routing bypass
+* ``pipeline.route`` — raw route selection and evidence-disabled gate
+* ``pipeline.resolve_provider`` — route normalization and provider resolution
+* ``pipeline.build_context`` — ``PipelineContext`` assembly
+* ``pipeline.execute`` — ``ExecutionEngine`` invocation
+* ``pipeline.outcome`` — ``ExecutionResult`` → ``RouterOutcome`` conversion
 
 NOT responsibilities (stays in main.py entry wrapper):
 - Feedback detection
@@ -25,7 +26,6 @@ NOT responsibilities (stays in main.py entry wrapper):
 
 from __future__ import annotations
 
-import dataclasses
 import logging
 import os
 import sys
@@ -45,8 +45,6 @@ if str(ROOT_DIR / "tools") not in sys.path:
 # ---------------------------------------------------------------------------
 from router_py.request_types import (
     ClassificationResult,
-    ExecutionResult,
-    PipelineContext,
     RouterOutcome,
     RoutingDecision,
 )
@@ -56,15 +54,14 @@ from router_py.request_types import (
 # ---------------------------------------------------------------------------
 from router_py.pipeline import classify
 from router_py.pipeline import route
+from router_py.pipeline import resolve_provider
+from router_py.pipeline import build_context
+from router_py.pipeline import execute
+from router_py.pipeline import outcome
 from router_py.policy import normalize_augmentation_policy
 
 # Re-export for tests/code that patch the pipeline's classifier reference.
 classify_intent = classify.classify_intent
-
-# ---------------------------------------------------------------------------
-# Execution
-# ---------------------------------------------------------------------------
-from router_py.execution_engine import ExecutionEngine
 
 logger = logging.getLogger(__name__)
 
@@ -183,11 +180,10 @@ def process(
     #    and request constraints always run unconditionally.
     # ------------------------------------------------------------------
     _t2 = _time.time()
-    decision = route.normalize_decision(
+    decision = resolve_provider.resolve_provider(
         decision,
-        classification=classification,
-        question=question,
-        context=context,
+        classification,
+        context,
         route_prefix=route_prefix,
         augmented_direct_once=augmented_direct_once,
     )
@@ -204,101 +200,32 @@ def process(
         return gate_outcome, classification, decision
 
     # ------------------------------------------------------------------
-    # 4. Build PipelineContext
+    # 5. Build PipelineContext
     # ------------------------------------------------------------------
     _t3 = _time.time()
-    pipeline_ctx = PipelineContext.from_env(question=question, surface=surface)
-    if context:
-        # Merge caller-provided extras
-        for key, value in context.items():
-            if hasattr(pipeline_ctx, key):
-                # Use object.__setattr__ because PipelineContext is frozen
-                pipeline_ctx = dataclasses.replace(pipeline_ctx, **{key: value})
-            else:
-                pipeline_ctx = dataclasses.replace(
-                    pipeline_ctx,
-                    extras={**pipeline_ctx.extras, key: value},
-                )
-
-    # 4a. Override force_local from classification
-    if classification.force_local:
-        pipeline_ctx = dataclasses.replace(pipeline_ctx, force_local=True)
-
+    pipeline_ctx = build_context.build_pipeline_context(
+        question, surface, context, classification
+    )
     if _profiling:
         _profile["context_build_ms"] = int((_time.time() - _t3) * 1000)
 
     # ------------------------------------------------------------------
-    # 5. Execute
+    # 6. Execute
     # ------------------------------------------------------------------
     _t4 = _time.time()
-    try:
-        engine = ExecutionEngine(
-            config={
-                "timeout": timeout,
-                "model": model or os.environ.get("LUCY_MODEL", "local-lucy-llama31"),
-                "use_sqlite_state": True,
-            }
-        )
-
-        exec_context = pipeline_ctx.to_dict()
-
-        result = engine.execute(
-            classification,
-            decision,
-            exec_context,
-        )
-
-    except Exception as exc:
-        logger.exception("ExecutionEngine failed")
-        execution_time = int((_time.time() - start_time) * 1000)
-        if _profiling:
-            _profile["execute_ms"] = int((_time.time() - _t4) * 1000)
-            _profile["total_ms"] = execution_time
-        outcome = RouterOutcome(
-            status="failed",
-            outcome_code="execution_error",
-            route=decision.route,
-            provider=decision.provider,
-            provider_usage_class=decision.provider_usage_class,
-            intent_family=classification.intent_family,
-            confidence=classification.confidence,
-            error_message=str(exc),
-            execution_time_ms=execution_time,
-            metadata={"latency_profile": _profile} if _profiling else {},
-            evidence_reason=decision.evidence_reason,
-            policy_reason=decision.policy_reason,
-        )
-        return outcome, classification, decision
-
+    result = execute.execute_request(
+        classification,
+        decision,
+        pipeline_ctx,
+        model,
+        timeout,
+    )
     if _profiling:
         _profile["execute_ms"] = int((_time.time() - _t4) * 1000)
 
     # ------------------------------------------------------------------
-    # 6. Convert ExecutionResult → RouterOutcome
+    # 7. Convert ExecutionResult → RouterOutcome
     # ------------------------------------------------------------------
-    execution_time = int((_time.time() - start_time) * 1000)
-    if _profiling:
-        _profile["total_ms"] = execution_time
-        _profile["overhead_ms"] = max(0, execution_time - _profile.get("execute_ms", 0))
-
-    _meta = dict(result.metadata) if result.metadata else {}
-    if _profiling:
-        _meta["latency_profile"] = _profile
-
-    outcome = RouterOutcome(
-        status=result.status,
-        outcome_code=result.outcome_code,
-        route=result.route,
-        provider=result.provider,
-        provider_usage_class=result.provider_usage_class,
-        intent_family=classification.intent_family,
-        confidence=classification.confidence,
-        response_text=result.response_text,
-        error_message=result.error_message,
-        execution_time_ms=execution_time,
-        metadata=_meta,
-        evidence_reason=result.evidence_reason or decision.evidence_reason,
-        policy_reason=result.policy_reason or decision.policy_reason,
-    )
-
-    return outcome, classification, decision
+    return outcome.build_outcome(
+        result, classification, decision, start_time, _profile if _profiling else None
+    ), classification, decision

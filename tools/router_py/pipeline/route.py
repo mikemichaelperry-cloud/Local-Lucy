@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Route selection and policy normalization for the request pipeline.
+"""Route selection and evidence-disabled operator gate for the request pipeline.
 
 This module holds the routing step that used to live inline in
 ``request_pipeline.process()``. It is responsible for:
 
 * Calling ``select_route`` with the normalized augmentation policy
-* Applying route-prefix overrides
-* Applying ``augmented_direct_once`` overrides
-* Centralized provider resolution
-* Request-scoped capability constraints
+* Returning routing errors as ``RouterOutcome``
 * The evidence-disabled operator gate
+
+Route normalization (route prefix, ``augmented_direct_once``, provider
+resolution, and request-scoped capability constraints) lives in
+``pipeline.resolve_provider`` and is applied by the facade after this step.
 """
 
 from __future__ import annotations
@@ -30,172 +31,11 @@ if str(ROOT_DIR) not in sys.path:
 if str(ROOT_DIR / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT_DIR / "tools"))
 
-from router_py.request_types import (
-    ClassificationResult,
-    RouterOutcome,
-    RoutingDecision,
-)
+from router_py.request_types import ClassificationResult, RouterOutcome, RoutingDecision
 from router_py.classify import select_route
-from router_py.policy import (
-    normalize_augmentation_policy,
-    provider_usage_class_for,
-)
-from router_py.request_constraints import RequestConstraints
-from router_py import provider_resolver
+from router_py.policy import normalize_augmentation_policy
 
 logger = logging.getLogger(__name__)
-
-
-def _apply_route_prefix_override(
-    decision: RoutingDecision, route_prefix: str
-) -> RoutingDecision:
-    """Override the selected route when the caller supplies a route prefix."""
-    if not route_prefix or decision.route == route_prefix:
-        return decision
-    return RoutingDecision(
-        route=route_prefix,
-        mode="FORCED",
-        intent_family=decision.intent_family,
-        confidence=decision.confidence,
-        provider=decision.provider,
-        provider_usage_class=decision.provider_usage_class,
-        evidence_mode=decision.evidence_mode,
-        evidence_reason=decision.evidence_reason,
-        requires_evidence=decision.requires_evidence,
-        policy_reason=f"prefix_override_{route_prefix.lower()}",
-        ephemeral=decision.ephemeral,
-    )
-
-
-def _apply_augmented_direct_once(
-    decision: RoutingDecision, augmented_direct_once: bool
-) -> RoutingDecision:
-    """Force an otherwise LOCAL decision onto the AUGMENTED route."""
-    if not augmented_direct_once or decision.route != "LOCAL":
-        return decision
-    env_provider = os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
-    return RoutingDecision(
-        route="AUGMENTED",
-        mode="AUTO",
-        intent_family=decision.intent_family,
-        confidence=decision.confidence,
-        provider=env_provider,
-        provider_usage_class=provider_usage_class_for(env_provider),
-        evidence_mode="required",
-        evidence_reason="source_request",
-        requires_evidence=True,
-        policy_reason="augmented_direct_once",
-        ephemeral=decision.ephemeral,
-    )
-
-
-def _apply_request_constraints(
-    decision: RoutingDecision,
-    classification: ClassificationResult,
-    context: dict[str, Any] | None,
-) -> RoutingDecision:
-    """Apply request-scoped capability constraints, overriding operator settings."""
-    constraints = (context or {}).get("request_constraints")
-    if not isinstance(constraints, RequestConstraints):
-        return decision
-
-    network_routes = {"NEWS", "EVIDENCE", "AUGMENTED", "FULL"}
-    tool_routes = {"TIME", "WEATHER", "FINANCE"}
-
-    if constraints.network is False and decision.route in network_routes:
-        logger.info(
-            "request_constraint_blocks_network",
-            extra={
-                "route": decision.route,
-                "request_id": (context or {}).get("request_id", ""),
-            },
-        )
-        return dataclasses.replace(
-            decision,
-            route="LOCAL",
-            mode="FALLBACK",
-            provider="local",
-            provider_usage_class="local",
-            evidence_mode="",
-            evidence_reason="",
-            requires_evidence=False,
-            ephemeral=False,
-            policy_reason="request_constraint_network_denied",
-            decision_stage="operator_fallback",
-            reason_code="request_constraint_network_denied",
-        )
-
-    if constraints.tools is False and decision.route in tool_routes:
-        logger.info(
-            "request_constraint_blocks_tools",
-            extra={
-                "route": decision.route,
-                "request_id": (context or {}).get("request_id", ""),
-            },
-        )
-        return dataclasses.replace(
-            decision,
-            route="LOCAL",
-            mode="FALLBACK",
-            provider="local",
-            provider_usage_class="local",
-            evidence_mode="",
-            evidence_reason="",
-            requires_evidence=False,
-            ephemeral=False,
-            policy_reason="request_constraint_tools_denied",
-            decision_stage="operator_fallback",
-            reason_code="request_constraint_tools_denied",
-        )
-
-    return decision
-
-
-def normalize_decision(
-    decision: RoutingDecision,
-    *,
-    classification: ClassificationResult,
-    question: str,
-    context: dict[str, Any] | None,
-    route_prefix: str,
-    augmented_direct_once: bool,
-) -> RoutingDecision:
-    """
-    Apply all route-normalization steps to a preliminary decision.
-
-    This runs unconditionally in the facade on every decision, whether it came
-    from the embedding router, an env bypass, or Gemma 4 smart-routing bypass.
-    Normalization steps (in order):
-
-    1. Caller-supplied route prefix override.
-    2. Explicit one-shot ``augmented_direct_once`` override.
-    3. Centralized provider resolution.
-    4. Request-scoped capability constraints.
-
-    Args:
-        decision: Preliminary routing decision.
-        classification: The classified intent.
-        question: The user's query text.
-        context: Extra execution context from caller.
-        route_prefix: Pre-parsed route prefix or empty string.
-        augmented_direct_once: Force augmented route for this query.
-
-    Returns:
-        Normalized ``RoutingDecision``.
-    """
-    # Caller-supplied route prefix takes precedence.
-    decision = _apply_route_prefix_override(decision, route_prefix)
-
-    # Explicit one-shot augmented override.
-    decision = _apply_augmented_direct_once(decision, augmented_direct_once)
-
-    # Centralized provider resolution (single source of truth).
-    decision = provider_resolver.apply_provider(decision, classification, context)
-
-    # Request-scoped capability constraints (override operator settings).
-    decision = _apply_request_constraints(decision, classification, context)
-
-    return decision
 
 
 def select_route_for_question(

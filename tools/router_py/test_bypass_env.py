@@ -134,8 +134,7 @@ def test_evidence_disabled_fallback_for_augmented(tmp_path: Path, monkeypatch: A
     monkeypatch.setenv("LUCY_EVIDENCE_ENABLED", "0")
     monkeypatch.setenv("LUCY_RUNTIME_NAMESPACE_ROOT", str(tmp_path))
     monkeypatch.setattr(
-        request_pipeline,
-        "ExecutionEngine",
+        "router_py.pipeline.execute.ExecutionEngine",
         _fake_execution_engine_class("local fallback answer"),
     )
 
@@ -154,8 +153,7 @@ def test_evidence_disabled_fallback_for_time(tmp_path: Path, monkeypatch: Any) -
     monkeypatch.setenv("LUCY_EVIDENCE_ENABLED", "0")
     monkeypatch.setenv("LUCY_RUNTIME_NAMESPACE_ROOT", str(tmp_path))
     monkeypatch.setattr(
-        request_pipeline,
-        "ExecutionEngine",
+        "router_py.pipeline.execute.ExecutionEngine",
         _fake_execution_engine_class("the current time"),
     )
 
