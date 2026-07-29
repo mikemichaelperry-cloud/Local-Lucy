@@ -2,12 +2,12 @@
 
 **Date:** 2026-07-29  
 **Version:** v11  
-**Branch:** main  
+**Branch:** feature/v11-pipeline-split-escalation  
 **Scope:** English-only primary runtime
 
-> This document describes **v11 as implemented**. Hebrew / Racheli support has been removed from the primary runtime; the standalone Hebrew assistant was archived separately on 2026-07-10.
+> This document describes **v11 as implemented** on the `feature/v11-pipeline-split-escalation` branch. Hebrew / Racheli support has been removed from the primary runtime; the standalone Hebrew assistant was archived separately on 2026-07-10.
 >
-> Latest commit on `main`: see `git log`.
+> Latest commit on `feature/v11-pipeline-split-escalation`: see `git log`.
 
 ---
 
@@ -66,6 +66,7 @@ lucy-v11/
 ├── config/                    # Modelfiles, system prompts, policy configs
 │   ├── Modelfile.local-lucy-llama31
 │   ├── Modelfile.local-lucy-gemma4
+│   ├── capability_flags.yaml  # Conservative feature flags for v11 pipeline expansion
 │   ├── evidence_policy.yaml
 │   ├── trusted_domains.yaml
 │   ├── url_map.yaml
@@ -83,6 +84,9 @@ lucy-v11/
 ├── tools/router_py/           # Core execution engine (Python-native)
 │   ├── main.py
 │   ├── request_pipeline.py
+│   ├── main.py
+│   ├── request_pipeline.py    # thin orchestration facade → pipeline/
+│   ├── pipeline/              # classify → route → resolve → execute → outcome
 │   ├── classify.py            # thin facade → classify_core/
 │   ├── classify_core/         # intent, guards, memory gate, router, select
 │   ├── policy.py              # thin facade → policy/
@@ -101,6 +105,9 @@ lucy-v11/
 │   ├── feedback_parser/       # feedback parsing (split from feedback_parser.py)
 │   ├── news/                  # news provider (split from news_provider.py)
 │   ├── voice/                 # voice pipeline (split from voice_tool.py)
+│   ├── escalation/            # escalation suggestions and critical-source guard
+│   ├── planner/               # plan-to-pipeline CLI helpers
+│   ├── plan_to_pipeline_cli.py# CLI facade → planner/
 │   ├── model_selector.py
 │   ├── self_analysis.py
 │   ├── feedback_buffer.py
@@ -131,6 +138,9 @@ lucy-v11/
 
 | Package | Former monolith | Responsibility |
 |---|---|---|
+| `pipeline/` | `request_pipeline.py` | Request pipeline stages: classify, route, resolve provider, build context, execute, build outcome |
+| `planner/` | `plan_to_pipeline_cli.py` | Plan-to-pipeline CLI helpers: plan building, policy resolution, contract assembly |
+| `escalation/` | new for v11 | Escalation suggestions, general-knowledge web fetch, critical-source guard |
 | `classify_core/` | `classify.py` | Intent classification, guard detectors, memory gate, router lifecycle, route selection |
 | `policy/` | `policy.py` | Domain-specific guard lists (medical, software, finance, news, etc.) |
 | `policy_router/` | `policy_router.py` | Individual guard groups (time, weather, finance, news, medical, constraints) |
@@ -158,6 +168,102 @@ Each split preserves the original import path via a thin `__init__.py` facade or
 7. **Guard context** — `context_guard` filters evidence and memory for relevance.
 8. **Generate answer** — `local_answer` streams the final response from Ollama (or formats external provider output).
 9. **Persist** — Turn is written to SQLite; feedback/state files are updated.
+
+### 4.1 Pipeline Facade (`tools/router_py/request_pipeline.py`)
+
+`request_pipeline.py` is now a thin orchestration facade. Its `process()` function delegates each stage to a focused sub-module under `tools/router_py/pipeline/`. This keeps the choke-point readable while making each stage independently testable and patchable.
+
+The `process()` flow is:
+
+1. **Environment bypass** — `LUCY_ROUTER_BYPASS` / `LUCY_CHAT_FORCE_MODE` short-circuit to a forced route.
+2. **Classify** — `pipeline.classify.classify_question()` runs intent classification and the Gemma 4 smart-routing bypass.
+3. **Route** — `pipeline.route.select_route_for_question()` produces a raw `RoutingDecision`.
+4. **Resolve provider** — `pipeline.resolve_provider.resolve_provider()` applies route prefixes, `augmented_direct_once`, centralized provider resolution, and request-scoped constraints.
+5. **Critical-source policy** — `pipeline.route.apply_critical_source_policy()` restricts critical categories to trusted sources.
+6. **Evidence-disabled gate** — `pipeline.route.apply_evidence_disabled_gate()` blocks or degrades routes when evidence is disabled.
+7. **Build context** — `pipeline.build_context.build_pipeline_context()` assembles the `PipelineContext`.
+8. **Execute** — `pipeline.execute.execute_request()` invokes `ExecutionEngine`.
+9. **Build outcome** — `pipeline.outcome.build_outcome()` converts `ExecutionResult` → `RouterOutcome` and attaches source attribution / escalation suggestions.
+10. **Optional web fetch** — If `auto_web_general_knowledge` is enabled, an untrusted web fetch may be performed for thin local answers.
+
+### 4.2 `pipeline/` Package Modules
+
+| Module | Responsibility |
+|---|---|
+| `pipeline/classify.py` | Intent classification wrapper, Gemma 4 smart-routing bypass, legacy env-bypass helpers, self-analysis pre-check. |
+| `pipeline/route.py` | Raw route selection via `select_route()`, evidence-disabled operator gate, critical-source trusted-source policy. |
+| `pipeline/resolve_provider.py` | Route normalization: prefix override, `augmented_direct_once`, provider resolution, request constraints. |
+| `pipeline/build_context.py` | `PipelineContext` assembly from environment variables and caller extras. |
+| `pipeline/execute.py` | `ExecutionEngine` invocation and failure-to-`ExecutionResult` conversion. |
+| `pipeline/outcome.py` | `ExecutionResult` → `RouterOutcome` conversion, latency profiling metadata, source attribution / trust label / escalation suggestion assembly. |
+| `pipeline/attribution.py` | `SourceAttribution` builder and trust-label mapping (gated by `source_attribution` flag). |
+| `pipeline/config.py` | `CapabilityFlags` dataclass and YAML/env loading. |
+
+### 4.3 `planner/` Package Modules
+
+`planner/` holds the internals of `tools/router_py/plan_to_pipeline_cli.py`. The CLI is now a thin wrapper; plan construction and policy resolution live in focused modules.
+
+| Module | Responsibility |
+|---|---|
+| `planner/cli.py` | Argparse handling, stage timing, JSON output, orchestration of the plan-to-pipeline flow. |
+| `planner/plan_builder.py` | Legacy plan extraction, semantic-interpretation patching, route-prefix effective-plan construction. |
+| `planner/policy_resolver.py` | Contextual followup resolution, local-context response matching, pet-food policy, local-response ID matching. |
+| `planner/news_rewriter.py` | Conservative news-query rewriting when the router selects `NEWS`. |
+| `planner/contract_builder.py` | Execution-contract assembly and full CLI output dictionary construction via the runtime governor. |
+
+### 4.4 `escalation/` Package Modules
+
+`escalation/` is new for v11. It provides conservative escalation suggestions and a critical-source guard, all gated by capability flags.
+
+| Module | Responsibility |
+|---|---|
+| `escalation/config.py` | Critical-category list and human-readable suggestion strings. |
+| `escalation/suggestion.py` | `suggest_escalation()` — returns a short web-escalation hint only when the `suggest_web_escalation` flag is on, the route is `LOCAL`, and the category is not critical. |
+| `escalation/fetcher.py` | DuckDuckGo HTML fetcher for general-knowledge web results (used only when `auto_web_general_knowledge` is enabled). |
+| `escalation/critical_guard.py` | `is_critical_category()`, trusted-domain allowlist resolution, and the `operator_blocked` helper used by the critical-source policy. |
+
+### 4.5 Capability Flags (`config/capability_flags.yaml`)
+
+The `config/capability_flags.yaml` file controls conservative v11 pipeline features. Every flag defaults to off (or to the safest setting) so the default runtime behaviour is unchanged.
+
+| Flag | Default | Effect when enabled |
+|---|---|---|
+| `source_attribution` | `false` | `RouterOutcome` receives `source_attribution` and `trust_label` fields describing the provenance/confidence of the answer. |
+| `suggest_web_escalation` | `false` | Thin `LOCAL` answers may include a suggestion to enable web search for more sources/current information. |
+| `auto_web_general_knowledge` | `false` | After a thin local answer, the pipeline fetches one DuckDuckGo result and reports it as an untrusted web source in `escalation_suggestion`. The local answer is never replaced. |
+| `trusted_sources_only_critical` | `true` | Critical categories (medical, financial, legal, safety, identity, travel advisory) are restricted to trusted-domain allowlists. Untrusted web routes are blocked or redirected to trusted evidence. |
+
+Each flag can also be overridden via environment variables:
+
+- `LUCY_SOURCE_ATTRIBUTION=1`
+- `LUCY_SUGGEST_WEB_ESCALATION=1`
+- `LUCY_AUTO_WEB_GENERAL_KNOWLEDGE=1`
+- `LUCY_TRUSTED_SOURCES_ONLY_CRITICAL=1`
+
+Set the env var to `0` to disable the corresponding feature.
+
+### 4.6 Critical-Source Policy
+
+The critical-source policy enforces a trusted-sources-only rule for sensitive categories. It is applied by `pipeline.route.apply_critical_source_policy()` after provider resolution and before execution.
+
+- Critical categories include: medical, veterinary, financial/market/economic, legal, regulatory, safety, identity, and travel advisory.
+- For critical queries, untrusted web routes are converted:
+  - `NEWS` → `EVIDENCE` with provider `trusted`.
+  - `AUGMENTED` → provider `trusted` with evidence required.
+  - `EVIDENCE` → provider forced to `trusted` if it was not already.
+- `LOCAL`, `CLARIFY`, `SELF_REVIEW`, and `MEMORY_RECALL` routes are unaffected.
+- If no trusted-domain allowlist is configured for the category, the request returns an `operator_blocked` outcome rather than allowing untrusted sources.
+
+Trusted-domain files are resolved from `config/trust/generated/` (e.g. `medical_runtime.txt`, `vet_runtime.txt`, `finance_runtime.txt`).
+
+### 4.7 Public Interfaces Preserved
+
+- `tools/router_py/request_pipeline.py::process(question, ...)` — unchanged signature.
+- `tools/router_py/classify.py` — thin facade; `classify_intent()`, `select_route()`, and public helpers remain importable.
+- `tools/router_py/plan_to_pipeline_cli.py` — CLI entry point and JSON output contract preserved.
+- `RouterOutcome` — gained optional `source_attribution`, `trust_label`, and `escalation_suggestion` fields; all existing fields remain.
+- `RoutingDecision` — unchanged.
+- `ClassificationResult` — unchanged.
 
 ---
 
@@ -513,6 +619,7 @@ The control panel blocks checkbox signals while programmatically refreshing a to
 | File / Variable | Purpose |
 |-----------------|---------|
 | `.env.example` | API keys, feature flags, endpoints |
+| `config/capability_flags.yaml` | Conservative v11 feature flags (source attribution, escalation, critical-source guard) |
 | `config/evidence_policy.yaml` | When external evidence is allowed/required |
 | `config/conversation_profile.json` | Default persona / tone |
 | `config/trusted_domains.yaml` | Allowlisted evidence sources |
@@ -521,6 +628,10 @@ The control panel blocks checkbox signals while programmatically refreshing a to
 | `LUCY_SESSION_MEMORY=1` | Enable session memory |
 | `LUCY_ENABLE_INTERNET=1` | Enable external providers |
 | `LUCY_WEB_ENABLED=1` | Enable HTTP adapter |
+| `LUCY_SOURCE_ATTRIBUTION=1` | Enable `source_attribution` capability flag |
+| `LUCY_SUGGEST_WEB_ESCALATION=1` | Enable `suggest_web_escalation` capability flag |
+| `LUCY_AUTO_WEB_GENERAL_KNOWLEDGE=1` | Enable `auto_web_general_knowledge` capability flag |
+| `LUCY_TRUSTED_SOURCES_ONLY_CRITICAL=1` | Enable critical-source trusted-sources-only policy |
 | `OLLAMA_FLASH_ATTENTION=1` | GPU optimization |
 | `OLLAMA_KV_CACHE_TYPE=q8_0` | GPU optimization |
 
@@ -531,7 +642,7 @@ The control panel blocks checkbox signals while programmatically refreshing a to
 | Location | Coverage |
 |----------|----------|
 | `tests/` | Golden responses, regression cases, specific entity fact gate |
-| `tools/router_py/test_*.py` | Routing, policy, classification, finance, medical, news, edge cases, evidence provider, self-analysis, code-review resolver, split characterization tests |
+| `tools/router_py/test_*.py` | Routing, policy, classification, finance, medical, news, edge cases, evidence provider, self-analysis, code-review resolver, split characterization tests, pipeline/escalation flag tests, critical-source guard tests, source-attribution tests, web-fetcher tests |
 | `tools/tests/` | Memory service, end-to-end comprehensive tests |
 | `tools/voice/tests/` | TTS fallback, voice utilities |
 | `ui-v10/tests/` | Off-screen HMI tests |
@@ -563,14 +674,15 @@ bash scripts/run-fast-tests.sh
 | `feedback_parser.py` | `feedback_parser/` | Merged to main |
 | `context_guard.py` | `context_guard/` | Merged to main (post-reboot recovery) |
 | `streaming_voice.py` | `streaming_voice/` | Merged to main |
+| `request_pipeline.py` | `pipeline/` + `request_pipeline.py` facade | Pipeline split on `feature/v11-pipeline-split-escalation` |
+| `plan_to_pipeline_cli.py` | `planner/` + `plan_to_pipeline_cli.py` facade | Planner split on `feature/v11-pipeline-split-escalation` |
+| *(new)* | `escalation/` | New package for source attribution, escalation suggestions, critical-source guard on `feature/v11-pipeline-split-escalation` |
 
 ### Remaining large production files
 
 | File | Lines | Notes |
 |---|---|---|
-| `plan_to_pipeline_cli.py` | ~794 | Frozen baseline — do not split without explicit approval |
 | `main.py` | ~740 | Central orchestrator — high blast radius |
-| `request_pipeline.py` | ~653 | Stage-3 choke point — high blast radius |
 | `execution_engine_state.py` | ~666 | State persistence layer |
 | `voice_recorder.py` | ~528 | Good next candidate |
 | `self_analysis.py` | ~496 | Self-contained |
@@ -600,6 +712,12 @@ bash scripts/run-fast-tests.sh
 | Evidence freshness not checked | **Freshness check** for medical/vet/finance evidence |
 | Live evidence failures returned clarification | **Graceful fallback** to local knowledge with `local_with_caveat` |
 | Monolithic `tools/router_py/` modules | **Ongoing split into focused packages** with preserved public APIs |
+| Inline request-pipeline logic | **`request_pipeline.py`** is now a thin facade over `pipeline/` sub-modules |
+| Inline plan-to-pipeline CLI logic | **`plan_to_pipeline_cli.py`** is now a thin facade over `planner/` sub-modules |
+| No source attribution on answers | **`SourceAttribution`** added to `RouterOutcome` behind `source_attribution` flag |
+| No escalation hints | **Conservative escalation suggestions** behind `suggest_web_escalation` flag |
+| No automatic web fetch for general knowledge | **`auto_web_general_knowledge`** fetches one untrusted web result for thin local answers |
+| Critical categories could use untrusted web sources | **Critical-source policy** restricts medical/financial/legal/safety/identity queries to trusted-domain allowlists |
 
 ---
 
