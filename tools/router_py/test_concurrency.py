@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR / "tools"))
 
-from router_py.state_manager import get_state_manager, StateManager
+from router_py.state import get_state_manager, StateManager
 
 
 class ConcurrencyTestResults:

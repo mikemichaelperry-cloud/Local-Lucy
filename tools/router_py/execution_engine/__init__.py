@@ -66,7 +66,7 @@ from router_py.request_constraints import RequestConstraints
 from router_py.request_types import ExecutionResult
 from router_py import response_formatter
 from router_py.self_analysis import SelfAnalysisEngine
-from router_py.state_manager import get_state_manager
+from router_py.state import get_state_manager
 from router_py.execution_engine_state import StateWriter
 from router_py.resilience import get_breaker, CircuitBreakerOpen
 from router_py.shutdown_handler import register_closeable
