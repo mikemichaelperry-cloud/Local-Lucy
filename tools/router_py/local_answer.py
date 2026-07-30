@@ -97,33 +97,6 @@ _heartbeat_stop = threading.Event()
 _heartbeat_model: str | None = None
 
 
-def _get_active_model_from_state() -> str | None:
-    """Read the currently selected model from the authoritative state file.
-
-    Heartbeat/warmup threads use this instead of relying only on their
-    thread-local model argument. That way a state change made through the
-    HMI, CLI, or a profile reload is respected even if no new heartbeat
-    thread is explicitly started for the new model.
-    """
-    raw_state_file = os.environ.get("LUCY_RUNTIME_STATE_FILE", "").strip()
-    if raw_state_file:
-        state_file = Path(raw_state_file).expanduser()
-    else:
-        namespace = os.environ.get(
-            "LUCY_RUNTIME_NAMESPACE_ROOT",
-            str(lucy_runtime_namespace_root()),
-        )
-        state_file = Path(namespace).expanduser() / "state" / "current_state.json"
-    try:
-        state = json.loads(state_file.read_text(encoding="utf-8"))
-        model = str(state.get("model", "")).strip()
-        if model and model.lower() != "auto":
-            return model
-    except Exception:
-        pass
-    return None
-
-
 def _ollama_heartbeat_ping(
     model: str = "local-lucy-llama31", url: str = "http://127.0.0.1:11434/api/generate"
 ) -> None:
@@ -192,12 +165,13 @@ def stop_ollama_heartbeat() -> None:
     _heartbeat_stop.set()
 
 
-# Import persistent facts and active identity from SQL memory service (with fallback for standalone use)
+# Import active identity helpers from SQL memory service (with fallback for standalone use).
+# Persistent-fact retrieval lives in router_py.local_answer_core.facts so it can be shared
+# with the engine without creating circular imports.
 try:
     from memory.memory_service import (
         get_current_user_identity as _get_current_user_identity,
         get_persistent_facts_revision as _get_persistent_facts_revision,
-        get_relevant_persistent_facts as _get_relevant_persistent_facts,
     )
 
     logger.info("[FACTS] Imported memory service helpers from memory.memory.service")
@@ -207,7 +181,6 @@ except ImportError as _e1:
         from tools.memory.memory_service import (
             get_current_user_identity as _get_current_user_identity,
             get_persistent_facts_revision as _get_persistent_facts_revision,
-            get_relevant_persistent_facts as _get_relevant_persistent_facts,
         )
 
         logger.info("[FACTS] Imported memory service helpers from tools.memory.memory_service")
@@ -215,9 +188,6 @@ except ImportError as _e1:
         logger.error(
             f"[FACTS] Failed to import memory service helpers: {_e2}. Using fallback no-ops."
         )
-
-        def _get_relevant_persistent_facts(query, category=None, limit=3, threshold=0.35):
-            return []
 
         def _get_persistent_facts_revision(category=None):
             return ""
@@ -233,7 +203,9 @@ from router_py.local_answer_core.config import (
     LocalAnswerConfig,
 )
 from router_py.local_answer_core.engine import LocalAnswer
+from router_py.local_answer_core.facts import _get_relevant_persistent_facts
 from router_py.local_answer_core.logger import LocalAnswerLogger
+from router_py.local_answer_core.state import _get_active_model_from_state
 from router_py.local_answer_core.self_knowledge import (
     WATER_WET_RESPONSE,
     _MODEL_IDENTITIES,

@@ -37,6 +37,7 @@ from router_py.local_answer_core.self_knowledge import (
     _load_family_facts_direct,
     get_self_knowledge,
 )
+from router_py.local_answer_core.facts import _get_relevant_persistent_facts
 from router_py.local_answer_core.utils import _OllamaWarmupThread, get_gpu_free_vram_mb
 from router_py.ollama_cleanup import unload_other_lucy_models
 

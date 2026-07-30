@@ -12,6 +12,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from router_py.local_answer_core.state import _get_active_model_from_state
+
 
 class _OllamaWarmupThread(threading.Thread):
     """Daemon thread that pings Ollama periodically to keep the model loaded.
