@@ -1,5 +1,5 @@
-source_attribution: false
-suggest_web_escalation: false
-auto_web_general_knowledge: false
+source_attribution: true
+suggest_web_escalation: true
+auto_web_general_knowledge: true
 trusted_sources_only_critical: true
 auto_web_allowed_domains: []

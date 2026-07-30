@@ -14,9 +14,9 @@ from router_py.pipeline.config import load_capability_flags
 
 def test_load_capability_flags_defaults():
     flags = load_capability_flags()
-    assert flags.source_attribution is False
-    assert flags.suggest_web_escalation is False
-    assert flags.auto_web_general_knowledge is False
+    assert flags.source_attribution is True
+    assert flags.suggest_web_escalation is True
+    assert flags.auto_web_general_knowledge is True
     assert flags.trusted_sources_only_critical is True
     assert flags.auto_web_allowed_domains == ()
 
