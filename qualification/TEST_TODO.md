@@ -256,7 +256,8 @@
   Evidence: tools/router_py/test_policy_router.py::TestGuardBoundaries + tools/router_py/test_classify_low_confidence.py
 - [FRQ-FULL-001] PASSED — Full deterministic regression across tools/router_py after privacy-redaction test alignment.
   Evidence: 1233 passed, 7 skipped, 274 deselected, 188 subtests passed (2026-08-06T16:39Z).
-- [FRQ-MODEL-001] PENDING — Sequential model verification (Gemma/Llama, no dual residency).
+- [FRQ-MODEL-001] PASSED — Sequential model verification (Gemma/Llama, no dual residency).
+  Evidence: stage_08_gemma_smoke.py 3/3; stage_09_gemma_scenario_suite.py 12/12; stage_10_llama_smoke.py 3/3; stage_11_llama_scenario_suite.py 12/12 with 12/12 route/outcome parity; stage_13_model_switch.py 3/3; ollama ps confirmed no dual residency after each stage.
 - [FRQ-PRIV-001] PENDING — Privacy and fault verification.
 - [FRQ-SOAK-001] PENDING — Soak and final clean run.
 - [FRQ-MAN-001] PENDING — Create immutable qualification manifest and revised completion report.
