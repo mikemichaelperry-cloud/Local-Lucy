@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -147,6 +148,12 @@ def classify_intent(query: str, surface: str = "cli") -> ClassificationResult:
 
     # Check for force_local flag (creative writing, privacy requests)
     force_local = output.get("force_local", False)
+
+    # Environment override: LUCY_FORCE_LOCAL=1 forces local routing even when
+    # the classifier itself does not request it.  This is used by tests and by
+    # privacy-sensitive callers who want to guarantee no outbound traffic.
+    if os.environ.get("LUCY_FORCE_LOCAL", "0") == "1":
+        force_local = True
 
     # Creative writing override: force LOCAL for stories, poems, fiction
     # regardless of topic keywords (prevents medical/financial evidence mode
