@@ -258,7 +258,8 @@
   Evidence: 1233 passed, 7 skipped, 274 deselected, 188 subtests passed (2026-08-06T16:39Z).
 - [FRQ-MODEL-001] PASSED — Sequential model verification (Gemma/Llama, no dual residency).
   Evidence: stage_08_gemma_smoke.py 3/3; stage_09_gemma_scenario_suite.py 12/12; stage_10_llama_smoke.py 3/3; stage_11_llama_scenario_suite.py 12/12 with 12/12 route/outcome parity; stage_13_model_switch.py 3/3; ollama ps confirmed no dual residency after each stage.
-- [FRQ-PRIV-001] PENDING — Privacy and fault verification.
+- [FRQ-PRIV-001] PASSED — Privacy and fault verification.
+  Evidence: test_stage_06_planner_security.py (10 passed); test_stage_06_untrusted_web.py (1 passed); test_stage_14_fault_injection.py (5 passed); test_stage_15_privacy_audit.py (4 passed); test_execution_engine_state.py::TestPIIRedaction (5 passed); test_memory_privacy_canary.py (5 passed).
 - [FRQ-SOAK-001] PENDING — Soak and final clean run.
 - [FRQ-MAN-001] PENDING — Create immutable qualification manifest and revised completion report.
 
