@@ -210,7 +210,13 @@ def _get_fact_embedding_engine_name() -> str:
     """Return identifier for the currently active fact-embedding engine."""
     if _get_minilm_model() is not None:
         return "minilm"
-    return f"ollama:{os.environ.get('LUCY_OLLAMA_MODEL', 'local-lucy')}"
+    active_model = (
+        os.environ.get("LUCY_LOCAL_MODEL")
+        or os.environ.get("LUCY_MODEL")
+        or os.environ.get("LUCY_OLLAMA_MODEL")
+        or "local-lucy-llama31"
+    )
+    return f"ollama:{active_model}"
 
 
 def _compute_fact_embedding(text: str) -> list[float] | None:
@@ -808,11 +814,16 @@ def _summarize_turns_with_ollama(
     )
 
     # Prefer a small/fast model for summarization if configured, otherwise fall
-    # back to the active Ollama model. This avoids timeouts when a large model
-    # is still loading or busy with the user's main request.
+    # back to the active local model. This keeps the same model resident and
+    # prevents two Local Lucy models from being loaded at the same time.
     summary_model = os.environ.get("LUCY_MEMORY_SUMMARIZE_MODEL", "")
     if not summary_model:
-        summary_model = os.environ.get("LUCY_OLLAMA_MODEL", "local-lucy")
+        summary_model = (
+            os.environ.get("LUCY_LOCAL_MODEL")
+            or os.environ.get("LUCY_MODEL")
+            or os.environ.get("LUCY_OLLAMA_MODEL")
+            or "local-lucy-llama31"
+        )
 
     payload = {
         "model": summary_model,
@@ -1029,7 +1040,12 @@ def _get_embedding(text: str, timeout: float = 15.0) -> list[float] | None:
         except Exception as exc:
             logger.debug(f"MiniLM embedding failed: {exc}")
 
-    model = os.environ.get("LUCY_OLLAMA_MODEL", "local-lucy")
+    model = (
+        os.environ.get("LUCY_LOCAL_MODEL")
+        or os.environ.get("LUCY_MODEL")
+        or os.environ.get("LUCY_OLLAMA_MODEL")
+        or "local-lucy-llama31"
+    )
     key = hashlib.sha256(f"{text.strip()}:{model}".encode("utf-8")).hexdigest()
     with _EMBEDDING_CACHE_LOCK:
         cached = _EMBEDDING_CACHE.pop(key, None)
@@ -1274,6 +1290,27 @@ _DEEP_CONTEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Explicit requests to recall the conversation history itself. These must
+# bypass topic-shift detection because the query is intentionally about the
+# prior conversation, not a new topic.
+_EXPLICIT_MEMORY_RECALL_RE = re.compile(
+    r"\b("
+    r"what did (?:i|we|he|she|they) (?:say|discuss|talk about|ask|mention)|"
+    r"what (?:was|were) (?:my|our|the) (?:last|previous)|"
+    r"remind me (?:of|about)|"
+    r"do you remember|"
+    r"what did you say|"
+    r"read (?:my|the|your) (?:last|previous) (?:answer|response|reply)|"
+    r"repeat (?:that|what)|"
+    r"say that again|"
+    r"summarize (?:our|the|my) (?:conversation|chat|discussion)|"
+    r"what have we been (?:discussing|talking about)|"
+    r"look at (?:our|the|my) (?:previous|earlier) (?:discussion|conversation|chat)|"
+    r"use the corrected information"
+    r")\b",
+    re.IGNORECASE,
+)
+
 # Temporal uses of "this" (e.g., "this evening") are not conversational
 # references, so exclude them from deep-context detection.
 _TEMPORAL_THIS_RE = re.compile(
@@ -1459,10 +1496,14 @@ def _is_vague_followup(query: str) -> bool:
 
     Such queries rely on recent conversation context to make sense and must
     never be answered from a stale session summary or treated as a topic shift.
+    Explicit memory-recall queries (e.g. "what did we discuss earlier") also bypass
+    topic-shift detection because the query is intentionally about prior conversation.
     """
     q = query.strip()
     if not q:
         return False
+    if _EXPLICIT_MEMORY_RECALL_RE.search(q):
+        return True
     if _VAGUE_FOLLOWUP_RE.search(q):
         return True
     if _AFFIRMATION_FOLLOWUP_RE.search(q):
@@ -1513,6 +1554,26 @@ def _top_gap_threshold() -> float | None:
     except ValueError:
         return 0.10
     return max(0.0, min(1.0, v))
+
+
+def _recent_turn_limit() -> int:
+    """Return configured number of recent turns to include verbatim (default 12)."""
+    raw = os.environ.get("LUCY_MEMORY_RECENT_TURN_LIMIT", "12").strip()
+    try:
+        v = int(raw)
+    except ValueError:
+        v = 12
+    return max(1, v)
+
+
+def _max_injected_turns() -> int:
+    """Return configured max semantically recalled older turns (default 8)."""
+    raw = os.environ.get("LUCY_MEMORY_MAX_INJECTED_TURNS", "8").strip()
+    try:
+        v = int(raw)
+    except ValueError:
+        v = 8
+    return max(0, v)
 
 
 def _topic_shift_threshold() -> float:
@@ -1599,6 +1660,67 @@ def _is_topic_shift(current_query: str, previous_text: str) -> bool:
     return _is_topic_shift_impl(current_query, previous_text)
 
 
+def _find_relevant_turns_in_session(
+    session_id: str,
+    query: str,
+    query_embedding: list[float] | None = None,
+    recent_limit: int = 4,
+    top_k: int | None = None,
+    similarity_threshold: float | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Return older turns in *session_id* ranked by similarity to *query*.
+
+    Turns within the most recent *recent_limit* are excluded because they are
+    already included verbatim.  Embeddings are computed on demand via the same
+    engine used for summary/fact embeddings, so no schema migration is needed.
+
+    Returns:
+        (turns, diagnostics) where turns are dicts with role/text keys and
+        diagnostics contains candidate counts and top score.
+    """
+    diagnostics: dict[str, Any] = {
+        "candidates": 0,
+        "above_threshold": 0,
+        "top_score": None,
+    }
+    threshold = (
+        similarity_threshold if similarity_threshold is not None else _similarity_threshold()
+    )
+    all_turns = get_all_turns(session_id)
+    if not all_turns or not query.strip():
+        return [], diagnostics
+
+    # Exclude the N most recent turns (verbatim block)
+    older_turns = all_turns[:-recent_limit] if len(all_turns) > recent_limit else []
+    if not older_turns:
+        return [], diagnostics
+
+    query_vector = _get_embedding_cached(query.strip(), query_embedding)
+    if query_vector is None:
+        return [], diagnostics
+
+    scored: list[dict[str, Any]] = []
+    for turn in older_turns:
+        text = turn.get("text", "").strip()
+        if not text:
+            continue
+        turn_embedding = _get_embedding(text)
+        if turn_embedding is None:
+            continue
+        sim = _cosine_similarity(query_vector, turn_embedding)
+        diagnostics["candidates"] += 1
+        if sim >= threshold:
+            diagnostics["above_threshold"] += 1
+            scored.append({"role": turn["role"], "text": text, "similarity": sim})
+
+    scored.sort(key=lambda x: x["similarity"], reverse=True)
+    if scored:
+        diagnostics["top_score"] = scored[0]["similarity"]
+    if top_k is None:
+        top_k = _max_injected_turns()
+    return scored[:top_k], diagnostics
+
+
 # ---------------------------------------------------------------------------
 # Context assembly
 # ---------------------------------------------------------------------------
@@ -1606,8 +1728,8 @@ def _is_topic_shift(current_query: str, previous_text: str) -> bool:
 
 def assemble_context_with_telemetry(
     current_session_id: str = "default",
-    max_chars: int = 500,
-    recent_turn_limit: int = 4,
+    max_chars: int | None = None,
+    recent_turn_limit: int | None = None,
     other_summary_limit: int = 2,
     query: str = "",
     depth: str = "auto",
@@ -1635,6 +1757,11 @@ def assemble_context_with_telemetry(
             memory_session_injected: session_id of top injected match or "none"
             memory_top_gap: gap between top 1 and top 2 or "none"
     """
+    if max_chars is None:
+        max_chars = int(os.environ.get("LUCY_MEMORY_MAX_CHARS", "2000").strip() or "2000")
+    if recent_turn_limit is None:
+        recent_turn_limit = _recent_turn_limit()
+
     telemetry: dict[str, str] = {
         "memory_context_used": "false",
         "memory_mode_used": "none",
@@ -1642,6 +1769,8 @@ def assemble_context_with_telemetry(
         "memory_top_score": "none",
         "memory_session_injected": "none",
         "memory_top_gap": "none",
+        "memory_turns_verbatim": "0",
+        "memory_turns_semantic": "0",
     }
 
     if depth == "auto":
@@ -1677,6 +1806,8 @@ def assemble_context_with_telemetry(
             telemetry["memory_context_used"] = "true"
             telemetry["memory_mode_used"] = mode
             telemetry["memory_depth_used"] = "shallow"
+            telemetry["memory_turns_verbatim"] = str(len(recent_turns))
+            telemetry["memory_turns_semantic"] = "0"
             return context, telemetry
         return "", telemetry
 
@@ -1684,6 +1815,7 @@ def assemble_context_with_telemetry(
     if mode == "local":
         recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
         vague_followup = _is_vague_followup(query)
+        query_embedding: list[float] | None = None
         # Topic-shift gate: don't inject stale context for radically different queries.
         # Vague follow-ups intentionally reference prior context, so bypass the gate.
         if query.strip() and recent_turns and not vague_followup:
@@ -1702,13 +1834,26 @@ def assemble_context_with_telemetry(
                 ):
                     telemetry["memory_topic_shift_detected"] = "true"
                     return "", telemetry
-        # Vague follow-ups must use recent turns, not a possibly-stale summary.
+        # Position-aware assembly: verbatim recent turns first, then semantically
+        # ranked older turns, then the session summary (least critical under budget).
+        semantic_turns: list[dict[str, Any]] = []
+        if recent_turns:
+            parts.append(format_turns_for_prompt(recent_turns))
+        if query.strip() and not vague_followup:
+            semantic_turns, turn_diag = _find_relevant_turns_in_session(
+                current_session_id,
+                query,
+                query_embedding=query_embedding,
+                recent_limit=recent_turn_limit,
+            )
+            if semantic_turns:
+                parts.append(format_turns_for_prompt(semantic_turns))
+            if turn_diag.get("top_score") is not None:
+                telemetry["memory_top_score"] = f"{turn_diag['top_score']:.3f}"
         if not vague_followup:
             current_summary = get_session_summary(current_session_id)
             if current_summary:
                 parts.append(f"Session summary: {current_summary}")
-        if recent_turns:
-            parts.append(format_turns_for_prompt(recent_turns))
         if not parts:
             return "", telemetry
         context = "\n\n".join(parts)
@@ -1716,47 +1861,18 @@ def assemble_context_with_telemetry(
         telemetry["memory_context_used"] = "true"
         telemetry["memory_mode_used"] = "local"
         telemetry["memory_depth_used"] = "deep"
+        telemetry["memory_turns_verbatim"] = str(len(recent_turns))
+        telemetry["memory_turns_semantic"] = str(len(semantic_turns))
         return context, telemetry
 
     # DEEP — AUGMENTED: full context assembly with cross-session recall
     included_session_ids: set[str] = set()
     top_session: str | None = None
+    session_summary_parts: list[str] = []
 
     query_embedding = _get_embedding(query.strip()) if query.strip() else None
 
-    # 1. Semantic recall (uses env-configured thresholds)
-    if query.strip():
-        try:
-            relevant, diag = _find_relevant_sessions_with_diagnostics_impl(query, query_embedding)
-            if diag.get("top_score") is not None:
-                telemetry["memory_top_score"] = f"{diag['top_score']:.3f}"
-            if diag.get("top_gap") is not None:
-                telemetry["memory_top_gap"] = f"{diag['top_gap']:.3f}"
-            for item in relevant:
-                text = item["summary_text"]
-                if len(text) > 150:
-                    text = text[:150].rsplit(" ", 1)[0] + "..."
-                parts.append(f"Related session: {text}")
-                included_session_ids.add(item["session_id"])
-                if top_session is None:
-                    top_session = item["session_id"]
-        except Exception:
-            pass
-
-    # 2. Chronological fallback — only when no query (semantic already handled it)
-    if not query.strip() and len(parts) < other_summary_limit:
-        other_summaries = get_other_session_summaries(current_session_id, limit=other_summary_limit)
-        for summary in other_summaries:
-            if summary["session_id"] in included_session_ids:
-                continue
-            text = summary["summary_text"]
-            if len(text) > 150:
-                text = text[:150].rsplit(" ", 1)[0] + "..."
-            parts.append(f"Previous session: {text}")
-            if len(parts) >= other_summary_limit:
-                break
-
-    # 3. Current session summary and recent turns (topic-shift gated)
+    # 1. Current session: recent turns first, then semantic older turns, then summary.
     recent_turns = get_recent_turns(current_session_id, limit=recent_turn_limit)
     vague_followup = _is_vague_followup(query)
     topic_shift = False
@@ -1774,12 +1890,60 @@ def assemble_context_with_telemetry(
         ):
             topic_shift = True
             telemetry["memory_topic_shift_detected"] = "true"
+
+    semantic_turns: list[dict[str, Any]] = []
     if not topic_shift:
-        current_summary = get_session_summary(current_session_id)
-        if current_summary and not vague_followup:
-            parts.append(f"Session summary: {current_summary}")
         if recent_turns:
             parts.append(format_turns_for_prompt(recent_turns))
+        if query.strip() and not vague_followup:
+            semantic_turns, turn_diag = _find_relevant_turns_in_session(
+                current_session_id,
+                query,
+                query_embedding=query_embedding,
+                recent_limit=recent_turn_limit,
+            )
+            if semantic_turns:
+                parts.append(format_turns_for_prompt(semantic_turns))
+            if turn_diag.get("top_score") is not None:
+                telemetry["memory_top_score"] = f"{turn_diag['top_score']:.3f}"
+        current_summary = get_session_summary(current_session_id)
+        if current_summary and not vague_followup:
+            session_summary_parts.append(f"Session summary: {current_summary}")
+
+    # 2. Cross-session semantic recall (uses env-configured thresholds)
+    if query.strip():
+        try:
+            relevant, diag = _find_relevant_sessions_with_diagnostics_impl(query, query_embedding)
+            if diag.get("top_score") is not None and telemetry["memory_top_score"] == "none":
+                telemetry["memory_top_score"] = f"{diag['top_score']:.3f}"
+            if diag.get("top_gap") is not None:
+                telemetry["memory_top_gap"] = f"{diag['top_gap']:.3f}"
+            for item in relevant:
+                text = item["summary_text"]
+                if len(text) > 150:
+                    text = text[:150].rsplit(" ", 1)[0] + "..."
+                session_summary_parts.append(f"Related session: {text}")
+                included_session_ids.add(item["session_id"])
+                if top_session is None:
+                    top_session = item["session_id"]
+        except Exception:
+            pass
+
+    # 3. Chronological fallback — only when no query (semantic already handled it)
+    if not query.strip() and len(session_summary_parts) < other_summary_limit:
+        other_summaries = get_other_session_summaries(current_session_id, limit=other_summary_limit)
+        for summary in other_summaries:
+            if summary["session_id"] in included_session_ids:
+                continue
+            text = summary["summary_text"]
+            if len(text) > 150:
+                text = text[:150].rsplit(" ", 1)[0] + "..."
+            session_summary_parts.append(f"Previous session: {text}")
+            if len(session_summary_parts) >= other_summary_limit:
+                break
+
+    # Session-level context is lower priority than current turns, so append last.
+    parts.extend(session_summary_parts)
 
     if not parts:
         return "", telemetry
@@ -1790,6 +1954,8 @@ def assemble_context_with_telemetry(
     telemetry["memory_context_used"] = "true"
     telemetry["memory_mode_used"] = "augmented"
     telemetry["memory_depth_used"] = "deep"
+    telemetry["memory_turns_verbatim"] = str(len(recent_turns))
+    telemetry["memory_turns_semantic"] = str(len(semantic_turns))
     if top_session:
         telemetry["memory_session_injected"] = top_session
     return context, telemetry
@@ -1797,8 +1963,8 @@ def assemble_context_with_telemetry(
 
 def assemble_context(
     current_session_id: str = "default",
-    max_chars: int = 500,
-    recent_turn_limit: int = 4,
+    max_chars: int | None = None,
+    recent_turn_limit: int | None = None,
     other_summary_limit: int = 2,
     query: str = "",
     depth: str = "auto",
