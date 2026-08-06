@@ -8,6 +8,7 @@ when explicitly enabled and that defaults remain backward-compatible.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -88,6 +89,10 @@ def _set_flags(monkeypatch, **kwargs: bool) -> None:
     for name, value in defaults.items():
         env_name = f"LUCY_{name.upper()}"
         monkeypatch.setenv(env_name, "1" if value else "0")
+    # Earlier tests that import main.py can leave provider/policy env vars set.
+    # Remove them so provider resolution uses query-type defaults in this suite.
+    monkeypatch.delenv("LUCY_AUGMENTED_PROVIDER", raising=False)
+    monkeypatch.delenv("LUCY_AUGMENTATION_POLICY", raising=False)
 
 
 def _outcome_without_timing(outcome):
@@ -275,7 +280,8 @@ def test_auto_web_general_knowledge_fetches_for_non_critical(monkeypatch):
         classification=classification,
     )
     assert "Found It" in outcome.escalation_suggestion
-    assert "example.com/found" in outcome.escalation_suggestion
+    assert "example.com" in outcome.escalation_suggestion
+    assert "example.com/found" not in outcome.escalation_suggestion
     assert "untrusted" in outcome.escalation_suggestion.lower()
 
 
@@ -399,6 +405,45 @@ def test_trusted_sources_only_critical_preserves_parity_decision(monkeypatch):
     assert final_decision.route == "AUGMENTED"
     assert final_decision.provider == "kimi"
     assert outcome.outcome_code != "operator_blocked"
+
+
+# ---------------------------------------------------------------------------
+# 8. Diagnostic trace flag
+# ---------------------------------------------------------------------------
+
+
+def test_router_diagnostics_flag_writes_trace(monkeypatch, tmp_path: Path):
+    """When LUCY_ROUTER_DIAGNOSTICS=1, process() writes a structured trace entry."""
+    diagnostics_file = tmp_path / "router_diagnostics.jsonl"
+    monkeypatch.setenv("LUCY_ROUTER_DIAGNOSTICS", "1")
+    monkeypatch.setenv("LUCY_ROUTER_DIAGNOSTICS_PATH", str(diagnostics_file))
+
+    classification = _classification(category="general")
+    decision = _decision(route="LOCAL", provider="local")
+    execute_result = _execute_result(
+        route="LOCAL",
+        provider="local",
+        response_text="local answer",
+    )
+
+    with patch(
+        "router_py.request_pipeline.execute.execute_request",
+        return_value=execute_result,
+    ):
+        process(
+            "what is the capital of france",
+            classification=classification,
+            decision=decision,
+        )
+
+    assert diagnostics_file.exists()
+    lines = diagnostics_file.read_text().strip().splitlines()
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["original_query"] == "what is the capital of france"
+    assert entry["final_route"] == "LOCAL"
+    assert entry["final_provider"] == "local"
+    assert "capability_flags" in entry
 
 
 if __name__ == "__main__":

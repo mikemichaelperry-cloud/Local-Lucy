@@ -301,7 +301,8 @@ def test_process_attaches_web_suggestion_when_flag_enabled():
         classification=classification,
     )
     assert "Found It" in outcome.escalation_suggestion
-    assert "example.com/found" in outcome.escalation_suggestion
+    assert "example.com" in outcome.escalation_suggestion
+    assert "example.com/found" not in outcome.escalation_suggestion
     assert "untrusted" in outcome.escalation_suggestion.lower()
 
 
@@ -492,7 +493,8 @@ def test_process_fetches_when_source_attribution_flag_disabled():
         classification=classification,
     )
     assert "Found It" in outcome.escalation_suggestion
-    assert "example.com/found" in outcome.escalation_suggestion
+    assert "example.com" in outcome.escalation_suggestion
+    assert "example.com/found" not in outcome.escalation_suggestion
 
 
 def test_process_skips_fetch_when_attribution_basis_is_low():

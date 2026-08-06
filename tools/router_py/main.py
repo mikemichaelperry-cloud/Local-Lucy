@@ -329,8 +329,11 @@ def _persist_memory_turn(
         mem_path = Path(mem_file).expanduser()
         mem_path.parent.mkdir(parents=True, exist_ok=True)
 
+        from router_py.privacy import strip_untrusted_source_annotations
+
+        assistant_text = strip_untrusted_source_annotations(response_text)
         assistant_text = (
-            response_text.replace("BEGIN_VALIDATED", " ")
+            assistant_text.replace("BEGIN_VALIDATED", " ")
             .replace("END_VALIDATED", " ")
             .replace("\r", " ")
             .replace("\n", " ")
@@ -372,6 +375,186 @@ def _persist_memory_turn(
             mem_path.write_text(trimmed, encoding="utf-8")
     except Exception as e:
         logging.warning(f"Failed to persist chat memory: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Location-fact extraction
+# ---------------------------------------------------------------------------
+
+_LOCATION_PATTERNS = [
+    re.compile(
+        r"(?:\b|^)i\s+(?:live|reside|am\s+located|am\s+based)\s+in\s+(.+?)(?:\.|$|\s+(?:and|but|,|;))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:\b|^)my\s+(?:location|address|home\s+town|hometown|city|village|kibbutz)\s+is\s+(.+?)(?:\.|$|\s+(?:and|but|,|;))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:\b|^)i\s+moved\s+(?:to|into)\s+(.+?)(?:\.|$|\s+(?:and|but|,|;))",
+        re.IGNORECASE,
+    ),
+]
+
+
+def _extract_location_fact(
+    question: str,
+    *,
+    constraints: "RequestConstraints | None" = None,
+) -> None:
+    """Detect a user statement of location and persist it as a fact.
+
+    Examples that trigger storage:
+      - "I live in Kibbutz Magal in Israel."
+      - "My location is Jerusalem."
+      - "I moved to Tel Aviv."
+
+    The fact is stored with category ``location`` so ``_get_current_context``
+    and ``_build_prompt`` can use it for location-aware queries.
+    """
+    from router_py.request_constraints import RequestConstraints
+
+    if isinstance(constraints, RequestConstraints) and constraints.memory_write is False:
+        logging.debug("Skipping location extraction: memory_write denied")
+        return
+
+    for pattern in _LOCATION_PATTERNS:
+        match = pattern.search(question)
+        if match:
+            location = match.group(1).strip()
+            if not location:
+                continue
+            try:
+                from memory.memory_service import store_persistent_fact
+
+                store_persistent_fact(f"User lives in {location}.", category="location")
+                logging.info(f"Stored location fact: User lives in {location}.")
+            except ImportError:
+                try:
+                    from tools.memory.memory_service import store_persistent_fact
+
+                    store_persistent_fact(f"User lives in {location}.", category="location")
+                    logging.info(f"Stored location fact: User lives in {location}.")
+                except Exception as e:
+                    logging.warning(f"Failed to store location fact: {e}")
+            except Exception as e:
+                logging.warning(f"Failed to store location fact: {e}")
+            return
+
+
+# ---------------------------------------------------------------------------
+# Search-imperative anaphora resolution
+# ---------------------------------------------------------------------------
+
+# Bare imperatives that ask Lucy to run a web search without specifying a topic.
+# When these appear immediately after a web-route exchange, inherit the prior
+# topic instead of routing LOCAL and denying the capability.
+_SEARCH_TOOL_IMPERATIVE_PATTERN = re.compile(
+    r"^(?:please\s+)?(?:use\s+(?:duckduckgo|ddg|google|bing)\s+(?:search|to\s+search)|"
+    r"(?:run|do|perform)\s+(?:a\s+)?(?:duckduckgo|ddg|google|bing|web)\s+search|"
+    r"search\s+(?:with|using)\s+(?:duckduckgo|ddg|google|bing)|"
+    r"(?:duckduckgo|ddg|google|bing)\s+(?:search|it)|"
+    r"search\s+(?:the\s+web|online)|"
+    r"(?:can you\s+)?search\s+(?:again|once\s+more))(?:\s+please)?\s*(?:\.|\?|!)?$",
+    re.IGNORECASE,
+)
+
+
+def _maybe_resolve_search_imperative(query: str) -> str:
+    """Resolve a bare search-tool imperative to the prior web topic, if any.
+
+    If the user says "Use DuckDuckGo search" immediately after a web-route
+    exchange (AUGMENTED, EVIDENCE, NEWS, WEATHER, TIME, FINANCE), return the
+    prior user query so the pipeline routes to the web fallback on the same
+    topic. Otherwise return the original query unchanged.
+    """
+    if not query or not _SEARCH_TOOL_IMPERATIVE_PATTERN.search(query.strip()):
+        return query
+
+    try:
+        from router_py.feedback_buffer import get_buffer
+
+        buffer = get_buffer()
+        last = buffer.last()
+        if last is None:
+            return query
+        if last.route not in ("AUGMENTED", "EVIDENCE", "NEWS", "WEATHER", "TIME", "FINANCE"):
+            return query
+        prior_query = (last.query or "").strip()
+        if not prior_query:
+            return query
+        # Avoid infinite loops: if the prior query is itself a search imperative,
+        # do not inherit it.
+        if _SEARCH_TOOL_IMPERATIVE_PATTERN.search(prior_query):
+            return query
+        logging.info(
+            "Resolved search imperative to prior web topic",
+            extra={"original": query, "resolved": prior_query},
+        )
+        return prior_query
+    except Exception as e:
+        logging.debug(f"Search-imperative resolution failed: {e}")
+        return query
+
+
+# ---------------------------------------------------------------------------
+# Location-anaphora resolution
+# ---------------------------------------------------------------------------
+
+# Phrases that refer to the user's own location but do not name it. When a
+# stored location fact exists, replacing the anaphora with the actual location
+# makes web routes (AUGMENTED/EVIDENCE) useful instead of searching for "near me".
+_LOCATION_ANAPHORA_PATTERNS = [
+    re.compile(r"\bnear\s+me\b", re.IGNORECASE),
+    re.compile(r"\bin\s+my\s+area\b", re.IGNORECASE),
+    re.compile(r"\bin\s+this\s+area\b", re.IGNORECASE),
+    re.compile(r"\baround\s+here\b", re.IGNORECASE),
+    re.compile(r"\bclose\s+to\s+me\b", re.IGNORECASE),
+    re.compile(r"\bmy\s+area\b", re.IGNORECASE),
+]
+
+
+_LOCATION_FACT_PREFIX = "User lives in "
+
+
+def _maybe_resolve_location_anaphora(query: str) -> str:
+    """Replace location anaphora with the stored user location, if available.
+
+    Examples:
+      - "restaurant near me" -> "restaurant near Kibbutz Magal, Israel"
+      - "restaurants in this area" -> "restaurants in Kibbutz Magal, Israel"
+
+    Returns the original query unchanged when no location fact is stored or
+    the query already contains an explicit location.
+    """
+    if not query:
+        return query
+    try:
+        from router_py.local_answer_core.self_knowledge import _load_location_facts_direct
+
+        facts = _load_location_facts_direct()
+        if not facts:
+            return query
+        fact = facts[0]
+        if fact.startswith(_LOCATION_FACT_PREFIX):
+            location = fact[len(_LOCATION_FACT_PREFIX) :].rstrip(".").strip()
+        else:
+            location = fact.strip()
+        if not location:
+            return query
+        resolved = query
+        for pattern in _LOCATION_ANAPHORA_PATTERNS:
+            resolved = pattern.sub(f" near {location}", resolved)
+        if resolved != query:
+            resolved = re.sub(r"\s{2,}", " ", resolved).strip()
+            logging.info(
+                "Resolved location anaphora",
+                extra={"original": query, "resolved": resolved},
+            )
+        return resolved
+    except Exception as e:
+        logging.debug(f"Location-anaphora resolution failed: {e}")
+        return query
 
 
 def execute_plan_python(
@@ -423,6 +606,7 @@ def execute_plan_python(
             policy_reason="input_rejected",
         )
     question = validation.sanitized
+    original_question = question
 
     # --- Request-scoped capability constraints ---
     # Extract explicit user restrictions ("do not use network access", etc.) and
@@ -431,6 +615,23 @@ def execute_plan_python(
     request_constraints = (context or {}).get("request_constraints")
     if request_constraints is None:
         request_constraints = extract_request_constraints(question)
+
+    # --- Location fact extraction ---
+    # User statements like "I live in ..." should persist as authoritative facts
+    # for location-aware follow-ups. This runs before the pipeline so the fact is
+    # available to the current request if storage is fast, and to future requests.
+    _extract_location_fact(question, constraints=request_constraints)
+
+    # --- Search-imperative anaphora resolution ---
+    # Bare imperatives such as "Use DuckDuckGo search" should inherit the prior
+    # web topic when one exists, rather than routing LOCAL and denying capability.
+    question = _maybe_resolve_search_imperative(question)
+
+    # --- Location-anaphora resolution ---
+    # Replace "near me" / "in this area" with the stored user location so web
+    # routes can actually search the right place. This runs after location
+    # extraction so a just-stated location is available immediately.
+    question = _maybe_resolve_location_anaphora(question)
 
     # --- Structured logger ---
     logger = get_structured_logger("router_py.main").bind(
@@ -590,7 +791,7 @@ def execute_plan_python(
         if os.environ.get("LUCY_SESSION_MEMORY") == "1" and result.response_text:
             session_id = os.environ.get("LUCY_SESSION_ID", "default") or "default"
             _persist_memory_turn(
-                question,
+                original_question,
                 result.response_text,
                 session_id=session_id,
                 constraints=request_constraints,
@@ -602,7 +803,7 @@ def execute_plan_python(
                 from router_py.feedback_buffer import record_exchange
 
                 record_exchange(
-                    query=question,
+                    query=original_question,
                     route=result.route,
                     intent_family=classification.intent_family,
                     response_text=result.response_text or "",
@@ -678,6 +879,16 @@ def main() -> int:
     """Main entry point."""
     setup_logging(level=logging.INFO, json=True)
 
+    # Start recurring Ollama warmup ping to eliminate cold-start latency.
+    # This lives inside main() so importing this module (e.g. in tests) does not
+    # spawn a background thread that pings Ollama.
+    try:
+        from router_py.local_answer import LocalAnswer
+
+        LocalAnswer.start_recurring_warmup()
+    except Exception:
+        pass
+
     parser = argparse.ArgumentParser(description="Local Lucy Router (Python)")
     parser.add_argument("question", nargs="?", help="User question")
     parser.add_argument("--policy", default="fallback_only", help="Augmentation policy")
@@ -725,16 +936,6 @@ try:
     register_closeable(shutdown_cleanup)
 except Exception:
     pass
-
-# Start recurring Ollama warmup ping to eliminate cold-start latency.
-# This is a no-op if LUCY_WARMUP_ENABLED is not "1" or if Ollama is unreachable.
-try:
-    from router_py.local_answer import LocalAnswer
-
-    LocalAnswer.start_recurring_warmup()
-except Exception:
-    pass
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

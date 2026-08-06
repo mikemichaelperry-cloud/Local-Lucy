@@ -94,6 +94,11 @@ _CONSPIRACY_MARKERS = (
         re.IGNORECASE,
     ),
     re.compile(r"\b(pyramids?\s+(were\s+)?built\s+by\s+aliens)\b", re.IGNORECASE),
+    # Flat-earth variants including "Is the earth flat?" and "The earth is flat."
+    re.compile(
+        r"\b(earth\s+(is\s+)?flat|flat\s+earth|is\s+(the\s+)?earth\s+flat)\b",
+        re.IGNORECASE,
+    ),
 )
 
 # Markers that indicate the query is about a current/live fact, even if it is
@@ -337,6 +342,64 @@ _GARBAGE_PATTERNS = (
     re.compile(r"\basdfghjkl\b", re.IGNORECASE),
     re.compile(r"\bqwertyuiop\b", re.IGNORECASE),
 )
+
+# Restaurant / dining queries that the embedding router often mislabels as TIME
+# or WEATHER when they include words like "today" or a location.
+_RESTAURANT_DINING_RE = re.compile(
+    r"\b(?:restaurant|restaurants|restraunt|restraunts|restraurant|restraurants|"
+    r"cafe|cafes|diner|diners|bistro|bistros|eatery|eateries|"
+    r"place\s+to\s+eat|places\s+to\s+eat|where\s+(?:to\s+)?eat|"
+    r"good\s+food|dining)\b",
+    re.IGNORECASE,
+)
+
+# Common food-specific establishments (e.g. "pizza place near me", "sushi spot
+# in Tokyo").  Kept separate so recipe queries without a location/time qualifier
+# are not misrouted.
+_FOOD_ESTABLISHMENT_RE = re.compile(
+    r"\b(?:pizza|burger|sushi|kebab|falafel|hummus|shawarma|taco|ramen|curry|"
+    r"dim\s+sum|steak|seafood|bbq|barbecue)(?:\s+(?:place|joint|spot|restaurant|"
+    r"places|restaurants))?\b",
+    re.IGNORECASE,
+)
+
+_RESTAURANT_QUALIFIER_RE = re.compile(
+    r"\b(?:near|nere|in|around|by|close\s+to|area|kibbutz|city|me|us|here|today|"
+    r"tonight|now|saturday|sunday|monday|tuesday|wednesday|thursday|friday|"
+    r"weekend|open)\b",
+    re.IGNORECASE,
+)
+
+# Residence / location statements that should stay LOCAL (memory write or
+# hypothetical) rather than being misrouted to WEATHER because they contain a
+# place name.  Narrow patterns avoid catching "I live in London, what's the
+# weather?" which is a genuine weather query, and they do not catch compound
+# sentences like "I live in X. Search for restaurants...".
+_RESIDENCE_STATEMENT_RE = re.compile(
+    r"^(?:\s*actually\s+)?\s*I\s+(?:live|lived|am\s+staying|used\s+to\s+live|"
+    r"no\s+longer\s+live)\s+in\b[^?.!]*[.!?]?$",
+    re.IGNORECASE,
+)
+_QUOTED_RESIDENCE_RE = re.compile(
+    r"the\s+article\s+says[^?.!]*\bI\s+live\s+in\b[^?.!]*[.!?]?['\"]?$",
+    re.IGNORECASE,
+)
+_OTHER_PERSON_RESIDENCE_RE = re.compile(
+    r"^\s*My\s+(?:brother|sister|mother|father|son|daughter|friend|wife|"
+    r"husband|partner)\s+lives\s+in\b[^?.!]*[.!?]?$",
+    re.IGNORECASE,
+)
+_HYPOTHETICAL_RESIDENCE_RE = re.compile(
+    r"^\s*If\s+I\s+lived\s+in\b[^?.!]*[.!?]?$",
+    re.IGNORECASE,
+)
+
+# Terms that, when present, mean a residence-statement pattern is actually a
+# live-data request about the mentioned place.
+_RESIDENCE_WEATHER_EXCLUSIONS = frozenset(
+    {"weather", "forecast", "temperature", "rain", "snow", "sunny", "cloudy"}
+)
+
 
 # Terms that make a "current" query clearly historical or technical, not live.
 _NON_CURRENT_CONTEXT = frozenset(
@@ -893,6 +956,7 @@ def gate_medical_vet(
             r"\bprescription\b",
             r"\bdosage\b",
             r"\bvaccine\b",
+            r"\bvaccines\b",
             r"\bvaccination\b",
             r"\bmalaria\b",
             r"\bdengue\b",
@@ -1275,6 +1339,39 @@ def gate_garbage_nonsense(
     return None
 
 
+def gate_residence_statement(
+    query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
+) -> PolicyDecision | None:
+    """Residence, location, and hypothetical location statements -> LOCAL.
+
+    Prevents standalone statements like "I live in Kibbutz Magal" or
+    "I no longer live in Tel Aviv" from being misrouted to WEATHER just because
+    they contain a place name.  Genuine weather queries about the user's location
+    ("I live in London, what's the weather?") are preserved by excluding any
+    query with a question mark or weather-related terms.
+    """
+    if not query:
+        return None
+    q_lower = query.lower()
+    if any(term in q_lower for term in _RESIDENCE_WEATHER_EXCLUSIONS):
+        return None
+    if (
+        _RESIDENCE_STATEMENT_RE.search(query)
+        or _QUOTED_RESIDENCE_RE.search(q_lower)
+        or _OTHER_PERSON_RESIDENCE_RE.search(query)
+        or _HYPOTHETICAL_RESIDENCE_RE.search(query)
+    ):
+        return PolicyDecision(
+            route="LOCAL",
+            reason_code="policy:residence_statement",
+            matched_rule="residence_statement",
+            provider="local",
+            provider_usage_class="local",
+            policy_reason="residence_or_location_statement",
+        )
+    return None
+
+
 def _is_specific_entity_fact_query(query: str) -> bool:
     """Detect factual questions about a specific named real-world entity."""
     if not query:
@@ -1357,6 +1454,11 @@ def gate_weather(
     from router_py.classify import _is_weather_query
 
     if query and _is_weather_query(query):
+        # Travel-planning queries that also mention weather ("Plan a trip to Paris
+        # and tell me the weather") are better handled as travel/tourism lookups;
+        # the travel_tourism gate runs later and routes them to AUGMENTED.
+        if _TRAVEL_PLACE_RE.search(query):
+            return None
         return PolicyDecision(
             route="WEATHER",
             reason_code="policy:weather_query",
@@ -1399,6 +1501,17 @@ def gate_evidence_request(
     if not query:
         return None
     if not _has_evidence_request_intent(query):
+        return None
+    # An explicit local-only or network-denial constraint takes precedence over
+    # a source request (e.g. "What is 2+2? Do not search the web.").  Leave the
+    # decision to later gates / the embedding router rather than forcing outward.
+    constraints = extract_request_constraints(query)
+    if constraints.network is False or constraints.local_only is True:
+        return None
+    # Do not let a trailing evidence imperative override a clearly local
+    # capability such as arithmetic ("What is 2+2? Search the web.").  The broad
+    # factual_lookup gate already excludes math, so this keeps such queries local.
+    if re.search(r"[+\-*/=]", query):
         return None
     # Source requests that are not already medical/vet should go to AUGMENTED
     # with evidence required.
@@ -1454,6 +1567,40 @@ def gate_public_figure_age(
             provider="openai",
             provider_usage_class="paid",
             policy_reason="public_figure_age_override",
+        )
+    return None
+
+
+def gate_restaurant_dining(
+    query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
+) -> PolicyDecision | None:
+    """Restaurant / dining queries with a location or time qualifier.
+
+    The embedding router sometimes mislabels these as TIME or WEATHER because
+    they contain words like "today" or a place name. This deterministic gate
+    catches them before the time/weather gates and routes them to AUGMENTED
+    for current, location-aware information.
+
+    Defensively excludes pet food questions so the medical/vet/recreational-pet
+    gates keep priority.
+    """
+    if not query:
+        return None
+    q = query.lower()
+    # Exclude pet-eating questions; those are handled by earlier gates.
+    if any(t in q for t in ("dog", "cat", "pet", "puppy", "kitten")):
+        return None
+    if (
+        _RESTAURANT_DINING_RE.search(query) or _FOOD_ESTABLISHMENT_RE.search(query)
+    ) and _RESTAURANT_QUALIFIER_RE.search(query):
+        return PolicyDecision(
+            route="AUGMENTED",
+            reason_code="policy:restaurant_dining",
+            matched_rule="restaurant_dining",
+            ephemeral=True,
+            provider="wikipedia",
+            provider_usage_class="free",
+            policy_reason="router_restaurant_dining_guard",
         )
     return None
 
@@ -1584,6 +1731,11 @@ def gate_current_information(
 ) -> PolicyDecision | None:
     """Conservative current/changing facts not covered by other gates."""
     if not query:
+        return None
+    # Explicit local-only or network-denial constraints take precedence over
+    # current-information lookup.
+    constraints = extract_request_constraints(query)
+    if constraints.network is False or constraints.local_only is True:
         return None
     if not _is_current_information_query(query):
         return None

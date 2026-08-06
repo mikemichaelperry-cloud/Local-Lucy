@@ -141,6 +141,28 @@ class TestTimeWeatherNewsGates:
         assert decision is not None
         assert decision.route == "NEWS"
 
+    def test_news_with_restaurant_signal_yields_to_restaurant_dining(self, router: PolicyRouter) -> None:
+        # "News about the best pizza place near me" is a restaurant lookup, not a
+        # current-news request. The news guard must not override the restaurant signal.
+        decision = router.apply("News about the best pizza place near me", _clf())
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:restaurant_dining"
+
+    def test_travel_plan_with_weather_yields_to_travel_tourism(self, router: PolicyRouter) -> None:
+        # Mixed travel-planning and weather should route as travel/tourism (AUGMENTED)
+        # rather than being forced to WEATHER.
+        decision = router.apply("Plan a trip to Paris and tell me the weather", _clf())
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:travel_tourism"
+
+    def test_pure_weather_still_weather(self, router: PolicyRouter) -> None:
+        decision = router.apply("Will it rain in Paris today?", _clf())
+        assert decision is not None
+        assert decision.route == "WEATHER"
+        assert decision.reason_code == "policy:weather_query"
+
 
 class TestEvidenceRequestGate:
     def test_verify_this(self, router: PolicyRouter) -> None:
@@ -154,6 +176,16 @@ class TestEvidenceRequestGate:
         decision = router.apply("Cite your sources", _clf())
         assert decision is not None
         assert decision.route == "AUGMENTED"
+
+    def test_evidence_request_respects_local_only_restriction(self, router: PolicyRouter) -> None:
+        # A trailing evidence imperative must not override an explicit local-only
+        # or network-denial constraint.
+        decision = router.apply("What is 2+2? Do not search the web.", _clf())
+        assert decision is None or decision.route != "AUGMENTED"
+
+    def test_evidence_request_respects_local_only_marker(self, router: PolicyRouter) -> None:
+        decision = router.apply("Verify this claim using only currently available information.", _clf())
+        assert decision is None or decision.route != "AUGMENTED"
 
 
 class TestConflictAnalysisGate:
@@ -191,6 +223,57 @@ class TestCurrentInformationGate:
         assert decision is None
 
 
+class TestRestaurantDiningGate:
+    def test_restaurant_near_me_routes_augmented(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "Hi Lucy, what is a good restaurant near me that is open on Saturdays?", _clf()
+        )
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:restaurant_dining"
+
+    def test_restaurant_today_typo_routes_augmented(self, router: PolicyRouter) -> None:
+        # "restraunt" typo and "today" must not be misrouted as TIME.
+        decision = router.apply(
+            "Search for restraunts in my area that are open today.", _clf()
+        )
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:restaurant_dining"
+
+    def test_restaurant_near_location_routes_augmented(self, router: PolicyRouter) -> None:
+        # "near kibbutz Magal" must not be misrouted as WEATHER.
+        decision = router.apply(
+            "I am looking for a good restaurant open today near kibbutz Magal.", _clf()
+        )
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:restaurant_dining"
+
+    def test_restraurant_typo_near_location_routes_augmented(self, router: PolicyRouter) -> None:
+        # "restraurant" (extra r) must still be caught and routed AUGMENTED, not WEATHER.
+        decision = router.apply(
+            "Can you please recommend a good restraurant near Hadera?", _clf()
+        )
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:restaurant_dining"
+
+    def test_restraurant_typo_nere_qualifier_routes_augmented(self, router: PolicyRouter) -> None:
+        # "restraurant" typo plus "nere" typo for "near" must not route to WEATHER.
+        decision = router.apply(
+            "Can you please recommend a good restraurant nere kibbutz Magal?", _clf()
+        )
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:restaurant_dining"
+
+    def test_pet_food_not_restaurant(self, router: PolicyRouter) -> None:
+        # Pet eating questions should not be caught by the restaurant gate.
+        decision = router.apply("Can my dog eat chicken?", _clf())
+        assert decision is None or decision.route != "AUGMENTED"
+
+
 class TestRecipeGate:
     def test_recipe_request(self, router: PolicyRouter) -> None:
         decision = router.apply("Best recipe for chocolate cake", _clf())
@@ -220,6 +303,81 @@ class TestTravelTourismGate:
         assert decision is not None
         assert decision.route == "AUGMENTED"
         assert decision.reason_code == "policy:travel_tourism"
+
+
+class TestConspiracyGate:
+    def test_flat_earth_question_routes_local(self, router: PolicyRouter) -> None:
+        decision = router.apply("Is the earth flat?", _clf())
+        assert decision is not None
+        assert decision.route == "LOCAL"
+        assert decision.matched_rule == "local_reasoning"
+        assert decision.policy_reason == "conspiracy_or_unsubstantiated_claim"
+
+    def test_flat_earth_statement_routes_local(self, router: PolicyRouter) -> None:
+        decision = router.apply("The earth is flat", _clf())
+        assert decision is not None
+        assert decision.route == "LOCAL"
+
+
+class TestGuardBoundaries:
+    """Mixed-intent and edge cases for the recently modified guards."""
+
+    def test_restaurant_plus_opening_time(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "What time does the Italian restaurant near me open on Saturdays?", _clf()
+        )
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:restaurant_dining"
+
+    def test_restaurant_plus_weather(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "Is the patio restaurant open today and will it rain tonight?", _clf()
+        )
+        # Restaurant signal must dominate the weather terms.
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:restaurant_dining"
+
+    def test_travel_planning_plus_weather(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "Plan a trip to Paris and tell me the weather", _clf()
+        )
+        assert decision is not None
+        assert decision.route == "AUGMENTED"
+        assert decision.reason_code == "policy:travel_tourism"
+
+    def test_residence_statement_plus_weather(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "I live in Kibbutz Magal. What is the weather in Kibbutz Magal today?", _clf()
+        )
+        # This is a genuine weather question with an explicit place, not a standalone residence statement.
+        assert decision is not None
+        assert decision.route == "WEATHER"
+        assert decision.reason_code == "policy:weather_query"
+
+    def test_standalone_residence_statement_is_local(self, router: PolicyRouter) -> None:
+        decision = router.apply("Actually I live in Kibbutz Magal in Israel.", _clf())
+        assert decision is not None
+        assert decision.route == "LOCAL"
+        assert decision.reason_code == "policy:residence_statement"
+
+    def test_arithmetic_with_evidence_imperative_stays_local(self, router: PolicyRouter) -> None:
+        decision = router.apply("What is 2+2? Search the web.", _clf())
+        assert decision is None or decision.route == "LOCAL"
+
+    def test_medical_memory_recall_does_not_trigger_web_evidence(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "What did I say earlier about my blood pressure medication?", _clf()
+        )
+        # Explicit memory recall must stay LOCAL; evidence-request gate must not fire.
+        assert decision is None or decision.route == "LOCAL"
+
+    def test_local_only_current_information_request(self, router: PolicyRouter) -> None:
+        decision = router.apply(
+            "What is the latest version of Python? Use only currently available information.", _clf()
+        )
+        assert decision is None or decision.route == "LOCAL"
 
 
 class TestNegativeCases:
