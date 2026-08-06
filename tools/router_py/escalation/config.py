@@ -23,3 +23,9 @@ CRITICAL_CATEGORIES: tuple[str, ...] = (
 # the user to enable web search rather than performing escalation automatically.
 SUGGESTION_GENERAL_KNOWLEDGE: str = "Enable web search for more sources."
 SUGGESTION_CURRENT_INFO: str = "Enable web search for current information."
+
+# Confidence threshold below which a LOCAL answer is considered "thin" and may
+# trigger an escalation suggestion or an automatic general-knowledge web fetch.
+# A value of 0.5 means "less than even chance"; it catches genuinely uncertain
+# classifier output without flagging borderline-but-reasonable local answers.
+THIN_LOCAL_CONFIDENCE_THRESHOLD: float = 0.5

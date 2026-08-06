@@ -8,6 +8,7 @@ for a fixed set of representative inputs before the planner split.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -18,12 +19,28 @@ CLI = Path(__file__).resolve().parent / "plan_to_pipeline_cli.py"
 
 
 def _run(plan: dict, question: str, route_prefix: str = "") -> dict:
-    cmd = [sys.executable, str(CLI), "--plan-json", json.dumps(plan, separators=(",", ":")), "--question", question]
+    cmd = [
+        sys.executable,
+        str(CLI),
+        "--plan-json",
+        json.dumps(plan, separators=(",", ":")),
+        "--question",
+        question,
+    ]
     if route_prefix:
         cmd += ["--route-prefix", route_prefix]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(CLI.parent.parent.parent))
+    # Run the CLI in a clean environment so earlier tests that loaded main.py
+    # (which sets LUCY_AUGMENTATION_POLICY=disabled and LUCY_AUGMENTED_PROVIDER)
+    # do not leak into these characterization snapshots.
+    env = os.environ.copy()
+    env["LUCY_AUGMENTATION_POLICY"] = "fallback_only"
+    env.pop("LUCY_AUGMENTED_PROVIDER", None)
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, cwd=str(CLI.parent.parent.parent), env=env
+    )
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
+
 
 EXPECTED_LOCAL_KNOWLEDGE = '{"clarification_question":null,"confidence_band":"high","contextual_followup_applied":false,"contextual_followup_kind":"","effective_intent":"LOCAL_KNOWLEDGE","effective_min_sources":1,"effective_needs_web":false,"effective_plan":{"allow_domains_file":null,"category":"general","confidence_policy":"normal","intent":"LOCAL_KNOWLEDGE","min_sources":1,"needs_citations":false,"needs_web":false,"one_clarifying_question":null,"output_mode":"CHAT","prefer_domains":[],"region_filter":null},"effective_plan_output_mode":"CHAT","execution_contract":{"allowed_tools":["local_worker","local_answer"],"audit_tags":["contract:current","intent:local_knowledge","route:local","mode:auto","surface:cli","confidence_band:high","freshness:low","risk:low","source_criticality:low"],"clarification_question":null,"confidence":0.71,"contract_version":"current","fallback_policy":"local_safe","intent":"local_knowledge","local_response_id":null,"local_response_text":null,"requires_clarification":false,"requires_sources":false,"resolved_question":null,"route":"LOCAL"},"force_mode":"LOCAL","freshness_requirement":"low","knowledge_path":"","manifest_authority_basis":"conceptual_local_prompt","manifest_selected_route":"LOCAL","manifest_version":"current","manifest_winning_signal":"conceptual_local","medical_detector":{"candidate_medication":"","confidence":"none","confidence_score":0.0,"detection_source":"not_detected","detector_fired":false,"normalized_candidate":"","normalized_query":"","original_query":"what is 2+2","pattern_family":"","provenance_notes":[],"resolved_execution_query":"what is 2+2"},"medical_detector_candidate_medication":"","medical_detector_confidence":"none","medical_detector_confidence_score":0.0,"medical_detector_detection_source":"not_detected","medical_detector_fired":false,"medical_detector_normalized_candidate":"","medical_detector_normalized_query":"","medical_detector_original_query":"what is 2+2","medical_detector_pattern_family":"","medical_detector_provenance_notes_json":"[]","medical_detector_resolved_execution_query":"what is 2+2","mixed_intent":false,"needs_clarification":false,"offline_action":"allow","one_clarifying_question":null,"operator_override":"none","outcome_code_override":"","policy_actual_route":"local","policy_base_recommended_route":"local","policy_confidence":0.83,"policy_confidence_threshold":0.6,"policy_recommended_route":"local","prefix_requires_evidence":false,"reason_codes":["intent:LOCAL_KNOWLEDGE","freshness:low","risk:low","source_criticality:low","local_capability:unproven","intent_family:local_answer","winning_signal:conceptual_local"],"reason_codes_csv":"intent:LOCAL_KNOWLEDGE,freshness:low,risk:low,source_criticality:low,local_capability:unproven,intent_family:local_answer,winning_signal:conceptual_local","resolved_question":"","risk_level":"low","route_control_mode":"AUTO","route_decision":{"augmented_family":"","clarification_question":null,"confidence_band":"high","force_mode":"LOCAL","freshness_requirement":"low","intent_family":"local_answer","mixed_intent":false,"needs_clarification":false,"offline_action":"allow","operator_override":"none","policy_actual_route":"local","policy_base_recommended_route":"local","policy_confidence":0.83,"policy_confidence_threshold":0.6,"policy_recommended_route":"local","precedence_version":"current","reason_codes":["intent:LOCAL_KNOWLEDGE","freshness:low","risk:low","source_criticality:low","local_capability:unproven","intent_family:local_answer","winning_signal:conceptual_local"],"reason_codes_csv":"intent:LOCAL_KNOWLEDGE,freshness:low,risk:low,source_criticality:low,local_capability:unproven,intent_family:local_answer,winning_signal:conceptual_local","risk_level":"low","route_mode":"LOCAL","signal_flags":{"ambiguity_followup":false,"conceptual_inflation":false,"conflict":false,"current_product_recommendation":false,"geopolitics":false,"israel_region":false,"legal_finance":false,"medical_context":false,"news":false,"policy_global":false,"source_request":false,"temporal":false,"travel_risk":false,"url":false},"source_criticality":"low","surface":"cli","winning_signal":"conceptual_local"},"route_manifest":{"allowed_routes":["LOCAL"],"authority_basis":"conceptual_local_prompt","clarify_required":false,"context_referent_confidence":"","context_resolution_used":false,"evidence_mode":"","evidence_mode_reason":"not_evidence_route","forbidden_routes":["NEWS","EVIDENCE","AUGMENTED","CLARIFY"],"intent_family":"local_answer","manifest_version":"current","original_query":"what is 2+2","precedence_version":"current","resolved_execution_query":"what is 2+2","selected_route":"LOCAL","signals":{"ambiguity_followup":false,"conflict":false,"current_product":false,"geopolitics":false,"israel_region_live":false,"medical_context":false,"news":false,"source_request":false,"temporal":false,"url":false},"winning_signal":"conceptual_local"},"route_mode":"LOCAL","route_prefix":"","route_reason_override":"","router_intent":"LOCAL_KNOWLEDGE","semantic_interpreter":{"ambiguity_flag":false,"confidence":0.0,"forward_candidates":false,"gate_reason":"deterministic_sufficient","inferred_domain":"unknown","inferred_intent_family":"unknown","interpreter_fired":false,"invocation_attempted":false,"normalized_candidates":[],"original_query":"what is 2+2","provenance_notes":[],"resolved_execution_query":"what is 2+2","result_status":"skipped","retrieval_candidates":[],"selected_normalized_query":"what is 2+2","selected_retrieval_query":"","use_reason":"deterministic_sufficient","used_for_routing":false},"semantic_interpreter_ambiguity_flag":false,"semantic_interpreter_confidence":0.0,"semantic_interpreter_fired":false,"semantic_interpreter_forward_candidates":false,"semantic_interpreter_gate_reason":"deterministic_sufficient","semantic_interpreter_inferred_domain":"unknown","semantic_interpreter_inferred_intent_family":"unknown","semantic_interpreter_invocation_attempted":false,"semantic_interpreter_normalized_candidates_csv":"","semantic_interpreter_normalized_candidates_json":"[]","semantic_interpreter_original_query":"what is 2+2","semantic_interpreter_resolved_execution_query":"what is 2+2","semantic_interpreter_result_status":"skipped","semantic_interpreter_retrieval_candidates_csv":"","semantic_interpreter_retrieval_candidates_json":"[]","semantic_interpreter_selected_normalized_query":"what is 2+2","semantic_interpreter_selected_retrieval_query":"","semantic_interpreter_use_reason":"deterministic_sufficient","semantic_interpreter_used_for_routing":false,"source_criticality":"low","surface":"cli"}\n'
 
@@ -33,37 +50,46 @@ EXPECTED_MEDICAL = '{"clarification_question":null,"confidence_band":"medium","c
 
 EXPECTED_PET_FOOD = '{"clarification_question":null,"confidence_band":"high","contextual_followup_applied":false,"contextual_followup_kind":"","effective_intent":"PET_FOOD","effective_min_sources":0,"effective_needs_web":false,"effective_plan":{"allow_domains_file":null,"category":"pet_food","confidence_policy":"normal","intent":"PET_FOOD","min_sources":0,"needs_citations":false,"needs_web":false,"one_clarifying_question":null,"output_mode":"CHAT","prefer_domains":[],"region_filter":null},"effective_plan_output_mode":"CHAT","execution_contract":{"allowed_tools":["local_worker","local_answer"],"audit_tags":["contract:current","intent:local_knowledge","route:local","mode:auto","surface:cli","confidence_band:high","freshness:low","risk:low","source_criticality:low"],"clarification_question":null,"confidence":0.83,"contract_version":"current","fallback_policy":"local_safe","intent":"local_knowledge","local_response_id":null,"local_response_text":"I cannot verify that food as safe for your dog from this quick classifier.\\nUse plain pet-formulated food by default and avoid seasoned/fatty/salty human foods.\\nIf any unusual symptoms appear, contact your veterinarian.\\nConservative sources: vcahospitals.com, akc.org, petmd.com.","requires_clarification":false,"requires_sources":false,"resolved_question":null,"route":"LOCAL"},"force_mode":"LOCAL","freshness_requirement":"low","knowledge_path":"hit","manifest_authority_basis":"governor_local_response","manifest_selected_route":"LOCAL","manifest_version":"current","manifest_winning_signal":"conceptual_local","medical_detector":{"candidate_medication":"","confidence":"none","confidence_score":0.0,"detection_source":"not_detected","detector_fired":false,"normalized_candidate":"","normalized_query":"","original_query":"best dog food for puppies","pattern_family":"","provenance_notes":[],"resolved_execution_query":"best dog food for puppies"},"medical_detector_candidate_medication":"","medical_detector_confidence":"none","medical_detector_confidence_score":0.0,"medical_detector_detection_source":"not_detected","medical_detector_fired":false,"medical_detector_normalized_candidate":"","medical_detector_normalized_query":"","medical_detector_original_query":"best dog food for puppies","medical_detector_pattern_family":"","medical_detector_provenance_notes_json":"[]","medical_detector_resolved_execution_query":"best dog food for puppies","mixed_intent":false,"needs_clarification":false,"offline_action":"allow","one_clarifying_question":null,"operator_override":"governor_pet_food_knowledge","outcome_code_override":"knowledge_short_circuit_hit","policy_actual_route":"local","policy_base_recommended_route":"local","policy_confidence":0.83,"policy_confidence_threshold":0.6,"policy_recommended_route":"local","prefix_requires_evidence":false,"reason_codes":["intent:PET_FOOD","freshness:low","risk:low","source_criticality:low","local_capability:proven","intent_family:local_answer","winning_signal:conceptual_local"],"reason_codes_csv":"intent:PET_FOOD,freshness:low,risk:low,source_criticality:low,local_capability:proven,intent_family:local_answer,winning_signal:conceptual_local","resolved_question":"","risk_level":"low","route_control_mode":"AUTO","route_decision":{"augmented_family":"","clarification_question":null,"confidence_band":"high","force_mode":"LOCAL","freshness_requirement":"low","intent_family":"local_answer","mixed_intent":false,"needs_clarification":false,"offline_action":"allow","operator_override":"governor_pet_food_knowledge","policy_actual_route":"local","policy_base_recommended_route":"local","policy_confidence":0.83,"policy_confidence_threshold":0.6,"policy_recommended_route":"local","precedence_version":"current","reason_codes":["intent:PET_FOOD","freshness:low","risk:low","source_criticality:low","local_capability:proven","intent_family:local_answer","winning_signal:conceptual_local"],"reason_codes_csv":"intent:PET_FOOD,freshness:low,risk:low,source_criticality:low,local_capability:proven,intent_family:local_answer,winning_signal:conceptual_local","risk_level":"low","route_mode":"LOCAL","signal_flags":{"ambiguity_followup":false,"conceptual_inflation":false,"conflict":false,"current_product_recommendation":false,"geopolitics":false,"israel_region":false,"legal_finance":false,"medical_context":false,"news":false,"policy_global":false,"source_request":false,"temporal":false,"travel_risk":false,"url":false},"source_criticality":"low","surface":"cli","winning_signal":"conceptual_local"},"route_manifest":{"allowed_routes":["LOCAL"],"authority_basis":"governor_local_response","clarify_required":false,"context_referent_confidence":"","context_resolution_used":false,"evidence_mode":"","evidence_mode_reason":"not_evidence_route","forbidden_routes":["NEWS","EVIDENCE","AUGMENTED","CLARIFY"],"intent_family":"local_answer","manifest_version":"current","original_query":"best dog food for puppies","precedence_version":"current","resolved_execution_query":"best dog food for puppies","selected_route":"LOCAL","signals":{"ambiguity_followup":false,"conflict":false,"current_product":false,"geopolitics":false,"israel_region_live":false,"medical_context":false,"news":false,"source_request":false,"temporal":false,"url":false},"winning_signal":"conceptual_local"},"route_mode":"LOCAL","route_prefix":"","route_reason_override":"knowledge_pet_food_short_circuit","router_intent":"PET_FOOD","semantic_interpreter":{"ambiguity_flag":false,"confidence":0.0,"forward_candidates":false,"gate_reason":"deterministic_sufficient","inferred_domain":"unknown","inferred_intent_family":"unknown","interpreter_fired":false,"invocation_attempted":false,"normalized_candidates":[],"original_query":"best dog food for puppies","provenance_notes":[],"resolved_execution_query":"best dog food for puppies","result_status":"skipped","retrieval_candidates":[],"selected_normalized_query":"best dog food for puppies","selected_retrieval_query":"","use_reason":"deterministic_sufficient","used_for_routing":false},"semantic_interpreter_ambiguity_flag":false,"semantic_interpreter_confidence":0.0,"semantic_interpreter_fired":false,"semantic_interpreter_forward_candidates":false,"semantic_interpreter_gate_reason":"deterministic_sufficient","semantic_interpreter_inferred_domain":"unknown","semantic_interpreter_inferred_intent_family":"unknown","semantic_interpreter_invocation_attempted":false,"semantic_interpreter_normalized_candidates_csv":"","semantic_interpreter_normalized_candidates_json":"[]","semantic_interpreter_original_query":"best dog food for puppies","semantic_interpreter_resolved_execution_query":"best dog food for puppies","semantic_interpreter_result_status":"skipped","semantic_interpreter_retrieval_candidates_csv":"","semantic_interpreter_retrieval_candidates_json":"[]","semantic_interpreter_selected_normalized_query":"best dog food for puppies","semantic_interpreter_selected_retrieval_query":"","semantic_interpreter_use_reason":"deterministic_sufficient","semantic_interpreter_used_for_routing":false,"source_criticality":"low","surface":"cli"}\n'
 
+
 def test_local_knowledge():
     """local knowledge plan produces identical CLI output."""
     from router_py.core.intent_classifier import classify_question
-    plan = classify_question('what is 2+2')
-    actual = _run(plan, 'what is 2+2', '')
+
+    plan = classify_question("what is 2+2")
+    actual = _run(plan, "what is 2+2", "")
     expected = json.loads(EXPECTED_LOCAL_KNOWLEDGE)
     assert actual == expected
+
 
 def test_news():
     """news plan produces identical CLI output."""
     from router_py.core.intent_classifier import classify_question
-    plan = classify_question('latest news about Israel')
-    actual = _run(plan, 'latest news about Israel', 'news')
+
+    plan = classify_question("latest news about Israel")
+    actual = _run(plan, "latest news about Israel", "news")
     expected = json.loads(EXPECTED_NEWS)
     assert actual == expected
+
 
 def test_medical():
     """medical plan produces identical CLI output."""
     from router_py.core.intent_classifier import classify_question
-    plan = classify_question('What is lisinopril?')
-    actual = _run(plan, 'What is lisinopril?', '')
+
+    plan = classify_question("What is lisinopril?")
+    actual = _run(plan, "What is lisinopril?", "")
     expected = json.loads(EXPECTED_MEDICAL)
     assert actual == expected
+
 
 def test_pet_food():
     """pet food plan produces identical CLI output."""
     from router_py.core.intent_classifier import classify_question
-    plan = classify_question('best dog food for puppies')
-    actual = _run(plan, 'best dog food for puppies', '')
+
+    plan = classify_question("best dog food for puppies")
+    actual = _run(plan, "best dog food for puppies", "")
     expected = json.loads(EXPECTED_PET_FOOD)
     assert actual == expected
+
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

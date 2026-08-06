@@ -29,8 +29,10 @@ from .gates import (
     gate_stable_knowledge,
     gate_local_reasoning,
     gate_garbage_nonsense,
+    gate_residence_statement,
     gate_specific_entity_fact,
     gate_finance,
+    gate_restaurant_dining,
     gate_time,
     gate_weather,
     gate_news,
@@ -70,9 +72,15 @@ class PolicyRouter:
         # Run it early so symbol-only or placeholder input does not accidentally
         # match a downstream weather/news/finance keyword heuristic.
         gate_garbage_nonsense,
+        # Residence / location statements must stay LOCAL before the weather gate
+        # can misroute "I live in Kibbutz Magal" to WEATHER.
+        gate_residence_statement,
         # Dedicated external-source gates run next so time/weather/news/finance
         # /conflict/age/current queries keep their routes and reason codes.
+        # Restaurant/dining must run before time/weather so "restaurants open today"
+        # is not misrouted as a time or weather query.
         gate_finance,
+        gate_restaurant_dining,
         gate_time,
         gate_weather,
         gate_news,

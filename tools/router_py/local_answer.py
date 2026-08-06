@@ -105,16 +105,33 @@ def _ollama_heartbeat_ping(
     if _heartbeat_stop.is_set() or _heartbeat_model != model:
         return
     try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(
-                {"model": model, "prompt": "", "stream": False, "options": {"num_predict": 1}}
-            ).encode(),
-            headers={"Content-Type": "application/json"},
-            method="POST",
+        # Prevent two local models from ever being resident at the same time.
+        from router_py.ollama_cleanup import (
+            is_lucy_model,
+            ollama_load_lock,
+            unload_other_lucy_models,
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            resp.read()
+
+        keep_alive = os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "").strip() or "5m"
+        with ollama_load_lock():
+            if is_lucy_model(model):
+                unload_other_lucy_models(model)
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(
+                    {
+                        "model": model,
+                        "prompt": "",
+                        "stream": False,
+                        "keep_alive": keep_alive,
+                        "options": {"num_predict": 1},
+                    }
+                ).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                resp.read()
     except Exception:
         pass  # Silently fail; Ollama may not be running yet
 
@@ -141,7 +158,25 @@ def start_ollama_heartbeat(model: str = "local-lucy-llama31") -> None:
     switches models, any previous heartbeat thread is stopped and a new one is
     started for the new model so the old model is not re-loaded behind the
     caller's back.
+
+    If the environment requests immediate unload (LUCY_LOCAL_KEEP_ALIVE=0) or
+    background warmup is disabled (LUCY_DISABLE_BACKGROUND_WARMUP=1), the
+    heartbeat is skipped so models do not pile up in VRAM.
     """
+    if os.environ.get("LUCY_DISABLE_BACKGROUND_WARMUP", "").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        logger.debug("[HEARTBEAT] Disabled because LUCY_DISABLE_BACKGROUND_WARMUP=1")
+        return
+
+    keep_alive = os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "").strip()
+    if keep_alive == "0":
+        logger.debug("[HEARTBEAT] Disabled because LUCY_LOCAL_KEEP_ALIVE=0")
+        return
+
     global _heartbeat_thread, _heartbeat_model
     if _heartbeat_thread is not None and _heartbeat_thread.is_alive() and _heartbeat_model == model:
         return

@@ -307,6 +307,68 @@ class TestRequiresEvidenceMode(unittest.TestCase):
                 self.assertEqual(reason, "financial_data")
 
 
+class TestTechAnimalGuard(unittest.TestCase):
+    """Brand/tech terms containing animal words must not trigger veterinary evidence."""
+
+    def test_tech_brands_with_animal_words_are_not_veterinary(self):
+        queries = [
+            "What is DuckDuckGo?",
+            "How does DuckDuckGo protect privacy?",
+            "Is Duck.Go a real service?",
+            "Explain the rubber duck debugging technique.",
+            "What is a rubberduck?",
+            "Compare python vs javascript",  # programming context already covered
+            "What is a bug in software?",
+            "Install docker on ubuntu",
+        ]
+        for query in queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertNotEqual(
+                    reason,
+                    "veterinary_context",
+                    f"{query!r} must not be classified as veterinary",
+                )
+
+    def test_software_memory_terms_are_not_medical(self):
+        """Software/system 'memory' terms must not trigger medical evidence."""
+        queries = [
+            "How big is the SQLite memory database?",
+            "Why is the model confused?",
+            "Check internal consistency of the cache.",
+            "Diagnose system health.",
+            "Symptoms of memory corruption in a process.",
+            "What are neural-network weights?",
+        ]
+        for query in queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertFalse(
+                    reason.startswith("medical"),
+                    f"{query!r} must not be medical; got {reason}",
+                )
+                self.assertNotEqual(
+                    reason,
+                    "veterinary_context",
+                    f"{query!r} must not be veterinary",
+                )
+
+    def test_genuine_animal_health_is_veterinary(self):
+        """Real animal-health queries must still trigger veterinary evidence."""
+        queries = [
+            "My duck is limping",
+            "My dog ate chocolate",
+            "Cat vomiting blood",
+            "Why is my rabbit not eating?",
+            "Pet snake shedding problems",
+        ]
+        for query in queries:
+            with self.subTest(query=query):
+                requires, reason = requires_evidence_mode(query)
+                self.assertTrue(requires, f"Expected evidence for: {query}")
+                self.assertEqual(reason, "veterinary_context")
+
+
 class TestProviderUsageClass(unittest.TestCase):
     """Test provider_usage_class_for function."""
 

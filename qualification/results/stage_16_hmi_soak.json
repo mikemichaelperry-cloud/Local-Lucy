@@ -1,0 +1,90 @@
+[
+  {
+    "model": "local-lucy-gemma4:latest",
+    "question": "What is the capital of France?",
+    "passed": true,
+    "outcome": {
+      "status": "ok",
+      "route": "LOCAL",
+      "stdout_len": 31,
+      "stderr": "",
+      "elapsed_s": 12.14
+    },
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "model": "local-lucy-gemma4:latest",
+    "question": "What is 17 times 23?",
+    "passed": true,
+    "outcome": {
+      "status": "ok",
+      "route": "LOCAL",
+      "stdout_len": 19,
+      "stderr": "",
+      "elapsed_s": 21.08
+    },
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "model": "local-lucy-gemma4:latest",
+    "question": "Write a haiku about the moon.",
+    "passed": true,
+    "outcome": {
+      "status": "ok",
+      "route": "LOCAL",
+      "stdout_len": 77,
+      "stderr": "",
+      "elapsed_s": 9.18
+    },
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "model": "local-lucy-llama31:latest",
+    "question": "Who was Marie Curie?",
+    "passed": true,
+    "outcome": {
+      "status": "ok",
+      "route": "LOCAL",
+      "stdout_len": 253,
+      "stderr": "",
+      "elapsed_s": 2.34
+    },
+    "loaded_models": [
+      "local-lucy-llama31:latest"
+    ]
+  },
+  {
+    "model": "local-lucy-llama31:latest",
+    "question": "What is the weather like in this area?",
+    "passed": true,
+    "outcome": {
+      "status": "ok",
+      "route": "LOCAL",
+      "stdout_len": 348,
+      "stderr": "",
+      "elapsed_s": 5.72
+    },
+    "loaded_models": [
+      "local-lucy-llama31:latest"
+    ]
+  },
+  {
+    "model": "local-lucy-llama31:latest",
+    "question": "Who are you and what model are you running?",
+    "passed": true,
+    "outcome": {
+      "status": "ok",
+      "route": "LOCAL",
+      "stdout_len": 203,
+      "stderr": "",
+      "elapsed_s": 0.16
+    },
+    "loaded_models": []
+  }
+]

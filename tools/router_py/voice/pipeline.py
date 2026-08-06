@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import signal
+import socket
 import struct
 import subprocess
 import sys
@@ -813,13 +814,25 @@ class VoicePipeline(BaseToolWrapper):
 
         _voice_usage_logger.info(f"Voice synthesis starting: engine={engine}, voice={voice}")
 
+        # Try the pre-warmed Kokoro worker first (fast path). This avoids
+        # spawning a new Python process and reloading the model for every
+        # utterance.
+        try:
+            audio = self._synthesize_via_worker(text.strip(), voice=voice)
+            if audio is not None:
+                elapsed_ms = int((time.time() - start_time) * 1000)
+                self._logger.info(f"Synthesis completed in {elapsed_ms}ms (engine=kokoro, path=worker)")
+                return audio
+        except Exception as exc:
+            self._logger.warning(f"Kokoro worker synthesis failed, falling back to subprocess: {exc}")
+
         # Create temp output directory
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
                 # Use ui-v10 Python for TTS to ensure Kokoro is available
                 voice_python = self._resolve_voice_python()
 
-                # Always use subprocess to avoid Python environment issues
+                # Fallback: subprocess to avoid Python environment issues
                 # (Kokoro is installed in ui-v10 venv, not system Python)
                 if not voice_python:
                     raise SynthesisError("No voice Python available. Ensure ui-v10 venv exists.")
@@ -924,6 +937,77 @@ class VoicePipeline(BaseToolWrapper):
             return json.loads(result.stdout)
         except json.JSONDecodeError:
             return {"ok": False, "error": f"Invalid JSON output: {result.stdout}"}
+
+    def _synthesize_via_worker(
+        self,
+        text: str,
+        voice: Optional[str],
+    ) -> Optional[AudioBuffer]:
+        """Fast path: use the persistent Kokoro worker socket if available."""
+        socket_path = self._resolve_root() / "tmp" / "run" / "kokoro_tts_worker.sock"
+        if not socket_path.exists():
+            return None
+
+        resolved_voice = voice or self.tts_voice or "af_bella"
+        tmp_path: Optional[Path] = None
+        wav_path: Optional[str] = None
+        sock: Optional[socket.socket] = None
+        try:
+            # The worker closes each connection after one request, so prewarm
+            # and synthesis need separate sockets.
+            prewarm_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            prewarm_sock.settimeout(15.0)
+            prewarm_sock.connect(str(socket_path))
+            prewarm_sock.send(json.dumps({"cmd": "prewarm"}).encode() + b"\n")
+            prewarm_response = json.loads(prewarm_sock.recv(4096).decode())
+            prewarm_sock.close()
+            if not prewarm_response.get("ok"):
+                return None
+
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.settimeout(15.0)
+            sock.connect(str(socket_path))
+
+            request = {
+                "cmd": "synthesize",
+                "engine": "kokoro",
+                "text": text,
+                "voice": resolved_voice,
+                "output_dir": str(tmp_path.parent),
+            }
+            sock.send(json.dumps(request).encode() + b"\n")
+            response_data = sock.recv(4096).decode()
+            response = json.loads(response_data)
+
+            if not response.get("ok"):
+                return None
+
+            wav_path = response.get("wav_path")
+            if not wav_path or not Path(wav_path).exists():
+                return None
+
+            return AudioBuffer.from_file(wav_path)
+        except Exception:
+            return None
+        finally:
+            if sock is not None:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+            if wav_path is not None:
+                try:
+                    Path(wav_path).unlink(missing_ok=True)
+                except Exception:
+                    pass
+            if tmp_path is not None:
+                try:
+                    tmp_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
     # =========================================================================
     # Stage 5: Audio Playback

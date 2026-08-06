@@ -1,8 +1,8 @@
 # Local Lucy V11 — Architecture
 
-**Date:** 2026-07-29  
+**Date:** 2026-07-30  
 **Version:** v11  
-**Branch:** feature/v11-pipeline-split-escalation  
+**Branch:** main  
 **Scope:** English-only primary runtime
 
 > This document describes **v11 as implemented** on the `feature/v11-pipeline-split-escalation` branch. Hebrew / Racheli support has been removed from the primary runtime; the standalone Hebrew assistant was archived separately on 2026-07-10.
@@ -179,6 +179,8 @@ The `process()` flow is:
 9. **Build outcome** — `pipeline.outcome.build_outcome()` converts `ExecutionResult` → `RouterOutcome` and attaches source attribution / escalation suggestions.
 10. **Optional web fetch** — If `auto_web_general_knowledge` is enabled, an untrusted web fetch may be performed for thin local answers.
 
+**Diagnostic trace.** When `LUCY_ROUTER_DIAGNOSTICS=1`, `process()` writes a structured JSONL entry containing the original/resolved query, classifier intent/confidence, candidate routes, pre-guard route, final route/provider, evidence/policy reasons, matched rule, capability flags, and outcome code. The default path is `qualification/router_diagnostics.jsonl` and can be overridden with `LUCY_ROUTER_DIAGNOSTICS_PATH`. This trace is disabled by default and never emitted to user-facing output.
+
 ### 4.2 `pipeline/` Package Modules
 
 | Module | Responsibility |
@@ -212,28 +214,28 @@ The `process()` flow is:
 |---|---|
 | `escalation/config.py` | Critical-category list and human-readable suggestion strings. |
 | `escalation/suggestion.py` | `suggest_escalation()` — returns a short web-escalation hint only when the `suggest_web_escalation` flag is on, the route is `LOCAL`, and the category is not critical. |
-| `escalation/fetcher.py` | DuckDuckGo HTML fetcher for general-knowledge web results (used only when `auto_web_general_knowledge` is enabled). |
+| `escalation/fetcher.py` | DuckDuckGo HTML fetcher for general-knowledge web results. Used both by the thin-local `auto_web_general_knowledge` path and as a last-resort fallback inside `execution_engine` for ordinary `AUGMENTED` factual queries when primary providers fail. Results are always marked `provider=web_untrusted` and the final answer carries a verification caveat. |
 | `escalation/critical_guard.py` | `is_critical_category()`, trusted-domain allowlist resolution, and the `operator_blocked` helper used by the critical-source policy. |
 
 ### 4.5 Capability Flags (`config/capability_flags.yaml`)
 
-The `config/capability_flags.yaml` file controls conservative v11 pipeline features. Every flag defaults to off **except** `trusted_sources_only_critical`, which is intentionally default-on as a safety exception requested by the user: critical information must use only trusted sources. Disable it explicitly if you need the previous behaviour.
+The `config/capability_flags.yaml` file controls conservative v11 pipeline features. As of 2026-07-30 the expansion flags are **default-enabled** for live testing; `trusted_sources_only_critical` remains default-on as a safety exception: critical information must use only trusted sources. Disable any flag explicitly if you need the previous behaviour.
 
 | Flag | Default | Effect when enabled |
 |---|---|---|
-| `source_attribution` | `false` | `RouterOutcome` receives `source_attribution` and `trust_label` fields describing the provenance/confidence of the answer. |
-| `suggest_web_escalation` | `false` | Thin `LOCAL` answers may include a suggestion to enable web search for more sources/current information. |
-| `auto_web_general_knowledge` | `false` | After a thin local answer, the pipeline fetches one DuckDuckGo result and reports it as an untrusted web source in `escalation_suggestion`. The local answer is never replaced. |
+| `source_attribution` | `true` | `RouterOutcome` receives `source_attribution` and `trust_label` fields describing the provenance/confidence of the answer. |
+| `suggest_web_escalation` | `true` | Thin `LOCAL` answers may include a suggestion to enable web search for more sources/current information. |
+| `auto_web_general_knowledge` | `true` | After a thin local answer, the pipeline fetches one DuckDuckGo result and reports it as an untrusted web source in `escalation_suggestion`. The local answer is never replaced. |
 | `auto_web_allowed_domains` | `[]` | Optional domain allowlist for `auto_web_general_knowledge`. When non-empty, only results whose registered domain matches one of these entries are returned. Subdomains are accepted. |
 | `trusted_sources_only_critical` | `true` | Critical categories (see below) are restricted to trusted-domain allowlists. Untrusted web routes are blocked or redirected to trusted evidence. Default-on as an intentional safety exception. |
 
-Each flag can also be overridden via environment variables:
+`START_LUCY.sh` also exports `LUCY_EVIDENCE_ENABLED=1` and `LUCY_ENABLE_INTERNET=1` so the HMI/desktop shortcut launches with evidence/web features on. Each flag can still be overridden via environment variable:
 
-- `LUCY_SOURCE_ATTRIBUTION=1`
-- `LUCY_SUGGEST_WEB_ESCALATION=1`
-- `LUCY_AUTO_WEB_GENERAL_KNOWLEDGE=1`
+- `LUCY_SOURCE_ATTRIBUTION=0`
+- `LUCY_SUGGEST_WEB_ESCALATION=0`
+- `LUCY_AUTO_WEB_GENERAL_KNOWLEDGE=0`
 - `LUCY_AUTO_WEB_ALLOWED_DOMAINS=example.com,wikipedia.org`
-- `LUCY_TRUSTED_SOURCES_ONLY_CRITICAL=1`
+- `LUCY_TRUSTED_SOURCES_ONLY_CRITICAL=0`
 
 Set the env var to `0` to disable the corresponding feature.
 
@@ -252,6 +254,18 @@ The critical-source policy enforces a trusted-sources-only rule for sensitive ca
 - When a trusted allowlist is available, `apply_critical_source_policy()` mutates the caller's `context` dict to set `context["allow_domains_file"]`; callers should expect this side effect.
 
 Trusted-domain files are resolved from `config/trust/generated/` (e.g. `medical_runtime.txt`, `vet_runtime.txt`, `finance_runtime.txt`).
+
+### 4.6a General-Web Fallback Exclusions
+
+The execution-engine web fallback (DuckDuckGo) is intentionally restricted. It does **not** run for:
+
+- `EVIDENCE` route queries.
+- High-stakes evidence reasons: `medical_context`, `medical_safety`, `medical_body_symptom`, `veterinary_context`, `legal_context`, `financial_high_stakes`, `financial_data`.
+- Live/current topics: `current_information`, `conflict_live`, `news_synthesis`.
+- Known conspiracy/hoax tropes (e.g. flat earth, moon-landing hoax, chemtrails, vaccine microchips, climate-change hoax), where an untrusted first search hit is likely misinformation.
+- Explicit `network=False` request constraints.
+
+When the fallback is blocked, the engine either answers from local parametric knowledge with an honest caveat or returns a clarification, but never silently replaces the missing source with an unvetted web result.
 
 ### 4.7 Public Interfaces Preserved
 
@@ -293,11 +307,16 @@ An ordered set of regex/heuristic gates runs before the embedding model. Key gat
 | `personal_family` | "How old is my daughter?" | `LOCAL` |
 | `recreational_pet` | "Should I walk my dog?" | `LOCAL` |
 | `medical_vet` | "Side effects of metformin", "My cat is limping" | `EVIDENCE` |
+| `medical_vet` (software exception) | "Cache symptoms", "Model confusion", "System health" | stays non-medical |
+| `tech_animal` | "What is DuckDuckGo?", "Rubber duck debugging" | stays non-veterinary |
+| `explicit_capability_restriction` | "Do not store this", "No network access" | `LOCAL` |
+| `residence_statement` | "I live in Kibbutz Magal", "I no longer live in Tel Aviv" | `LOCAL` |
 | `finance` | "TSLA price", "EUR to USD" | `FINANCE` |
+| `restaurant_dining` | "restaurant near me", "pizza place near me", "open today near kibbutz Magal" | `AUGMENTED` |
 | `time` | "What time is it in Tokyo?" | `TIME` |
 | `weather` | "Weather in London" | `WEATHER` |
 | `news` | "Latest Israel news" | `NEWS` |
-| `evidence_request` | "Cite your sources" | `AUGMENTED` (evidence required) |
+| `evidence_request` | "Cite your sources" (honours local-only / arithmetic denials) | `AUGMENTED` (evidence required) |
 | `conflict_analysis` | "Will Russia win in Ukraine?" | `AUGMENTED` |
 | `public_figure_age` | "How old is Bill Clinton?" | `AUGMENTED` |
 | `recipe` | "Best chocolate cake recipe" | `AUGMENTED` |
@@ -335,7 +354,7 @@ Providers are Python modules loaded and executed inside `execution_engine/`.
 | Route | Primary provider | Notes |
 |-------|------------------|-------|
 | `LOCAL` | Ollama local model | Injects session memory + persistent facts |
-| `AUGMENTED` | Wikipedia evidence + OpenAI/Kimi synthesis | Sourced external answer; Wikipedia is evidence, OpenAI/Kimi synthesise |
+| `AUGMENTED` | Wikipedia evidence + OpenAI/Kimi synthesis; last-resort DuckDuckGo fallback | Sourced external answer; Wikipedia is evidence, OpenAI/Kimi synthesise; if all primary sources fail or are irrelevant, a single DuckDuckGo result may be used and is explicitly labelled untrusted |
 | `EVIDENCE` | Trusted evidence (Wikipedia + allowlisted domains) | Medical/vet/finance safety route |
 | `NEWS` | RSS news provider | Current headlines with recency scoring and source cross-check |
 | `WEATHER` | Weather provider | Live forecast |
@@ -366,6 +385,8 @@ Evidence source quality is constrained by `config/trusted_domains.yaml` and `con
 - Loads relevant memory context.
 - Calls the appropriate provider function.
 - Filters evidence and memory through `context_guard`.
+- For ordinary `AUGMENTED` factual queries, when primary providers return no usable evidence or are filtered out as irrelevant, falls back to a single DuckDuckGo result labelled `provider=web_untrusted` / `trust_class=untrusted` and prefixes the answer with an explicit verification caveat.
+- Refuses the general-web fallback for high-stakes, live/current, conspiracy/hoax, or explicitly no-network queries.
 - Formats the response and writes structured state updates via `StateWriter`.
 - On failure, escalates to clarification or local reasoning rather than crashing.
 
@@ -585,6 +606,38 @@ Streams TTS audio chunks as text is generated, eliminating delays. Manages Kokor
 - Ingests **explicit user feedback only**.
 - Safety gate prevents auto-learning of medical/vet/evidence routes without human review.
 - Versioned examples go to `comprehensive_examples.json`; high-stakes or conflicting feedback goes to `pending_review.jsonl`.
+
+### 12.5 Location Fact Extraction (`tools/router_py/main.py` + `tools/router_py/local_answer_core/`)
+
+- User statements such as "I live in Kibbutz Magal" are extracted in `main.py` via `_extract_location_fact()` and stored as `persistent_facts` with `category='location'`.
+- The stored location overrides the timezone-derived default used by `_get_current_context()` in `self_knowledge.py`.
+- Location-aware queries ("restaurant in this area", "near me", "around here") are detected by `_is_location_aware_query()` in `self_knowledge.py`.
+- In `engine.py::_build_prompt()`, location-aware queries load the most recent location fact via `_load_location_facts_direct()` and inject it into the prompt so the model interprets anaphoric location references correctly.
+- Before the pipeline runs, `_maybe_resolve_location_anaphora()` in `main.py` replaces bare anaphoric location phrases ("near me", "in my area") with the stored location text so that web routes (`AUGMENTED`, `EVIDENCE`) search the right place instead of searching for "near me".
+- This path is independent of personal/family fact retrieval; general-knowledge questions still rely on the model's parametric knowledge.
+
+### 12.6 Search-Imperative Anaphora (`tools/router_py/main.py`)
+
+- Bare imperatives such as "Use DuckDuckGo search", "search the web", or "Google it" are matched by `_SEARCH_TOOL_IMPERATIVE_PATTERN`.
+- `_maybe_resolve_search_imperative()` consults the feedback buffer (`tools/router_py/feedback_buffer.py`):
+  - If the immediately prior exchange was routed to a web/external mode (`AUGMENTED`, `EVIDENCE`, `NEWS`, `WEATHER`, `TIME`, `FINANCE`), the imperative is rewritten to the prior user query.
+  - This lets the user ask Lucy to re-run a web search on the current topic without restating it.
+  - If the prior query is itself a search imperative, no inheritance occurs (prevents loops).
+- Capability questions ("Can you search the web?") do not match the pattern and remain `LOCAL`.
+
+### 12.7 Restaurant / Dining Guard (`tools/router_py/policy_router/`)
+
+- Deterministic `gate_restaurant_dining` runs before `gate_time` and `gate_weather` so restaurant/dining queries that include a location or time qualifier are not misrouted.
+- Triggers include "restaurant near me", "restaurants open today", "good restaurant near kibbutz Magal", common typos, and food-specific establishments such as "pizza place", "burger joint", or "sushi spot".
+- The gate routes to `AUGMENTED` (general-knowledge web lookup) rather than `LOCAL`, because restaurant hours and recommendations depend on current, location-specific data.
+- It is intentionally narrow: it does not match pet-food queries, recipes, or stable culinary facts without a location/time qualifier.
+
+### 12.8 Residence / Location Statement Guard (`tools/router_py/policy_router/`)
+
+- `gate_residence_statement` runs before `gate_weather` to keep standalone residence and location statements local.
+- Triggers include "I live in ...", "Actually I live in ...", "I no longer live in ...", "I used to live in ...", "I am staying in ...", "My brother lives in ...", "If I lived in ...", and quoted residence ("The article says, 'I live in London.'").
+- It deliberately preserves genuine weather queries that mention the user's location by requiring no question mark and no weather terms in the query.
+- Statements caught by this gate route to `LOCAL` so the location-memory subsystem can extract or ignore them as appropriate.
 
 ---
 

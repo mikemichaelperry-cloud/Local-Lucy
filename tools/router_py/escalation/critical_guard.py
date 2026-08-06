@@ -36,6 +36,8 @@ TRUSTED_DOMAIN_FILES: dict[str, str] = {
     "economic": "config/trust/generated/finance_runtime.txt",
     "legal": "config/trust/generated/policy_global_runtime.txt",
     "regulatory": "config/trust/generated/policy_global_runtime.txt",
+    "travel": "config/trust/generated/travel_runtime.txt",
+    "travel_advisory": "config/trust/generated/travel_runtime.txt",
 }
 
 # Fallback trusted-domain allowlist used when a critical EVIDENCE route already

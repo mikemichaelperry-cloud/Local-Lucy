@@ -1,0 +1,221 @@
+[
+  {
+    "scenario_id": "S09-GEM-001",
+    "category": "local_fact",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 19,
+    "required_concepts_found": [
+      "391"
+    ],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 2.55,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-002",
+    "category": "local_fact",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 31,
+    "required_concepts_found": [
+      "Paris"
+    ],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 0.05,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-003",
+    "category": "augmented_fact",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 233,
+    "required_concepts_found": [
+      "Nobel",
+      "radioactivity"
+    ],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 0.04,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-004",
+    "category": "medical_block",
+    "expected_route": "EVIDENCE",
+    "actual_route": "EVIDENCE",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 481,
+    "required_concepts_found": [],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 7.98,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-005",
+    "category": "current_events_block",
+    "expected_route": "NEWS",
+    "actual_route": "NEWS",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 11794,
+    "required_concepts_found": [],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 0.82,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-006",
+    "category": "conspiracy_block",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 156,
+    "required_concepts_found": [],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 12.42,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-007",
+    "category": "reasoning",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 246,
+    "required_concepts_found": [
+      "because",
+      "therefore"
+    ],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 28.6,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-008",
+    "category": "creative",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 77,
+    "required_concepts_found": [],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 6.59,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-009",
+    "category": "location_anaphora",
+    "expected_route": "WEATHER",
+    "actual_route": "WEATHER",
+    "status": "completed",
+    "outcome_code": "error",
+    "response_len": 143,
+    "required_concepts_found": [],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 0.25,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-010",
+    "category": "restaurant_dining",
+    "expected_route": "AUGMENTED",
+    "actual_route": "AUGMENTED",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 316,
+    "required_concepts_found": [
+      "pizza"
+    ],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 1.85,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-011",
+    "category": "persona_identity",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 108,
+    "required_concepts_found": [
+      "Local Lucy",
+      "gemma"
+    ],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 9.58,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  },
+  {
+    "scenario_id": "S09-GEM-012",
+    "category": "network_denial",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 128,
+    "required_concepts_found": [],
+    "forbidden_claims_found": [],
+    "passed": true,
+    "notes": [],
+    "elapsed_s": 10.15,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ]
+  }
+]

@@ -1,0 +1,150 @@
+[
+  {
+    "case_id": "llama_local_fact",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "passed": true,
+    "outcome": {
+      "status": "completed",
+      "route": "LOCAL",
+      "outcome_code": "answered",
+      "response_len": 89
+    },
+    "loaded_models": [
+      "local-lucy-llama31:latest"
+    ]
+  },
+  {
+    "case_id": "llama_augmented_fact",
+    "expected_route": [
+      "AUGMENTED",
+      "LOCAL"
+    ],
+    "actual_route": "LOCAL",
+    "passed": true,
+    "outcome": {
+      "status": "completed",
+      "route": "LOCAL",
+      "outcome_code": "answered",
+      "response_len": 253
+    },
+    "loaded_models": [
+      "local-lucy-llama31:latest"
+    ]
+  },
+  {
+    "case_id": "llama_hmi_surface",
+    "expected_route": "LOCAL",
+    "actual_route": "LOCAL",
+    "passed": true,
+    "outcome": {
+      "status": "ok",
+      "stdout": "The product of 17 and 23 is 391. I can calculate this using basic arithmetic operations within my parametric knowledge.",
+      "stderr": "",
+      "payload": {
+        "accepted": true,
+        "authority": {
+          "active_root": "/home/mike/lucy-v11",
+          "authority_root": "/home/mike/lucy-v11",
+          "runtime_namespace_root": "/home/mike/.local/share/local-lucy-v11",
+          "legacy_runtime_namespace_root": "/home/mike/lucy/runtime-v10",
+          "legacy_runtime_namespace_present": false,
+          "legacy_runtime_namespace_status": "absent"
+        },
+        "completed_at": "2026-08-06T17:11:26Z",
+        "control_state": {
+          "mode": "online",
+          "conversation": "on",
+          "memory": "on",
+          "evidence": "off",
+          "voice": "on",
+          "augmentation_policy": "direct_allowed",
+          "augmented_provider": "openai",
+          "model": "local-lucy-llama31:latest",
+          "profile": "lucy-v11"
+        },
+        "error": "",
+        "outcome": {
+          "action_hint": "",
+          "requested_mode": "",
+          "final_mode": "",
+          "answer_class": "local_answer",
+          "provider_authorization": "not_applicable",
+          "operator_trust_label": "local",
+          "operator_answer_path": "Local answer",
+          "operator_note": "No escalation was needed.",
+          "fallback_used": "",
+          "fallback_reason": "",
+          "trust_class": "local",
+          "intent_family": "local_answer",
+          "evidence_mode": "",
+          "evidence_mode_reason": "",
+          "evidence_mode_selection": "not_applicable",
+          "augmented_allowed": "",
+          "augmented_provider": "local",
+          "augmented_provider_selected": "",
+          "augmented_provider_used": "local",
+          "augmented_provider_usage_class": "local",
+          "augmented_provider_call_reason": "",
+          "augmented_provider_status": "",
+          "augmented_provider_error_reason": "",
+          "augmented_provider_selection_reason": "",
+          "augmented_provider_selection_query": "",
+          "augmented_provider_selection_rule": "",
+          "augmented_provider_cost_notice": "",
+          "augmented_paid_provider_invoked": "",
+          "augmentation_policy": "fallback_only",
+          "augmented_direct_request": "0",
+          "unverified_context_used": "",
+          "unverified_context_class": "",
+          "unverified_context_title": "",
+          "unverified_context_url": "",
+          "primary_outcome_code": "",
+          "primary_trust_class": "",
+          "recovery_attempted": "",
+          "recovery_used": "",
+          "recovery_eligible": "",
+          "recovery_lane": "",
+          "augmented_behavior_shape": "",
+          "augmented_clarification_required": "",
+          "augmented_answer_contract": {},
+          "self_review_request": "",
+          "self_review_mode": "",
+          "self_review_targets": "",
+          "self_review_target_count": "",
+          "evidence_created": "false",
+          "outcome_code": "answered",
+          "rc": null,
+          "utc": "2026-08-06T17:11:26Z",
+          "execution_time_ms": 839
+        },
+        "request_id": "2026-08-06T17:11:24.521456270Z-494013",
+        "request_text": "What is 17 times 23?",
+        "response_text": "The product of 17 and 23 is 391. I can calculate this using basic arithmetic operations within my parametric knowledge.",
+        "route": {
+          "mode": "LOCAL",
+          "selected_route": "LOCAL",
+          "requested_mode": "",
+          "final_mode": "",
+          "intent_class": "",
+          "intent_family": "local_answer",
+          "evidence_mode": "",
+          "evidence_mode_reason": "",
+          "evidence_mode_selection": "not_applicable",
+          "authority_basis": "",
+          "winning_signal": "",
+          "query": "What is 17 times 23?",
+          "reason": "router_local",
+          "session_id": "2026-08-06T17:11:24.521456270Z-494013",
+          "utc": "2026-08-06T17:11:26Z"
+        },
+        "status": "completed",
+        "model_recommendation": "local-lucy-llama31:latest",
+        "model_recommendation_reason": "General query; defaulting to Llama 3.1 (manual override selected: local-lucy-llama31:latest)"
+      }
+    },
+    "loaded_models": [
+      "local-lucy-llama31:latest"
+    ]
+  }
+]

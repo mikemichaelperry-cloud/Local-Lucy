@@ -153,6 +153,28 @@ def _matches_allowed_domains(url: str, allowed_domains: list[str]) -> bool:
     return False
 
 
+# Known misinformation / conspiracy / hoax domains. These are dropped from
+# DuckDuckGo fallback results so the engine does not amplify them.
+_KNOWN_MISINFORMATION_DOMAINS = frozenset(
+    {
+        "naturalnews.com",
+        "beforeitsnews.com",
+        "infowars.com",
+        "prisonplanet.com",
+        "globalresearch.ca",
+        "activistpost.com",
+        "stillnessinthestorm.com",
+        "yournewswire.com",
+        "christiantruther.com",
+    }
+)
+
+
+def _is_misinformation_domain(url: str) -> bool:
+    """Return True when *url* is on the known misinformation blocklist."""
+    return _domain_for(url) in _KNOWN_MISINFORMATION_DOMAINS
+
+
 def _build_search_url(query: str) -> str:
     """Build a DuckDuckGo HTML search URL for *query*."""
     params = urllib.parse.urlencode({"q": query})
@@ -212,6 +234,9 @@ def fetch_general_knowledge(
     for record in parser.results:
         result_url = record.get("url", "")
         if not result_url:
+            continue
+        if _is_misinformation_domain(result_url):
+            logger.warning("Dropping misinformation domain result: %s", result_url)
             continue
         if _matches_allowed_domains(result_url, allowed_domains or []):
             return FetchResult(

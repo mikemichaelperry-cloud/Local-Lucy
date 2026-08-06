@@ -428,7 +428,12 @@ class StateWriter:
             context.get("augmented_provider", "")
             or os.environ.get("LUCY_AUGMENTED_PROVIDER", "wikipedia")
         ).strip()
-        model = str(context.get("model", "") or os.environ.get("LUCY_MODEL", "local-lucy")).strip()
+        active_model = (
+            os.environ.get("LUCY_LOCAL_MODEL")
+            or os.environ.get("LUCY_MODEL")
+            or "local-lucy-llama31"
+        )
+        model = str(context.get("model", "") or active_model).strip()
         profile = str(os.environ.get("LUCY_RUNTIME_PROFILE", "lucy-v11")).strip()
 
         return {

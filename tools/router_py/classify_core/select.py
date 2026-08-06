@@ -10,6 +10,7 @@ import re
 import sys
 import urllib.error
 import urllib.request
+from dataclasses import replace
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -22,6 +23,8 @@ from router_py.classify_core.guards import (
     _is_capability_query,
     _is_hostile_override_attempt,
     _is_public_figure_age_query,
+    _is_time_query,
+    _is_weather_query,
     _LOCAL_ALWAYS_SHORT,
 )
 from router_py.classify_core.memory import (
@@ -80,6 +83,15 @@ def _call_llm_arbiter(query: str) -> str | None:
         "Route:"
     )
     try:
+        # Prevent two local models from ever being resident at the same time.
+        # Hold the cross-process lock for the whole request so the load/generate
+        # cannot overlap with another Local Lucy process.
+        from router_py.ollama_cleanup import (
+            is_lucy_model,
+            ollama_load_lock,
+            unload_other_lucy_models,
+        )
+
         payload = json.dumps(
             {
                 "model": model,
@@ -88,14 +100,17 @@ def _call_llm_arbiter(query: str) -> str | None:
                 "options": {"temperature": 0.0},
             }
         ).encode("utf-8")
-        req = urllib.request.Request(
-            f"{base_url}/api/generate",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
+        with ollama_load_lock():
+            if is_lucy_model(model):
+                unload_other_lucy_models(model)
+            req = urllib.request.Request(
+                f"{base_url}/api/generate",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
         text = result.get("response", "").strip().upper()
         for route in _LLM_ARBITER_ROUTES:
             if route in text:
@@ -556,8 +571,10 @@ def select_route(
             # Confidence-triggered LLM arbiter: when the embedding classifier is
             # uncertain (low confidence and low margin), ask a small local model
             # before applying the remaining safety overrides.  If Ollama is
-            # unavailable we keep the router's decision but mark it low-confidence.
+            # unavailable we fall back deterministically to augmented/evidence/web
+            # rather than trusting a low-confidence LOCAL decision.
             low_confidence = False
+            policy_reason_override: str | None = None
             confidence_margin = result.get("confidence_margin", 0.0)
             if confidence < 0.60 and confidence_margin < 0.15:
                 low_confidence = True
@@ -566,6 +583,45 @@ def select_route(
                     route = llm_route
                     embedding_route = f"llm_arbiter:{llm_route}"
                     guards_fired = guards_fired + ["llm_arbiter"]
+                elif not classification.force_local and route == "LOCAL":
+                    # Only override a low-confidence LOCAL decision.  If the
+                    # embedding router already picked AUGMENTED/NEWS/etc., trust it.
+                    # Use classification signals to choose the fallback target.
+                    # News/opinion synthesis requests ("what is your assessment",
+                    # "what is your opinion") should stay LOCAL.
+                    _is_opinion_synthesis = bool(
+                        re.search(
+                            r"\b(what is your|what's your|give me your|what do you think|your (assessment|opinion|take|view|analysis))\b",
+                            query.lower(),
+                        )
+                    )
+                    fallback_route: str | None = None
+                    if not _is_opinion_synthesis:
+                        if classification.evidence_reason in (
+                            "medical_context",
+                            "medical_body_symptom",
+                            "veterinary_context",
+                        ):
+                            fallback_route = "EVIDENCE"
+                        elif classification.evidence_reason in (
+                            "conflict_live",
+                            "financial_data",
+                        ):
+                            fallback_route = "AUGMENTED"
+                        elif classification.evidence_reason == "news_synthesis":
+                            fallback_route = "NEWS"
+                        elif classification.evidence_reason == "weather_query" and _is_weather_query(query):
+                            fallback_route = "WEATHER"
+                        elif classification.evidence_reason == "time_query" and _is_time_query(query):
+                            fallback_route = "TIME"
+                        elif classification.needs_web or classification.augmentation_recommended:
+                            fallback_route = "AUGMENTED"
+
+                    if fallback_route:
+                        route = fallback_route
+                        embedding_route = f"low_confidence_fallback:{fallback_route}"
+                        guards_fired = guards_fired + ["low_confidence_fallback"]
+                        policy_reason_override = "low_confidence_fallback"
 
             # Conflict analysis override: the embedding router sometimes returns LOCAL
             # for live-conflict analysis questions (e.g. "Will Russia win in Ukraine").
@@ -592,6 +648,16 @@ def select_route(
             if evidence_reason == "financial_data" and route == "LOCAL":
                 route = "AUGMENTED"
                 guards_fired = guards_fired + ["financial_data_override"]
+
+            # Travel advisory override: the explicit classifier already identified
+            # this as a travel query, so force EVIDENCE and let the trusted travel
+            # provider answer from Wikivoyage instead of parametric local knowledge.
+            if classification.category == "travel_advisory":
+                route = "EVIDENCE"
+                evidence_reason = classification.evidence_reason or "travel_advisory"
+                evidence_mode = "required"
+                requires_evidence = True
+                guards_fired = guards_fired + ["travel_advisory_override"]
 
             # Public-figure age override: the embedding router currently routes
             # "How old is Bill Clinton?" to LOCAL. Force AUGMENTED so the answer
@@ -743,6 +809,9 @@ def select_route(
                     low_confidence=low_confidence,
                     **embedding_meta,
                 )
+
+            if policy_reason_override:
+                decision = replace(decision, policy_reason=policy_reason_override)
 
             # Continuation follow-up inheritance: "more details", "tell me more",
             # "elaborate", etc. should stay on the previous route so the user gets

@@ -1,0 +1,61 @@
+[
+  {
+    "question": "What is the weather in London?",
+    "expected": [
+      "WEATHER"
+    ],
+    "actual": "WEATHER",
+    "status": "ok",
+    "passed": true
+  },
+  {
+    "question": "What time is it in Tokyo?",
+    "expected": [
+      "TIME"
+    ],
+    "actual": "TIME",
+    "status": "ok",
+    "passed": true
+  },
+  {
+    "question": "Why is the sky blue?",
+    "expected": [
+      "AUGMENTED",
+      "LOCAL"
+    ],
+    "actual": "AUGMENTED",
+    "status": "ok",
+    "passed": true
+  },
+  {
+    "question": "What is your opinion on climate change?",
+    "expected": [
+      "AUGMENTED",
+      "LOCAL"
+    ],
+    "actual": "LOCAL",
+    "status": "ok",
+    "passed": true
+  },
+  {
+    "question": "How does temperature affect baking?",
+    "expected": [
+      "AUGMENTED",
+      "EVIDENCE",
+      "LOCAL"
+    ],
+    "actual": "EVIDENCE",
+    "status": "ok",
+    "passed": true
+  },
+  {
+    "question": "Explain thermodynamics to me.",
+    "expected": [
+      "AUGMENTED",
+      "LOCAL"
+    ],
+    "actual": "LOCAL",
+    "status": "ok",
+    "passed": true
+  }
+]

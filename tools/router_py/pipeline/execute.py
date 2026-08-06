@@ -63,7 +63,11 @@ def execute_request(
         engine = ExecutionEngine(
             config={
                 "timeout": timeout,
-                "model": model or os.environ.get("LUCY_MODEL", "local-lucy-llama31"),
+                # Prefer the local-model env var; fall back to LUCY_MODEL only for
+                # backward compatibility with callers that do not distinguish them.
+                "model": model
+                or os.environ.get("LUCY_LOCAL_MODEL")
+                or os.environ.get("LUCY_MODEL", "local-lucy-llama31"),
                 "use_sqlite_state": True,
             }
         )

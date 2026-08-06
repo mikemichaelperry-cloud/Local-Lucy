@@ -1,0 +1,44 @@
+[
+  {
+    "model": "local-lucy-gemma4:latest",
+    "question": "What is the capital of France?",
+    "route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 31,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ],
+    "elapsed_s": 10.89,
+    "passed": true,
+    "notes": []
+  },
+  {
+    "model": "local-lucy-llama31:latest",
+    "question": "What is 17 times 23?",
+    "route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 119,
+    "loaded_models": [
+      "local-lucy-llama31:latest"
+    ],
+    "elapsed_s": 1.13,
+    "passed": true,
+    "notes": []
+  },
+  {
+    "model": "local-lucy-gemma4:latest",
+    "question": "Who was Marie Curie?",
+    "route": "LOCAL",
+    "status": "completed",
+    "outcome_code": "answered",
+    "response_len": 233,
+    "loaded_models": [
+      "local-lucy-gemma4:latest"
+    ],
+    "elapsed_s": 0.04,
+    "passed": true,
+    "notes": []
+  }
+]

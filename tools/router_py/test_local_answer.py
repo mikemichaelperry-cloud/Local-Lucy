@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -555,6 +556,13 @@ class TestHeartbeat(unittest.TestCase):
         self.assertIsNot(first_thread, second_thread)
         self.assertTrue(second_thread.is_alive())
 
+    def test_heartbeat_disabled_by_env(self):
+        """LUCY_DISABLE_BACKGROUND_WARMUP=1 prevents the heartbeat thread from starting."""
+        local_answer._heartbeat_thread = None
+        with patch.dict(os.environ, {"LUCY_DISABLE_BACKGROUND_WARMUP": "1"}):
+            start_ollama_heartbeat("model-a")
+            self.assertIsNone(local_answer._heartbeat_thread)
+
 
 class TestWarmup(unittest.TestCase):
     """Test Ollama warmup thread and recurring warmup starter."""
@@ -579,8 +587,8 @@ class TestWarmup(unittest.TestCase):
             keep_alive="5m",
         )
         # Isolate from any real runtime state file on disk.
-        with patch("local_answer._get_active_model_from_state", return_value="test-model"):
-            with patch("urllib.request.urlopen") as mock_urlopen:
+        with patch("router_py.local_answer_core.utils._get_active_model_from_state", return_value="test-model"):
+            with patch("router_py.local_answer_core.utils.urllib.request.urlopen") as mock_urlopen:
                 mock_resp = MagicMock()
                 mock_resp.read.return_value = b"{}"
                 mock_urlopen.return_value.__enter__ = MagicMock(return_value=mock_resp)
@@ -622,6 +630,103 @@ class TestWarmup(unittest.TestCase):
         thread.stop()
         thread.join(timeout=2.0)
         self.assertFalse(thread.is_alive())
+
+    def test_warmup_thread_run_does_not_reference_local_answer(self):
+        """Regression: _OllamaWarmupThread must not crash with NameError.
+
+        The thread previously referenced ``LocalAnswer._warmup_thread`` directly,
+        which is undefined inside ``local_answer_core.utils``.  It must be able to
+        run when constructed with an explicit current-thread callback instead.
+        """
+        thread = _OllamaWarmupThread(
+            interval_s=0,
+            model="test-model",
+            api_url="http://127.0.0.1:11434/api/generate",
+            keep_alive="5m",
+            get_current_thread=lambda: None,
+        )
+        with patch("router_py.local_answer_core.utils._get_active_model_from_state", return_value="test-model"):
+            with patch.object(thread, "_ping"):
+                thread.start()
+                # Give the thread time to reach the replacement check that used to
+                # raise NameError.
+                time.sleep(0.1)
+                self.assertTrue(thread.is_alive())
+                thread.stop()
+                thread.join(timeout=1.0)
+                self.assertFalse(thread.is_alive())
+
+    def test_warmup_thread_replacement_callback(self):
+        """The get_current_thread callback decides when this thread is obsolete."""
+        current_thread: _OllamaWarmupThread | None = None
+
+        def get_current() -> _OllamaWarmupThread | None:
+            return current_thread
+
+        thread = _OllamaWarmupThread(
+            interval_s=0,
+            model="test-model",
+            api_url="http://127.0.0.1:11434/api/generate",
+            keep_alive="5m",
+            get_current_thread=get_current,
+        )
+        with patch("router_py.local_answer_core.utils._get_active_model_from_state", return_value="test-model"):
+            with patch.object(thread, "_ping"):
+                current_thread = thread
+                thread.start()
+                time.sleep(0.05)
+                # While it is the current thread, it should keep running.
+                self.assertTrue(thread.is_alive())
+                # Simulate a newer thread taking over.
+                current_thread = _OllamaWarmupThread(
+                    interval_s=3600,
+                    model="new-model",
+                    api_url="http://127.0.0.1:11434/api/generate",
+                    keep_alive="5m",
+                )
+                thread.join(timeout=1.0)
+                self.assertFalse(thread.is_alive())
+                current_thread.stop()
+
+    def test_warmup_thread_unloads_other_lucy_models_before_ping(self):
+        """A Lucy-model ping must evict any other resident Lucy model first."""
+        thread = _OllamaWarmupThread(
+            interval_s=300,
+            model="local-lucy-llama31",
+            api_url="http://127.0.0.1:11434/api/generate",
+            keep_alive="5m",
+        )
+        with patch("router_py.local_answer_core.utils._get_active_model_from_state", return_value="local-lucy-llama31"):
+            with patch("router_py.local_answer_core.utils.unload_other_lucy_models") as mock_unload:
+                with patch("router_py.local_answer_core.utils.urllib.request.urlopen") as mock_urlopen:
+                    mock_resp = MagicMock()
+                    mock_resp.read.return_value = b"{}"
+                    mock_urlopen.return_value.__enter__ = MagicMock(return_value=mock_resp)
+                    mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+                    thread._ping()
+
+                    mock_unload.assert_called_once_with("local-lucy-llama31")
+                    mock_urlopen.assert_called_once()
+
+    def test_warmup_thread_skips_unload_for_non_lucy_model(self):
+        """Non-Lucy model names must not evict the currently loaded local model."""
+        thread = _OllamaWarmupThread(
+            interval_s=300,
+            model="test-model",
+            api_url="http://127.0.0.1:11434/api/generate",
+            keep_alive="5m",
+        )
+        with patch("router_py.local_answer_core.utils._get_active_model_from_state", return_value="test-model"):
+            with patch("router_py.local_answer_core.utils.unload_other_lucy_models") as mock_unload:
+                with patch("router_py.local_answer_core.utils.urllib.request.urlopen") as mock_urlopen:
+                    mock_resp = MagicMock()
+                    mock_resp.read.return_value = b"{}"
+                    mock_urlopen.return_value.__enter__ = MagicMock(return_value=mock_resp)
+                    mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
+                    thread._ping()
+
+                    mock_unload.assert_not_called()
+                    mock_urlopen.assert_called_once()
 
     def test_start_recurring_warmup_respects_disabled_env(self):
         """Test LUCY_WARMUP_ENABLED=0 prevents thread start."""
@@ -673,6 +778,24 @@ class TestWarmup(unittest.TestCase):
         """Test missing model name prevents thread start."""
         LocalAnswer.start_recurring_warmup(config=LocalAnswerConfig(model=""))
         self.assertIsNone(LocalAnswer._warmup_thread)
+
+    def test_warmup_ollama_disabled_by_env(self):
+        """LUCY_DISABLE_BACKGROUND_WARMUP=1 prevents warmup_ollama from pinging."""
+        LocalAnswer._warmup_done = False
+        with patch.dict(os.environ, {"LUCY_DISABLE_BACKGROUND_WARMUP": "1"}):
+            with patch("threading.Thread") as mock_thread:
+                LocalAnswer.warmup_ollama(config=LocalAnswerConfig(model="test-model"))
+                mock_thread.assert_not_called()
+        self.assertTrue(LocalAnswer._warmup_done)
+
+    def test_start_recurring_warmup_disabled_by_env(self):
+        """LUCY_DISABLE_BACKGROUND_WARMUP=1 prevents recurring warmup thread start."""
+        with patch.dict(
+            os.environ,
+            {"LUCY_DISABLE_BACKGROUND_WARMUP": "1", "LUCY_WARMUP_ENABLED": "1"},
+        ):
+            LocalAnswer.start_recurring_warmup(config=LocalAnswerConfig(model="test-model"))
+            self.assertIsNone(LocalAnswer._warmup_thread)
 
 
 class TestIntegration(unittest.TestCase):

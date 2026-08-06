@@ -51,6 +51,9 @@ def build_source_attribution(
         confidence = "high" if has_evidence else "medium"
         return SourceAttribution(basis="local", sources=sources, confidence=confidence)
 
+    if route == "AUGMENTED" and trust_class == "untrusted":
+        return SourceAttribution(basis="web_untrusted", sources=sources, confidence="low")
+
     if route == "AUGMENTED":
         return SourceAttribution(basis="augmented", sources=sources, confidence="medium")
 

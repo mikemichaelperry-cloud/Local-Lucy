@@ -77,7 +77,7 @@ _NETWORK_DENIALS = [
     re.compile(r"\bdo\s+not\s+(?:use|access)\b[^.]*?\bnetwork\s+access\b"),
     # Direct standalone denials.
     re.compile(r"\bdo\s+not\s+(?:use|access)\s+(?:the\s+)?internet\b"),
-    re.compile(r"\bdo\s+not\s+browse\s+(?:the\s+)?web\b"),
+    re.compile(r"\bdo\s+not\s+(?:browse|search)\s+(?:the\s+)?web\b"),
     re.compile(r"\bno\s+(?:network\s+access|internet|web)\b"),
 ]
 

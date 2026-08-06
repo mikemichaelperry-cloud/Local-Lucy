@@ -1,0 +1,99 @@
+{
+  "stage": "STAGE_17",
+  "passed": 11,
+  "total": 11,
+  "all_passed": true,
+  "results": [
+    {
+      "case_id": "live_wikipedia",
+      "passed": true,
+      "provider": "wikipedia",
+      "context_len": 492
+    },
+    {
+      "case_id": "live_time",
+      "passed": true,
+      "timezone": "Europe/London"
+    },
+    {
+      "case_id": "live_weather",
+      "passed": true,
+      "has_current": false
+    },
+    {
+      "case_id": "live_finance_fx",
+      "passed": true,
+      "provider": "finance",
+      "context_len": 37
+    },
+    {
+      "case_id": "router_general_knowledge",
+      "passed": true,
+      "query": "Who painted the Mona Lisa?",
+      "expected": [
+        "AUGMENTED"
+      ],
+      "actual": "AUGMENTED",
+      "provider": "wikipedia",
+      "policy_reason": "factual_lookup_truth_first"
+    },
+    {
+      "case_id": "router_weather",
+      "passed": true,
+      "query": "What is the weather in London?",
+      "expected": [
+        "WEATHER"
+      ],
+      "actual": "WEATHER",
+      "provider": "weather",
+      "policy_reason": "router_weather_guard"
+    },
+    {
+      "case_id": "router_time",
+      "passed": true,
+      "query": "What time is it in Tokyo?",
+      "expected": [
+        "TIME"
+      ],
+      "actual": "TIME",
+      "provider": "timeapi",
+      "policy_reason": "router_time_guard"
+    },
+    {
+      "case_id": "router_medical",
+      "passed": true,
+      "query": "I have a fever and cough, what should I do?",
+      "expected": [
+        "EVIDENCE"
+      ],
+      "actual": "EVIDENCE",
+      "provider": "trusted",
+      "policy_reason": "evidence_required_medical_context"
+    },
+    {
+      "case_id": "router_finance",
+      "passed": true,
+      "query": "What is the current Apple stock price?",
+      "expected": [
+        "FINANCE"
+      ],
+      "actual": "FINANCE",
+      "provider": "finance",
+      "policy_reason": "router_finance_guard"
+    },
+    {
+      "case_id": "source_distinction_medical",
+      "passed": true,
+      "query": "What are the side effects of metformin?",
+      "route": "EVIDENCE",
+      "provider": "trusted"
+    },
+    {
+      "case_id": "source_distinction_general",
+      "passed": true,
+      "query": "Who painted the Mona Lisa?",
+      "route": "AUGMENTED",
+      "provider": "wikipedia"
+    }
+  ]
+}

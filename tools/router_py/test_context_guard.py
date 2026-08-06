@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import context_guard
 import metrics
 import pytest
 
@@ -251,10 +252,15 @@ def test_provenance_boosts_trusted_and_damps_generated():
 
 def test_temporal_penalty_for_current_query_with_stale_evidence():
     query = "What is the latest climate news?"
-    fresh = {"context": "Climate news today.", "date": "2026-07-04"}
+    # Use a recent date so it is NOT penalised; stale date is well beyond threshold.
+    from datetime import datetime, timedelta, timezone
+    recent = (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d")
+    fresh = {"context": "Climate news today.", "date": recent}
     stale = {"context": "Climate news last year.", "date": "2025-01-01"}
 
-    with patch("context_guard._load_ce_model", return_value=_fake_ce(1.0)):
+    # Patch the cached singleton directly; the fixture forces _load_ce_model to
+    # return None, which would bypass the fake cross-encoder.
+    with patch.object(context_guard, "_ce_model", _fake_ce(1.0)):
         fresh_score = score_evidence_relevance(query, fresh)
         stale_score = score_evidence_relevance(query, stale)
 

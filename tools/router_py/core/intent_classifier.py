@@ -249,11 +249,28 @@ def _is_primary_doc_request(text: str) -> bool:
     return False
 
 
-def _is_travel_advisory(text: str) -> bool:
+def _has_travel_destination(text: str) -> bool:
+    """Return True when the text mentions a likely travel destination."""
+    if _contains_any(text, list(TRAVEL_DESTINATIONS)):
+        return True
+    # Broad catch: capitalised place after a preposition commonly used in travel queries.
     return _has_re(
         text,
-        r"\b(travel|travelling|traveling|visit|trip|tourism|tourist|safe|safety|advisory|warning|dangerous|risk|safe to travel|is it safe)\b",
-    ) and _contains_any(text, list(TRAVEL_DESTINATIONS))
+        r"\b(?:in|to|around|of|from|across|throughout)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,2})\b",
+    )
+
+
+def _is_travel_advisory(text: str) -> bool:
+    # Explicit travel-intent phrases that need only a destination.
+    if _has_re(
+        text,
+        r"\b(what\s+(?:to|should\s+i)\s+(?:see|do|visit)|where\s+(?:to|should\s+i)\s+(?:go|visit)|best\s+places\s+(?:to\s+)?(?:visit|see|go)|places\s+to\s+(?:visit|see)|things\s+to\s+(?:see|do)|travel\s+guide|guide\s+to)\b",
+    ) and _has_travel_destination(text):
+        return True
+    return _has_re(
+        text,
+        r"\b(travel|travelling|traveling|visit|trip|tourism|tourist|safe|safety|advisory|warning|dangerous|risk|safe to travel|is it safe|holiday|vacation|itinerary|sightseeing|destinations?)\b",
+    ) and _has_travel_destination(text)
 
 
 def _is_current_fact(text: str) -> bool:
@@ -348,13 +365,11 @@ def _is_medical_query(text: str) -> bool:
 
 
 def _is_mixed_ambiguous(text: str) -> bool:
-    if _has_re(text, r"\btravel\s+(information|info|advice)\b") and not _contains_any(
-        text, list(TRAVEL_DESTINATIONS)
-    ):
+    if _has_re(text, r"\btravel\s+(information|info|advice)\b") and not _has_travel_destination(text):
         return True
-    if _has_re(text, r"\btell me about\b") and _contains_any(text, list(TRAVEL_DESTINATIONS)):
+    if _has_re(text, r"\btell me about\b") and _has_travel_destination(text):
         return True
-    if _has_re(text, r"\bwhat about\b") and _contains_any(text, list(TRAVEL_DESTINATIONS)):
+    if _has_re(text, r"\bwhat about\b") and _has_travel_destination(text):
         return True
     return False
 

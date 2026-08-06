@@ -34,7 +34,14 @@ def _is_loaded(name: str) -> bool:
 
 
 def _load_model(name: str) -> None:
-    """Send a minimal generate request to force Ollama to load the model."""
+    """Send a minimal generate request to force Ollama to load the model.
+
+    Uses the same cross-process lock as production code so the smoke test
+    does not accidentally load a model while the HMI or another test holds
+    a different one.
+    """
+    from router_py.ollama_cleanup import is_lucy_model, ollama_load_lock, unload_other_lucy_models
+
     body = json.dumps(
         {
             "model": name,
@@ -51,8 +58,11 @@ def _load_model(name: str) -> None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=120.0) as resp:
-            resp.read()
+        with ollama_load_lock():
+            if is_lucy_model(name):
+                unload_other_lucy_models(name)
+            with urllib.request.urlopen(req, timeout=120.0) as resp:
+                resp.read()
     except Exception as exc:
         pytest.skip(f"Could not load {name}: {exc}")
 

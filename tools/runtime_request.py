@@ -613,7 +613,12 @@ def _run_backend_submit_python(
     if outcome.metadata:
         for key, value in outcome.metadata.items():
             str_key = str(key).upper()
-            if str_key not in outcome_meta:
+            # Allow execution-engine trust_class to override the default
+            # provider_usage_class-based TRUST_CLASS so trusted-domain
+            # bounded responses are labelled correctly.
+            if str_key == "TRUST_CLASS":
+                outcome_meta[str_key] = str(value)
+            elif str_key not in outcome_meta:
                 outcome_meta[str_key] = str(value)
 
     payload = {
@@ -628,7 +633,12 @@ def _run_backend_submit_python(
             "voice": state.get("voice", "off"),
             "augmentation_policy": state.get("augmentation_policy", "disabled"),
             "augmented_provider": state.get("augmented_provider", "wikipedia"),
-            "model": state.get("model", "local-lucy"),
+            "model": state.get(
+                "model",
+                os.environ.get("LUCY_LOCAL_MODEL")
+                or os.environ.get("LUCY_MODEL")
+                or "local-lucy-llama31",
+            ),
             "profile": state.get("profile", "lucy-v11"),
         },
         "error": "",
@@ -644,9 +654,6 @@ def _run_backend_submit_python(
         "route": build_route_payload(route_meta, outcome_meta, request_text=request_text),
         "status": outcome.status,
     }
-    # Signal to submit_request() that the Python backend already wrote the
-    # HMI-facing JSON state files (last_request_result.json / request_history.jsonl).
-    payload["_state_persisted"] = True
     return payload
 
 
@@ -973,7 +980,12 @@ def _run_backend_submit_chat_bin(
             "voice": state.get("voice", "off"),
             "augmentation_policy": state.get("augmentation_policy", "disabled"),
             "augmented_provider": state.get("augmented_provider", "wikipedia"),
-            "model": state.get("model", "local-lucy"),
+            "model": state.get(
+                "model",
+                os.environ.get("LUCY_LOCAL_MODEL")
+                or os.environ.get("LUCY_MODEL")
+                or "local-lucy-llama31",
+            ),
             "profile": state.get("profile", "lucy-v11"),
         },
         "error": "",
@@ -1567,7 +1579,7 @@ def determine_answer_class(outcome_meta: dict[str, str]) -> str:
         return "validation_failed"
     if outcome_code == "requires_evidence_mode":
         return "requires_evidence_mode"
-    if trust_class == "evidence_backed" or final_mode == "EVIDENCE":
+    if trust_class in ("evidence_backed", "trusted") or final_mode == "EVIDENCE":
         return "evidence_backed_answer"
     if final_mode == "AUGMENTED":
         if _truthy_text(outcome_meta.get("FALLBACK_USED")):

@@ -3,16 +3,23 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
 import subprocess
 import threading
 import time
+import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from router_py.local_answer_core.state import _get_active_model_from_state
+from router_py.ollama_cleanup import (
+    is_lucy_model,
+    ollama_load_lock,
+    unload_other_lucy_models,
+)
 
 
 class _OllamaWarmupThread(threading.Thread):
@@ -28,13 +35,22 @@ class _OllamaWarmupThread(threading.Thread):
         model: str,
         api_url: str,
         keep_alive: str,
+        get_current_thread: Callable[[], _OllamaWarmupThread | None] | None = None,
     ):
         super().__init__(daemon=True, name="ollama-warmup")
         self.interval_s = interval_s
         self.model = model
         self.api_url = api_url
         self.keep_alive = keep_alive
+        self._get_current_thread = get_current_thread
         self._stop_event = threading.Event()
+
+    def _is_replaced(self) -> bool:
+        """Return True if a newer warmup thread has taken over."""
+        if self._get_current_thread is None:
+            return False
+        current = self._get_current_thread()
+        return current is not None and current is not self
 
     def run(self) -> None:
         while not self._stop_event.is_set():
@@ -46,7 +62,7 @@ class _OllamaWarmupThread(threading.Thread):
             active_model = _get_active_model_from_state() or self.model
             if active_model != self.model:
                 break
-            if LocalAnswer._warmup_thread is not None and LocalAnswer._warmup_thread is not self:
+            if self._is_replaced():
                 break
             self._ping()
 
@@ -56,7 +72,7 @@ class _OllamaWarmupThread(threading.Thread):
         active_model = _get_active_model_from_state() or self.model
         if (
             active_model != self.model
-            or (LocalAnswer._warmup_thread is not None and LocalAnswer._warmup_thread is not self)
+            or self._is_replaced()
             or self._stop_event.is_set()
         ):
             return
@@ -68,14 +84,19 @@ class _OllamaWarmupThread(threading.Thread):
             "options": {"num_predict": 0},
         }
         try:
-            req = urllib.request.Request(
-                self.api_url,
-                data=json.dumps(body).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=30.0) as resp:
-                resp.read()
+            # Prevent two local models from ever being resident at the same time.
+            # The HMI uses the same guard when it switches models.
+            with ollama_load_lock():
+                if is_lucy_model(self.model):
+                    unload_other_lucy_models(self.model)
+                req = urllib.request.Request(
+                    self.api_url,
+                    data=json.dumps(body).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=30.0) as resp:
+                    resp.read()
         except Exception:
             pass  # Silently fail — Ollama may not be running yet
 

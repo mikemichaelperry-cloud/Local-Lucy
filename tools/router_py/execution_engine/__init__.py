@@ -56,6 +56,7 @@ from .helpers import (
     _evidence_has_content,
     _load_session_memory_context_with_telemetry,
     _load_session_memory_context,
+    _is_memory_or_followup_query,
 )
 
 from tools.xdg_paths import lucy_runtime_namespace_root
@@ -74,6 +75,13 @@ from router_py.structured_logging import get_structured_logger, ContextualLogger
 from router_py.context_guard import is_evidence_relevant, filter_memory_context
 from router_py.code_review_model_resolver import CodeReviewModelResolver
 from router_py.local_answer import LocalAnswerConfig
+
+try:
+    from router_py.escalation.fetcher import fetch_general_knowledge
+
+    HAS_WEB_FETCHER = True
+except Exception:
+    HAS_WEB_FETCHER = False
 
 try:
     from router_py import metrics as _router_metrics
@@ -852,6 +860,34 @@ class ExecutionEngine:
             metadata=new_metadata,
         )
 
+    def _label_web_untrusted_fallback(
+        self,
+        result: ExecutionResult,
+        evidence: dict[str, Any],
+    ) -> ExecutionResult:
+        """Label AUGMENTED responses that used the general-web fallback.
+
+        The web fetcher is explicitly last-resort and untrusted. Make sure the
+        user can see that in the answer text and in outcome metadata.
+        """
+        title = evidence.get("title", "") or "untrusted web source"
+        url = evidence.get("url", "")
+        source_line = f"{title} — {url}" if url else title
+        label = (
+            "[Note: the following answer was sourced from an untrusted web "
+            f"search result ({source_line}). Please verify independently.]\n\n"
+        )
+        new_metadata = dict(result.metadata or {})
+        new_metadata["trust_class"] = "untrusted"
+        new_metadata["web_untrusted_label_applied"] = True
+        return dataclasses.replace(
+            result,
+            response_text=label + result.response_text,
+            provider="web_untrusted",
+            provider_usage_class=provider_usage_class_for("web_untrusted") or "free",
+            metadata=new_metadata,
+        )
+
     def _context_indicates_medical_query(self, context: dict[str, Any]) -> bool:
         """Return True when execution context already carries a medical signal."""
         for key in ("is_medical_query", "medical_context", "routing_signal_medical_context"):
@@ -861,6 +897,70 @@ class ExecutionEngine:
                     return True
             elif isinstance(value, str) and self._is_truthy(value):
                 return True
+        return False
+
+    @staticmethod
+    def _is_untrusted_web_inappropriate(question: str, evidence_reason: str) -> bool:
+        """Return True when the general-web fallback must not be used.
+
+        Untrusted DuckDuckGo results are intentionally last-resort and must not
+        be invoked for:
+
+        * high-stakes regulated domains (medical/veterinary/legal/financial);
+        * live/current topics where stale or unvetted sources are dangerous;
+        * known conspiracy/hoax tropes where the first search hit is likely to
+          be misinformation.
+        """
+        high_stakes_reasons = {
+            "medical_context",
+            "medical_safety",
+            "medical_body_symptom",
+            "veterinary_context",
+            "legal_context",
+            "financial_high_stakes",
+            "financial_data",
+            "current_information",
+            "conflict_live",
+            "news_synthesis",
+        }
+        if evidence_reason in high_stakes_reasons:
+            return True
+
+        norm = re.sub(r"[^\w\s]", " ", (question or "").lower())
+        norm = re.sub(r"\s+", " ", norm).strip()
+
+        conspiracy_phrases = [
+            "flat earth",
+            "earth flat",
+            "moon landing faked",
+            "moon landing hoax",
+            "moon landing fake",
+            "nine eleven inside job",
+            "9 11 inside job",
+            "vaccine microchip",
+            "vaccines contain microchips",
+            "microchips in vaccines",
+            "chemtrails",
+            "lizard people",
+            "reptilian",
+            "illuminati",
+            "new world order",
+            "qanon",
+            "pizzagate",
+            "holocaust denial",
+            "holohoax",
+            "climate change hoax",
+            "climate change a hoax",
+            "global warming hoax",
+            "global warming a hoax",
+            "plandemic",
+            "fake moon",
+            "birther",
+        ]
+        for phrase in conspiracy_phrases:
+            if phrase in norm:
+                return True
+
         return False
 
     # ======================================================================
@@ -1120,7 +1220,15 @@ class ExecutionEngine:
         # Filter retrieved evidence before it reaches any LLM prompt.
         # Direct-answer routes (WEATHER, TIME, FINANCE, NEWS) return evidence
         # as the response, so we skip filtering there to preserve completeness.
-        if evidence and route.route in ("EVIDENCE", "FULL", "AUGMENTED"):
+        # Intentional web-untrusted fallback results are exempt from the semantic
+        # relevance guard: the user explicitly enabled general-knowledge web
+        # fetch, and DuckDuckGo already ranked the result for the query.
+        is_web_untrusted_fallback = (
+            evidence is not None
+            and evidence.get("provider") == "web_untrusted"
+            and evidence.get("fallback_used") is True
+        )
+        if evidence and route.route in ("EVIDENCE", "FULL", "AUGMENTED") and not is_web_untrusted_fallback:
             relevant = await asyncio.to_thread(
                 is_evidence_relevant, question, evidence, request_id=request_id
             )
@@ -1131,6 +1239,19 @@ class ExecutionEngine:
                     evidence.get("title", "")[:60],
                 )
                 evidence = None
+
+        # Last-resort general-knowledge web fetch for ordinary AUGMENTED factual
+        # queries when primary evidence was missing or filtered out as irrelevant.
+        # Critical routes (EVIDENCE/medical/vet/legal/current/financial) and
+        # conspiracy/hoax-prone topics intentionally skip this.
+        if (
+            not _evidence_has_content(evidence)
+            and route.route == "AUGMENTED"
+            and not self._is_untrusted_web_inappropriate(question, route.evidence_reason)
+        ):
+            web_ev = await self._fetch_web_evidence(question)
+            if web_ev:
+                evidence = web_ev
 
         # Route-dependent evidence failure handling (Phase 1-2).
         # When evidence is unavailable or was rejected, do not silently fall back
@@ -1415,9 +1536,18 @@ class ExecutionEngine:
                 question, session_id=session_id
             )
             if session_memory:
-                session_memory = await asyncio.to_thread(
-                    filter_memory_context, question, session_memory, request_id=request_id
-                )
+                # Explicit memory/follow-up queries ("read my last answer",
+                # "what did I say earlier", "and if she...") share few keywords
+                # with the turns they reference. Semantic filtering drops the
+                # very context they need, so we keep the recent turns intact.
+                if _is_memory_or_followup_query(question):
+                    self._logger.debug(
+                        "Keeping full session memory for memory/follow-up query"
+                    )
+                else:
+                    session_memory = await asyncio.to_thread(
+                        filter_memory_context, question, session_memory, request_id=request_id
+                    )
                 if session_memory:
                     self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
 
@@ -1485,7 +1615,11 @@ class ExecutionEngine:
             "evidence_fetched": evidence is not None,
             "evidence_title": evidence.get("title", "") if evidence else "",
             "evidence_url": evidence.get("url", "") if evidence else "",
-            "trust_class": "unverified" if evidence else "local",
+            "trust_class": (
+                evidence.get("trust_class", "unverified")
+                if evidence
+                else "local"
+            ),
             "real_route_preserved": True,  # Marker for testing
             **memory_telemetry,
         }
@@ -1506,6 +1640,9 @@ class ExecutionEngine:
 
         if route.route == "EVIDENCE" and result.response_text:
             result = self._label_evidence_fallback(result, evidence)
+
+        if route.route == "AUGMENTED" and evidence and evidence.get("provider") == "web_untrusted" and result.response_text:
+            result = self._label_web_untrusted_fallback(result, evidence)
 
         if is_medical_query and result.route == "AUGMENTED" and result.response_text:
             result = self._append_medical_sources(result, context)
@@ -1614,6 +1751,7 @@ class ExecutionEngine:
         last_error = parallel_result.get("last_error", "")
         attempted = parallel_result.get("attempted", [])
         self._logger.warning(f"All evidence providers failed. Last error: {last_error}")
+
         # Return a minimal dict with telemetry so callers know what was attempted
         return {
             "fallback_used": True,
@@ -1623,6 +1761,46 @@ class ExecutionEngine:
             "attempted_chain": attempted,
             "successful_backend": "",
             "degradation_level": "low",
+        }
+
+    async def _fetch_web_evidence(self, question: str) -> dict[str, Any] | None:
+        """Fetch a single DuckDuckGo result as untrusted web evidence.
+
+        Only used as a fallback when trusted/primary evidence providers fail for
+        ordinary AUGMENTED factual questions. The result is explicitly labelled
+        as untrusted so downstream attribution reflects it.
+        """
+        if not HAS_WEB_FETCHER:
+            return None
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None, lambda: fetch_general_knowledge(question)
+            )
+        except Exception as exc:
+            self._logger.warning(f"General web fetch failed: {exc}")
+            return None
+        if not result or not result.url:
+            return None
+
+        context_parts = [result.snippet]
+        if result.title:
+            context_parts.insert(0, result.title)
+        context = "\n".join(p for p in context_parts if p)
+        return {
+            "context": context,
+            "content": context,
+            "title": result.title,
+            "url": result.url,
+            "sources": [result.url],
+            "provider": "web_untrusted",
+            "source_type": "web_untrusted",
+            "trust_class": "untrusted",
+            "evidence_fetched": True,
+            "fallback_used": True,
+            "fallback_reason": "primary_evidence_providers_failed",
+            "successful_backend": "web_untrusted",
+            "degradation_level": "untrusted",
         }
 
     async def _fetch_evidence_parallel(

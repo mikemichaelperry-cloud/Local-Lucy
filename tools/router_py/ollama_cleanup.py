@@ -8,13 +8,52 @@ released when Lucy exits or switches models.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
+import os
+import threading
 import urllib.error
 import urllib.request
-from typing import Any
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Iterator
 
 logger = logging.getLogger(__name__)
+
+# Serialize load/unload/ping operations that affect Ollama VRAM so the router
+# backend never keeps two local models resident at the same time.
+OLLAMA_LOAD_LOCK = threading.Lock()
+
+
+def _ollama_load_lock_file() -> Path:
+    """Return the cross-process lock file used to serialize Ollama loads.
+
+    The lock guards the single Ollama daemon, so it must be shared across
+    runtime namespaces. Tests or CLI invocations that override
+    LUCY_RUNTIME_NAMESPACE_ROOT still compete for the same GPU and must
+    serialize with the HMI and with each other.
+    """
+    path = Path.home() / ".local" / "share" / "local-lucy-v11" / "state" / "ollama_load.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+@contextmanager
+def ollama_load_lock() -> Iterator[None]:
+    """Acquire both the in-process and cross-process Ollama load locks.
+
+    This prevents two Local Lucy processes (e.g. the HMI and a test run) from
+    loading different local models into Ollama at the same time.
+    """
+    with OLLAMA_LOAD_LOCK:
+        lock_path = _ollama_load_lock_file()
+        with open(lock_path, "w") as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 DEFAULT_OLLAMA_API_URL = "http://127.0.0.1:11434"
 # Local Lucy v11's allowed model universe: the Llama wrapper fleet and Gemma 4.
@@ -23,8 +62,6 @@ LUCY_MODEL_PREFIXES = ("local-lucy", "gemma4")
 
 
 def _ollama_api_url() -> str:
-    import os
-
     raw = os.environ.get("LUCY_OLLAMA_API_URL", DEFAULT_OLLAMA_API_URL).strip().rstrip("/")
     # Some callers set LUCY_OLLAMA_API_URL to the full generate endpoint.
     # Normalize to the base Ollama API URL so /api/ps and /api/generate work.

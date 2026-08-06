@@ -957,7 +957,7 @@
     "labels": {
       "intent_family": "how_to",
       "evidence_mode": "not_required",
-      "route": "LOCAL",
+      "route": "AUGMENTED",
       "policy_override": "none"
     },
     "metadata": {
@@ -4848,7 +4848,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05e7\u05d5\u05e8\u05d4 \u05e2\u05db\u05e9\u05d9\u05d5 \u05d1\u05e2\u05d5\u05dc\u05dd?",
+    "query": "מה קורה עכשיו בעולם?",
     "labels": {
       "intent_family": "news_request",
       "evidence_mode": "not_required",
@@ -5030,7 +5030,7 @@
     }
   },
   {
-    "query": "Dame el pron\u00f3stico",
+    "query": "Dame el pronóstico",
     "labels": {
       "intent_family": "ephemeral_query",
       "evidence_mode": "not_required",
@@ -6255,7 +6255,7 @@
     }
   },
   {
-    "query": "\u00bfC\u00f3mo est\u00e1 el clima?",
+    "query": "¿Cómo está el clima?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -11919,7 +11919,7 @@
     }
   },
   {
-    "query": "I'm scheduling a meeting, what time is it in S\u00e3o Paulo?",
+    "query": "I'm scheduling a meeting, what time is it in São Paulo?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -12348,7 +12348,7 @@
     }
   },
   {
-    "query": "\u00bfC\u00f3mo est\u00e1 el clima hoy?",
+    "query": "¿Cómo está el clima hoy?",
     "labels": {
       "intent_family": "ephemeral_query",
       "evidence_mode": "not_required",
@@ -12387,7 +12387,7 @@
     }
   },
   {
-    "query": "Qu'est-ce que la photosynth\u00e8se?",
+    "query": "Qu'est-ce que la photosynthèse?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -12400,7 +12400,7 @@
     }
   },
   {
-    "query": "\u00bfQu\u00e9 es la gravedad?",
+    "query": "¿Qué es la gravedad?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15546,7 +15546,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05d4\u05e9\u05dd \u05e9\u05dc\u05da?",
+    "query": "מה השם שלך?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15559,7 +15559,7 @@
     }
   },
   {
-    "query": "\u05de\u05d9 \u05d0\u05ea?",
+    "query": "מי את?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15572,7 +15572,7 @@
     }
   },
   {
-    "query": "\u05e1\u05e4\u05e8 \u05dc\u05d9 \u05d1\u05d3\u05d9\u05d7\u05d4",
+    "query": "ספר לי בדיחה",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15585,7 +15585,7 @@
     }
   },
   {
-    "query": "\u05db\u05ea\u05d5\u05d1 \u05dc\u05d9 \u05e1\u05d9\u05e4\u05d5\u05e8 \u05e7\u05e6\u05e8",
+    "query": "כתוב לי סיפור קצר",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15598,7 +15598,7 @@
     }
   },
   {
-    "query": "\u05d0\u05d9\u05da \u05de\u05d5\u05ea\u05e7\u05e0\u05d9\u05dd \u05e4\u05d9\u05d9\u05ea\u05d5\u05df?",
+    "query": "איך מותקנים פייתון?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15611,7 +15611,7 @@
     }
   },
   {
-    "query": "\u05ea\u05e8\u05d2\u05d5\u05dd \u05e9\u05dc \u05e9\u05dc\u05d5\u05dd \u05dc\u05d0\u05e0\u05d2\u05dc\u05d9\u05ea",
+    "query": "תרגום של שלום לאנגלית",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15624,7 +15624,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05d4\u05d4\u05d1\u05d3\u05dc \u05d1\u05d9\u05df \u05e7\u05d8\u05df \u05dc\u05d2\u05d3\u05d5\u05dc?",
+    "query": "מה ההבדל בין קטן לגדול?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15637,7 +15637,7 @@
     }
   },
   {
-    "query": "\u05db\u05de\u05d4 \u05d9\u05dc\u05d3\u05d9\u05dd \u05d9\u05e9 \u05dc\u05d9?",
+    "query": "כמה ילדים יש לי?",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15650,7 +15650,7 @@
     }
   },
   {
-    "query": "\u05e1\u05e4\u05e8 \u05dc\u05d9 \u05e2\u05dc \u05d4\u05db\u05dc\u05d1 \u05e9\u05dc\u05d9",
+    "query": "ספר לי על הכלב שלי",
     "labels": {
       "intent_family": "local_answer",
       "evidence_mode": "not_required",
@@ -15663,7 +15663,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4\u05d9 \u05e2\u05d9\u05e8 \u05d4\u05d1\u05d9\u05e8\u05d4 \u05e9\u05dc \u05e6\u05e8\u05e4\u05ea?",
+    "query": "מהי עיר הבירה של צרפת?",
     "labels": {
       "intent_family": "factual_lookup",
       "evidence_mode": "not_required",
@@ -15676,7 +15676,7 @@
     }
   },
   {
-    "query": "\u05de\u05d9 \u05d4\u05d9\u05d4 \u05d0\u05d3\u05dd \u05d4\u05e8\u05d0\u05e9\u05d5\u05df \u05e9\u05d8\u05e1 \u05dc\u05d7\u05dc\u05dc?",
+    "query": "מי היה אדם הראשון שטס לחלל?",
     "labels": {
       "intent_family": "factual_lookup",
       "evidence_mode": "not_required",
@@ -15689,7 +15689,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05d2\u05d5\u05d1\u05d4\u05d5 \u05e9\u05dc \u05d4\u05e8 \u05d0\u05d5\u05d5\u05e8\u05e1\u05d8?",
+    "query": "מה גובהו של הר אוורסט?",
     "labels": {
       "intent_family": "factual_lookup",
       "evidence_mode": "not_required",
@@ -15702,7 +15702,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4\u05d9 \u05de\u05e9\u05de\u05e2\u05d5\u05ea \u05d4\u05d7\u05d9\u05d9\u05dd?",
+    "query": "מהי משמעות החיים?",
     "labels": {
       "intent_family": "factual_lookup",
       "evidence_mode": "not_required",
@@ -15715,7 +15715,7 @@
     }
   },
   {
-    "query": "\u05d4\u05db\u05dc\u05d1 \u05e9\u05dc\u05d9 \u05de\u05e7\u05d9\u05d0, \u05de\u05d4 \u05dc\u05e2\u05e9\u05d5\u05ea?",
+    "query": "הכלב שלי מקיא, מה לעשות?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -15728,7 +15728,7 @@
     }
   },
   {
-    "query": "\u05d4\u05d7\u05ea\u05d5\u05dc \u05e9\u05dc\u05d9 \u05dc\u05d0 \u05d0\u05d5\u05db\u05dc \u05db\u05d1\u05e8 \u05d9\u05d5\u05de\u05d9\u05d9\u05dd",
+    "query": "החתול שלי לא אוכל כבר יומיים",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -15741,7 +15741,7 @@
     }
   },
   {
-    "query": "\u05d4\u05d0\u05dd \u05db\u05dc\u05d1\u05d9\u05dd \u05d9\u05db\u05d5\u05dc\u05d9\u05dd \u05dc\u05d0\u05db\u05d5\u05dc \u05e9\u05d5\u05e7\u05d5\u05dc\u05d3?",
+    "query": "האם כלבים יכולים לאכול שוקולד?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -15754,7 +15754,7 @@
     }
   },
   {
-    "query": "\u05db\u05d0\u05d1 \u05d1\u05d8\u05df \u05d7\u05d6\u05e7 \u05d5\u05d7\u05d5\u05dd \u05de\u05d4 \u05dc\u05e2\u05e9\u05d5\u05ea?",
+    "query": "כאב בטן חזק וחום מה לעשות?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -15767,7 +15767,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4\u05df \u05ea\u05d5\u05e4\u05e2\u05d5\u05ea \u05d4\u05dc\u05d5\u05d5\u05d0\u05d9 \u05e9\u05dc \u05d0\u05e1\u05e4\u05d9\u05e8\u05d9\u05df?",
+    "query": "מהן תופעות הלוואי של אספירין?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -15780,7 +15780,7 @@
     }
   },
   {
-    "query": "\u05d4\u05d0\u05dd \u05d7\u05d9\u05e1\u05d5\u05e0\u05d9\u05dd \u05dc\u05d9\u05dc\u05d3\u05d9\u05dd \u05d1\u05d8\u05d5\u05d7\u05d9\u05dd?",
+    "query": "האם חיסונים לילדים בטוחים?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -15793,7 +15793,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4\u05d5 \u05d4\u05d9\u05e1\u05d5\u05d3 \u05d4\u05e0\u05e4\u05e9\u05d9 \u05d1\u05e4\u05dc\u05d9\u05dc\u05d9\u05dd?",
+    "query": "מהו היסוד הנפשי בפלילים?",
     "labels": {
       "intent_family": "current_evidence",
       "evidence_mode": "required",
@@ -15806,7 +15806,7 @@
     }
   },
   {
-    "query": "\u05e1\u05e4\u05e8 \u05dc\u05d9 \u05e2\u05dc \u05d4\u05d0\u05d9\u05e8\u05d5\u05e2\u05d9\u05dd \u05d4\u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd \u05d1\u05d9\u05e9\u05e8\u05d0\u05dc",
+    "query": "ספר לי על האירועים האחרונים בישראל",
     "labels": {
       "intent_family": "current_news",
       "evidence_mode": "not_required",
@@ -15819,7 +15819,7 @@
     }
   },
   {
-    "query": "\u05d7\u05d3\u05e9\u05d5\u05ea \u05e2\u05d3\u05db\u05e0\u05d9\u05d5\u05ea \u05e2\u05dc \u05d8\u05db\u05e0\u05d5\u05dc\u05d5\u05d2\u05d9\u05d4",
+    "query": "חדשות עדכניות על טכנולוגיה",
     "labels": {
       "intent_family": "current_news",
       "evidence_mode": "not_required",
@@ -15832,7 +15832,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05de\u05d6\u05d2 \u05d4\u05d0\u05d5\u05d5\u05d9\u05e8 \u05d4\u05d9\u05d5\u05dd?",
+    "query": "מה מזג האוויר היום?",
     "labels": {
       "intent_family": "current_weather",
       "evidence_mode": "not_required",
@@ -15845,7 +15845,7 @@
     }
   },
   {
-    "query": "\u05d4\u05d0\u05dd \u05d9\u05e8\u05d3 \u05d2\u05e9\u05dd \u05de\u05d7\u05e8 \u05d1\u05ea\u05dc \u05d0\u05d1\u05d9\u05d1?",
+    "query": "האם ירד גשם מחר בתל אביב?",
     "labels": {
       "intent_family": "current_weather",
       "evidence_mode": "not_required",
@@ -15858,7 +15858,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05d4\u05d8\u05de\u05e4\u05e8\u05d8\u05d5\u05e8\u05d4 \u05d1\u05d9\u05e8\u05d5\u05e9\u05dc\u05d9\u05dd?",
+    "query": "מה הטמפרטורה בירושלים?",
     "labels": {
       "intent_family": "current_weather",
       "evidence_mode": "not_required",
@@ -15871,7 +15871,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05d4\u05e9\u05e2\u05d4 \u05e2\u05db\u05e9\u05d9\u05d5?",
+    "query": "מה השעה עכשיו?",
     "labels": {
       "intent_family": "current_time",
       "evidence_mode": "not_required",
@@ -15884,7 +15884,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05d4\u05e9\u05e2\u05d4 \u05d1\u05e0\u05d9\u05d5 \u05d9\u05d5\u05e8\u05e7?",
+    "query": "מה השעה בניו יורק?",
     "labels": {
       "intent_family": "current_time",
       "evidence_mode": "not_required",
@@ -15897,7 +15897,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05de\u05d7\u05d9\u05e8 \u05d4\u05de\u05e0\u05d9\u05d4 \u05e9\u05dc \u05d0\u05e4\u05dc?",
+    "query": "מה מחיר המניה של אפל?",
     "labels": {
       "intent_family": "current_finance",
       "evidence_mode": "not_required",
@@ -15910,7 +15910,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05de\u05d7\u05d9\u05e8 \u05d4\u05d1\u05d9\u05d8\u05e7\u05d5\u05d9\u05df?",
+    "query": "מה מחיר הביטקוין?",
     "labels": {
       "intent_family": "current_finance",
       "evidence_mode": "not_required",
@@ -15923,7 +15923,7 @@
     }
   },
   {
-    "query": "\u05db\u05de\u05d4 \u05e9\u05d5\u05d5\u05d4 \u05d4\u05d3\u05d5\u05dc\u05e8 \u05d4\u05d9\u05d5\u05dd?",
+    "query": "כמה שווה הדולר היום?",
     "labels": {
       "intent_family": "current_finance",
       "evidence_mode": "not_required",
@@ -15936,7 +15936,7 @@
     }
   },
   {
-    "query": "\u05de\u05d9 \u05de\u05e0\u05e6\u05d7 \u05d1\u05de\u05e9\u05d7\u05e7 \u05e2\u05db\u05e9\u05d9\u05d5?",
+    "query": "מי מנצח במשחק עכשיו?",
     "labels": {
       "intent_family": "ephemeral",
       "evidence_mode": "not_required",
@@ -15949,7 +15949,7 @@
     }
   },
   {
-    "query": "\u05de\u05d4 \u05de\u05e6\u05d1 \u05d4\u05ea\u05e0\u05d5\u05e2\u05d4 \u05d1\u05db\u05d1\u05d9\u05e9 6?",
+    "query": "מה מצב התנועה בכביש 6?",
     "labels": {
       "intent_family": "ephemeral",
       "evidence_mode": "not_required",

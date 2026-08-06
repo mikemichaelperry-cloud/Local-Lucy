@@ -1,0 +1,870 @@
+{
+  "note": "Baseline metrics measure classify+route only; anaphora/context resolution in main.py is excluded.",
+  "validation": {
+    "overall_accuracy": 1.0,
+    "total_cases": 21,
+    "correct": 21,
+    "per_route": {
+      "AUGMENTED": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 7,
+        "fp": 0,
+        "fn": 0
+      },
+      "EVIDENCE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 3,
+        "fp": 0,
+        "fn": 0
+      },
+      "FINANCE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "LOCAL": {
+        "precision": 1.0,
+        "recall": 0.875,
+        "f1": 0.933,
+        "tp": 7,
+        "fp": 0,
+        "fn": 1
+      },
+      "NEWS": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 2,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "results": [
+      {
+        "case_id": "ADV-GUARD-001",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "What is the weather like at the Italian restaurant tonight?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-002",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "News about the best pizza place near me",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-003",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "What time does the bank open on Saturday?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-004",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "restaurants near my daughter",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-005",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "Find somewhere nearby, but do not search the web.",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-006",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "What is 2 + 2? Search the web.",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "BOUND-MED-001",
+        "source": "boundary",
+        "split": "validation",
+        "query": "What is lisinopril?",
+        "expected": "EVIDENCE",
+        "predicted": "EVIDENCE",
+        "correct": true,
+        "risk_level": "high"
+      },
+      {
+        "case_id": "BOUND-MED-002",
+        "source": "boundary",
+        "split": "validation",
+        "query": "My dog is vomiting after eating chocolate.",
+        "expected": "EVIDENCE",
+        "predicted": "EVIDENCE",
+        "correct": true,
+        "risk_level": "high"
+      },
+      {
+        "case_id": "BOUND-FIN-001",
+        "source": "boundary",
+        "split": "validation",
+        "query": "Current price of Apple stock",
+        "expected": "FINANCE",
+        "predicted": "FINANCE",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "BOUND-NEWS-001",
+        "source": "boundary",
+        "split": "validation",
+        "query": "Latest news about Israel",
+        "expected": "NEWS",
+        "predicted": "NEWS",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "BOUND-EVI-001",
+        "source": "boundary",
+        "split": "validation",
+        "query": "Can you provide sources for the claim that vaccines are unsafe?",
+        "expected": "EVIDENCE",
+        "predicted": "EVIDENCE",
+        "correct": true,
+        "risk_level": "high"
+      },
+      {
+        "case_id": "NEG-LOC-001",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "The article says, 'I live in London.'",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "NEG-LOC-002",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "I no longer live in Tel Aviv.",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "NEG-LOC-003",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "What would the weather be like if I moved there?",
+        "expected": "LOCAL",
+        "predicted": "WEATHER",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "NEG-CAP-001",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "Can you browse the internet?",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "NEG-CAP-002",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "Who are you?",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "VAL-REST-001",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "Good place to eat near me now",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "VAL-REST-002",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "Which cafes are open today in Hadera?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "VAL-ANAPH-001",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "What about taking it with alcohol?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "high"
+      },
+      {
+        "case_id": "VAL-MIXED-001",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "Plan a trip to Paris and tell me the weather",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "VAL-MIXED-002",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "Current finance news about the tech sector",
+        "expected": "NEWS",
+        "predicted": "NEWS",
+        "correct": true,
+        "risk_level": "low"
+      }
+    ]
+  },
+  "locked_holdout": {
+    "overall_accuracy": 0.8666666666666667,
+    "total_cases": 15,
+    "correct": 13,
+    "per_route": {
+      "AUGMENTED": {
+        "precision": 1.0,
+        "recall": 0.727,
+        "f1": 0.842,
+        "tp": 8,
+        "fp": 0,
+        "fn": 3
+      },
+      "EVIDENCE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "LOCAL": {
+        "precision": 0.5,
+        "recall": 1.0,
+        "f1": 0.667,
+        "tp": 2,
+        "fp": 2,
+        "fn": 0
+      },
+      "WEATHER": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "results": [
+      {
+        "case_id": "HMI-REST-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Hi Lucy, whas a good restraunt near me that is open on Saturdays?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-REST-002",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "I live in Kibbutz Magal. Search for restraunts in my area that are open today.",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-REST-003",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "I am looking for a good restraunt open today near kibbutz Magal.",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-ANAPH-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Use DuckDuckGo search",
+        "expected": "AUGMENTED",
+        "predicted": "LOCAL",
+        "correct": false,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-LOC-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Can you please suggest a good restaurant in this area that is oppen on Saturdays?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-LOC-002",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "What about in the area code 3884500",
+        "expected": "AUGMENTED",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-AUG-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "How about in the Hadera area?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-LOC-003",
+        "source": "real_hmi_success",
+        "split": "locked_holdout",
+        "query": "Do you know where I live?",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-LOC-004",
+        "source": "real_hmi_success",
+        "split": "locked_holdout",
+        "query": "Actually I live in Kibbutz Magal in Israel.",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HOLD-ANAPH-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Can you search again?",
+        "expected": "AUGMENTED",
+        "predicted": "LOCAL",
+        "correct": false,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HOLD-REST-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Hi Lucy, what's a good restraunt open saturday around kibbutz magal?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HOLD-LOC-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "restaurants open now near me",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HOLD-GUARD-001",
+        "source": "adversarial",
+        "split": "locked_holdout",
+        "query": "What time is it at the restaurant near me?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "HOLD-GUARD-002",
+        "source": "adversarial",
+        "split": "locked_holdout",
+        "query": "News about the weather in Hadera",
+        "expected": "WEATHER",
+        "predicted": "WEATHER",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "HOLD-MED-001",
+        "source": "boundary",
+        "split": "locked_holdout",
+        "query": "Is it safe to take ibuprofen during pregnancy?",
+        "expected": "EVIDENCE",
+        "predicted": "EVIDENCE",
+        "correct": true,
+        "risk_level": "high"
+      }
+    ]
+  },
+  "combined": {
+    "overall_accuracy": 0.9444444444444444,
+    "total_cases": 36,
+    "correct": 34,
+    "per_route": {
+      "AUGMENTED": {
+        "precision": 1.0,
+        "recall": 0.833,
+        "f1": 0.909,
+        "tp": 15,
+        "fp": 0,
+        "fn": 3
+      },
+      "EVIDENCE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 4,
+        "fp": 0,
+        "fn": 0
+      },
+      "FINANCE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "LOCAL": {
+        "precision": 0.818,
+        "recall": 0.9,
+        "f1": 0.857,
+        "tp": 9,
+        "fp": 2,
+        "fn": 1
+      },
+      "NEWS": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "WEATHER": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "results": [
+      {
+        "case_id": "ADV-GUARD-001",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "What is the weather like at the Italian restaurant tonight?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-002",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "News about the best pizza place near me",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-003",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "What time does the bank open on Saturday?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-004",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "restaurants near my daughter",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-005",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "Find somewhere nearby, but do not search the web.",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "ADV-GUARD-006",
+        "source": "adversarial",
+        "split": "validation",
+        "query": "What is 2 + 2? Search the web.",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "BOUND-MED-001",
+        "source": "boundary",
+        "split": "validation",
+        "query": "What is lisinopril?",
+        "expected": "EVIDENCE",
+        "predicted": "EVIDENCE",
+        "correct": true,
+        "risk_level": "high"
+      },
+      {
+        "case_id": "BOUND-MED-002",
+        "source": "boundary",
+        "split": "validation",
+        "query": "My dog is vomiting after eating chocolate.",
+        "expected": "EVIDENCE",
+        "predicted": "EVIDENCE",
+        "correct": true,
+        "risk_level": "high"
+      },
+      {
+        "case_id": "BOUND-FIN-001",
+        "source": "boundary",
+        "split": "validation",
+        "query": "Current price of Apple stock",
+        "expected": "FINANCE",
+        "predicted": "FINANCE",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "BOUND-NEWS-001",
+        "source": "boundary",
+        "split": "validation",
+        "query": "Latest news about Israel",
+        "expected": "NEWS",
+        "predicted": "NEWS",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "BOUND-EVI-001",
+        "source": "boundary",
+        "split": "validation",
+        "query": "Can you provide sources for the claim that vaccines are unsafe?",
+        "expected": "EVIDENCE",
+        "predicted": "EVIDENCE",
+        "correct": true,
+        "risk_level": "high"
+      },
+      {
+        "case_id": "NEG-LOC-001",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "The article says, 'I live in London.'",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "NEG-LOC-002",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "I no longer live in Tel Aviv.",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "NEG-LOC-003",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "What would the weather be like if I moved there?",
+        "expected": "LOCAL",
+        "predicted": "WEATHER",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "NEG-CAP-001",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "Can you browse the internet?",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "NEG-CAP-002",
+        "source": "negative_control",
+        "split": "validation",
+        "query": "Who are you?",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "VAL-REST-001",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "Good place to eat near me now",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "VAL-REST-002",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "Which cafes are open today in Hadera?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "VAL-ANAPH-001",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "What about taking it with alcohol?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "high"
+      },
+      {
+        "case_id": "VAL-MIXED-001",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "Plan a trip to Paris and tell me the weather",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "VAL-MIXED-002",
+        "source": "synthetic_regression",
+        "split": "validation",
+        "query": "Current finance news about the tech sector",
+        "expected": "NEWS",
+        "predicted": "NEWS",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-REST-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Hi Lucy, whas a good restraunt near me that is open on Saturdays?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-REST-002",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "I live in Kibbutz Magal. Search for restraunts in my area that are open today.",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-REST-003",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "I am looking for a good restraunt open today near kibbutz Magal.",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-ANAPH-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Use DuckDuckGo search",
+        "expected": "AUGMENTED",
+        "predicted": "LOCAL",
+        "correct": false,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-LOC-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Can you please suggest a good restaurant in this area that is oppen on Saturdays?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-LOC-002",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "What about in the area code 3884500",
+        "expected": "AUGMENTED",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-AUG-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "How about in the Hadera area?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-LOC-003",
+        "source": "real_hmi_success",
+        "split": "locked_holdout",
+        "query": "Do you know where I live?",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HMI-LOC-004",
+        "source": "real_hmi_success",
+        "split": "locked_holdout",
+        "query": "Actually I live in Kibbutz Magal in Israel.",
+        "expected": "LOCAL",
+        "predicted": "LOCAL",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HOLD-ANAPH-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Can you search again?",
+        "expected": "AUGMENTED",
+        "predicted": "LOCAL",
+        "correct": false,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HOLD-REST-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "Hi Lucy, what's a good restraunt open saturday around kibbutz magal?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HOLD-LOC-001",
+        "source": "real_hmi_failure",
+        "split": "locked_holdout",
+        "query": "restaurants open now near me",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "low"
+      },
+      {
+        "case_id": "HOLD-GUARD-001",
+        "source": "adversarial",
+        "split": "locked_holdout",
+        "query": "What time is it at the restaurant near me?",
+        "expected": "AUGMENTED",
+        "predicted": "AUGMENTED",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "HOLD-GUARD-002",
+        "source": "adversarial",
+        "split": "locked_holdout",
+        "query": "News about the weather in Hadera",
+        "expected": "WEATHER",
+        "predicted": "WEATHER",
+        "correct": true,
+        "risk_level": "medium"
+      },
+      {
+        "case_id": "HOLD-MED-001",
+        "source": "boundary",
+        "split": "locked_holdout",
+        "query": "Is it safe to take ibuprofen during pregnancy?",
+        "expected": "EVIDENCE",
+        "predicted": "EVIDENCE",
+        "correct": true,
+        "risk_level": "high"
+      }
+    ]
+  }
+}

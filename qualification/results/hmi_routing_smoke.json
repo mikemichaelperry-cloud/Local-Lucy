@@ -1,0 +1,302 @@
+{
+  "passed": 24,
+  "total": 24,
+  "results": [
+    {
+      "query": "Hi Lucy, whas a good restraunt near me that is open on Saturdays?",
+      "predicted": "AUGMENTED",
+      "acceptable": [
+        "AUGMENTED",
+        "EVIDENCE"
+      ],
+      "forbidden": [
+        "TIME",
+        "WEATHER",
+        "LOCAL"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "I live in Kibbutz Magal. Search for restraunts in my area that are open today.",
+      "predicted": "AUGMENTED",
+      "acceptable": [
+        "AUGMENTED",
+        "EVIDENCE"
+      ],
+      "forbidden": [
+        "TIME",
+        "LOCAL"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "I am looking for a good restraunt open today near kibbutz Magal.",
+      "predicted": "AUGMENTED",
+      "acceptable": [
+        "AUGMENTED",
+        "EVIDENCE"
+      ],
+      "forbidden": [
+        "TIME",
+        "WEATHER",
+        "LOCAL"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "Can you please suggest a good restaurant in this area that is oppen on Saturdays?",
+      "predicted": "AUGMENTED",
+      "acceptable": [
+        "AUGMENTED",
+        "EVIDENCE"
+      ],
+      "forbidden": [
+        "LOCAL",
+        "TIME",
+        "WEATHER"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "How about in the Hadera area?",
+      "predicted": "AUGMENTED",
+      "acceptable": [
+        "AUGMENTED",
+        "EVIDENCE"
+      ],
+      "forbidden": [
+        "LOCAL"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "restaurants open now near me",
+      "predicted": "AUGMENTED",
+      "acceptable": [
+        "AUGMENTED",
+        "EVIDENCE"
+      ],
+      "forbidden": [
+        "TIME",
+        "WEATHER",
+        "LOCAL"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "Use DuckDuckGo search",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL",
+        "CLARIFY"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "EVIDENCE",
+        "NEWS"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "Can you search the web?",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "EVIDENCE",
+        "NEWS"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "Do you know where I live?",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "EVIDENCE",
+        "NEWS"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "Actually I live in Kibbutz Magal in Israel.",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "EVIDENCE",
+        "NEWS"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "Find somewhere nearby, but do not search the web.",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "EVIDENCE",
+        "NEWS"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "What is 2 + 2? Search the web.",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "EVIDENCE"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "restaurants near my daughter",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL",
+        "AUGMENTED"
+      ],
+      "forbidden": [],
+      "status": "PASS"
+    },
+    {
+      "query": "The article says, 'I live in London.'",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL"
+      ],
+      "forbidden": [],
+      "status": "PASS"
+    },
+    {
+      "query": "I no longer live in Tel Aviv.",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL"
+      ],
+      "forbidden": [],
+      "status": "PASS"
+    },
+    {
+      "query": "What would the weather be like if I moved there?",
+      "predicted": "WEATHER",
+      "acceptable": [
+        "LOCAL",
+        "WEATHER",
+        "AUGMENTED"
+      ],
+      "forbidden": [],
+      "status": "PASS"
+    },
+    {
+      "query": "Can you browse the internet?",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "EVIDENCE",
+        "NEWS"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "Who are you?",
+      "predicted": "LOCAL",
+      "acceptable": [
+        "LOCAL"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "EVIDENCE",
+        "NEWS"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "What's the weather in Hadera?",
+      "predicted": "WEATHER",
+      "acceptable": [
+        "WEATHER"
+      ],
+      "forbidden": [
+        "LOCAL",
+        "AUGMENTED"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "What time is it in Rome?",
+      "predicted": "TIME",
+      "acceptable": [
+        "TIME"
+      ],
+      "forbidden": [
+        "LOCAL",
+        "AUGMENTED"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "Current price of Apple stock",
+      "predicted": "FINANCE",
+      "acceptable": [
+        "FINANCE",
+        "AUGMENTED"
+      ],
+      "forbidden": [
+        "LOCAL"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "Latest news about Israel",
+      "predicted": "NEWS",
+      "acceptable": [
+        "NEWS"
+      ],
+      "forbidden": [
+        "LOCAL",
+        "AUGMENTED"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "What is lisinopril?",
+      "predicted": "EVIDENCE",
+      "acceptable": [
+        "EVIDENCE"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "LOCAL"
+      ],
+      "status": "PASS"
+    },
+    {
+      "query": "My dog is vomiting after eating chocolate.",
+      "predicted": "EVIDENCE",
+      "acceptable": [
+        "EVIDENCE"
+      ],
+      "forbidden": [
+        "AUGMENTED",
+        "LOCAL"
+      ],
+      "status": "PASS"
+    }
+  ]
+}

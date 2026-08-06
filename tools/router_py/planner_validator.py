@@ -7,6 +7,7 @@ JSON, isolated single-word queries, unknown fields, and invented URLs.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import re
 from dataclasses import dataclass
@@ -85,15 +86,44 @@ class PlannerValidator:
         cleaned = re.sub(r"\s+", " ", query.strip())
         return len(cleaned.split()) >= 2
 
+    @staticmethod
+    def _is_private_or_local_url(url: str) -> bool:
+        """Return True for URLs that target the local machine or private networks."""
+        parsed = urlparse(url)
+        if parsed.scheme == "file":
+            return True
+        hostname = parsed.hostname
+        if hostname is None:
+            return True
+        lowered = hostname.lower()
+        if lowered in {"localhost", "127.0.0.1", "::1"}:
+            return True
+        try:
+            addr = ipaddress.ip_address(lowered)
+        except ValueError:
+            return False
+        return (
+            addr.is_private
+            or addr.is_loopback
+            or addr.is_link_local
+            or addr.is_multicast
+            or addr.is_reserved
+        )
+
     def _is_fabricated_url(self, url: str) -> bool:
-        """Return True when *url* appears to be model-invented.
+        """Return True when *url* appears to be model-invented or unsafe.
 
         Model-generated plans are not a trusted provenance for arbitrary URLs.
         Only syntactically valid HTTPS URLs that point to concrete resources
-        (i.e. not root-level placeholder pages) are accepted.
+        (i.e. not root-level placeholder pages) are accepted. Private-network
+        and local-machine URLs are rejected because planner output must never
+        direct the fetcher at internal infrastructure.
         """
         parsed = urlparse(url)
         if parsed.scheme != "https" or not parsed.hostname:
+            return True
+
+        if self._is_private_or_local_url(url):
             return True
 
         path = parsed.path.lower()

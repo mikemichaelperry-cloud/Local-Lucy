@@ -26,10 +26,12 @@ NOT responsibilities (stays in main.py entry wrapper):
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -62,11 +64,90 @@ from router_py.pipeline import outcome
 from router_py.pipeline.config import load_capability_flags
 from router_py.policy import normalize_augmentation_policy
 from router_py.escalation import fetcher
+from router_py.escalation.config import THIN_LOCAL_CONFIDENCE_THRESHOLD
+from router_py.privacy import redact_untrusted_log_source
 
 # Re-export for tests/code that patch the pipeline's classifier reference.
 classify_intent = classify.classify_intent
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Lightweight diagnostic trace (disabled by default)
+# ---------------------------------------------------------------------------
+
+
+def _diagnostics_enabled() -> bool:
+    return os.environ.get("LUCY_ROUTER_DIAGNOSTICS", "").lower() in {"1", "true", "yes"}
+
+
+def _diagnostics_path() -> Path:
+    path = os.environ.get("LUCY_ROUTER_DIAGNOSTICS_PATH", "")
+    if path:
+        return Path(path)
+    root = Path(__file__).resolve().parent.parent.parent
+    return root / "qualification" / "router_diagnostics.jsonl"
+
+
+def _write_router_diagnostic_trace(
+    *,
+    request_id: str,
+    original_query: str,
+    resolved_query: str,
+    classification: ClassificationResult | None,
+    pre_guard_decision: RoutingDecision | None,
+    final_decision: RoutingDecision,
+    flags,
+    outcome_code: str,
+) -> None:
+    """Write a structured routing-trace entry when diagnostics are enabled."""
+    if not _diagnostics_enabled():
+        return
+
+    raw_plan = classification.raw_plan if classification else {}
+    if not isinstance(raw_plan, dict):
+        raw_plan = {}
+
+    candidate_routes = raw_plan.get("candidate_routes") or []
+    if not candidate_routes and classification and classification.selected_route:
+        candidate_routes = [classification.selected_route]
+
+    entry = {
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "request_id": request_id,
+        "original_query": original_query,
+        "resolved_query": resolved_query or original_query,
+        "classifier_intent": classification.intent if classification else "",
+        "classifier_confidence": classification.confidence if classification else 0.0,
+        "classifier_intent_family": classification.intent_family if classification else "",
+        "candidate_routes": candidate_routes,
+        "pre_guard_route": pre_guard_decision.route if pre_guard_decision else "",
+        "pre_guard_provider": pre_guard_decision.provider if pre_guard_decision else "",
+        "final_route": final_decision.route,
+        "final_provider": final_decision.provider,
+        "execution_provider": final_decision.provider,
+        "evidence_policy": final_decision.evidence_mode or "none",
+        "evidence_reason": final_decision.evidence_reason or "",
+        "policy_reason": final_decision.policy_reason or "",
+        "reason_code": final_decision.reason_code or "",
+        "matched_rule": final_decision.matched_rule or "",
+        "capability_flags": {
+            "source_attribution": flags.source_attribution,
+            "suggest_web_escalation": flags.suggest_web_escalation,
+            "auto_web_general_knowledge": flags.auto_web_general_knowledge,
+            "trusted_sources_only_critical": flags.trusted_sources_only_critical,
+        },
+        "outcome_code": outcome_code,
+    }
+
+    try:
+        path = _diagnostics_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, default=str) + "\n")
+    except Exception as exc:
+        logger.debug("router_diagnostic_trace_failed", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -139,15 +220,14 @@ def process(
     # In parity/comparison mode we preserve the exact routing decision and
     # skip the request-scoped critical-source policy modification.
     _caller_supplied_both = classification is not None and decision is not None
+    _pre_guard_decision: RoutingDecision | None = decision
 
     # ------------------------------------------------------------------
     # 0. Environment bypass (LUCY_ROUTER_BYPASS / LUCY_CHAT_FORCE_MODE)
     # ------------------------------------------------------------------
     forced_route = classify._forced_route_from_env(question)
     if forced_route:
-        classification, decision = classify._bypass_classification_decision(
-            question, forced_route
-        )
+        classification, decision = classify._bypass_classification_decision(question, forced_route)
     else:
         # ------------------------------------------------------------------
         # 1. Classify (skipped if caller provides classification)
@@ -185,6 +265,9 @@ def process(
             decision = route_result
             if _profiling:
                 _profile["route_ms"] = int((_time.time() - _t1) * 1000)
+
+    # Capture route before provider resolution / policy gates for diagnostics.
+    _pre_guard_decision = decision
 
     # ------------------------------------------------------------------
     # 3. Normalize decision — applies to router, bypass, and smart-routing
@@ -228,9 +311,7 @@ def process(
     # 6. Build PipelineContext
     # ------------------------------------------------------------------
     _t3 = _time.time()
-    pipeline_ctx = build_context.build_pipeline_context(
-        question, surface, context, classification
-    )
+    pipeline_ctx = build_context.build_pipeline_context(question, surface, context, classification)
     if _profiling:
         _profile["context_build_ms"] = int((_time.time() - _t3) * 1000)
 
@@ -276,18 +357,48 @@ def process(
             if router_outcome.source_attribution is not None
             else "none"
         )
-        if attribution_basis == "none":
+        attribution_confidence = (
+            router_outcome.source_attribution.confidence
+            if router_outcome.source_attribution is not None
+            else "unknown"
+        )
+        is_evidence_backed = attribution_confidence == "high"
+        raw_confidence = getattr(classification, "confidence", None)
+        low_classifier_confidence = (
+            isinstance(raw_confidence, (int, float))
+            and raw_confidence < THIN_LOCAL_CONFIDENCE_THRESHOLD
+        )
+        is_thin_local = attribution_basis == "none" or (
+            low_classifier_confidence and not is_evidence_backed
+        )
+        if decision.route == "LOCAL" and is_thin_local:
             fetched = fetcher.fetch_general_knowledge(
                 question,
                 allowed_domains=list(_capability_flags.auto_web_allowed_domains),
                 classification=classification,
             )
             if fetched.url:
+                redacted_title, redacted_url = redact_untrusted_log_source(
+                    fetched.title,
+                    fetched.url,
+                    question,
+                )
                 router_outcome = replace(
                     router_outcome,
                     escalation_suggestion=(
-                        f"Web sources found (untrusted): {fetched.title} — {fetched.url}"
+                        f"Web sources found (untrusted): {redacted_title} — {redacted_url}"
                     ),
                 )
+
+    _write_router_diagnostic_trace(
+        request_id=(router_outcome.request_id or ""),
+        original_query=question,
+        resolved_query=(context or {}).get("resolved_question", ""),
+        classification=classification,
+        pre_guard_decision=_pre_guard_decision,
+        final_decision=decision,
+        flags=_capability_flags,
+        outcome_code=router_outcome.outcome_code,
+    )
 
     return router_outcome, classification, decision

@@ -1,0 +1,24 @@
+{
+  "stage": "STAGE_18",
+  "passed": 2,
+  "total": 2,
+  "all_passed": true,
+  "results": [
+    {
+      "file": "tools/router_py/test_voice_request_parity.py",
+      "passed": true,
+      "returncode": 0,
+      "summary": "7 passed in 13.16s",
+      "stdout_tail": "============================= test session starts ==============================\nplatform linux -- Python 3.10.12, pytest-9.0.3, pluggy-1.6.0 -- /usr/bin/python3\ncachedir: .pytest_cache\nrootdir: /home/mike/lucy-v11\nconfigfile: pyproject.toml\nplugins: asyncio-1.3.0, rerunfailures-16.4, anyio-4.12.1\nasyncio: mode=auto, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 7 items\n\ntools/router_py/test_voice_request_parity.py::TestVoiceSurfaceConstraintEnforcement::test_voice_no_network_forces_local PASSED [ 14%]\ntools/router_py/test_voice_request_parity.py::TestVoiceSurfaceConstraintEnforcement::test_voice_no_tools_forces_local_time PASSED [ 28%]\ntools/router_py/test_voice_request_parity.py::TestVoiceSurfaceConstraintEnforcement::test_voice_negative_memory_instruction_routes_local PASSED [ 42%]\ntools/router_py/test_voice_request_parity.py::TestVoiceSurfaceMedicalRouting::test_voice_cognitive_symptom_routes_evidence PASSED [ 57%]\ntools/router_py/test_voice_request_parity.py::TestVoiceSurfaceInputValidation::test_voice_empty_input_rejected PASSED [ 71%]\ntools/router_py/test_voice_request_parity.py::TestVoiceSurfaceInputValidation::test_voice_whitespace_only_input_rejected PASSED [ 85%]\ntools/router_py/test_voice_request_parity.py::TestVoiceSurfaceTtsSanitization::test_voice_response_strips_html_and_urls PASSED [100%]\n\n============================== 7 passed in 13.16s ==============================",
+      "stderr_tail": ""
+    },
+    {
+      "file": "tools/router_py/test_e2e_hmi_voice.py",
+      "passed": true,
+      "returncode": 0,
+      "summary": "15 passed in 16.32s",
+      "stdout_tail": "asyncio: mode=auto, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function\ncollecting ... collected 15 items\n\ntools/router_py/test_e2e_hmi_voice.py::TestVoiceLocalRoute::test_voice_local_json_state_files_written PASSED [  6%]\ntools/router_py/test_e2e_hmi_voice.py::TestVoiceLocalRoute::test_voice_local_sqlite_written PASSED [ 13%]\ntools/router_py/test_e2e_hmi_voice.py::TestVoiceLocalRoute::test_voice_surface_propagated_to_metadata PASSED [ 20%]\ntools/router_py/test_e2e_hmi_voice.py::TestHmiTimeRoute::test_hmi_time_state_files PASSED [ 26%]\ntools/router_py/test_e2e_hmi_voice.py::TestHmiTimeRoute::test_hmi_time_sqlite_outcome PASSED [ 33%]\ntools/router_py/test_e2e_hmi_voice.py::TestVoiceAugmentedTelemetry::test_augmented_memory_telemetry_in_files PASSED [ 40%]\ntools/router_py/test_e2e_hmi_voice.py::TestVoiceAugmentedTelemetry::test_augmented_memory_telemetry_in_sqlite PASSED [ 46%]\ntools/router_py/test_e2e_hmi_voice.py::TestTerminalOutcome::test_clarify_records_terminal_outcome PASSED [ 53%]\ntools/router_py/test_e2e_hmi_voice.py::TestTerminalOutcome::test_clarify_records_terminal_sqlite PASSED [ 60%]\ntools/router_py/test_e2e_hmi_voice.py::TestStateConsistency::test_consistency_passes_when_both_match PASSED [ 66%]\ntools/router_py/test_e2e_hmi_voice.py::TestStateConsistency::test_consistency_fails_on_mismatch PASSED [ 73%]\ntools/router_py/test_e2e_hmi_voice.py::TestMainRunVoiceSurface::test_voice_timeout_propagation PASSED [ 80%]\ntools/router_py/test_e2e_hmi_voice.py::TestMainRunVoiceSurface::test_hmi_surface_propagation PASSED [ 86%]\ntools/router_py/test_e2e_hmi_voice.py::TestFullVoiceTurn::test_full_voice_turn_local PASSED [ 93%]\ntools/router_py/test_e2e_hmi_voice.py::TestFullVoiceTurn::test_full_voice_turn_weather PASSED [100%]\n\n============================= 15 passed in 16.32s ==============================",
+      "stderr_tail": ""
+    }
+  ]
+}

@@ -580,10 +580,20 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         ]
         has_programming_context = any(t in normalized for t in programming_context_terms)
 
+        # Brand/tech terms that happen to contain animal words but are not
+        # about animals (e.g., DuckDuckGo contains "duck").
+        tech_animal_exceptions = (
+            "duckduckgo",
+            "duck.go",
+            "rubber duck",
+            "rubberduck",
+        )
+        has_tech_animal_exception = any(t in normalized for t in tech_animal_exceptions)
+
         # Tier 1: Specific animal species — immediate trigger (very high confidence)
         # Skip if query is clearly about programming (prevents "Python function"
         # from triggering veterinary_context)
-        if not has_programming_context:
+        if not has_programming_context and not has_tech_animal_exception:
             if _ANIMAL_SINGLE_RE.search(normalized):
                 return True, "veterinary_context"
             for term in _ANIMAL_MULTI:
@@ -1081,6 +1091,7 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         "statins",
         "drug",
         "vaccine",
+        "vaccines",
         "vaccination",
         "pregnancy",
         "pregnant",
@@ -1438,8 +1449,56 @@ def requires_evidence_mode(query: str, context: dict | None = None) -> tuple[boo
         if not any(_phrase_in_text(h, normalized) for h in health_indicators):
             return False, "science_context"
 
+    # Software/system context guard: medical metaphors such as "symptoms",
+    # "diagnosis", "confusion", or "health" used when discussing computers,
+    # ML models, caches, code, or internal systems must not trigger medical
+    # evidence.  Genuine health queries still match non-metaphor keywords.
+    software_system_terms = [
+        "cache",
+        "caching",
+        "database",
+        "process",
+        "processor",
+        "system",
+        "internal consistency",
+        "neural network",
+        "neural-network",
+        "weights",
+        "memory corruption",
+        "software",
+        "code",
+        "coding",
+        "debugging",
+        "program",
+        "function",
+        "bug",
+        "cpu",
+        "gpu",
+        "ram",
+        "disk",
+        "model",
+        "llm",
+        "router",
+        "pipeline",
+        "api",
+        "server",
+        "client",
+        "runtime",
+    ]
+    software_medical_metaphors = {
+        "symptom",
+        "symptoms",
+        "diagnosis",
+        "health",
+        "confused",
+        "confusion",
+    }
+    has_software_system_context = any(t in normalized for t in software_system_terms)
+
     for keyword in medical_keywords:
         if _phrase_in_text(keyword, normalized):
+            if has_software_system_context and keyword in software_medical_metaphors:
+                continue
             return True, "medical_context"
 
     # Body-part + symptom pattern detection — catches novel phrasings like "my chest feels tight"

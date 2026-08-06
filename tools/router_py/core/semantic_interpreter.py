@@ -399,16 +399,28 @@ def _call_local_model(prompt: str) -> Tuple[Dict[str, Any], str]:
             "seed": 7,
         },
     }
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    # On a 12 GB GPU two large local models cannot both be resident.
+    # Hold the cross-process lock for the whole request so no other Local Lucy
+    # process can load a different model while this one is loading/generating.
     network_start = time.perf_counter()
     try:
-        with urllib.request.urlopen(request, timeout=timeout_s) as response:
-            raw = response.read().decode("utf-8", errors="ignore")
+        from router_py.ollama_cleanup import (
+            is_lucy_model,
+            ollama_load_lock,
+            unload_other_lucy_models,
+        )
+
+        with ollama_load_lock():
+            if is_lucy_model(model):
+                unload_other_lucy_models(model)
+            request = urllib.request.Request(
+                url,
+                data=json.dumps(body).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=timeout_s) as response:
+                raw = response.read().decode("utf-8", errors="ignore")
     except (urllib.error.URLError, TimeoutError, OSError):
         _append_latency(
             "model_call", max(1, int(round((time.perf_counter() - network_start) * 1000)))

@@ -199,6 +199,26 @@ def apply_critical_source_policy(
         )
 
     if decision.route == "AUGMENTED":
+        # Travel advisories need strict trusted sources; do not race Wikipedia
+        # or other general providers against the trusted travel provider.
+        if classification.category == "travel_advisory":
+            logger.info(
+                "critical_source_policy_travel_to_evidence",
+                extra={"category": classification.category},
+            )
+            return dataclasses.replace(
+                decision,
+                route="EVIDENCE",
+                provider="trusted",
+                provider_usage_class="free",
+                evidence_mode="required",
+                evidence_reason=classification.evidence_reason
+                or decision.evidence_reason
+                or "travel_advisory",
+                requires_evidence=True,
+                policy_reason="critical_trusted_sources_only",
+                reason_code="travel_to_evidence_trusted",
+            )
         logger.info(
             "critical_source_policy_augmented_to_trusted",
             extra={"category": classification.category},

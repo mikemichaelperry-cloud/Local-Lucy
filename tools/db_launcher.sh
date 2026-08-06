@@ -206,7 +206,7 @@ show_memory() {
 
     if echo "$tables" | grep -qi "conversation_turns"; then
         echo "💬 Active Recent Conversation Turns (full text):"
-        sqlite3 "$DB3" "SELECT role, text, substr(created_at,1,19) AS time FROM conversation_turns ORDER BY created_at DESC LIMIT 6;" -line 2>/dev/null || echo "(Could not read conversation_turns table)"
+        sqlite3 "$DB3" "SELECT role, text, datetime(created_at, 'localtime') AS time FROM conversation_turns ORDER BY created_at DESC LIMIT 6;" -line 2>/dev/null || echo "(Could not read conversation_turns table)"
     else
         echo "No 'conversation_turns' table found."
     fi
@@ -214,7 +214,7 @@ show_memory() {
 
     if echo "$tables" | grep -qi "archived_turns"; then
         echo "🗃️ Recently Archived Turns (full text preserved in DB; previews shown):"
-        sqlite3 "$DB3" "SELECT id, role, length(text) AS chars, substr(text,1,120) AS preview, substr(archived_at,1,19) AS archived FROM archived_turns ORDER BY archived_at DESC LIMIT 6;" -line 2>/dev/null || echo "(Could not read archived_turns table)"
+        sqlite3 "$DB3" "SELECT id, role, length(text) AS chars, substr(text,1,120) AS preview, datetime(archived_at, 'localtime') AS archived FROM archived_turns ORDER BY archived_at DESC LIMIT 6;" -line 2>/dev/null || echo "(Could not read archived_turns table)"
         echo ""
         read -rp "Enter an archived turn id to view its FULL TEXT, or press Enter to skip: " arch_id
         if [[ "$arch_id" =~ ^[0-9]+$ ]]; then
@@ -231,7 +231,7 @@ show_memory() {
 
     if echo "$tables" | grep -qi "session_summaries"; then
         echo "📝 Session Summaries:"
-        sqlite3 "$DB3" "SELECT session_id, summary_text, summarized_turn_count, substr(created_at,1,19) AS time FROM session_summaries ORDER BY created_at DESC LIMIT 5;" -line 2>/dev/null || echo "(Could not read session_summaries table)"
+        sqlite3 "$DB3" "SELECT session_id, summary_text, summarized_turn_count, datetime(created_at, 'localtime') AS time FROM session_summaries ORDER BY created_at DESC LIMIT 5;" -line 2>/dev/null || echo "(Could not read session_summaries table)"
     else
         echo "No 'session_summaries' table found."
     fi

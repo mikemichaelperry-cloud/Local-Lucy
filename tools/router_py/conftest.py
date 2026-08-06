@@ -6,6 +6,28 @@ import pytest
 OLLAMA_URL = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434/api/generate")
 
 
+@pytest.fixture(autouse=True)
+def _disable_persistent_model_warmup_for_fast_tests(request):
+    """Set LUCY_LOCAL_KEEP_ALIVE=0 for fast tests so they do not keep models warm.
+
+    Slow/live tests that exercise warmup/heartbeat behavior are left untouched.
+    """
+    markers = {m.name for m in request.node.iter_markers()}
+    if markers & {"slow", "live"}:
+        yield
+        return
+
+    old_keep_alive = os.environ.get("LUCY_LOCAL_KEEP_ALIVE")
+    os.environ["LUCY_LOCAL_KEEP_ALIVE"] = "0"
+    try:
+        yield
+    finally:
+        if old_keep_alive is None:
+            os.environ.pop("LUCY_LOCAL_KEEP_ALIVE", None)
+        else:
+            os.environ["LUCY_LOCAL_KEEP_ALIVE"] = old_keep_alive
+
+
 def _ollama_is_reachable() -> bool:
     """Return True if the Ollama daemon is listening at the configured URL.
 

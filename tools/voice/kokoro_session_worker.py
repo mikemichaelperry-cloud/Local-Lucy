@@ -111,7 +111,23 @@ def handle_prewarm(payload: Mapping[str, Any], env: Mapping[str, str]) -> dict[s
         lang_code = kokoro_backend.resolve_lang_code(env, selected.voice)
         repo_id = kokoro_backend.resolve_repo_id(env)
         device = kokoro_backend.resolve_device(env)
-        kokoro_backend.get_pipeline(lang_code=lang_code, repo_id=repo_id, device=device)
+        pipeline = kokoro_backend.get_pipeline(lang_code=lang_code, repo_id=repo_id, device=device)
+
+        # Warm CUDA kernels with a tiny forward pass so the first real request
+        # does not pay the one-time GPU compile/launch cost.
+        try:
+            import numpy as np
+
+            kokoro_backend.synthesize_audio(
+                pipeline=pipeline,
+                text="hi",
+                voice=selected.voice,
+                speed=1.0,
+                split_pattern=kokoro_backend.resolve_split_pattern(env),
+                np_module=np,
+            )
+        except Exception:
+            pass
     except Exception as exc:
         return _failure(
             str(exc),

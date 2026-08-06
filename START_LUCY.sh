@@ -83,6 +83,7 @@ fi
 export LUCY_LOCAL_MODEL="${_state_model_tmp:-local-lucy-llama31}"
 unset _state_file_tmp _state_model_tmp
 export LUCY_ENABLE_INTERNET=1
+export LUCY_EVIDENCE_ENABLED=1
 export LUCY_SESSION_MEMORY=1
 
 # GPU memory optimization: enable Flash Attention for Ollama

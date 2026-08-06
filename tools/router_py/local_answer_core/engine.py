@@ -33,13 +33,14 @@ from router_py.local_answer_core.self_knowledge import (
     _get_active_persona_fragment,
     _get_current_context,
     _get_current_user_identity,
+    _is_location_aware_query,
     _is_personal_fact_query,
     _load_family_facts_direct,
+    _load_location_facts_direct,
     get_self_knowledge,
 )
 from router_py.local_answer_core.facts import _get_relevant_persistent_facts
 from router_py.local_answer_core.utils import _OllamaWarmupThread, get_gpu_free_vram_mb
-from router_py.ollama_cleanup import unload_other_lucy_models
 
 try:
     from router_py.context_guard import filter_memory_context
@@ -62,8 +63,22 @@ def _logger():
     return la._local_answer_logger
 
 
+def _background_warmup_disabled() -> bool:
+    """Return True when background heartbeat/warmup threads are disabled."""
+    return os.environ.get("LUCY_DISABLE_BACKGROUND_WARMUP", "").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def _start_heartbeat(model: str) -> None:
     """Start the Ollama heartbeat via the facade module."""
+    if _background_warmup_disabled():
+        logger.debug("[HEARTBEAT] Skipped because LUCY_DISABLE_BACKGROUND_WARMUP=1")
+        return
+
     import sys
 
     la = sys.modules.get("router_py.local_answer")
@@ -125,11 +140,15 @@ class LocalAnswer:
         """Send a lightweight request to Ollama to keep the model loaded.
 
         This runs in a background thread so the caller is not blocked.
-        The warmup is skipped if it has already been triggered in this process.
+        The warmup is skipped if it has already been triggered in this process
+        or if background warmup is disabled.
         """
         if cls._warmup_done:
             return
         cls._warmup_done = True
+        if _background_warmup_disabled():
+            logger.debug("[WARMUP] Skipped because LUCY_DISABLE_BACKGROUND_WARMUP=1")
+            return
         cfg = config or LocalAnswerConfig.from_env()
         if not cfg.model:
             return
@@ -145,14 +164,24 @@ class LocalAnswer:
 
         def _ping():
             try:
-                req = urllib.request.Request(
-                    api_url,
-                    data=json.dumps(body).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
+                # Prevent two local models from ever being resident at the same time.
+                from router_py.ollama_cleanup import (
+                    is_lucy_model,
+                    ollama_load_lock,
+                    unload_other_lucy_models,
                 )
-                with urllib.request.urlopen(req, timeout=60.0) as resp:
-                    resp.read()
+
+                with ollama_load_lock():
+                    if is_lucy_model(cfg.model):
+                        unload_other_lucy_models(cfg.model)
+                    req = urllib.request.Request(
+                        api_url,
+                        data=json.dumps(body).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=60.0) as resp:
+                        resp.read()
             except Exception:
                 pass
 
@@ -203,8 +232,19 @@ class LocalAnswer:
         thread and starts a new one for the new model, so the previous model is
         not kept warm after a switch.
         """
+        if _background_warmup_disabled():
+            logger.debug("[WARMUP] Recurring warmup disabled because LUCY_DISABLE_BACKGROUND_WARMUP=1")
+            return
+
         enabled = os.environ.get("LUCY_WARMUP_ENABLED", "1").lower() in ("1", "true", "yes", "on")
         if not enabled:
+            return
+
+        # If the environment requests immediate unload, do not run a recurring
+        # warmup thread; that would keep a model resident against the user's wish.
+        keep_alive = os.environ.get("LUCY_LOCAL_KEEP_ALIVE", "").strip()
+        if keep_alive == "0":
+            logger.debug("[WARMUP] Recurring warmup disabled because LUCY_LOCAL_KEEP_ALIVE=0")
             return
 
         interval_s = int(os.environ.get("LUCY_WARMUP_INTERVAL_S", "300"))
@@ -237,6 +277,7 @@ class LocalAnswer:
             model=cfg.model,
             api_url=api_url,
             keep_alive=keep_alive,
+            get_current_thread=lambda: LocalAnswer._warmup_thread,
         )
         cls._warmup_thread = thread
         thread.start()
@@ -350,6 +391,15 @@ class LocalAnswer:
             # Personal reference patterns - user asking about themselves
             r"^[\s]*(what is my|what are my|what\'s my|who am i|do you know my|remember my|you said my)",
             r"^[\s]*(my name|my favorite|my preference|my choice|my color|my age|my location)",
+            # Continuation/finish requests can appear anywhere in the sentence.
+            r"\b(?:please\s+)?continue(?:\s+(?:the\s+)?story|from\s+where\s+you\s+(?:left\s+off|stopped)|it)?\b",
+            r"\b(?:please\s+)?(?:finish|complete)(?:\s+it|\s+the\s+story|\s+your\s+answer|\s+the\s+response)?\b",
+            r"\b(?:keep\s+going|carry\s+on|go\s+on)\b",
+            r"\b(?:it\s+was\s+truncated|you\s+stopped\s+mid(?:-)?sentence|you\s+got\s+cut\s+off)\b",
+            # Repetition requests must see the prior turn to repeat it.
+            r"\brepeat\s+(?:this|that|the\s+story|the\s+last|it)\b",
+            r"\bsay\s+that\s+again\b",
+            r"\bwhat\s+did\s+you\s+just\s+say\b",
         ]
         for pattern in followup_phrases:
             if re.search(pattern, q):
@@ -1102,6 +1152,7 @@ class LocalAnswer:
         # them entirely so a semantically-similar fact (e.g. "Mike is 66") does
         # not trick the model into saying "I don't know" about Bill Clinton.
         is_personal_query = _is_personal_fact_query(query)
+        is_location_query = _is_location_aware_query(query)
         persistent_facts: list[str] = []
 
         if is_personal_query:
@@ -1136,6 +1187,18 @@ class LocalAnswer:
                     "[GUARD] Suppressing session memory for personal/family query with loaded facts"
                 )
                 session_memory = ""
+
+        # Location-aware queries (e.g. "restaurant in this area") should receive
+        # the user-supplied location fact so "this area" resolves correctly.
+        if is_location_query and not persistent_facts:
+            try:
+                persistent_facts = _load_location_facts_direct()
+                logger.info(
+                    f"[FACTS] Loaded {len(persistent_facts)} location facts for query: {query[:60]}"
+                )
+            except Exception as e:
+                persistent_facts = []
+                logger.warning(f"[FACTS] Failed to load location facts: {e}")
 
         parts: list[str] = []
 
@@ -1221,6 +1284,14 @@ class LocalAnswer:
                 "The user is asking about themselves, their family, or their pets, "
                 "but no persistent facts are available. Say clearly that you do not "
                 "have that information. Do not invent or guess."
+            )
+        elif is_location_query and persistent_facts:
+            instruction = (
+                "Answer using the [PERSISTENT FACTS] block above for location context. "
+                "The user is asking about something relative to their stored location. "
+                "Use the location fact to interpret 'this area', 'near me', etc. "
+                "You may combine it with your own general knowledge, but do not invent "
+                "specific venues or current opening hours you cannot verify."
             )
         else:
             instruction = (
@@ -1360,11 +1431,9 @@ class LocalAnswer:
         # for. SELF_REVIEW and explicit word-count routes (e.g. creative writing)
         # may exceed the usual num_predict_long cap when the generation profile
         # deliberately requested a larger budget.
-        max_num_predict = max(self.config.num_predict_long, num_predict)
-        effective_num_predict = min(
-            num_predict * self._thinking_model_token_multiplier(),
-            max_num_predict,
-        )
+        multiplier = self._thinking_model_token_multiplier()
+        max_num_predict = max(self.config.num_predict_long, num_predict * multiplier)
+        effective_num_predict = min(num_predict * multiplier, max_num_predict)
         options = {
             "temperature": temperature if temperature is not None else self.config.temperature,
             "top_p": self.config.top_p,
@@ -1390,72 +1459,85 @@ class LocalAnswer:
             "options": options,
         }
         # On a 12 GB GPU two large local models cannot both be resident.
-        # Unload any other Local Lucy model before loading the target.
-        try:
-            await asyncio.to_thread(unload_other_lucy_models, self.config.model)
-        except Exception:
-            pass
-
-        # Retry with exponential backoff for model-load transitions.
+        # Hold the cross-process load lock for the entire generate request so
+        # the model load cannot overlap with another Local Lucy process.
         max_attempts = 3
         base_delay = 0.5
         thinking_retry_done = False
+
+        def _generate_once(payload_override: Dict[str, Any]) -> Dict[str, Any]:
+            from router_py.ollama_cleanup import (
+                is_lucy_model,
+                ollama_load_lock,
+                unload_other_lucy_models,
+            )
+
+            with ollama_load_lock():
+                if is_lucy_model(self.config.model):
+                    unload_other_lucy_models(self.config.model)
+                req = urllib.request.Request(
+                    self.config.ollama_url,
+                    data=json.dumps(payload_override).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=120.0) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+
         for attempt in range(max_attempts):
             try:
-                session = await self._get_session()
-                async with session.post(self.config.ollama_url, json=payload) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    text = data.get("response", "")
-                    # Qwen3 and similar thinking models may emit reasoning in
-                    # 'thinking' while leaving 'response' empty when token budget
-                    # is consumed by the thinking phase. Retry once with a larger
-                    # budget before falling back to the thinking text.
-                    if not text and data.get("thinking"):
-                        if not thinking_retry_done:
-                            thinking_retry_done = True
-                            payload["options"]["num_predict"] = min(
-                                payload["options"]["num_predict"] * 4,
-                                max_num_predict,
-                            )
-                            logger.warning(
-                                f"Ollama response empty but thinking present for {self.config.model}; "
-                                f"retrying with num_predict={payload['options']['num_predict']}"
-                            )
-                            continue
-                        # The visible response is empty even after the retry,
-                        # so use the thinking text as a last resort.  Trim it to
-                        # a reasonable length because raw reasoning can be
-                        # thousands of tokens and break downstream checks/UI.
-                        thinking_text = data["thinking"].strip()
-                        max_thinking_fallback_chars = min(480, num_predict * 2)
-                        if len(thinking_text) > max_thinking_fallback_chars:
-                            thinking_text = (
-                                thinking_text[:max_thinking_fallback_chars].rsplit(" ", 1)[0] + "…"
-                            )
-                        text = thinking_text
-                        if text:
-                            logger.warning(
-                                f"Ollama response empty but thinking present for {self.config.model}; using thinking as fallback"
-                            )
-                    duration_ms = int((time.time() - start_time) * 1000)
-                    if text:
-                        return text, duration_ms
-                    if attempt == max_attempts - 1:
-                        logger.error(
-                            f"Ollama returned empty response for {self.config.model} after {max_attempts} attempts"
-                        )
-                        return "", duration_ms
-                    # Empty response: Ollama likely mid-load/unload.
-                    delay = base_delay * (2**attempt)
-                    logger.warning(
-                        f"Ollama returned empty response for {self.config.model}, retrying in {delay}s... (attempt {attempt + 1}/{max_attempts})"
-                    )
-                    await asyncio.sleep(delay)
+                data = await asyncio.to_thread(_generate_once, payload)
             except Exception as e:
                 duration_ms = int((time.time() - start_time) * 1000)
                 logger.error(f"Ollama API call failed: {e}")
                 raise
+
+            text = data.get("response", "")
+            # Qwen3 and similar thinking models may emit reasoning in
+            # 'thinking' while leaving 'response' empty when token budget
+            # is consumed by the thinking phase. Retry once with a larger
+            # budget before falling back to the thinking text.
+            if not text and data.get("thinking"):
+                if not thinking_retry_done:
+                    thinking_retry_done = True
+                    payload["options"]["num_predict"] = min(
+                        payload["options"]["num_predict"] * 4,
+                        max_num_predict,
+                    )
+                    logger.warning(
+                        f"Ollama response empty but thinking present for {self.config.model}; "
+                        f"retrying with num_predict={payload['options']['num_predict']}"
+                    )
+                    continue
+                # The visible response is empty even after the retry,
+                # so use the thinking text as a last resort.  Trim it to
+                # a reasonable length because raw reasoning can be
+                # thousands of tokens and break downstream checks/UI.
+                thinking_text = data["thinking"].strip()
+                max_thinking_fallback_chars = min(480, num_predict * 2)
+                if len(thinking_text) > max_thinking_fallback_chars:
+                    thinking_text = (
+                        thinking_text[:max_thinking_fallback_chars].rsplit(" ", 1)[0] + "…"
+                    )
+                text = thinking_text
+                if text:
+                    logger.warning(
+                        f"Ollama response empty but thinking present for {self.config.model}; using thinking as fallback"
+                    )
+            duration_ms = int((time.time() - start_time) * 1000)
+            if text:
+                return text, duration_ms
+            if attempt == max_attempts - 1:
+                logger.error(
+                    f"Ollama returned empty response for {self.config.model} after {max_attempts} attempts"
+                )
+                return "", duration_ms
+            # Empty response: Ollama likely mid-load/unload.
+            delay = base_delay * (2**attempt)
+            logger.warning(
+                f"Ollama returned empty response for {self.config.model}, retrying in {delay}s... (attempt {attempt + 1}/{max_attempts})"
+            )
+            await asyncio.sleep(delay)
         return "", int((time.time() - start_time) * 1000)
 
     async def generate_answer(

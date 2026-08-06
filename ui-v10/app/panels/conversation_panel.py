@@ -108,6 +108,9 @@ class ConversationPanel(QFrame):
         self._history = QTextBrowser()
         self._history.setReadOnly(True)
         self._history.setOpenExternalLinks(True)
+        self._history.document().setDefaultStyleSheet(
+            "a { color: #ff9800; text-decoration: underline; }"
+        )
         self._history.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._history.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._history.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)

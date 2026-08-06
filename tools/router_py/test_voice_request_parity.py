@@ -15,6 +15,10 @@ import pytest
 def isolated_namespace(monkeypatch, tmp_path):
     """Use a temporary namespace root so tests do not pollute global state."""
     monkeypatch.setenv("LUCY_RUNTIME_NAMESPACE_ROOT", str(tmp_path))
+    # Enable evidence/internet so medical queries can route to EVIDENCE;
+    # explicit network-denial constraints in individual tests still override this.
+    monkeypatch.setenv("LUCY_EVIDENCE_ENABLED", "1")
+    monkeypatch.setenv("LUCY_ENABLE_INTERNET", "1")
     yield tmp_path
 
 

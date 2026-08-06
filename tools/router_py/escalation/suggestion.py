@@ -13,6 +13,7 @@ from router_py.escalation.config import (
     CRITICAL_CATEGORIES,
     SUGGESTION_CURRENT_INFO,
     SUGGESTION_GENERAL_KNOWLEDGE,
+    THIN_LOCAL_CONFIDENCE_THRESHOLD,
 )
 from router_py.pipeline.config import CapabilityFlags
 from router_py.request_types import (
@@ -58,11 +59,21 @@ def suggest_escalation(
     if _is_critical_category(classification):
         return ""
 
-    # Thin local answer: no source basis or low attribution confidence.
+    # Thin local answer: no source basis, low attribution confidence, or a
+    # classifier confidence below the conservative threshold.
     if attribution is not None and (
         attribution.basis == "none" or attribution.confidence == "low"
     ):
         return SUGGESTION_GENERAL_KNOWLEDGE
+
+    # Low classifier confidence, unless the local answer is already backed by
+    # evidence (high attribution confidence).  Guard against mocks or missing
+    # values that may not be numeric.
+    raw_confidence = getattr(classification, "confidence", None)
+    if isinstance(raw_confidence, (int, float)):
+        if raw_confidence < THIN_LOCAL_CONFIDENCE_THRESHOLD:
+            if attribution is None or attribution.confidence != "high":
+                return SUGGESTION_GENERAL_KNOWLEDGE
 
     # Current information need signalled by the classifier but routed locally.
     if classification.needs_web:

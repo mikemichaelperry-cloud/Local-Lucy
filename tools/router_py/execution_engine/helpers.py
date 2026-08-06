@@ -21,6 +21,54 @@ if str(ROOT_DIR / "tools") not in sys.path:
 from tools.xdg_paths import lucy_runtime_namespace_root
 
 
+# Patterns that indicate the user is referring to the prior conversation.
+# These queries must receive the raw session memory, not a semantically-filtered
+# subset, because short follow-ups like "read my last answer" share few keywords
+# with the turns they reference.
+_EXPLICIT_MEMORY_QUERY_PATTERNS = (
+    r"\bwhat\s+did\s+we\s+(discuss|talk|chat)\s+(earlier|before|about)",
+    r"\bwhat\s+were\s+we\s+(discussing|talking|chatting)\s+(about|earlier|before)",
+    r"\bwhat\s+did\s+i\s+(say|mention|ask)\s+(earlier|before)",
+    r"\bwhat\s+did\s+you\s+(say|mention|tell\s+me)\s+(earlier|before)",
+    r"\bwhat\s+was\s+(i|we)\s+(saying|talking|discussing)\s+(about|earlier|before)",
+    r"\bremind\s+me\s+what\s+we\s+(discussed|talked|chatted)\s+(about|earlier|before)",
+    r"\bwhat\s+was\s+our\s+(conversation|discussion)\s+about",
+    r"\bwhat\s+have\s+we\s+been\s+(discussing|talking)\s+about",
+    r"\bread\s+(my|the|your)\s+(last|previous)\s+(answer|response|reply)",
+    r"\blook\s+(at|over)\s+(the\s+)?context",
+    r"\bwhat\s+did\s+(i|you|we)\s+say\s+about\s+that",
+)
+_CONTEXT_FOLLOWUP_PATTERNS = (
+    r"^[\s]*(?:and|also|then|so)\s+",
+    r"^[\s]*(?:what about|how about|about that|on that|on this|regarding that|regarding this|more on that|tell me more about that|continue|go on|elaborate|expand|follow up|follow-up)\b",
+    r"(?:be more|give me more|include|add|what are the|can you be more)\s+(detailed|detail|details|specific|specifics|quantities|quantity|information|info)",
+    r"(?:more\s+(details|detail|information|info|specifics|context|quantities))",
+    r"(?:be more|more)\s+(specific|detailed|precise)",
+    r"^[\s]*(?:what is my|what are my|what\'s my|who am i|do you know my|remember my|you said my)",
+    r"^[\s]*(?:my name|my favorite|my preference|my choice|my color|my age|my location)",
+    r"(?:^|[^\w_])(previous answer|last answer|last response|earlier answer|as you said|you said earlier|same topic)([^\w_]|$)",
+    # Continuation/finish requests can appear anywhere in the sentence.
+    r"\b(?:please\s+)?continue(?:\s+(?:the\s+)?story|from\s+where\s+you\s+(?:left\s+off|stopped)|it)?\b",
+    r"\b(?:please\s+)?(?:finish|complete)(?:\s+it|\s+the\s+story|\s+your\s+answer|\s+the\s+response)?\b",
+    r"\b(?:keep\s+going|carry\s+on|go\s+on)\b",
+    r"\b(?:it\s+was\s+truncated|you\s+stopped\s+mid(?:-)?sentence|you\s+got\s+cut\s+off)\b",
+    # Repetition requests must see the prior turn to repeat it.
+    r"\brepeat\s+(?:this|that|the\s+story|the\s+last|it)\b",
+    r"\bsay\s+that\s+again\b",
+    r"\bwhat\s+did\s+you\s+just\s+say\b",
+)
+
+
+def _is_memory_or_followup_query(question: str) -> bool:
+    """Return True when *question* explicitly refers to prior conversation."""
+    q = question.strip().lower()
+    if any(re.search(p, q) for p in _EXPLICIT_MEMORY_QUERY_PATTERNS):
+        return True
+    if any(re.search(p, q) for p in _CONTEXT_FOLLOWUP_PATTERNS):
+        return True
+    return False
+
+
 def _get_root():
     """Return the current execution_engine ROOT_DIR dynamically."""
     import router_py.execution_engine as _ee
@@ -241,7 +289,7 @@ def _load_session_memory_context_with_telemetry(
         from memory.memory_service import assemble_context_with_telemetry
 
         context, telemetry = assemble_context_with_telemetry(
-            current_session_id=session_id, max_chars=1200, query=query, depth=depth, mode=mode
+            current_session_id=session_id, max_chars=2400, query=query, depth=depth, mode=mode
         )
         if context:
             return context, telemetry
@@ -268,12 +316,34 @@ def _load_session_memory_context_with_telemetry(
     if not lines:
         return "", telemetry
 
-    # Limit context size (last 16 lines, max 500 chars)
+    # Position-aware fallback when SQLite is unavailable: keep the most recent
+    # turns verbatim, then append older turns that share keywords with the query.
+    # Explicit memory/context-follow-up queries receive the full recent window.
+    recent_turn_limit = 4
     max_lines = 16
     max_chars = 500
-    context = "\n".join(lines[-max_lines:]).strip()
 
+    is_explicit_memory_query = any(
+        re.search(pattern, (query or "").lower()) for pattern in _EXPLICIT_MEMORY_QUERY_PATTERNS
+    ) or any(
+        re.search(pattern, (query or "").lower()) for pattern in _CONTEXT_FOLLOWUP_PATTERNS
+    )
+
+    recent_lines = lines[-recent_turn_limit:] if len(lines) > recent_turn_limit else lines
+    older_lines = lines[:-recent_turn_limit] if len(lines) > recent_turn_limit else []
+
+    if is_explicit_memory_query or not query.strip():
+        selected = lines[-max_lines:]
+    else:
+        query_words = [w.lower() for w in re.findall(r"\b[a-z]{4,}\b", query or "")]
+        matched_older = [
+            ln for ln in older_lines if any(w in ln.lower() for w in query_words)
+        ]
+        selected = (recent_lines + matched_older)[-max_lines:]
+
+    context = "\n".join(selected).strip()
     if len(context) > max_chars:
+        # Keep the end (most recent turns) when truncating the text fallback.
         context = context[-max_chars:]
 
     if context:

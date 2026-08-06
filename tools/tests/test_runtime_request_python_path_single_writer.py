@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Regression guard against double-writing request history.
+"""Regression guard for request-history persistence.
 
-The Python-native router (tools/router_py) already persists
-last_request_result.json and request_history.jsonl via StateWriter.
-When runtime_request.submit_request() also persists for the Python path,
-every request appears twice in history.  These tests prove that a backend
-which has already persisted is not persisted again by submit_request().
+The Python-native router (tools/router_py) writes last_request_result.json and
+request_history.jsonl for outcomes produced by the ExecutionEngine, but it does
+not write them for early-exit outcomes such as operator_blocked or
+feedback_acknowledged.  runtime_request.submit_request() is therefore
+responsible for persisting every payload it receives.  The history writer
+skips duplicate request_ids, so an outcome that the engine already wrote is
+not duplicated.
 """
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -62,14 +65,12 @@ def _minimal_payload(request_text: str) -> dict:
     }
 
 
-def test_python_backend_marker_skips_runtime_persistence(monkeypatch, tmp_path):
-    """When the backend sets _state_persisted, submit_request must not write again."""
+def test_python_backend_persists_once_via_wrapper(monkeypatch, tmp_path):
+    """submit_request() persists a Python-backend payload itself."""
     calls = {"persist": 0, "history": 0}
 
     def fake_run_backend_submit(*, request_text, **kwargs):
-        payload = _minimal_payload(request_text)
-        payload["_state_persisted"] = True
-        return payload
+        return _minimal_payload(request_text)
 
     monkeypatch.setattr(runtime_request, "run_backend_submit", fake_run_backend_submit)
 
@@ -85,14 +86,51 @@ def test_python_backend_marker_skips_runtime_persistence(monkeypatch, tmp_path):
 
     result = runtime_request.submit_request("hello python backend", persist=True)
 
-    # The internal marker should not leak out of submit_request.
     assert "_state_persisted" not in result
-    assert calls["persist"] == 0, "runtime_request persisted result for already-persisted backend"
-    assert calls["history"] == 0, "runtime_request appended history for already-persisted backend"
+    assert calls["persist"] == 1, "runtime_request should persist Python-backend result"
+    assert calls["history"] == 1, "runtime_request should append Python-backend history"
+
+
+def test_python_backend_does_not_duplicate_history_when_engine_already_wrote(tmp_path):
+    """If the engine already wrote the same request_id, wrapper appends nothing."""
+    request_text = "hello python backend dedup"
+    payload = _minimal_payload(request_text)
+    request_id = payload["request_id"]
+
+    namespace = tmp_path / "ns"
+    namespace.mkdir()
+    state_dir = namespace / "state"
+    state_dir.mkdir()
+    history_file = state_dir / "request_history.jsonl"
+    result_file = state_dir / "last_request_result.json"
+
+    # Simulate an engine write that already happened.
+    entry = runtime_request.build_history_entry(payload)
+    history_file.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setenv("LUCY_RUNTIME_NAMESPACE_ROOT", str(namespace))
+    monkeypatch.setenv("LUCY_RUNTIME_REQUEST_RESULT_FILE", str(result_file))
+    monkeypatch.setenv("LUCY_RUNTIME_REQUEST_HISTORY_FILE", str(history_file))
+
+    def fake_run_backend_submit(*, request_text, **kwargs):
+        return payload
+
+    monkeypatch.setattr(runtime_request, "run_backend_submit", fake_run_backend_submit)
+
+    try:
+        runtime_request.submit_request(request_text, persist=True)
+    finally:
+        monkeypatch.undo()
+
+    lines = [line.strip() for line in history_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(lines) == 1, f"expected one history entry, got {len(lines)}"
+    parsed = json.loads(lines[0])
+    assert parsed["request_id"] == request_id
 
 
 def test_chat_bin_backend_without_marker_persists_once(monkeypatch, tmp_path):
-    """A backend that does not set _state_persisted is still persisted by submit_request."""
+    """A backend that does not set _state_persisted is persisted by submit_request."""
     calls = {"persist": 0, "history": 0}
 
     def fake_run_backend_submit(*, request_text, **kwargs):

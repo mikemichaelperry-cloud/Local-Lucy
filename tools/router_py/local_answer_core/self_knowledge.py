@@ -81,6 +81,32 @@ def _load_family_facts_direct() -> list[str]:
         return []
 
 
+def _load_location_facts_direct() -> list[str]:
+    """Direct SQLite fallback: load the most recent location-category fact.
+
+    Location facts are stored when the user says things like "I live in X".
+    They should override the timezone-derived default location.
+    """
+    try:
+        import sqlite3
+
+        db_path = os.environ.get("LUCY_MEMORY_DB_PATH", "")
+        if not db_path:
+            db_path = str(lucy_memory_db_path())
+        conn = sqlite3.connect(db_path, check_same_thread=False)
+        cursor = conn.execute(
+            "SELECT fact_text FROM persistent_facts WHERE category = 'location' ORDER BY id DESC LIMIT 1"
+        )
+        row = cursor.fetchone()
+        conn.close()
+        facts = [row[0]] if row else []
+        logger.info(f"[FACTS] Direct SQLite load returned {len(facts)} location facts")
+        return facts
+    except Exception as e:
+        logger.warning(f"[FACTS] Direct SQLite location fallback failed: {e}")
+        return []
+
+
 # ---------------------------------------------------------------------------
 # Persona fragments: loaded from config/personas/<name>.txt and injected
 # into the local prompt when that identity is active. This applies to any
@@ -157,6 +183,34 @@ def _is_personal_fact_query(query: str) -> bool:
     """Return True if the query is about the user's own facts/family/pets."""
     normalized = query.lower()
     return any(k in normalized for k in _PERSONAL_FACT_KEYWORDS)
+
+
+# Keywords / phrases that indicate the user is asking about a location relative
+# to themselves (e.g. "this area", "near me"). These should trigger injection of
+# the stored user location fact.
+_LOCATION_AWARE_PHRASES = (
+    "this area",
+    "this region",
+    "this neighbourhood",
+    "this neighborhood",
+    "around here",
+    "near me",
+    "near us",
+    "close to me",
+    "in my area",
+    "in my town",
+    "in my city",
+    "in my village",
+    "in my kibbutz",
+    "local ",
+    "locally",
+)
+
+
+def _is_location_aware_query(query: str) -> bool:
+    """Return True if the query is location-aware relative to the user."""
+    normalized = query.lower()
+    return any(p in normalized for p in _LOCATION_AWARE_PHRASES)
 
 
 # Self-knowledge: identity, capabilities, limitations.
@@ -361,6 +415,17 @@ def _get_current_context() -> str:
         if location == "Unknown" and "/" in tz_name:
             region = tz_name.split("/")[1].replace("_", " ").title()
             location = region
+
+        # User-supplied location facts override the timezone guess.
+        location_facts = _load_location_facts_direct()
+        if location_facts:
+            # Fact text is expected to be "User lives in <location>."
+            stored = location_facts[0]
+            prefix = "user lives in "
+            if stored.lower().startswith(prefix):
+                location = stored[len(prefix) :].rstrip(".").strip()
+            else:
+                location = stored.strip()
 
         offset = now.strftime("%z")
         offset_str = f"UTC{offset[:3]}:{offset[3:]}" if len(offset) >= 5 else "UTC"

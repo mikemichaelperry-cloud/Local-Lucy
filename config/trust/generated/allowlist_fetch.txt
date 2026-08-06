@@ -146,3 +146,10 @@ www.ynetnews.com
 xe.com
 ynet.co.il
 ynetnews.com
+goisrael.com
+www.goisrael.com
+israel.travel
+www.israel.travel
+wikivoyage.org
+en.wikivoyage.org
+www.wikivoyage.org
