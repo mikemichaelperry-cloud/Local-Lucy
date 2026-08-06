@@ -21,7 +21,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 2.58,
+      "elapsed_s": 2.51,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -95,7 +95,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 7.88,
+      "elapsed_s": 8.02,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -113,12 +113,12 @@
       "actual_route": "NEWS",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 11796,
+      "response_len": 11767,
       "required_concepts_found": [],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.71,
+      "elapsed_s": 0.87,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -159,7 +159,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 940,
+      "response_len": 1054,
       "required_concepts_found": [
         "because",
         "since",
@@ -168,7 +168,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 3.21,
+      "elapsed_s": 3.75,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -214,7 +214,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.25,
+      "elapsed_s": 0.27,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -232,14 +232,14 @@
       "actual_route": "AUGMENTED",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 374,
+      "response_len": 319,
       "required_concepts_found": [
         "pizza"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.74,
+      "elapsed_s": 2.01,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -257,7 +257,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 203,
+      "response_len": 205,
       "required_concepts_found": [
         "Local Lucy",
         "llama"
@@ -283,12 +283,12 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 191,
+      "response_len": 135,
       "required_concepts_found": [],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.01,
+      "elapsed_s": 0.89,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],

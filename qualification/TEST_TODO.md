@@ -262,8 +262,9 @@
   Evidence: test_stage_06_planner_security.py (10 passed); test_stage_06_untrusted_web.py (1 passed); test_stage_14_fault_injection.py (5 passed); test_stage_15_privacy_audit.py (4 passed); test_execution_engine_state.py::TestPIIRedaction (5 passed); test_memory_privacy_canary.py (5 passed).
 - [FRQ-SOAK-001] PASSED — Soak and final clean run.
   Evidence: stage_16_hmi_soak.py 6/6 passed; stage_16_hmi_weather_boundary.py 6/6 passed; stage_19_clean_run.py 7/7 passed.
-- [FRQ-MAN-001] IN_PROGRESS — Create immutable qualification manifest and revised completion report.
+- [FRQ-MAN-001] PASSED — Create immutable qualification manifest and revised completion report.
+  Evidence: qualification/FINAL_QUALIFICATION_MANIFEST.json + qualification/FINAL_QUALIFICATION_MANIFEST.md; behavioural candidate commit 423e5dd; manifest commit 4495f83.
 
 ---
 
-**Qualification status:** STAGE_00–STAGE_19 complete. Final requalification verification complete; all mandatory acceptance criteria satisfied.
+**Qualification status:** STAGE_00–STAGE_19 complete. Final requalification verification complete. Decision: **QUALIFIED**.

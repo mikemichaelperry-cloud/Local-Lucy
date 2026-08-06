@@ -9,7 +9,7 @@
     "loaded_models": [
       "local-lucy-gemma4:latest"
     ],
-    "elapsed_s": 10.89,
+    "elapsed_s": 4.52,
     "passed": true,
     "notes": []
   },
@@ -33,7 +33,7 @@
     "route": "LOCAL",
     "status": "completed",
     "outcome_code": "answered",
-    "response_len": 233,
+    "response_len": 253,
     "loaded_models": [
       "local-lucy-gemma4:latest"
     ],
