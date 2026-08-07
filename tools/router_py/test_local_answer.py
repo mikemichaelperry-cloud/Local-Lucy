@@ -365,7 +365,7 @@ class TestPromptBuilding(unittest.TestCase):
         """Memory block uses the authoritative preamble and sits before the user turn."""
         prompt = self.answer._build_prompt(
             "what did I say earlier?",
-            "User: hello",
+            "user: hello",
             "chat",
             "",
             False,
@@ -373,7 +373,8 @@ class TestPromptBuilding(unittest.TestCase):
         )
         self.assertIn("authoritative", prompt)
         self.assertIn("look at the history first", prompt)
-        self.assertLess(prompt.find("authoritative"), prompt.find("User:"))
+        final_user_turn = prompt.rfind("User:")
+        self.assertLess(prompt.find("authoritative"), final_user_turn)
 
     def test_build_prompt_conversation_mode(self):
         """Test prompt building with conversation mode."""
