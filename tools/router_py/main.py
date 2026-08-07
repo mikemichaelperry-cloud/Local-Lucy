@@ -320,7 +320,13 @@ def _persist_memory_turn(
         truncated = bool(metadata.get("truncated")) if metadata else False
         full_text = response_text if truncated else None
         store_turn("user", question, session_id=session_id)
-        store_turn("assistant", response_text, session_id=session_id, full_text=full_text)
+        store_turn(
+            "assistant",
+            response_text,
+            session_id=session_id,
+            full_text=full_text,
+            truncated=truncated,
+        )
         maybe_summarize_session(session_id=session_id)
     except Exception:
         logging.warning("SQLite memory write failed, falling back to text file", exc_info=True)

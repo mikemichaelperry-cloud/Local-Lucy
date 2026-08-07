@@ -367,6 +367,7 @@ def store_turn(
     *,
     session_id: str = "default",
     full_text: str | None = None,
+    truncated: bool = False,
 ) -> None:
     """
     Store a single conversation turn in SQLite.
@@ -375,8 +376,9 @@ def store_turn(
         role: One of "user" or "assistant".
         text: The turn text (will be stripped).
         session_id: Session identifier (default "default").
-        full_text: Optional original, un-truncated assistant output. When
-            provided and different from *text*, ``truncated`` is set to 1.
+        full_text: Optional original, un-truncated assistant output. Stored
+            only when provided and different from *text*.
+        truncated: Whether the stored *text* was truncated. Stored as 1/0.
 
     Raises:
         ValueError: If role is not "user" or "assistant".
@@ -389,12 +391,13 @@ def store_turn(
     if not text:
         return
 
-    truncated = 1 if full_text and full_text != text else 0
+    stored_full_text = full_text if full_text and full_text != text else None
+    truncated_flag = 1 if truncated else 0
     conn = _get_connection()
     conn.execute(
         "INSERT INTO conversation_turns (session_id, role, text, full_text, truncated) "
         "VALUES (?, ?, ?, ?, ?)",
-        (session_id, role, text, full_text, truncated),
+        (session_id, role, text, stored_full_text, truncated_flag),
     )
     conn.commit()
 
@@ -457,9 +460,10 @@ class MemoryService:
         turn_index: int | None = None,
         metadata: dict | None = None,
         full_text: str | None = None,
+        truncated: bool = False,
     ) -> None:
         """Store a single conversation turn in the configured database."""
-        store_turn(role, text, session_id=session_id, full_text=full_text)
+        store_turn(role, text, session_id=session_id, full_text=full_text, truncated=truncated)
 
     def get_recent_turns(self, session_id: str = "default", limit: int = 6) -> list[dict[str, Any]]:
         """Return recent conversation turns for *session_id*."""
