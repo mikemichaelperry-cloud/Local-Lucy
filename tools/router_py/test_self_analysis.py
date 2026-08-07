@@ -982,7 +982,7 @@ def test_code_review_config_fields_have_defaults():
     assert config.code_review_top_k == 64
     assert config.code_review_context_target == 16384
     assert config.code_review_max_tokens == 4096
-    assert config.code_review_context_chars == 32768
+    assert config.code_review_context_chars == 200000
 
 
 def test_code_review_config_fields_read_from_env(monkeypatch):

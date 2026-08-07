@@ -45,7 +45,7 @@ class LocalAnswerConfig:
     evidence_max_tokens: int = 1536
     creative_max_tokens: int = 4096
     self_review_max_tokens: int = 4096
-    self_review_context_chars: int = 32768
+    self_review_context_chars: int = 200000
     # Code-review specialist model settings
     code_review_model: str = "local-lucy-gemma4"
     code_review_specialist_enabled: bool = True
@@ -54,7 +54,7 @@ class LocalAnswerConfig:
     code_review_top_k: int = 64
     code_review_context_target: int = 16384
     code_review_max_tokens: int = 4096
-    code_review_context_chars: int = 32768
+    code_review_context_chars: int = 200000
     embedding_cache_size: int = 1024
     keep_model_warm: bool = True
     max_context_chars: int = 1200
@@ -127,7 +127,7 @@ class LocalAnswerConfig:
             creative_max_tokens=int(os.environ.get("LUCY_CREATIVE_MAX_TOKENS", "4096")),
             self_review_max_tokens=int(os.environ.get("LUCY_SELF_REVIEW_MAX_TOKENS", "4096")),
             self_review_context_chars=int(
-                os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "32768")
+                os.environ.get("LUCY_SELF_REVIEW_CONTEXT_CHARS", "200000")
             ),
             code_review_model=os.environ.get("LUCY_CODE_REVIEW_MODEL", "local-lucy-gemma4"),
             code_review_specialist_enabled=os.environ.get(
@@ -142,7 +142,7 @@ class LocalAnswerConfig:
             ),
             code_review_max_tokens=int(os.environ.get("LUCY_CODE_REVIEW_MAX_TOKENS", "4096")),
             code_review_context_chars=int(
-                os.environ.get("LUCY_CODE_REVIEW_CONTEXT_CHARS", "32768")
+                os.environ.get("LUCY_CODE_REVIEW_CONTEXT_CHARS", "200000")
             ),
             embedding_cache_size=int(os.environ.get("LUCY_EMBEDDING_CACHE_SIZE", "1024")),
             keep_model_warm=os.environ.get("LUCY_KEEP_MODEL_WARM", "1").lower()
