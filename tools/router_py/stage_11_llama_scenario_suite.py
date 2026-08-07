@@ -43,6 +43,9 @@ DEFAULT_OLLAMA_URL = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:114
 SUITE_PATH = ROOT / "qualification" / "scenarios" / "shared_scenario_suite.json"
 GEMMA_REPORT_PATH = ROOT / "qualification" / "results" / "stage_09_gemma_scenarios.json"
 REPORT_PATH = ROOT / "qualification" / "results" / "stage_11_llama_scenarios.json"
+MEMORY_BASELINE_FIXTURE_PATH = (
+    ROOT / "qualification" / "fixtures" / "gemma_memory_baseline.json"
+)
 
 
 def _api_ps() -> list[str]:
@@ -119,6 +122,20 @@ def _load_gemma_report() -> dict[str, dict]:
     return {r["scenario_id"]: r for r in data}
 
 
+def _load_memory_baseline_fixture() -> dict[str, list[str]]:
+    """Load the Gemma memory baseline key entities fixture.
+
+    The fixture records the key entities that Gemma responses are expected to
+    contain for each memory scenario.  Llama must contain the same entities to
+    satisfy outcome parity.
+    """
+    if not MEMORY_BASELINE_FIXTURE_PATH.exists():
+        return {}
+    with open(MEMORY_BASELINE_FIXTURE_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+    return {item["scenario_id"]: item.get("entities", []) for item in data.get("scenarios", [])}
+
+
 def _set_state_model_to_llama() -> None:
     """Update current_state.json so the pipeline uses Llama exclusively."""
     from router_py.main import load_state_from_file
@@ -167,6 +184,11 @@ def _seed_synthetic_location_fact(namespace_root: Path) -> None:
     )
 
 
+def _is_memory_scenario(scenario: dict) -> bool:
+    """Return True when the scenario needs a multi-turn memory session."""
+    return scenario.get("id", "").startswith("S09-MEM-") or "turns" in scenario
+
+
 def _adapt_concepts_for_llama(scenario: dict) -> tuple[list[str], list[str]]:
     """Return (required_concepts, forbidden_claims) adapted for Llama runs.
 
@@ -181,18 +203,78 @@ def _adapt_concepts_for_llama(scenario: dict) -> tuple[list[str], list[str]]:
     return required, forbidden
 
 
-def _run_scenario(scenario: dict, gemma_report: dict[str, dict]) -> dict:
-    question = scenario["user_request"]
-    t0 = time.time()
-    outcome = execute_plan_python(
-        question,
-        policy="fallback_only",
-        timeout=180,
-        surface="cli",
-    )
-    elapsed = time.time() - t0
+def _run_scenario(
+    scenario: dict,
+    gemma_report: dict[str, dict],
+    memory_baseline: dict[str, list[str]],
+) -> dict:
+    turns = scenario.get("turns", [scenario["user_request"]])
+    if not turns:
+        turns = [scenario["user_request"]]
 
-    response_text = outcome.response_text or ""
+    is_memory = _is_memory_scenario(scenario)
+    previous_session_memory = os.environ.get("LUCY_SESSION_MEMORY")
+    previous_session_id = os.environ.get("LUCY_SESSION_ID")
+
+    if is_memory:
+        os.environ["LUCY_SESSION_MEMORY"] = "1"
+        os.environ["LUCY_SESSION_ID"] = scenario["id"]
+    else:
+        os.environ["LUCY_SESSION_MEMORY"] = "0"
+        os.environ.pop("LUCY_SESSION_ID", None)
+
+    outcomes: list = []
+    t0 = time.time()
+    try:
+        for turn_index, turn_request in enumerate(turns):
+            outcome = execute_plan_python(
+                turn_request,
+                policy="fallback_only",
+                timeout=180,
+                surface="cli",
+            )
+            outcomes.append(outcome)
+            if outcome.status != "completed" and turn_index < len(turns) - 1:
+                break
+    finally:
+        if previous_session_memory is None:
+            os.environ.pop("LUCY_SESSION_MEMORY", None)
+        else:
+            os.environ["LUCY_SESSION_MEMORY"] = previous_session_memory
+        if previous_session_id is None:
+            os.environ.pop("LUCY_SESSION_ID", None)
+        else:
+            os.environ["LUCY_SESSION_ID"] = previous_session_id
+
+    elapsed = time.time() - t0
+    final_outcome = outcomes[-1] if outcomes else None
+    if final_outcome is None:
+        return {
+            "scenario_id": scenario["id"],
+            "category": scenario["category"],
+            "expected_route": scenario.get("expected_route"),
+            "actual_route": "LOCAL",
+            "status": "failed",
+            "outcome_code": "no_outcome",
+            "response_len": 0,
+            "required_concepts_found": [],
+            "forbidden_claims_found": [],
+            "passed": False,
+            "notes": ["no outcomes produced"],
+            "elapsed_s": round(elapsed, 2),
+            "loaded_models": _lucy_models_loaded(),
+            "parity": {
+                "gemma_route": gemma_report.get(scenario["id"], {}).get("actual_route"),
+                "route_matches": None,
+                "gemma_outcome_code": gemma_report.get(scenario["id"], {}).get("outcome_code"),
+                "outcome_matches": None,
+                "gemma_entities": memory_baseline.get(scenario["id"], []),
+                "entity_matches": None,
+                "missing_entities": [],
+            },
+        }
+
+    response_text = final_outcome.response_text or ""
     required_concepts, forbidden_claims = _adapt_concepts_for_llama(scenario)
     required_structure = scenario.get("required_structure")
 
@@ -200,8 +282,8 @@ def _run_scenario(scenario: dict, gemma_report: dict[str, dict]) -> dict:
     passed = True
 
     expected_route = scenario.get("expected_route")
-    if expected_route and outcome.route != expected_route:
-        notes.append(f"route expected {expected_route}, got {outcome.route}")
+    if expected_route and final_outcome.route != expected_route:
+        notes.append(f"route expected {expected_route}, got {final_outcome.route}")
         passed = False
 
     # S09-GEM-007 checks for reasoning markers; accept any of the listed markers.
@@ -232,23 +314,34 @@ def _run_scenario(scenario: dict, gemma_report: dict[str, dict]) -> dict:
         notes.append(f"Non-Llama Lucy model(s) loaded: {non_llama}")
         passed = False
 
-    if outcome.status != "completed":
-        notes.append(f"status={outcome.status}, error={outcome.error_message}")
+    if final_outcome.status != "completed":
+        notes.append(f"status={final_outcome.status}, error={final_outcome.error_message}")
         passed = False
 
     # Parity comparison against Gemma baseline.
     gemma_result = gemma_report.get(scenario["id"], {})
     gemma_route = gemma_result.get("actual_route")
-    route_parity = outcome.route == gemma_route if gemma_route else None
-    outcome_parity = outcome.outcome_code == gemma_result.get("outcome_code") if gemma_result else None
+    route_parity = final_outcome.route == gemma_route if gemma_route else None
+    outcome_parity = final_outcome.outcome_code == gemma_result.get("outcome_code") if gemma_result else None
+
+    baseline_entities = memory_baseline.get(scenario["id"], [])
+    missing_entities = [
+        e for e in baseline_entities if e.lower() not in response_text.lower()
+    ]
+    entity_parity = None
+    if is_memory and baseline_entities:
+        entity_parity = not missing_entities
+        if missing_entities:
+            notes.append(f"missing Gemma baseline entities: {missing_entities}")
+            passed = False
 
     return {
         "scenario_id": scenario["id"],
         "category": scenario["category"],
         "expected_route": expected_route,
-        "actual_route": outcome.route,
-        "status": outcome.status,
-        "outcome_code": outcome.outcome_code,
+        "actual_route": final_outcome.route,
+        "status": final_outcome.status,
+        "outcome_code": final_outcome.outcome_code,
         "response_len": len(response_text),
         "required_concepts_found": [c for c in required_concepts if c.lower() in response_text.lower()],
         "forbidden_claims_found": [c for c in forbidden_claims if c.lower() in response_text.lower()],
@@ -261,6 +354,9 @@ def _run_scenario(scenario: dict, gemma_report: dict[str, dict]) -> dict:
             "route_matches": route_parity,
             "gemma_outcome_code": gemma_result.get("outcome_code"),
             "outcome_matches": outcome_parity,
+            "gemma_entities": baseline_entities,
+            "entity_matches": entity_parity,
+            "missing_entities": missing_entities,
         },
     }
 
@@ -287,6 +383,7 @@ def main() -> int:
 
         suite = _load_suite()
         gemma_report = _load_gemma_report()
+        memory_baseline = _load_memory_baseline_fixture()
         results: list[dict] = []
         passed = True
 
@@ -294,7 +391,7 @@ def main() -> int:
             _load_llama_exclusively()
             for scenario in suite:
                 print(f"Running {scenario['id']}: {scenario['description']}")
-                result = _run_scenario(scenario, gemma_report)
+                result = _run_scenario(scenario, gemma_report, memory_baseline)
                 results.append(result)
                 print(
                     f"  route={result['actual_route']} "
@@ -308,7 +405,11 @@ def main() -> int:
 
         route_matches = sum(1 for r in results if r["parity"]["route_matches"] is True)
         outcome_matches = sum(1 for r in results if r["parity"]["outcome_matches"] is True)
+        entity_matches = sum(1 for r in results if r["parity"]["entity_matches"] is True)
         parity_available = sum(1 for r in results if r["parity"]["gemma_route"] is not None)
+        entity_parity_available = sum(
+            1 for r in results if r["parity"]["entity_matches"] is not None
+        )
 
         summary = {
             "llama_model": LLAMA_MODEL,
@@ -318,6 +419,7 @@ def main() -> int:
             "failed_scenarios": sum(1 for r in results if not r["passed"]),
             "route_parity": f"{route_matches}/{parity_available}",
             "outcome_parity": f"{outcome_matches}/{parity_available}",
+            "entity_parity": f"{entity_matches}/{entity_parity_available}",
             "results": results,
         }
 
@@ -331,6 +433,7 @@ def main() -> int:
         print(f"\nSummary: {summary['passed_scenarios']}/{summary['total_scenarios']} scenarios passed")
         print(f"Route parity with Gemma: {summary['route_parity']}")
         print(f"Outcome parity with Gemma: {summary['outcome_parity']}")
+        print(f"Entity parity with Gemma: {summary['entity_parity']}")
         return 0 if passed else 1
 
 

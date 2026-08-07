@@ -157,18 +157,70 @@ def _seed_synthetic_location_fact(namespace_root: Path) -> None:
     )
 
 
-def _run_scenario(scenario: dict) -> dict:
-    question = scenario["user_request"]
-    t0 = time.time()
-    outcome = execute_plan_python(
-        question,
-        policy="fallback_only",
-        timeout=180,
-        surface="cli",
-    )
-    elapsed = time.time() - t0
+def _is_memory_scenario(scenario: dict) -> bool:
+    """Return True when the scenario needs a multi-turn memory session."""
+    return scenario.get("id", "").startswith("S09-MEM-") or "turns" in scenario
 
-    response_text = outcome.response_text or ""
+
+def _run_scenario(scenario: dict) -> dict:
+    turns = scenario.get("turns", [scenario["user_request"]])
+    if not turns:
+        turns = [scenario["user_request"]]
+
+    is_memory = _is_memory_scenario(scenario)
+    previous_session_memory = os.environ.get("LUCY_SESSION_MEMORY")
+    previous_session_id = os.environ.get("LUCY_SESSION_ID")
+
+    if is_memory:
+        os.environ["LUCY_SESSION_MEMORY"] = "1"
+        os.environ["LUCY_SESSION_ID"] = scenario["id"]
+    else:
+        os.environ["LUCY_SESSION_MEMORY"] = "0"
+        os.environ.pop("LUCY_SESSION_ID", None)
+
+    outcomes: list = []
+    t0 = time.time()
+    try:
+        for turn_index, turn_request in enumerate(turns):
+            outcome = execute_plan_python(
+                turn_request,
+                policy="fallback_only",
+                timeout=180,
+                surface="cli",
+            )
+            outcomes.append(outcome)
+            if outcome.status != "completed" and turn_index < len(turns) - 1:
+                break
+    finally:
+        if previous_session_memory is None:
+            os.environ.pop("LUCY_SESSION_MEMORY", None)
+        else:
+            os.environ["LUCY_SESSION_MEMORY"] = previous_session_memory
+        if previous_session_id is None:
+            os.environ.pop("LUCY_SESSION_ID", None)
+        else:
+            os.environ["LUCY_SESSION_ID"] = previous_session_id
+
+    elapsed = time.time() - t0
+    final_outcome = outcomes[-1] if outcomes else None
+    if final_outcome is None:
+        return {
+            "scenario_id": scenario["id"],
+            "category": scenario["category"],
+            "expected_route": scenario.get("expected_route"),
+            "actual_route": "LOCAL",
+            "status": "failed",
+            "outcome_code": "no_outcome",
+            "response_len": 0,
+            "required_concepts_found": [],
+            "forbidden_claims_found": [],
+            "passed": False,
+            "notes": ["no outcomes produced"],
+            "elapsed_s": round(elapsed, 2),
+            "loaded_models": _lucy_models_loaded(),
+        }
+
+    response_text = final_outcome.response_text or ""
     required_concepts = scenario.get("required_answer_concepts", [])
     forbidden_claims = scenario.get("forbidden_answer_claims", [])
     required_structure = scenario.get("required_structure")
@@ -177,8 +229,8 @@ def _run_scenario(scenario: dict) -> dict:
     passed = True
 
     expected_route = scenario.get("expected_route")
-    if expected_route and outcome.route != expected_route:
-        notes.append(f"route expected {expected_route}, got {outcome.route}")
+    if expected_route and final_outcome.route != expected_route:
+        notes.append(f"route expected {expected_route}, got {final_outcome.route}")
         passed = False
 
     # S09-GEM-007 checks for reasoning markers; accept any of the listed markers.
@@ -209,17 +261,17 @@ def _run_scenario(scenario: dict) -> dict:
         notes.append(f"Non-Gemma Lucy model(s) loaded: {non_gemma}")
         passed = False
 
-    if outcome.status != "completed":
-        notes.append(f"status={outcome.status}, error={outcome.error_message}")
+    if final_outcome.status != "completed":
+        notes.append(f"status={final_outcome.status}, error={final_outcome.error_message}")
         passed = False
 
     return {
         "scenario_id": scenario["id"],
         "category": scenario["category"],
         "expected_route": expected_route,
-        "actual_route": outcome.route,
-        "status": outcome.status,
-        "outcome_code": outcome.outcome_code,
+        "actual_route": final_outcome.route,
+        "status": final_outcome.status,
+        "outcome_code": final_outcome.outcome_code,
         "response_len": len(response_text),
         "required_concepts_found": [c for c in required_concepts if c.lower() in response_text.lower()],
         "forbidden_claims_found": [c for c in forbidden_claims if c.lower() in response_text.lower()],

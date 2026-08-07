@@ -1,0 +1,21 @@
+{
+  "description": "Gemma baseline key entities for shared memory scenarios. Llama responses must contain the same entities to satisfy outcome parity.",
+  "scenarios": [
+    {
+      "scenario_id": "S09-MEM-001",
+      "entities": ["Spark"]
+    },
+    {
+      "scenario_id": "S09-MEM-002",
+      "entities": ["capital", "Japan"]
+    },
+    {
+      "scenario_id": "S09-MEM-003",
+      "entities": ["Local Lucy", "assistant"]
+    },
+    {
+      "scenario_id": "S09-MEM-004",
+      "entities": ["blue"]
+    }
+  ]
+}
