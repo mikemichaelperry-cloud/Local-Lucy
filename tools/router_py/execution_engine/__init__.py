@@ -1526,6 +1526,7 @@ class ExecutionEngine:
         session_memory = ""
         memory_telemetry: dict[str, Any] = {}
         api_fallback_telemetry: dict[str, Any] = {}
+        local_model_metadata: dict[str, Any] = {}
         if route.provider == "wikipedia":
             # Wikipedia routes do not consume session memory; skip the load
             # to avoid throwing away embedding/DB work.
@@ -1552,7 +1553,7 @@ class ExecutionEngine:
                     self._logger.debug(f"Loaded session memory ({len(session_memory)} chars)")
 
             if route.provider == "local":
-                response = await self._call_local_model_async(
+                response, local_model_metadata = await self._call_local_model_async(
                     prompt, context, session_memory, route_mode=route.route
                 )
             elif route.provider in ("openai", "kimi"):
@@ -1573,12 +1574,12 @@ class ExecutionEngine:
                         fallback_to="local",
                         degradation_level="limited",
                     )
-                    response = await self._call_local_model_async(
+                    response, local_model_metadata = await self._call_local_model_async(
                         prompt, context, session_memory, route_mode=route.route
                     )
             else:
                 # Default to local model
-                response = await self._call_local_model_async(
+                response, local_model_metadata = await self._call_local_model_async(
                     prompt, context, session_memory, route_mode=route.route
                 )
 
@@ -1626,6 +1627,7 @@ class ExecutionEngine:
         base_metadata = _ft_merge(base_metadata, evidence_telemetry)
         base_metadata = _ft_merge(base_metadata, api_fallback_telemetry)
         base_metadata = _ft_merge(base_metadata, fact_telemetry)
+        base_metadata = _ft_merge(base_metadata, local_model_metadata)
 
         result = ExecutionResult(
             status="completed",
@@ -2047,8 +2049,12 @@ class ExecutionEngine:
         context: dict[str, Any],
         session_memory: str = "",
         route_mode: str = "LOCAL",
-    ) -> str:
-        """Call local model asynchronously using Python-native path (delegated to provider module)."""
+    ) -> tuple[str, dict[str, Any]]:
+        """Call local model asynchronously using Python-native path (delegated to provider module).
+
+        Returns a tuple of (response_text, metadata). The metadata dict may
+        contain a ``truncated`` key when the model stopped due to token limits.
+        """
         # Background-warm Ollama on first call in this process to avoid cold-start latency.
         if HAS_LOCAL_ANSWER_PY:
             LocalAnswer.warmup_ollama()
@@ -2057,12 +2063,12 @@ class ExecutionEngine:
             breaker._before_call()
         except CircuitBreakerOpen:
             self._logger.warning("Circuit breaker open for local_model")
-            return "Error: Local model circuit breaker is OPEN."
+            return "Error: Local model circuit breaker is OPEN.", {}
         self._logger.debug(f"Calling local model async with prompt: {prompt[:50]}...")
         try:
             if HAS_PROVIDER_MODULES:
                 configured_model = self.config.get("model")
-                result = await call_local_model_async(
+                result_text, result_metadata = await call_local_model_async(
                     prompt=prompt,
                     context=context,
                     session_memory=session_memory,
@@ -2070,8 +2076,8 @@ class ExecutionEngine:
                     model=configured_model,
                 )
                 breaker._on_success()
-                return response_formatter.render_chat_fast_from_raw(result)
-            return "Error: Provider modules not available"
+                return response_formatter.render_chat_fast_from_raw(result_text), result_metadata
+            return "Error: Provider modules not available", {}
         except Exception as e:
             breaker._on_failure(e)
             self._logger.error(f"Local model call failed: {e}")

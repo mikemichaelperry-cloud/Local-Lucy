@@ -184,6 +184,7 @@ class AnswerResult:
     generation_profile: str = "default"
     duration_ms: int = 0
     error: Optional[str] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

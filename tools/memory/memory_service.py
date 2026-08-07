@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS conversation_turns (
     session_id TEXT NOT NULL DEFAULT 'default',
     role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
     text TEXT NOT NULL,
+    full_text TEXT DEFAULT NULL,
+    truncated INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -160,6 +162,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     """Create tables and indexes if they don't exist."""
     conn.executescript(_SCHEMA)
     _migrate_fact_embedding_columns(conn)
+    _migrate_turn_full_text_columns(conn)
     conn.commit()
 
 
@@ -171,6 +174,22 @@ def _migrate_fact_embedding_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE persistent_facts ADD COLUMN embedding BLOB")
     if "embedding_model" not in columns:
         conn.execute("ALTER TABLE persistent_facts ADD COLUMN embedding_model TEXT")
+
+
+def _migrate_turn_full_text_columns(conn: sqlite3.Connection) -> None:
+    """Add full_text/truncated columns to conversation_turns if missing (idempotent)."""
+    cursor = conn.execute("PRAGMA table_info(conversation_turns)")
+    columns = {row[1] for row in cursor.fetchall()}
+    if "full_text" not in columns:
+        try:
+            conn.execute("ALTER TABLE conversation_turns ADD COLUMN full_text TEXT DEFAULT NULL")
+        except sqlite3.OperationalError:
+            pass
+    if "truncated" not in columns:
+        try:
+            conn.execute("ALTER TABLE conversation_turns ADD COLUMN truncated INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -342,7 +361,13 @@ def _close_connection() -> None:
 # ---------------------------------------------------------------------------
 
 
-def store_turn(role: str, text: str, *, session_id: str = "default") -> None:
+def store_turn(
+    role: str,
+    text: str,
+    *,
+    session_id: str = "default",
+    full_text: str | None = None,
+) -> None:
     """
     Store a single conversation turn in SQLite.
 
@@ -350,6 +375,8 @@ def store_turn(role: str, text: str, *, session_id: str = "default") -> None:
         role: One of "user" or "assistant".
         text: The turn text (will be stripped).
         session_id: Session identifier (default "default").
+        full_text: Optional original, un-truncated assistant output. When
+            provided and different from *text*, ``truncated`` is set to 1.
 
     Raises:
         ValueError: If role is not "user" or "assistant".
@@ -362,10 +389,12 @@ def store_turn(role: str, text: str, *, session_id: str = "default") -> None:
     if not text:
         return
 
+    truncated = 1 if full_text and full_text != text else 0
     conn = _get_connection()
     conn.execute(
-        "INSERT INTO conversation_turns (session_id, role, text) VALUES (?, ?, ?)",
-        (session_id, role, text),
+        "INSERT INTO conversation_turns (session_id, role, text, full_text, truncated) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (session_id, role, text, full_text, truncated),
     )
     conn.commit()
 
@@ -384,21 +413,68 @@ def get_recent_turns(session_id: str = "default", limit: int = 6) -> list[dict[s
         limit: Maximum number of turns to return (user+assistant pairs).
 
     Returns:
-        List of dicts: [{"role": "user", "text": "...", "created_at": "..."}, ...]
-        ordered oldest → newest.
+        List of dicts: [{"role": "user", "text": "...", "full_text": "...",
+        "truncated": 0/1, "created_at": "..."}, ...] ordered oldest → newest.
     """
     conn = _get_connection()
     cursor = conn.execute(
-        "SELECT role, text, created_at FROM ("
-        "  SELECT role, text, created_at, id, 0 AS source FROM conversation_turns WHERE session_id = ?"
+        "SELECT role, text, full_text, truncated, created_at FROM ("
+        "  SELECT role, text, full_text, truncated, created_at, id, 0 AS source "
+        "    FROM conversation_turns WHERE session_id = ?"
         "  UNION ALL"
-        "  SELECT role, text, archived_at AS created_at, id, 1 AS source FROM archived_turns WHERE session_id = ?"
+        "  SELECT role, text, NULL AS full_text, 0 AS truncated, archived_at AS created_at, id, 1 AS source "
+        "    FROM archived_turns WHERE session_id = ?"
         ") ORDER BY created_at DESC, source ASC, id DESC LIMIT ?",
         (session_id, session_id, limit),
     )
     rows = cursor.fetchall()
     # Reverse to restore oldest-first ordering
-    return [{"role": row[0], "text": row[1], "created_at": row[2]} for row in reversed(rows)]
+    return [
+        {"role": row[0], "text": row[1], "full_text": row[2], "truncated": row[3], "created_at": row[4]}
+        for row in reversed(rows)
+    ]
+
+
+class MemoryService:
+    """Lightweight instance wrapper around module-level memory functions.
+
+    Useful for tests and callers that want a dedicated database path without
+    mutating global state permanently.
+    """
+
+    def __init__(self, db_path: str):
+        self.db_path = str(db_path)
+        self._previous_db_path = os.environ.get("LUCY_MEMORY_DB_PATH", "")
+        os.environ["LUCY_MEMORY_DB_PATH"] = self.db_path
+        _close_connection()
+        _ensure_schema(_get_connection())
+
+    def store_turn(
+        self,
+        session_id: str,
+        role: str,
+        text: str,
+        turn_index: int | None = None,
+        metadata: dict | None = None,
+        full_text: str | None = None,
+    ) -> None:
+        """Store a single conversation turn in the configured database."""
+        store_turn(role, text, session_id=session_id, full_text=full_text)
+
+    def get_recent_turns(self, session_id: str = "default", limit: int = 6) -> list[dict[str, Any]]:
+        """Return recent conversation turns for *session_id*."""
+        return get_recent_turns(session_id=session_id, limit=limit)
+
+    def __del__(self):
+        # Best-effort restoration of the previous DB path on cleanup.
+        try:
+            if self._previous_db_path:
+                os.environ["LUCY_MEMORY_DB_PATH"] = self._previous_db_path
+            else:
+                os.environ.pop("LUCY_MEMORY_DB_PATH", None)
+            _close_connection()
+        except Exception:
+            pass
 
 
 def get_all_turns(session_id: str = "default") -> list[dict[str, Any]]:

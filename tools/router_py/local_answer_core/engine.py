@@ -1525,20 +1525,25 @@ class LocalAnswer:
                         f"Ollama response empty but thinking present for {self.config.model}; using thinking as fallback"
                     )
             duration_ms = int((time.time() - start_time) * 1000)
+            metadata = {
+                "truncated": (
+                    data.get("done_reason") == "length" or data.get("finish_reason") == "length"
+                )
+            }
             if text:
-                return text, duration_ms
+                return text, duration_ms, metadata
             if attempt == max_attempts - 1:
                 logger.error(
                     f"Ollama returned empty response for {self.config.model} after {max_attempts} attempts"
                 )
-                return "", duration_ms
+                return "", duration_ms, metadata
             # Empty response: Ollama likely mid-load/unload.
             delay = base_delay * (2**attempt)
             logger.warning(
                 f"Ollama returned empty response for {self.config.model}, retrying in {delay}s... (attempt {attempt + 1}/{max_attempts})"
             )
             await asyncio.sleep(delay)
-        return "", int((time.time() - start_time) * 1000)
+        return "", int((time.time() - start_time) * 1000), {"truncated": False}
 
     async def generate_answer(
         self,
@@ -1734,7 +1739,7 @@ class LocalAnswer:
             temp_override = None
             if profile_name in ("detail", "chat_long"):
                 temp_override = 0.7
-            api_text, api_duration_ms = await self._call_ollama(
+            api_text, api_duration_ms, api_metadata = await self._call_ollama(
                 prompt, num_predict, temp_override, route_mode=route_mode
             )
             api_done = self._now_ms()
@@ -1781,7 +1786,10 @@ class LocalAnswer:
                 self._diag_append("response_chars", len(api_text))
                 self._diag_append("response_est_tokens", self._estimate_tokens(api_text))
                 return AnswerResult(
-                    text=api_text, generation_profile=profile_name, duration_ms=duration_ms
+                    text=api_text,
+                    generation_profile=profile_name,
+                    duration_ms=duration_ms,
+                    metadata=api_metadata,
                 )
 
         api_text = self._strip_identity_preamble(api_text, q_eval)
@@ -1810,7 +1818,11 @@ class LocalAnswer:
             self._cache_store(q_norm, cache_variant, api_text, fact_revision)
 
         return AnswerResult(
-            text=api_text, from_cache=False, generation_profile=profile_name, duration_ms=total_ms
+            text=api_text,
+            from_cache=False,
+            generation_profile=profile_name,
+            duration_ms=total_ms,
+            metadata=api_metadata,
         )
 
     async def close(self) -> None:

@@ -294,6 +294,7 @@ def _persist_memory_turn(
     session_id: str = "default",
     *,
     constraints: "RequestConstraints | None" = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Persist a conversation turn to chat memory (SQLite + text file).
 
@@ -303,6 +304,8 @@ def _persist_memory_turn(
         session_id: Session identifier.
         constraints: Optional request-scoped capability constraints. When
             ``memory_write`` is explicitly ``False``, persistence is skipped.
+        metadata: Optional execution metadata. When ``truncated`` is True, the
+            original ``response_text`` is also stored as ``full_text``.
     """
     from router_py.request_constraints import RequestConstraints
 
@@ -314,8 +317,10 @@ def _persist_memory_turn(
     try:
         from memory.memory_service import maybe_summarize_session, store_turn
 
+        truncated = bool(metadata.get("truncated")) if metadata else False
+        full_text = response_text if truncated else None
         store_turn("user", question, session_id=session_id)
-        store_turn("assistant", response_text, session_id=session_id)
+        store_turn("assistant", response_text, session_id=session_id, full_text=full_text)
         maybe_summarize_session(session_id=session_id)
     except Exception:
         logging.warning("SQLite memory write failed, falling back to text file", exc_info=True)
@@ -795,6 +800,7 @@ def execute_plan_python(
                 result.response_text,
                 session_id=session_id,
                 constraints=request_constraints,
+                metadata=result.metadata,
             )
 
         # --- Record exchange in feedback buffer for future attribution ---

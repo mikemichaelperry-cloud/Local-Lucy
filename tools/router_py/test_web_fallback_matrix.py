@@ -75,7 +75,7 @@ def _mock_engine(monkeypatch):
     from router_py.execution_engine import ExecutionEngine
 
     async def _fake_local(self, prompt, context, session_memory, route_mode=None):
-        return "Answer synthesized from available context."
+        return "Answer synthesized from available context.", {}
 
     async def _fake_parallel(self, question, route, chain):
         return {

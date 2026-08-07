@@ -83,9 +83,9 @@ async def _fake_local_model_async(
     context: dict | None = None,
     session_memory: str = "",
     route_mode: str = "LOCAL",
-) -> str:
+) -> tuple[str, dict]:
     """Return a mock local-model response without loading Ollama."""
-    return "The answer is 42."
+    return "The answer is 42.", {}
 
 
 # ---------------------------------------------------------------------------

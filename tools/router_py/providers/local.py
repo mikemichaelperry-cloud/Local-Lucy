@@ -19,14 +19,18 @@ async def call_local_model_async(
     session_memory: str = "",
     route_mode: str = "LOCAL",
     model: str | None = None,
-) -> str:
-    """Call local model asynchronously using Python-native path."""
+) -> tuple[str, dict[str, Any]]:
+    """Call local model asynchronously using Python-native path.
+
+    Returns a tuple of (response_text, metadata). Metadata includes
+    ``truncated`` when the model stopped because it hit the token limit.
+    """
     logger.debug(f"Calling local model async with prompt: {prompt[:50]}...")
 
     try:
         from router_py.local_answer import LocalAnswer, LocalAnswerConfig
     except ImportError:
-        return "Error: LocalAnswer module not available"
+        return "Error: LocalAnswer module not available", {}
 
     config = LocalAnswerConfig.from_env()
     if model:
@@ -44,9 +48,9 @@ async def call_local_model_async(
             session_memory=session_memory,
             route_mode=route_mode,
         )
-        return result.text
+        return result.text, result.metadata
     except Exception as e:
         logger.warning(f"Local model failed: {e}")
-        return f"Error: Local model failed to generate response. {e}"
+        return f"Error: Local model failed to generate response. {e}", {}
     finally:
         await answer.close()
