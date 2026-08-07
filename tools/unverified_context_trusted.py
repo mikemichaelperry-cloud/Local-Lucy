@@ -18,6 +18,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -638,6 +639,127 @@ def _fetch_wikivoyage_summary(page: str) -> dict[str, Any] | None:
             }
     except Exception:
         pass
+    return None
+
+
+def _fetch_url_text(url: str, timeout: int = 10) -> str | None:
+    """Fetch raw text from a URL via the fetch gate."""
+    if not HAS_FETCH_GATE:
+        return None
+    try:
+        reason, text = fetch_gate.fetch_url_text(url, timeout=timeout)
+        if reason == fetch_gate.OK and text:
+            return text
+    except Exception:
+        pass
+    return None
+
+
+def _extract_opengraph_description(text: str) -> str | None:
+    """Extract og:description or fallback description from HTML."""
+    if not text:
+        return None
+    # Try Open Graph description first
+    match = re.search(
+        r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)["\']',
+        text,
+        re.IGNORECASE,
+    )
+    if match:
+        desc = html.unescape(match.group(1)).strip()
+        if desc:
+            return desc
+    # Fallback to standard meta description
+    match = re.search(
+        r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']',
+        text,
+        re.IGNORECASE,
+    )
+    if match:
+        desc = html.unescape(match.group(1)).strip()
+        if desc:
+            return desc
+    return None
+
+
+# ── Israel travel fetch cache ─────────────────────────────────────────────────
+# Caches successful Israel Ministry of Tourism fetches for 24 hours by default.
+_LUCY_TRAVEL_CACHE_TTL_SECONDS = int(os.environ.get("LUCY_TRAVEL_CACHE_TTL_SECONDS") or "86400")
+
+
+_ISRAEL_DESTINATIONS: set[str] = {
+    "Israel",
+    "Jerusalem",
+    "Tel Aviv",
+    "Haifa",
+    "Eilat",
+    "Jaffa",
+    "Galilee",
+    "Negev",
+    "Dead Sea",
+    "Masada",
+}
+
+
+def _travel_cache_path() -> Path:
+    return Path.home() / ".local" / "share" / "local-lucy-v11" / "state" / "travel_cache.json"
+
+
+def _load_travel_cache() -> dict[str, Any]:
+    path = _travel_cache_path()
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {}
+
+
+def _save_travel_cache(cache: dict[str, Any]) -> None:
+    path = _travel_cache_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def _fetch_israel_travel_summary(destination: str) -> dict[str, str] | None:
+    """Fetch a tourism summary from Israel Ministry of Tourism sources."""
+    slug = destination.lower().replace(" ", "-")
+    urls = [
+        f"https://israel.travel/en/{slug}",
+        f"https://goisrael.com/en/{slug}",
+    ]
+
+    cache = _load_travel_cache()
+    ttl = _LUCY_TRAVEL_CACHE_TTL_SECONDS
+    now = time.time()
+
+    for url in urls:
+        cache_key = f"{destination}|{url}"
+        entry = cache.get(cache_key)
+        if entry and isinstance(entry, dict):
+            cached_at = entry.get("timestamp", 0)
+            if now - cached_at < ttl:
+                return entry.get("data")
+
+    for url in urls:
+        try:
+            text = _fetch_url_text(url, timeout=10)
+            if text:
+                summary = {"source": url, "text": _extract_opengraph_description(text) or text[:1500]}
+                cache_key = f"{destination}|{url}"
+                cache[cache_key] = {"timestamp": time.time(), "data": summary}
+                _save_travel_cache(cache)
+                return summary
+        except Exception:
+            continue
     return None
 
 
@@ -1514,8 +1636,36 @@ def _format_travel_response(
     # Build a destination-relevant source list. Wikivoyage is the universal trusted
     # source; official tourism boards are included only for matching destinations.
     sources = ["wikivoyage.org", "en.wikivoyage.org"]
-    if destination.lower() == "israel":
+    if destination in _ISRAEL_DESTINATIONS:
         sources.extend(["goisrael.com", "israel.travel"])
+
+    # For Israel destinations, prefer the official Ministry of Tourism sources.
+    if destination in _ISRAEL_DESTINATIONS:
+        israel_summary = _fetch_israel_travel_summary(destination)
+        if israel_summary and israel_summary.get("text"):
+            content = israel_summary["text"]
+            url = israel_summary["source"]
+            relevance_lead = (
+                f"Interesting places to visit in {destination} include cities, landmarks, "
+                f"natural attractions, and cultural sites described in the travel guide below."
+            )
+            lines = [
+                f"Source: {destination} – Israel Ministry of Tourism",
+                f"URL: {url}",
+                "",
+                relevance_lead,
+                "",
+                content,
+                "",
+                "Information sourced from an official Israel tourism board.",
+            ]
+            return _with_trusted_metadata(
+                "\n".join(lines),
+                include_metadata=include_metadata,
+                answer_basis="live_trusted_source",
+                live_fetch_status="success",
+                confidence="normal",
+            )
 
     # Fetch the destination overview from Wikivoyage.
     summary = _fetch_wikivoyage_summary(destination)
