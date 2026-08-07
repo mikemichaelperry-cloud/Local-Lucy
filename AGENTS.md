@@ -9,7 +9,7 @@
 ## Authority
 
 - **Working root:** `/home/mike/lucy-v11`
-- **Active branch:** `v10-dev`
+- **Active branch:** `main`
 - **Frozen:** V9 is tagged `local-lucy-v9-frozen-2026-05-28`. Never modify it.
 - **Default model:** `local-lucy-llama31` (llama3.1:8b via Ollama)
 
