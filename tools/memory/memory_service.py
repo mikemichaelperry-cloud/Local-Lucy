@@ -1435,6 +1435,18 @@ _VAGUE_FOLLOWUP_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Story-continuation requests must bypass topic-shift detection because they
+# intentionally rely on the immediately preceding assistant turn.  They are
+# treated as vague follow-ups even when phrased with extra words such as
+# "Continue the story." or "Finish the story please."
+_STORY_CONTINUATION_RE = re.compile(
+    r"^(?:\s*)(?:"
+    r"(?:please\s+)?(?:continue|finish|complete)(?:\s+(?:the\s+)?story)?|"
+    r"(?:please\s+)?(?:go on|keep going|carry on|tell me more)(?:\s+(?:the\s+)?story)?"
+    r")(?:\s+please)?[\s\W]*$",
+    re.IGNORECASE,
+)
+
 # Short affirmations that continue the prior turn (e.g. "Yes, please.",
 # "Sure", "Go ahead").  These carry no topic of their own and must keep context.
 _AFFIRMATION_FOLLOWUP_RE = re.compile(
@@ -1593,6 +1605,8 @@ def _is_vague_followup(query: str) -> bool:
     if _EXPLICIT_MEMORY_RECALL_RE.search(q):
         return True
     if _VAGUE_FOLLOWUP_RE.search(q):
+        return True
+    if _STORY_CONTINUATION_RE.search(q):
         return True
     if _AFFIRMATION_FOLLOWUP_RE.search(q):
         return True

@@ -302,7 +302,10 @@ def _load_session_memory_context_with_telemetry(
 
     is_continuation = _is_continuation_query(query)
 
-    # SQLite-first read attempt (summary-aware context assembly)
+    # SQLite-first read attempt (summary-aware context assembly).
+    # Only fall back to the text file when SQLite assembly raises an exception;
+    # an empty context from SQLite must be honoured so different sessions do not
+    # accidentally share the fallback file.
     try:
         from memory.memory_service import assemble_context_with_telemetry
 
@@ -314,8 +317,7 @@ def _load_session_memory_context_with_telemetry(
             mode=mode,
             is_continuation=is_continuation,
         )
-        if context:
-            return context, telemetry
+        return context, telemetry
     except Exception:
         logging.warning("SQLite memory read failed, falling back to text file", exc_info=True)
 

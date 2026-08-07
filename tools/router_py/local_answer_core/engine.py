@@ -779,30 +779,39 @@ class LocalAnswer:
             reason = "closed_truncated_fragment"
         return (text, True, reason)
 
-    def _cache_key(self, query: str, variant: str, fact_revision: str = "") -> str:
+    def _cache_key(
+        self, query: str, variant: str, fact_revision: str = "", session_memory: str = ""
+    ) -> str:
         """Generate cache key. Includes SELF_KNOWLEDGE hash so prompt
         changes automatically invalidate old cached entries.
         For personal/family/pet queries, also includes a fact revision
         so adding/editing/deleting facts busts the cache.
         For persona queries, includes the active identity so switching
-        personas does not reuse a differently-styled cached response."""
+        personas does not reuse a differently-styled cached response.
+        For continuation queries, includes a hash of session_memory so
+        continuation responses are not reused across different contexts."""
         # Hash the self-knowledge text so any prompt-template change
         # busts the cache without manual cleanup.
         sk_text = get_self_knowledge(self.config.model)
         sk_hash = hashlib.sha256(sk_text.encode()).hexdigest()[:16]
         active_identity = _get_current_user_identity() or ""
-        key_string = f"{self.config.model}|{sk_hash}|{active_identity}|{variant}|{query}"
+        # Hash the memory context so that "Continue the story." cached for one
+        # prior turn is not replayed for a different prior turn.
+        mem_hash = hashlib.sha256((session_memory or "").encode()).hexdigest()[:16]
+        key_string = (
+            f"{self.config.model}|{sk_hash}|{active_identity}|{variant}|{query}|{mem_hash}"
+        )
         if fact_revision:
             key_string += f"|{fact_revision}"
         return hashlib.sha256(key_string.encode()).hexdigest()
 
     def _cache_load(
-        self, query: str, variant: str, fact_revision: str = ""
+        self, query: str, variant: str, fact_revision: str = "", session_memory: str = ""
     ) -> Optional[Tuple[str, int]]:
         """Load from cache."""
         if not self.config.cache_enabled:
             return None
-        key = self._cache_key(query, variant, fact_revision)
+        key = self._cache_key(query, variant, fact_revision, session_memory)
         meta_file = self.config.cache_dir / f"{key}.meta"
         text_file = self.config.cache_dir / f"{key}.txt"
         if not meta_file.exists() or not text_file.exists():
@@ -842,13 +851,14 @@ class LocalAnswer:
         variant: str,
         text: str,
         fact_revision: str = "",
+        session_memory: str = "",
     ) -> None:
         """Store in cache."""
         if not self.config.cache_enabled or not text.strip():
             return
         try:
             self.config.cache_dir.mkdir(parents=True, exist_ok=True)
-            key = self._cache_key(query, variant, fact_revision)
+            key = self._cache_key(query, variant, fact_revision, session_memory)
             meta_file = self.config.cache_dir / f"{key}.meta"
             text_file = self.config.cache_dir / f"{key}.txt"
             with open(meta_file, "w") as f:
@@ -928,6 +938,7 @@ class LocalAnswer:
         output = output_mode.upper()
         q = self._normalize_query(query)
         is_creative = self._is_creative_writing_query(q)
+        is_story_continuation = self._is_story_continuation_query(q)
 
         if route == "SELF_REVIEW":
             return (
@@ -1017,6 +1028,16 @@ class LocalAnswer:
                 "conversation",
                 min(self.config.num_predict_conversation, local_budget),
                 "- Prefer two or three short sentences.",
+            )
+
+        if is_story_continuation:
+            return (
+                "chat_long",
+                creative_budget,
+                "- Continue the story from the conversation history above. "
+                "Keep the same characters, setting, and narrative voice. "
+                "If the story introduced a named protagonist, refer to them by name. "
+                "Do not start a new story.",
             )
 
         if is_creative:
@@ -1185,6 +1206,24 @@ class LocalAnswer:
         has_noun = any(n in q for n in creative_nouns)
         return has_verb and has_noun
 
+    def _is_story_continuation_query(self, query: str) -> bool:
+        """Detect explicit story-continuation requests.
+
+        These queries must be treated as creative/long-form so the model
+        receives the creative token budget and avoids the default
+        "two short sentences" constraint.
+        """
+        q = query.lower()
+        continuation_patterns = [
+            r"\b(?:please\s+)?continue\s+(?:the\s+)?story\b",
+            r"\b(?:please\s+)?go\s+on\b",
+            r"\b(?:please\s+)?(?:finish|complete)\s+(?:the\s+)?story\b",
+            r"\b(?:please\s+)?keep\s+going\b",
+            r"\b(?:please\s+)?carry\s+on\b",
+            r"\b(?:please\s+)?tell\s+me\s+more\b",
+        ]
+        return any(re.search(p, q) for p in continuation_patterns)
+
     def _build_prompt(
         self,
         query: str,
@@ -1264,6 +1303,27 @@ class LocalAnswer:
                 "The previous answer was cut off. Continue from exactly where it left off. "
                 "Do not repeat what has already been said."
             )
+
+        # Story continuation instruction: explicit guidance for "continue the story".
+        if self._is_story_continuation_query(query):
+            parts.append(
+                "Continue the story from the conversation history above. "
+                "Keep the same characters, setting, and narrative voice. "
+                "If the story introduced a named protagonist, refer to them by name. "
+                "Do not start a new story."
+            )
+
+        # Creative-writing constraint: ensure names explicitly provided by the
+        # user (e.g. "a robot named Spark") are honored in the generated story.
+        if self._is_creative_writing_query(query):
+            named_entities = re.findall(r"\bnamed\s+([A-Z][a-zA-Z]+)\b", query)
+            if named_entities:
+                entity_list = ", ".join(named_entities)
+                label = "that name" if len(named_entities) == 1 else "those names"
+                parts.append(
+                    f"The user explicitly named the following characters or elements: {entity_list}. "
+                    f"Use {label} exactly in the story."
+                )
 
         # Conversation mode directive
         if conversation_mode_active and conversation_system_block:
@@ -1660,14 +1720,29 @@ class LocalAnswer:
             if session_memory.strip():
                 self._diag_append("context_relevance_gate", "reuse_context")
 
-        if len(session_memory) > self.config.max_context_chars:
-            session_memory = session_memory[: self.config.max_context_chars]
+        # Continuation queries rely on the most recent assistant turn (the
+        # continuation reserve) which is appended at the end of session memory.
+        # Raising the context budget and preserving the tail prevents that
+        # reserve from being sliced off.
+        is_continuation_query = self._is_story_continuation_query(
+            q_eval
+        ) or self._context_followup_requested(q_eval)
+        max_context_chars = self.config.max_context_chars
+        if is_continuation_query:
+            max_context_chars = max(max_context_chars, 2400)
+        if len(session_memory) > max_context_chars:
+            if is_continuation_query:
+                session_memory = session_memory[-max_context_chars:]
+            else:
+                session_memory = session_memory[:max_context_chars]
 
         self._diag_append("cache_hit", "0")
 
         # Creative-writing guard: bypass ALL short-circuits (policy, 807, tube DB)
-        # so stories, poems, and fiction always reach the LLM.
-        is_creative = self._is_creative_writing_query(q_eval)
+        # so stories, poems, and fiction always reach the LLM.  Story continuations
+        # are included so they keep the default temperature and follow the prior
+        # narrative constraints.
+        is_creative = self._is_creative_writing_query(q_eval) or self._is_story_continuation_query(q_eval)
         if is_creative:
             self._diag_append("creative_writing_guard", "active")
 
@@ -1743,7 +1818,7 @@ class LocalAnswer:
         cache_start = self._now_ms()
         cached = None
         if not cache_bypass:
-            cached = self._cache_load(q_norm, cache_variant, fact_revision)
+            cached = self._cache_load(q_norm, cache_variant, fact_revision, session_memory)
         cache_end = self._now_ms()
         self._latprof_append("local_answer", "cache_lookup", cache_end - cache_start)
 
@@ -1811,12 +1886,17 @@ class LocalAnswer:
         pre_model_ms = payload_start - local_stage_start
         self._latprof_append("local_answer", "pre_model", pre_model_ms)
 
+        is_story_continuation = self._is_story_continuation_query(q_eval)
+
         try:
-            # Use higher temperature for creative/detail requests so the model
-            # can actually generate varied, imaginative text instead of getting
-            # stuck in deterministic instruction-echo mode.
+            # Use higher temperature for detail and story-continuation requests so
+            # the model can generate varied, imaginative text.  First-turn creative
+            # writing keeps the default temperature so it follows explicit user
+            # constraints such as named characters and word counts.
             temp_override = None
-            if profile_name in ("detail", "chat_long"):
+            if profile_name == "detail" or (
+                profile_name == "chat_long" and is_story_continuation
+            ):
                 temp_override = 0.7
             api_text, api_duration_ms, api_metadata = await self._call_ollama(
                 prompt, num_predict, temp_override, route_mode=route_mode
@@ -1894,7 +1974,7 @@ class LocalAnswer:
         self._latprof_append("local_answer", "total", total_ms)
 
         if not cache_bypass:
-            self._cache_store(q_norm, cache_variant, api_text, fact_revision)
+            self._cache_store(q_norm, cache_variant, api_text, fact_revision, session_memory)
 
         return AnswerResult(
             text=api_text,

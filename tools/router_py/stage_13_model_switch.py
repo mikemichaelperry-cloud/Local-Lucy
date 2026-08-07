@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -163,10 +164,30 @@ def _run_memory_continuation_step() -> dict:
     """
     previous_session_memory = os.environ.get("LUCY_SESSION_MEMORY")
     previous_session_id = os.environ.get("LUCY_SESSION_ID")
+    previous_memory_db = os.environ.get("LUCY_MEMORY_DB_PATH")
+    previous_chat_memory_file = os.environ.get("LUCY_RUNTIME_CHAT_MEMORY_FILE")
+    tmp_dir = None
 
     try:
+        # Isolate memory state in a fresh temp namespace so a previous run of
+        # this stage (or any other session) cannot leak into the continuity test.
+        tmp_dir = tempfile.TemporaryDirectory(prefix="lucy-stage13-memory-")
+        tmp_path = Path(tmp_dir.name)
         os.environ["LUCY_SESSION_MEMORY"] = "1"
         os.environ["LUCY_SESSION_ID"] = MEMORY_SESSION_ID
+        os.environ["LUCY_MEMORY_DB_PATH"] = str(tmp_path / "memory.db")
+        os.environ["LUCY_RUNTIME_CHAT_MEMORY_FILE"] = str(
+            tmp_path / "chat_session_memory.txt"
+        )
+        # Ensure the fallback chat file exists empty so prior sessions cannot leak in.
+        (tmp_path / "chat_session_memory.txt").write_text("", encoding="utf-8")
+        # Clear any prior turns for the fixed session ID from the fresh DB.
+        try:
+            from memory import memory_service
+
+            memory_service.clear_session(MEMORY_SESSION_ID)
+        except Exception:
+            pass
 
         # Step 1: Gemma tells the story.
         print(f"Switching to {GEMMA_MODEL} for memory story seed ...")
@@ -217,6 +238,11 @@ def _run_memory_continuation_step() -> dict:
             "tale",
             "journey",
             "again",
+            "as",
+            "while",
+            "with",
+            "until",
+            "eventually",
         ]
         continues_narrative = any(marker in response_text for marker in continuation_markers)
 
@@ -252,6 +278,16 @@ def _run_memory_continuation_step() -> dict:
             os.environ.pop("LUCY_SESSION_ID", None)
         else:
             os.environ["LUCY_SESSION_ID"] = previous_session_id
+        if previous_memory_db is None:
+            os.environ.pop("LUCY_MEMORY_DB_PATH", None)
+        else:
+            os.environ["LUCY_MEMORY_DB_PATH"] = previous_memory_db
+        if previous_chat_memory_file is None:
+            os.environ.pop("LUCY_RUNTIME_CHAT_MEMORY_FILE", None)
+        else:
+            os.environ["LUCY_RUNTIME_CHAT_MEMORY_FILE"] = previous_chat_memory_file
+        if tmp_dir is not None:
+            tmp_dir.cleanup()
 
 
 def main() -> int:
