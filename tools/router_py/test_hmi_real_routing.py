@@ -24,6 +24,8 @@ from typing import Any
 
 import pytest
 
+from router_py.model_residency import assert_single_local_lucy_model
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
@@ -70,6 +72,15 @@ def captured_urls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
     monkeypatch.setattr(urllib.request, "urlopen", _blocking_urlopen)
     return urls
+
+
+@pytest.fixture(autouse=True)
+def _mock_ollama_ps(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep residency checks deterministic without a live Ollama daemon."""
+    monkeypatch.setattr(
+        "router_py.model_residency.list_loaded_ollama_models",
+        lambda: [],
+    )
 
 
 @pytest.fixture
@@ -141,7 +152,9 @@ class TestHmiLocationAnaphora:
         submit: Any,
     ) -> None:
         # First, store the location.
-        submit("I live in Kibbutz Magal, Israel.", surface="hmi", persist=False)
+        payload = submit("I live in Kibbutz Magal, Israel.", surface="hmi", persist=False)
+        assert payload.get("route", {}).get("mode") == "LOCAL"
+        assert_single_local_lucy_model("after test_location_fact_stored_and_resolved")
 
         # Then ask a location-aware restaurant question.
         submit(
