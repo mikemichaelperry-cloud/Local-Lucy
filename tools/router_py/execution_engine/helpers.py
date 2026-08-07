@@ -273,7 +273,7 @@ def _load_session_memory_context_with_telemetry(
     mode: str = "local",
     session_id: str = "default",
     max_chars: int = 2400,
-) -> tuple[str, dict[str, str]]:
+) -> tuple[str, dict[str, Any]]:
     """
     Load session memory context and capture telemetry.
 

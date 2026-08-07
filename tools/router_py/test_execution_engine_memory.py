@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 
+from memory.memory_service import MemoryService
 from router_py.execution_engine.helpers import (
     _is_memory_or_followup_query,
     _load_session_memory_context_with_telemetry,
@@ -49,6 +50,32 @@ def test_continuation_reserves_budget(monkeypatch, tmp_path):
     )
     assert telemetry["continuation_reserve_chars"] == 100
     assert telemetry["memory_max_chars_used"] <= 300
+
+
+def test_continuation_reserve_when_last_turn_truncated(monkeypatch, tmp_path):
+    monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
+    monkeypatch.setenv("LUCY_MEMORY_DB_PATH", str(tmp_path / "mem.db"))
+    monkeypatch.setenv("LUCY_MEMORY_CONTINUATION_RESERVE_CHARS", "100")
+    monkeypatch.setattr(
+        "memory.memory_service.LUCY_MEMORY_CONTINUATION_RESERVE_CHARS", 100
+    )
+    from router_py.execution_engine.helpers import _load_session_memory_context_with_telemetry
+
+    svc = MemoryService(db_path=str(tmp_path / "mem.db"))
+    svc.store_turn(
+        session_id="s1",
+        role="assistant",
+        text="This answer was cut off...",
+        full_text="This answer was cut off mid-sentence and has more content hidden.",
+        truncated=True,
+    )
+
+    text, telemetry = _load_session_memory_context_with_telemetry(
+        session_id="s1", query="what is the weather today", max_chars=400
+    )
+    assert telemetry["continuation_reserve_chars"] > 0
+    assert telemetry["memory_max_chars_used"] <= 300
+    assert "This answer was cut off" in text
 
 
 class TestMemoryOrFollowupQuery:
