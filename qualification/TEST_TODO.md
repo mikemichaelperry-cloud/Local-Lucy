@@ -284,4 +284,19 @@
 
 ---
 
-**Qualification status:** STAGE_00–STAGE_19 complete. Final requalification verification complete. Decision: **QUALIFIED**. Phase 1 memory-first intelligence core complete.
+## Phase 2 — Tourism Sources
+
+- [PH2-TOUR-001] PASSED — Improve Israel destination extraction.
+  Evidence: `tools/unverified_context_trusted.py` (`_TRAVEL_DESTINATION_MAP`, `_TRAVEL_KEYWORDS`, `_normalise_destination`, `_extract_travel_destination`); `tools/router_py/test_travel_israel.py` (destination extraction cases all pass).
+- [PH2-TOUR-002] PASSED — Add Israel Ministry of Tourism fetcher with 24-hour file cache.
+  Evidence: `tools/unverified_context_trusted.py::_fetch_israel_travel_summary`; `tools/router_py/test_travel_israel.py` (fetcher allowlist, Open Graph, cache TTL, and end-to-end wiring all pass).
+- [PH2-TOUR-003] PASSED — Generalise travel fetcher to Wikivoyage for arbitrary destinations.
+  Evidence: `tools/unverified_context_trusted.py::_fetch_wikivoyage_summary` + `_fetch_json`; `config/trust/generated/travel_runtime.txt`; `tools/router_py/test_travel_general.py` (13 passed); non-live fail-fast guard prevents accidental live network calls under pytest.
+- [PH2-TOUR-004] PASSED — Route tourism recommendations to `AUGMENTED/trusted`; keep safety/advisory travel queries on `EVIDENCE/trusted`.
+  Evidence: `tools/router_py/policy_router/gates.py` (`gate_travel_tourism`, `_has_travel_safety_keyword`); `tools/router_py/pipeline/route.py` (`apply_critical_source_policy`); `tools/router_py/test_travel_routing.py` + `tools/router_py/test_policy_router.py`.
+
+**Phase 2 status:** PASSED — regression gate cleared. Phase 3 ready.
+
+---
+
+**Qualification status:** STAGE_00–STAGE_19 complete. Final requalification verification complete. Decision: **QUALIFIED**. Phase 1 memory-first intelligence core complete. Phase 2 tourism sources complete.
