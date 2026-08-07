@@ -7,7 +7,6 @@
 **Post-qualification config commit:** `30e9629 Raise Engineering-mode context limits to 200000 chars`  
 **Post-qualification docs commit:** `d99b48e docs: update handoff and architecture for 200k Engineering-mode context limit`  
 **Previous manifest commit:** `4495f833c8f18fcb361db9db982c504ce6f3607e` (behavioural candidate `423e5dd`)  
-**Current HEAD:** `568fa7e docs: record docs commit hash in SESSION_HANDOFF.md`  
 **Working tree:** clean (untracked `tools/router_py/state/__pycache__/` only)  
 **V10 status:** untouched  
 
