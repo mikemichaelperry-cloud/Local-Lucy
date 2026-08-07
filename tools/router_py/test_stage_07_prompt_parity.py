@@ -45,7 +45,11 @@ def _strip_identity_block(prompt: str) -> str:
             continue
         if not skip_paragraph:
             filtered.append(line)
-    return "\n".join(filtered)
+    # Task 5: the Gemma-specific memory hint is the only remaining
+    # model-family difference; strip it so parity tests compare the rest.
+    return "\n".join(filtered).replace(
+        " If the user refers to something earlier, look at the history first.", ""
+    )
 
 
 def test_s07_pp_001_prompts_differ_only_by_identity():
@@ -68,7 +72,7 @@ def test_s07_pp_001_prompts_differ_only_by_identity():
 
 
 def test_s07_pp_002_memory_block_parity():
-    """Session memory block is identical for Llama and Gemma."""
+    """Session memory block shares the core authority line; Gemma gets the extra hint."""
     query = "What did I ask earlier?"
     memory = "- User previously asked about the weather in Paris."
     llama_prompt = _build_prompt_for_model(
@@ -77,6 +81,13 @@ def test_s07_pp_002_memory_block_parity():
     gemma_prompt = _build_prompt_for_model(
         "local-lucy-gemma4", query, session_memory=memory
     )
+    core_message = "The conversation history below is authoritative. Use it to answer the user's question."
+    optional_clause = "If the user refers to something earlier, look at the history first."
+
+    assert core_message in llama_prompt
+    assert core_message in gemma_prompt
+    assert optional_clause not in llama_prompt
+    assert optional_clause in gemma_prompt
     assert _strip_identity_block(llama_prompt) == _strip_identity_block(gemma_prompt)
     assert memory in llama_prompt
     assert memory in gemma_prompt
@@ -124,3 +135,16 @@ def test_s07_pp_005_thinking_model_detection():
 
     assert llama._is_thinking_model() is False
     assert gemma._is_thinking_model() is True
+
+
+def test_prompt_shaper_per_model_family():
+    """Both families keep the core authoritative message; only the Gemma hint differs."""
+    from router_py.local_answer_core.engine import _PromptShaper
+
+    llama_preamble = _PromptShaper.memory_preamble("local-lucy-llama31:latest")
+    gemma_preamble = _PromptShaper.memory_preamble("local-lucy-gemma4:latest")
+
+    assert "authoritative" in llama_preamble
+    assert "authoritative" in gemma_preamble
+    assert "look at the history first" not in llama_preamble
+    assert "look at the history first" in gemma_preamble

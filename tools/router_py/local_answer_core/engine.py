@@ -124,6 +124,19 @@ except ImportError:
             return False
 
 
+class _PromptShaper:
+    """Thin, model-family-specific adjustments to the runtime prompt."""
+
+    @staticmethod
+    def memory_preamble(model_name: str) -> str:
+        """Return the memory-authority preamble, with a Gemma-specific hint."""
+        family = "gemma" if "gemma" in (model_name or "").lower() else "llama"
+        base = "The conversation history below is authoritative. Use it to answer the user's question."
+        if family == "gemma":
+            return base + " If the user refers to something earlier, look at the history first."
+        return base
+
+
 class LocalAnswer:
     """Main class for generating local LLM answers."""
 
@@ -1301,8 +1314,7 @@ class LocalAnswer:
             # the explicit continuation instruction below carries the signal.
             session_memory = self._strip_truncation_marker(session_memory)
             parts.append(
-                "The conversation history below is authoritative. Use it to answer the user's question.\n"
-                "If the user refers to something earlier, look at the history first.\n\n"
+                f"{_PromptShaper.memory_preamble(self.config.model)}\n\n"
                 f"{session_memory}"
             )
 
