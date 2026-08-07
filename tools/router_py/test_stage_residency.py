@@ -65,9 +65,7 @@ def test_stage_script_imports_residency_helpers(script_name: str) -> None:
         if isinstance(node, ast.ImportFrom) and node.module == "router_py.model_residency":
             imported_names.update(alias.name for alias in node.names)
 
-    assert "assert_single_local_lucy_model" in imported_names, (
-        f"{script_name} missing assert import"
-    )
+    assert "assert_single_local_lucy_model" in imported_names, f"{script_name} missing assert import"
     assert "get_local_lucy_loaded_models" in imported_names, f"{script_name} missing getter import"
 
 
@@ -96,12 +94,8 @@ def test_stage_script_calls_start_and_end_assertions(script_name: str) -> None:
             else:
                 calls.append((name, *args))
 
-    assert ("assert_single_local_lucy_model", "start") in calls, (
-        f"{script_name} missing start assertion"
-    )
-    assert ("assert_single_local_lucy_model", "end") in calls, (
-        f"{script_name} missing end assertion"
-    )
+    assert ("assert_single_local_lucy_model", "start") in calls, f"{script_name} missing start assertion"
+    assert ("assert_single_local_lucy_model", "end") in calls, f"{script_name} missing end assertion"
 
 
 class TestStage08RuntimeResidency:
@@ -111,24 +105,18 @@ class TestStage08RuntimeResidency:
 
         mod = _import_stage("stage_08_gemma_smoke")
 
-        with (
-            patch.object(mod, "assert_single_local_lucy_model") as mock_assert,
-            patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get,
-            patch.object(mod, "_load_gemma_exclusively") as mock_load,
-            patch.object(mod, "_set_state_model_to_gemma"),
-            patch.object(
-                mod,
-                "_run_hmi_surface_request",
-                return_value={
-                    "status": "ok",
-                    "payload": {"route": {"mode": "LOCAL"}},
-                    "stdout": "",
-                    "stderr": "",
-                },
-            ),
-            patch("router_py.main.execute_plan_python", return_value=_make_router_outcome()),
-            patch.object(mod, "unload_all_lucy_models"),
-        ):
+        with patch.object(mod, "assert_single_local_lucy_model") as mock_assert, \
+             patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get, \
+             patch.object(mod, "_load_gemma_exclusively") as mock_load, \
+             patch.object(mod, "_set_state_model_to_gemma"), \
+             patch.object(mod, "_run_hmi_surface_request", return_value={
+                 "status": "ok",
+                 "payload": {"route": {"mode": "LOCAL"}},
+                 "stdout": "",
+                 "stderr": "",
+             }), \
+             patch("router_py.main.execute_plan_python", return_value=_make_router_outcome()), \
+             patch.object(mod, "unload_all_lucy_models"):
             rc = mod.main()
 
         assert rc == 0
@@ -144,24 +132,18 @@ class TestStage10RuntimeResidency:
 
         mod = _import_stage("stage_10_llama_smoke")
 
-        with (
-            patch.object(mod, "assert_single_local_lucy_model") as mock_assert,
-            patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get,
-            patch.object(mod, "_load_llama_exclusively") as mock_load,
-            patch.object(mod, "_set_state_model_to_llama"),
-            patch.object(
-                mod,
-                "_run_hmi_surface_request",
-                return_value={
-                    "status": "ok",
-                    "payload": {"route": {"mode": "LOCAL"}},
-                    "stdout": "",
-                    "stderr": "",
-                },
-            ),
-            patch("router_py.main.execute_plan_python", return_value=_make_router_outcome()),
-            patch.object(mod, "unload_all_lucy_models"),
-        ):
+        with patch.object(mod, "assert_single_local_lucy_model") as mock_assert, \
+             patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get, \
+             patch.object(mod, "_load_llama_exclusively") as mock_load, \
+             patch.object(mod, "_set_state_model_to_llama"), \
+             patch.object(mod, "_run_hmi_surface_request", return_value={
+                 "status": "ok",
+                 "payload": {"route": {"mode": "LOCAL"}},
+                 "stdout": "",
+                 "stderr": "",
+             }), \
+             patch("router_py.main.execute_plan_python", return_value=_make_router_outcome()), \
+             patch.object(mod, "unload_all_lucy_models"):
             rc = mod.main()
 
         assert rc == 0
@@ -177,14 +159,12 @@ class TestStage09RuntimeResidency:
 
         mod = _import_stage("stage_09_gemma_scenario_suite")
 
-        with (
-            patch.object(mod, "assert_single_local_lucy_model") as mock_assert,
-            patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get,
-            patch.object(mod, "_load_gemma_exclusively"),
-            patch.object(mod, "_set_state_model_to_gemma"),
-            patch.object(mod, "_load_suite", return_value=[]),
-            patch.object(mod, "unload_all_lucy_models"),
-        ):
+        with patch.object(mod, "assert_single_local_lucy_model") as mock_assert, \
+             patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get, \
+             patch.object(mod, "_load_gemma_exclusively"), \
+             patch.object(mod, "_set_state_model_to_gemma"), \
+             patch.object(mod, "_load_suite", return_value=[]), \
+             patch.object(mod, "unload_all_lucy_models"):
             rc = mod.main()
 
         assert rc == 0
@@ -200,14 +180,12 @@ class TestStage11RuntimeResidency:
 
         mod = _import_stage("stage_11_llama_scenario_suite")
 
-        with (
-            patch.object(mod, "assert_single_local_lucy_model") as mock_assert,
-            patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get,
-            patch.object(mod, "_load_llama_exclusively"),
-            patch.object(mod, "_set_state_model_to_llama"),
-            patch.object(mod, "_load_suite", return_value=[]),
-            patch.object(mod, "unload_all_lucy_models"),
-        ):
+        with patch.object(mod, "assert_single_local_lucy_model") as mock_assert, \
+             patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get, \
+             patch.object(mod, "_load_llama_exclusively"), \
+             patch.object(mod, "_set_state_model_to_llama"), \
+             patch.object(mod, "_load_suite", return_value=[]), \
+             patch.object(mod, "unload_all_lucy_models"):
             rc = mod.main()
 
         assert rc == 0
@@ -223,33 +201,23 @@ class TestStage13RuntimeResidency:
 
         mod = _import_stage("stage_13_model_switch")
 
-        with (
-            patch.object(mod, "assert_single_local_lucy_model") as mock_assert,
-            patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get,
-            patch.object(mod, "_load_model_exclusively"),
-            patch.object(mod, "_set_state_model"),
-            patch.object(
-                mod,
-                "_run_step",
-                return_value={
-                    "passed": True,
-                    "route": "LOCAL",
-                    "loaded_models": [],
-                    "response_text": "test",
-                },
-            ),
-            patch.object(
-                mod,
-                "_run_memory_continuation_step",
-                return_value={
-                    "passed": True,
-                    "mentions_oscar": True,
-                    "continues_narrative": True,
-                    "notes": [],
-                },
-            ),
-            patch.object(mod, "unload_all_lucy_models"),
-        ):
+        with patch.object(mod, "assert_single_local_lucy_model") as mock_assert, \
+             patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get, \
+             patch.object(mod, "_load_model_exclusively"), \
+             patch.object(mod, "_set_state_model"), \
+             patch.object(mod, "_run_step", return_value={
+                 "passed": True,
+                 "route": "LOCAL",
+                 "loaded_models": [],
+                 "response_text": "test",
+             }), \
+             patch.object(mod, "_run_memory_continuation_step", return_value={
+                 "passed": True,
+                 "mentions_oscar": True,
+                 "continues_narrative": True,
+                 "notes": [],
+             }), \
+             patch.object(mod, "unload_all_lucy_models"):
             rc = mod.main()
 
         assert rc == 0
@@ -270,24 +238,18 @@ class TestStage16RuntimeResidency:
             status="ok", stdout="answer", stderr="", payload={"route": {"mode": "LOCAL"}}
         )
 
-        with (
-            patch.object(mod, "assert_single_local_lucy_model") as mock_assert,
-            patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get,
-            patch.object(mod, "_load_model_exclusively"),
-            patch.object(mod, "_set_state_model"),
-            patch.object(
-                mod,
-                "_run_hmi_request",
-                return_value={
-                    "status": "ok",
-                    "route": "LOCAL",
-                    "stdout_len": 10,
-                    "stderr": "",
-                },
-            ),
-            patch.object(mod, "unload_all_lucy_models"),
-            patch("app.services.runtime_bridge.RuntimeBridge", return_value=fake_bridge),
-        ):
+        with patch.object(mod, "assert_single_local_lucy_model") as mock_assert, \
+             patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get, \
+             patch.object(mod, "_load_model_exclusively"), \
+             patch.object(mod, "_set_state_model"), \
+             patch.object(mod, "_run_hmi_request", return_value={
+                 "status": "ok",
+                 "route": "LOCAL",
+                 "stdout_len": 10,
+                 "stderr": "",
+             }), \
+             patch.object(mod, "unload_all_lucy_models"), \
+             patch("app.services.runtime_bridge.RuntimeBridge", return_value=fake_bridge):
             rc = mod.main()
 
         assert rc == 0
