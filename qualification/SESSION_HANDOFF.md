@@ -1,12 +1,33 @@
 # Local Lucy V11 Qualification — Session Handoff
 
-**Session end:** 2026-08-07T13:41:09Z  
-**Final qualification decision:** `QUALIFIED`  
+**Session end:** 2026-08-07T16:33:17Z  
+**Final qualification decision:** `QUALIFIED` (for commit `ed26695b7bf647a0096c0a0a4c62eb92f5a991c6`; see Post-qualification update below)  
 **Final verified candidate commit:** `ed26695b7bf647a0096c0a0a4c62eb92f5a991c6`  
 **Task 18 memory-continuity fix commit:** `5591c1a fix(memory): continuation detection, cache key, reserve protection, session isolation`  
+**Post-qualification update commit:** `30e9629 Raise Engineering-mode context limits to 200000 chars`  
 **Previous manifest commit:** `4495f833c8f18fcb361db9db982c504ce6f3607e` (behavioural candidate `423e5dd`)  
-**Working tree:** clean  
+**Working tree:** clean (untracked `tools/router_py/state/__pycache__/` only)  
 **V10 status:** untouched  
+
+---
+
+## Post-qualification update (2026-08-07T16:33:17Z)
+
+After the final clean run recorded above, the following config-only change was applied to align the implementation with the v11 design documents:
+
+- **Commit:** `30e9629 Raise Engineering-mode context limits to 200000 chars`
+- **Files changed:**
+  - `tools/router_py/local_answer_core/config.py`
+  - `tools/router_py/test_self_analysis.py`
+  - `Architecture.md`
+  - `qualification/SESSION_HANDOFF.md` (this file)
+- **Change:** `self_review_context_chars` and `code_review_context_chars` defaults and env fallbacks raised from `32,768` to `200,000` characters.
+- **Reason:** The design documents (`SESSION_CONTEXT.md`, `docs/superpowers/specs/2026-07-16-gemma4-code-review-model-design.md`) already specified `200,000`; the implementation was still using `32,768`, which truncated ~1,500-line files in Engineering mode.
+- **Tests run:**
+  - `tools/router_py/test_self_analysis.py -k "config or truncates_very_long" -m slow` → 3 passed
+  - `tools/router_py/test_gemma4_identity.py`, `test_security_guard.py`, `test_local_answer.py::TestQueryClassification` -m slow → 9 passed
+- **HMI:** Restarted with PID 634305 after the change so the new default is loaded.
+- **Qualification impact:** This is a behavioural default change. The previous `QUALIFIED` decision applies strictly to commit `ed26695`; the current HEAD (`30e9629`) should be treated as a release candidate until a full clean run is repeated on it.
 
 ---
 
@@ -109,6 +130,9 @@ Stale desktop copies are archived at:
 - `qualification/results/stage_13_model_switch.json`
 - `qualification/results/stage_16_hmi_soak.json`
 - `qualification/results/stage_19_clean_run.json`
+- `tools/router_py/local_answer_core/config.py` (post-qualification: context limits)
+- `tools/router_py/test_self_analysis.py` (post-qualification: context-limit default test)
+- `Architecture.md` (post-qualification: context-limit documentation)
 
 ---
 

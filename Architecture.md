@@ -507,7 +507,7 @@ The Engineering panel enables a read-only code-review mode for analyzing Local L
 - Two-call staged review:
   1. **Broad audit** — code map, coverage ledger, candidate findings.
   2. **Deep investigation** — runs only when stage 1 reports confirmed/high/moderate-confidence findings; traces call paths, validates defects, ranks fixes.
-- Source is truncated to `LUCY_SELF_REVIEW_CONTEXT_CHARS` (default 32,768) when it exceeds the code-review context budget; the prompt is flagged with a truncation warning.
+- Source is truncated to `LUCY_SELF_REVIEW_CONTEXT_CHARS` (default 200,000) when it exceeds the code-review context budget; the prompt is flagged with a truncation warning.
 - The Ollama context window (`num_ctx`) is expanded to `LUCY_CODE_REVIEW_CONTEXT_TARGET` (default 16,384) for each SELF_REVIEW call, leaving room for the prompt, source, and the full output budget.
 
 **HMI behaviour**
@@ -785,7 +785,7 @@ When enabled via the **Engineering mode** toggle (relabelled from "Self-analysis
 - Dispatch bypasses the normal routing/local-answer pipeline: `tools/router_py/execution_engine.py` detects the enabled toggle plus a `.py` file reference or directory path, resolves a code-review model (`tools/router_py/code_review_model_resolver.py`), and calls `tools/router_py/self_analysis.py::SelfAnalysisEngine` directly.
 - `SelfAnalysisEngine` runs static analysis with stdlib `ast` and `ruff`, then performs a staged two-call LLM review through `LocalAnswer` with `route_mode="SELF_REVIEW"`.
 - Directory references are supported: small directories (≤5 Python files) are reviewed file-by-file; large directories return a file listing so the user can pick a specific file.
-- The SELF_REVIEW call expands the Ollama context window to `LUCY_CODE_REVIEW_CONTEXT_TARGET` (default 16,384) and truncates source to `LUCY_SELF_REVIEW_CONTEXT_CHARS` (default 32,768) to prevent output truncation.
+- The SELF_REVIEW call expands the Ollama context window to `LUCY_CODE_REVIEW_CONTEXT_TARGET` (default 16,384) and truncates source to `LUCY_SELF_REVIEW_CONTEXT_CHARS` (default 200,000) to prevent output truncation. `LUCY_CODE_REVIEW_CONTEXT_CHARS` also defaults to 200,000 so the code-review specialist can ingest comparably large files.
 - Static facts are labeled **LOCAL**; LLM suggestions are labeled **AUGMENTED**.
 - The toggle is stored in `current_state.json` under `self_analysis_mode`.
 
