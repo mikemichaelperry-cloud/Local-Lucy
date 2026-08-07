@@ -225,6 +225,8 @@ _TRAVEL_DESTINATION_MAP: dict[str, str] = {
     "syria": "Syria",
     "bali": "Bali",
     "israel": "Israel",
+    "eretz": "Israel",
+    "eretz israel": "Israel",
     "jerusalem": "Jerusalem",
     "tel aviv": "Tel Aviv",
     "tel-aviv": "Tel Aviv",
@@ -247,6 +249,7 @@ _TRAVEL_KEYWORDS: set[str] = {
     "tourist",
     "places to visit",
     "things to see",
+    "things to do",
     "what to see",
     "where to go",
     "vacation",
@@ -270,8 +273,8 @@ _TRAVEL_KEYWORDS: set[str] = {
 def _normalise_destination(dest: str) -> str:
     """Clean up a raw destination string and map variants to Wikivoyage titles."""
     dest = dest.strip()
-    # Strip leading crumbs like "guide to", "travel to", etc.
-    for prefix in ("guide to ", "travel to ", "trip to ", "tour of ", "visit "):
+    # Strip leading crumbs like "guide to", "travel to", "the", etc.
+    for prefix in ("guide to ", "travel to ", "trip to ", "tour of ", "visit ", "the "):
         if dest.lower().startswith(prefix):
             dest = dest[len(prefix) :].strip()
             break
@@ -300,6 +303,16 @@ def _extract_travel_destination(question: str) -> str | None:
         match = re.search(pattern, question, re.IGNORECASE)
         if match:
             return _normalise_destination(match.group(1))
+
+    # Broad "in/to/visit/see/do the? X" capture, mapped against known destinations.
+    broad_match = re.search(
+        r"(?:in|to|visit|see|do)\s+(?:the\s+)?([A-Z][A-Za-z\s]+)", question, re.IGNORECASE
+    )
+    if broad_match:
+        capture = broad_match.group(1).strip()
+        for variant, title in _TRAVEL_DESTINATION_MAP.items():
+            if re.search(rf"\b{re.escape(variant)}\b", capture, re.IGNORECASE):
+                return title
 
     # Known destination word lookup.
     for variant, title in _TRAVEL_DESTINATION_MAP.items():
