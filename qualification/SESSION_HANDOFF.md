@@ -4,7 +4,8 @@
 **Final qualification decision:** `QUALIFIED` (for commit `ed26695b7bf647a0096c0a0a4c62eb92f5a991c6`; see Post-qualification update below)  
 **Final verified candidate commit:** `ed26695b7bf647a0096c0a0a4c62eb92f5a991c6`  
 **Task 18 memory-continuity fix commit:** `5591c1a fix(memory): continuation detection, cache key, reserve protection, session isolation`  
-**Post-qualification update commit:** `30e9629 Raise Engineering-mode context limits to 200000 chars`  
+**Post-qualification config commit:** `30e9629 Raise Engineering-mode context limits to 200000 chars`  
+**Post-qualification docs commit:** `d99b48e docs: update handoff and architecture for 200k Engineering-mode context limit`  
 **Previous manifest commit:** `4495f833c8f18fcb361db9db982c504ce6f3607e` (behavioural candidate `423e5dd`)  
 **Working tree:** clean (untracked `tools/router_py/state/__pycache__/` only)  
 **V10 status:** untouched  
