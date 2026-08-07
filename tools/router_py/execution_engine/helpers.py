@@ -69,6 +69,18 @@ def _is_memory_or_followup_query(question: str) -> bool:
     return False
 
 
+# Lightweight continuation/follow-up detection used to reserve a dedicated slice
+# of the memory budget for the most recent assistant turn.
+_CONTINUATION_RE = re.compile(
+    r"\b(continue|go on|finish|complete|repeat that|say it again|tell me more|elaborate)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_continuation_query(query: str) -> bool:
+    return bool(_CONTINUATION_RE.search(query or ""))
+
+
 def _get_root():
     """Return the current execution_engine ROOT_DIR dynamically."""
     import router_py.execution_engine as _ee
@@ -256,7 +268,11 @@ def _evidence_has_content(evidence: dict[str, Any] | None) -> bool:
 
 
 def _load_session_memory_context_with_telemetry(
-    query: str = "", depth: str = "auto", mode: str = "local", session_id: str = "default"
+    query: str = "",
+    depth: str = "auto",
+    mode: str = "local",
+    session_id: str = "default",
+    max_chars: int = 2400,
 ) -> tuple[str, dict[str, str]]:
     """
     Load session memory context and capture telemetry.
@@ -284,12 +300,19 @@ def _load_session_memory_context_with_telemetry(
     if os.environ.get("LUCY_SESSION_MEMORY", "0") != "1":
         return "", telemetry
 
+    is_continuation = _is_continuation_query(query)
+
     # SQLite-first read attempt (summary-aware context assembly)
     try:
         from memory.memory_service import assemble_context_with_telemetry
 
         context, telemetry = assemble_context_with_telemetry(
-            current_session_id=session_id, max_chars=2400, query=query, depth=depth, mode=mode
+            current_session_id=session_id,
+            max_chars=max_chars,
+            query=query,
+            depth=depth,
+            mode=mode,
+            is_continuation=is_continuation,
         )
         if context:
             return context, telemetry

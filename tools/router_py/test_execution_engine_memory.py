@@ -35,6 +35,22 @@ class TestExecutionEngineMemoryBudget:
         assert calls.get("max_chars") == 2400
 
 
+def test_continuation_reserves_budget(monkeypatch, tmp_path):
+    monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
+    monkeypatch.setenv("LUCY_MEMORY_DB_PATH", str(tmp_path / "mem.db"))
+    monkeypatch.setenv("LUCY_MEMORY_CONTINUATION_RESERVE_CHARS", "100")
+    monkeypatch.setattr(
+        "memory.memory_service.LUCY_MEMORY_CONTINUATION_RESERVE_CHARS", 100
+    )
+    from router_py.execution_engine.helpers import _load_session_memory_context_with_telemetry
+
+    text, telemetry = _load_session_memory_context_with_telemetry(
+        session_id="s1", query="continue", max_chars=400
+    )
+    assert telemetry["continuation_reserve_chars"] == 100
+    assert telemetry["memory_max_chars_used"] <= 300
+
+
 class TestMemoryOrFollowupQuery:
     """Detect queries that explicitly refer to the prior conversation."""
 

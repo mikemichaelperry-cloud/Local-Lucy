@@ -45,6 +45,10 @@ from tools.xdg_paths import lucy_memory_db_path
 
 logger = logging.getLogger(__name__)
 
+LUCY_MEMORY_CONTINUATION_RESERVE_CHARS = int(
+    os.environ.get("LUCY_MEMORY_CONTINUATION_RESERVE_CHARS", "800")
+)
+
 
 def _truncate_at_turn_boundary(text: str, max_chars: int) -> str:
     """Truncate text cleanly at a turn boundary, never mid-turn.
@@ -1814,7 +1818,8 @@ def assemble_context_with_telemetry(
     query: str = "",
     depth: str = "auto",
     mode: str = "local",
-) -> tuple[str, dict[str, str]]:
+    is_continuation: bool = False,
+) -> tuple[str, dict[str, Any]]:
     """
     Assemble the session memory context string with telemetry.
 
@@ -1842,7 +1847,35 @@ def assemble_context_with_telemetry(
     if recent_turn_limit is None:
         recent_turn_limit = _recent_turn_limit()
 
-    telemetry: dict[str, str] = {
+    # Reserve a continuation budget when the user asks to continue or when the
+    # most recent assistant turn was truncated. The reserved slice is appended
+    # verbatim (using full_text if available) after the main context assembly.
+    continuation_reserve = int(
+        os.environ.get(
+            "LUCY_MEMORY_CONTINUATION_RESERVE_CHARS",
+            str(LUCY_MEMORY_CONTINUATION_RESERVE_CHARS),
+        )
+    )
+    last_turns = get_recent_turns(current_session_id, limit=1)
+    last_assistant_turn = (
+        last_turns[0] if last_turns and last_turns[0]["role"] == "assistant" else None
+    )
+    last_assistant_truncated = bool(last_assistant_turn and last_assistant_turn.get("truncated"))
+    needs_continuation_reserve = is_continuation or last_assistant_truncated
+    effective_max_chars = max_chars
+    if needs_continuation_reserve:
+        effective_max_chars = max(0, max_chars - continuation_reserve)
+
+    continuation_append = ""
+    if needs_continuation_reserve and last_assistant_turn:
+        cont_text = last_assistant_turn.get("full_text") or last_assistant_turn.get("text") or ""
+        cont_text = _strip_thinking_blocks(cont_text.strip())
+        if cont_text:
+            label = "Assistant: "
+            max_text_len = max(0, continuation_reserve - len(label))
+            continuation_append = f"{label}{cont_text[:max_text_len]}"
+
+    telemetry: dict[str, Any] = {
         "memory_context_used": "false",
         "memory_mode_used": "none",
         "memory_depth_used": "none",
@@ -1851,6 +1884,8 @@ def assemble_context_with_telemetry(
         "memory_top_gap": "none",
         "memory_turns_verbatim": "0",
         "memory_turns_semantic": "0",
+        "continuation_reserve_chars": continuation_reserve if needs_continuation_reserve else 0,
+        "memory_max_chars_used": effective_max_chars,
     }
 
     if depth == "auto":
@@ -1882,7 +1917,13 @@ def assemble_context_with_telemetry(
                     ):
                         telemetry["memory_topic_shift_detected"] = "true"
                         return "", telemetry
-            context = _truncate_at_turn_boundary(format_turns_for_prompt(recent_turns), max_chars)
+            context = _truncate_at_turn_boundary(
+                format_turns_for_prompt(recent_turns), effective_max_chars
+            )
+            if continuation_append:
+                context = f"{context}\n\n{continuation_append}" if context else continuation_append
+                if len(context) > max_chars:
+                    context = context[:max_chars]
             telemetry["memory_context_used"] = "true"
             telemetry["memory_mode_used"] = mode
             telemetry["memory_depth_used"] = "shallow"
@@ -1937,7 +1978,11 @@ def assemble_context_with_telemetry(
         if not parts:
             return "", telemetry
         context = "\n\n".join(parts)
-        context = _truncate_at_turn_boundary(context, max_chars)
+        context = _truncate_at_turn_boundary(context, effective_max_chars)
+        if continuation_append:
+            context = f"{context}\n\n{continuation_append}" if context else continuation_append
+            if len(context) > max_chars:
+                context = context[:max_chars]
         telemetry["memory_context_used"] = "true"
         telemetry["memory_mode_used"] = "local"
         telemetry["memory_depth_used"] = "deep"
@@ -2029,7 +2074,11 @@ def assemble_context_with_telemetry(
         return "", telemetry
 
     context = "\n\n".join(parts)
-    context = _truncate_at_turn_boundary(context, max_chars)
+    context = _truncate_at_turn_boundary(context, effective_max_chars)
+    if continuation_append:
+        context = f"{context}\n\n{continuation_append}" if context else continuation_append
+        if len(context) > max_chars:
+            context = context[:max_chars]
 
     telemetry["memory_context_used"] = "true"
     telemetry["memory_mode_used"] = "augmented"
