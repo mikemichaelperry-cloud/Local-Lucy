@@ -119,8 +119,13 @@ def test_travel_destination_extraction():
     assert _extract_travel_destination("News from Japan") is None
 
 
-def test_travel_provider_returns_wikivoyage_content():
+def test_travel_provider_returns_wikivoyage_content(monkeypatch):
     from router_py.providers.evidence import fetch_trusted_evidence
+
+    monkeypatch.setattr(
+        "unverified_context_trusted._fetch_json",
+        lambda url, timeout: {"extract": "France travel guide", "title": "France"},
+    )
 
     route = RoutingDecision(
         route="EVIDENCE",

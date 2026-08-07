@@ -648,6 +648,10 @@ def _fetch_url_text(url: str, timeout: int = 10) -> str | None:
 
 def _fetch_json(url: str, timeout: int = 10) -> dict[str, Any] | None:
     """Fetch and parse JSON from a URL."""
+    # Fail fast during non-live test runs to avoid accidental real network calls.
+    # Live stage scripts and integration tests should set LUCY_LIVE_TESTS=1.
+    if os.environ.get("LUCY_LIVE_TESTS") != "1" and os.environ.get("PYTEST_CURRENT_TEST"):
+        return None
     try:
         import urllib.request
 
