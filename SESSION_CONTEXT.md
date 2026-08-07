@@ -1,6 +1,7 @@
 # Local Lucy — Session Context (Auto-Updated)
 
 > **READ THIS FIRST** at every session start. Updated at every handoff.
+> Latest change: Engineering-mode context limit raised to 200,000 characters (2026-08-07).
 
 ---
 
@@ -15,7 +16,7 @@
 | **Model** | `local-lucy-llama31` (llama3.1:8b via Ollama) |
 | **Handoff file** | `~/Desktop/Local_Lucy_v11_Session_Handoff_<date>.md` |
 | **Default branch on origin** | `v10-dev` ✅ |
-| **Working tree** | Modified (self-analysis large-file / large-response support implemented; docs and prompts updated) |
+| **Working tree** | Clean (commit `7135801`; only untracked `tools/router_py/state/__pycache__/`) |
 
 ---
 
@@ -97,32 +98,31 @@ lucy-v11/
 
 ```bash
 # Current state (auto-generated)
-Branch: v10-dev
-Origin HEAD: v10-dev ✅ (pushed and in sync)
+Branch: main
+Origin HEAD: main (not checked against remote)
 Latest tag: v11.0.0-dev
-Commits since tag: 62
-Working tree: clean
+Commits since tag: 67+
+Working tree: clean (untracked `tools/router_py/state/__pycache/` only)
 ```
 
 ### Recent Commits (last 16)
 ```
-Task 10 Fix: explicit code-review resolver fallback/error coverage
-09cf2f9 test(router): make code-review resolver fallback/error cases explicit
-b8934c6 test(router): add code-review model fallback and error cases
-5a3cfc7 fix(tests): restore ControlPanel self-analysis tests alongside TTS suppression tests
-ea7d87c feat(hmi): suppress Kokoro TTS output for SELF_REVIEW responses
-4cdc0cd feat(self_analysis): detect and report source truncation before review
-0cc1f62 feat(self_analysis): implement two-call staged review with optional deep dive
-2e2e014 fix(self-review): bypass policy short-circuit for SELF_REVIEW and add exact 5 MB boundary test
-9dc4497 fix(self-analysis): payload-level test, is_self_review derivation, scoped cap relaxation
-2f848de fix(self-analysis): skip 807 short-circuit for SELF_REVIEW and clean cache helpers
-70b9346 Fix third-wave self-analysis large-file review findings
-ec8768e fix(self-analysis): round-2 review fixes
-8ef87a8 fix(self-analysis): address whole-branch review findings
-720cd08 feat(self-analysis): use SELF_REVIEW route and bypass repeat cache
-e6230ee feat(local_answer): add SELF_REVIEW route with large token budget
-aa655d0 feat(self-analysis): include source code and guard large/non-file paths
-9be66cd docs: add self-analysis large-file support implementation plan
+7135801 docs: remove self-referential HEAD line from SESSION_HANDOFF.md
+f44bd98 docs: record current HEAD in SESSION_HANDOFF.md
+568fa7e docs: record docs commit hash in SESSION_HANDOFF.md
+d99b48e docs: update handoff and architecture for 200k Engineering-mode context limit
+30e9629 Raise Engineering-mode context limits to 200000 chars
+ed26695 Qualification: final clean run for memory-tourism phase (Task 19)
+5591c1a fix(memory): continuation detection, cache key, reserve protection, session isolation
+30a8a49 docs: qualification report and manifest for memory-tourism phase
+0d1b9d0 feat(tourism): Israel Ministry of Tourism + Wikivoyage allowlist/caching
+a5aee0c test(memory): expanded memory retrieval, explicit recall, topic-shift, config precedence
+9e7b1c2 fix(router): correct routing metric calculation and holdout diagnostics
+6f8d4b5 fix(memory): privacy canary tests and outbound-capture harness
+7c4f9a1 fix(voice): reproduce and fix voice text-display regression
+8a3d0e2 test(guards): boundary tests for evidence/restaurant/weather/residence gates
+4b8c1a0 docs: KNOWN_LIMITATIONS and accepted holdout cases
+2e1f0a9 fix(router): guard weather/time low-confidence fallback to actual intent
 ```
 
 ### Persona LoRA Pipeline — Completed Within Hardware Limits
@@ -223,6 +223,20 @@ aa655d0 feat(self-analysis): include source code and guard large/non-file paths
   - Set `HF_HUB_DISABLE_PROGRESS_BARS=1` and `TRANSFORMERS_VERBOSITY=error` in `hybrid_router_v2.py`, `tools/router_py/context_guard.py`, `tools/router_py/policy.py`, and `tools/memory/memory_service.py` to reduce terminal spam from loading multiple sentence-transformer models.
   - Increased default memory summarization timeout from 30 s → 60 s (configurable via `LUCY_MEMORY_SUMMARIZE_TIMEOUT_S`) and added `LUCY_MEMORY_SUMMARIZE_MODEL` so a small/fast Ollama model can be used for session summaries.
 - **SHA256SUMS:** regenerated with `make sha`; both root and `ui-v10` discipline tests pass.
+
+### Engineering-Mode Context Limit Alignment — 2026-08-07
+- **Problem:** The implementation default for `self_review_context_chars` and `code_review_context_chars` was still `32,768`, while the design documents and user expectation specified `200,000` characters (~1,500 lines of code or text). This caused Engineering-mode file reviews to truncate large files.
+- **Fix applied:**
+  - `tools/router_py/local_answer_core/config.py`: raised both defaults and env fallbacks from `32,768` to `200,000`.
+  - `tools/router_py/test_self_analysis.py`: updated the default assertion to `200,000`.
+  - `Architecture.md` and desktop `Local_Lucy_V11_Architecture.md`: updated both references to `200,000`.
+  - `tools/router_py/local_answer_core/self_knowledge.py`: injected the new limit into Local Lucy's self-knowledge prompt so the model can answer accurately when asked about Engineering-mode file-review capacity.
+- **Verification:**
+  - `test_self_analysis.py -k "config or truncates_very_long" -m slow` → 3 passed
+  - `test_gemma4_identity.py`, `test_security_guard.py`, `test_local_answer.py::TestQueryClassification` -m slow → 9 passed
+  - `test_self_analysis.py::test_specialist_model_identity_exists` → passed
+- **HMI:** Restarted after the config change so the new default is active.
+- **Qualification note:** This is a post-qualification behavioural default change. The previous `QUALIFIED` decision in `qualification/SESSION_HANDOFF.md` applies to commit `ed26695`; current HEAD (`7135801`) should be treated as a release candidate until a full clean run is repeated.
 
 ---
 
@@ -333,5 +347,5 @@ cd ~/lucy-v11 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-07-24T22:05:00Z*
-*Session: Fixed routing/lockdown issues, raised input limit to 16000 chars, fixed request-history duplication and model-load races, cleared semantic regression, verified Mike persona, regenerated SHA256SUMS. Then fixed startup noise: suppressed CUDA 804 warnings, reduced MiniLM loading spam, raised memory summarization timeout to 60 s. Full test suite: 1225 passed, 12 skipped, 0 failed.*
+*Last updated: 2026-08-07T16:33:17Z*
+*Session: Aligned Engineering-mode context limits with design spec (32,768 → 200,000 chars); updated self-knowledge, architecture docs, session handoff, and SESSION_CONTEXT.md; restarted HMI; targeted tests passed. Full qualification clean run still pending on current HEAD.*
