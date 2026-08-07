@@ -70,7 +70,7 @@ async def test_gemma4_word_count_gets_thinking_headroom():
 
     calls: list[dict] = []
     with patch("urllib.request.urlopen", side_effect=lambda req, timeout=None: _fake_urlopen(calls, req, timeout)):
-        text, _duration = await answer._call_ollama("prompt", num_predict, route_mode="LOCAL")
+        text, _duration, _metadata = await answer._call_ollama("prompt", num_predict, route_mode="LOCAL")
 
     generate_calls = [c for c in calls if c["url"].endswith("/api/generate")]
     assert len(generate_calls) == 1
@@ -95,7 +95,7 @@ async def test_llama_word_count_keeps_visible_budget():
 
     calls: list[dict] = []
     with patch("urllib.request.urlopen", side_effect=lambda req, timeout=None: _fake_urlopen(calls, req, timeout)):
-        text, _duration = await answer._call_ollama("prompt", num_predict, route_mode="LOCAL")
+        text, _duration, _metadata = await answer._call_ollama("prompt", num_predict, route_mode="LOCAL")
 
     generate_calls = [c for c in calls if c["url"].endswith("/api/generate")]
     assert len(generate_calls) == 1

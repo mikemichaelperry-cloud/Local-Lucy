@@ -1493,7 +1493,7 @@ class LocalAnswer:
         num_predict: int,
         temperature: Optional[float] = None,
         route_mode: str = "LOCAL",
-    ) -> Tuple[str, int]:
+    ) -> Tuple[str, int, Dict[str, Any]]:
         """Call Ollama API with retry for model-load transitions."""
         start_time = time.time()
         # Thinking models need extra token headroom so reasoning does not swallow
