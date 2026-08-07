@@ -267,4 +267,21 @@
 
 ---
 
-**Qualification status:** STAGE_00–STAGE_19 complete. Final requalification verification complete. Decision: **QUALIFIED**.
+## Phase 1 — Memory-First Intelligence Core
+
+- [PH1-MEM-001] PASSED — Store full assistant output for truncated turns (`full_text` and `truncated` columns).
+  Evidence: tools/router_py/test_memory_continuation.py::test_truncated_turn_stores_full_text + tools/router_py/test_memory_continuation.py::test_truncated_flag_without_differing_full_text
+- [PH1-MEM-002] PASSED — Reserve continuation budget and detect continuation queries.
+  Evidence: tools/router_py/test_execution_engine_memory.py::test_continuation_reserves_budget + tools/router_py/test_execution_engine_memory.py::test_continuation_reserve_when_last_turn_truncated
+- [PH1-MEM-003] PASSED — Add continuation re-generation instruction to prompt when prior assistant turn was truncated.
+  Evidence: tools/router_py/test_memory_continuation.py (7 passed)
+- [PH1-MEM-004] PASSED — Strengthen memory-priority prompt instruction in local and augmented paths.
+  Evidence: tools/router_py/test_local_answer.py::TestPromptBuilding::test_memory_preamble_is_authoritative + tools/router_py/test_execution_engine_memory.py::TestExecutionEngineMemoryPrompt::test_augmented_api_path_uses_authoritative_memory_preamble
+- [PH1-MEM-005] PASSED — Add model-family-aware prompt shaper for memory preamble.
+  Evidence: tools/router_py/test_stage_07_prompt_parity.py::test_prompt_shaper_per_model_family + tools/router_py/test_stage_07_prompt_parity.py::test_s07_pp_002_memory_block_parity
+
+**Phase 1 status:** PASSED — regression gate cleared.
+
+---
+
+**Qualification status:** STAGE_00–STAGE_19 complete. Final requalification verification complete. Decision: **QUALIFIED**. Phase 1 memory-first intelligence core complete.
