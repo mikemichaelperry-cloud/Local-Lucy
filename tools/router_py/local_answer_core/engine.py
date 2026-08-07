@@ -53,6 +53,22 @@ except ImportError:
             return memory_text
 
 
+try:
+    from router_py.execution_engine.helpers import _is_continuation_query
+except ImportError:
+    try:
+        from execution_engine.helpers import _is_continuation_query
+    except ImportError:
+
+        def _is_continuation_query(query: str) -> bool:  # type: ignore[misc]
+            return False
+
+
+# Marker emitted by memory_service.assemble_context_with_telemetry when the
+# most recent assistant turn was stored with truncated=1.
+_TRUNCATION_MARKER = "[PREVIOUS_ANSWER_TRUNCATED]"
+
+
 def _logger():
     """Return the facade module logger dynamically to avoid circular imports."""
     import sys
@@ -410,6 +426,42 @@ class LocalAnswer:
         ):
             return True
         return False
+
+    def _last_assistant_turn_was_truncated(self, session_memory: str) -> bool:
+        """Return True when the most recent assistant turn in session memory was truncated.
+
+        Prefer the explicit marker emitted by the memory service; fall back to a
+        text-based heuristic (last assistant block does not end with sentence
+        punctuation) when the marker is not present.
+        """
+        if not session_memory or not session_memory.strip():
+            return False
+
+        # Stored flag from memory_service.assemble_context_with_telemetry.
+        if _TRUNCATION_MARKER in session_memory:
+            return True
+
+        # Fallback heuristic: parse the last Assistant block and treat a missing
+        # sentence terminator as a cut-off answer.
+        for block in reversed(session_memory.strip().split("\n\n")):
+            block = block.strip()
+            if block.startswith("Assistant:"):
+                text = block[len("Assistant:"):].strip()
+                if not text:
+                    continue
+                if text.endswith("..."):
+                    return True
+                if not re.search(r"[.!?](?:[\"'\)\]]+)?\s*$", text):
+                    return True
+                return False
+        return False
+
+    def _strip_truncation_marker(self, session_memory: str) -> str:
+        """Remove the internal truncation marker from the memory string."""
+        if _TRUNCATION_MARKER not in session_memory:
+            return session_memory
+        pattern = rf"^Assistant: {re.escape(_TRUNCATION_MARKER)} "
+        return re.sub(pattern, "Assistant: ", session_memory, flags=re.MULTILINE)
 
     def _estimate_tokens(self, text: str) -> int:
         """Estimate token count."""
@@ -1140,6 +1192,7 @@ class LocalAnswer:
         conversation_mode_active: bool,
         conversation_system_block: bool,
         augmented_context: str = "",
+        is_continuation: bool = False,
     ) -> str:
         """Build the prompt for Ollama.
 
@@ -1204,9 +1257,20 @@ class LocalAnswer:
 
         # Memory block (only when memory is active)
         if session_memory.strip():
+            # Strip the internal truncation marker so the model doesn't see it;
+            # the explicit continuation instruction below carries the signal.
+            session_memory = self._strip_truncation_marker(session_memory)
             parts.append(
                 "The user has enabled session memory. Use the facts below to answer follow-up questions.\n\n"
                 f"{session_memory}"
+            )
+
+        # Continuation re-generation instruction: only injected when the prior
+        # assistant turn was actually truncated.
+        if is_continuation:
+            parts.append(
+                "The previous answer was cut off. Continue from exactly where it left off. "
+                "Do not repeat what has already been said."
             )
 
         # Conversation mode directive
@@ -1704,6 +1768,17 @@ class LocalAnswer:
             augmented_background_context if route_mode in {"AUGMENTED", "EVIDENCE"} else ""
         )
 
+        # Continuation decision. The execution engine already reserves a dedicated
+        # memory budget for explicit continuation queries (Task 2). The prompt-level
+        # re-generation instruction, however, is only appropriate when the previous
+        # assistant turn was actually cut off. Explicit "continue"/"tell me more"
+        # requests on a complete prior turn are treated as elaboration.
+        is_explicit_continuation = _is_continuation_query(q_eval)
+        is_prior_truncated = self._last_assistant_turn_was_truncated(session_memory)
+        is_continuation = is_prior_truncated or (
+            is_explicit_continuation and is_prior_truncated
+        )
+
         prompt = self._build_prompt(
             q_eval,
             session_memory,
@@ -1712,6 +1787,7 @@ class LocalAnswer:
             conversation_active,
             self.config.conversation_system_block,
             augmented_context,
+            is_continuation=is_continuation,
         )
 
         prompt_chars = len(prompt)

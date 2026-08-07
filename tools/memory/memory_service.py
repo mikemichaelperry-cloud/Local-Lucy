@@ -49,6 +49,10 @@ LUCY_MEMORY_CONTINUATION_RESERVE_CHARS = int(
     os.environ.get("LUCY_MEMORY_CONTINUATION_RESERVE_CHARS", "800")
 )
 
+# Marker embedded in the continuation reserve so the prompt builder can tell
+# that the most recent assistant turn was stored with truncated=1.
+_TRUNCATION_MARKER = "[PREVIOUS_ANSWER_TRUNCATED]"
+
 
 def _truncate_at_turn_boundary(text: str, max_chars: int) -> str:
     """Truncate text cleanly at a turn boundary, never mid-turn.
@@ -1872,8 +1876,9 @@ def assemble_context_with_telemetry(
         cont_text = _strip_thinking_blocks(cont_text.strip())
         if cont_text:
             label = "Assistant: "
-            max_text_len = max(0, continuation_reserve - len(label))
-            continuation_append = f"{label}{cont_text[:max_text_len]}"
+            prefix = f"{_TRUNCATION_MARKER} " if last_assistant_truncated else ""
+            max_text_len = max(0, continuation_reserve - len(label) - len(prefix))
+            continuation_append = f"{label}{prefix}{cont_text[:max_text_len]}"
 
     telemetry: dict[str, Any] = {
         "memory_context_used": "false",
