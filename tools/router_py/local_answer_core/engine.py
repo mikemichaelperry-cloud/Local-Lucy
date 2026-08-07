@@ -53,17 +53,6 @@ except ImportError:
             return memory_text
 
 
-try:
-    from router_py.execution_engine.helpers import _is_continuation_query
-except ImportError:
-    try:
-        from execution_engine.helpers import _is_continuation_query
-    except ImportError:
-
-        def _is_continuation_query(query: str) -> bool:  # type: ignore[misc]
-            return False
-
-
 # Marker emitted by memory_service.assemble_context_with_telemetry when the
 # most recent assistant turn was stored with truncated=1.
 _TRUNCATION_MARKER = "[PREVIOUS_ANSWER_TRUNCATED]"
@@ -1773,11 +1762,7 @@ class LocalAnswer:
         # re-generation instruction, however, is only appropriate when the previous
         # assistant turn was actually cut off. Explicit "continue"/"tell me more"
         # requests on a complete prior turn are treated as elaboration.
-        is_explicit_continuation = _is_continuation_query(q_eval)
-        is_prior_truncated = self._last_assistant_turn_was_truncated(session_memory)
-        is_continuation = is_prior_truncated or (
-            is_explicit_continuation and is_prior_truncated
-        )
+        is_continuation = self._last_assistant_turn_was_truncated(session_memory)
 
         prompt = self._build_prompt(
             q_eval,
