@@ -238,10 +238,13 @@ class TestStage16RuntimeResidency:
             status="ok", stdout="answer", stderr="", payload={"route": {"mode": "LOCAL"}}
         )
 
+        monkeypatch.setattr(mod, "REPORT_PATH", tmp_path / "stage_16_hmi_soak.json")
+
         with patch.object(mod, "assert_single_local_lucy_model") as mock_assert, \
              patch.object(mod, "get_local_lucy_loaded_models", return_value=[]) as mock_get, \
              patch.object(mod, "_load_model_exclusively"), \
              patch.object(mod, "_set_state_model"), \
+             patch.object(mod, "_lucy_models_loaded", return_value=[]) as mock_loaded, \
              patch.object(mod, "_run_hmi_request", return_value={
                  "status": "ok",
                  "route": "LOCAL",
