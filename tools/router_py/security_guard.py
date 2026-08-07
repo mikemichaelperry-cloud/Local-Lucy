@@ -169,13 +169,25 @@ class PromptInjectionDetector:
 
     @classmethod
     def _has_excessive_repetition(cls, text: str, threshold: int = 10) -> bool:
-        """Detect if the same character repeats excessively (e.g., 'aaaaaa...')."""
+        """Detect if the same non-formatting character repeats excessively (e.g., 'aaaaaa...').
+
+        Whitespace and common Markdown/formatting characters are ignored so that
+        pasted documents, tables, code blocks, and separators do not trigger
+        false positives.
+        """
         if len(text) < 20:
             return False
+        # Ignore whitespace and Markdown/formatting characters that legitimately
+        # repeat in documents (tables, headers, horizontal rules, code fences).
+        formatting_chars = set(" \t\n\r-|=#_*>~`")
         max_repeat = 1
         current_repeat = 1
         for i in range(1, len(text)):
-            if text[i] == text[i - 1]:
+            ch = text[i]
+            if ch in formatting_chars:
+                current_repeat = 1
+                continue
+            if ch == text[i - 1]:
                 current_repeat += 1
                 max_repeat = max(max_repeat, current_repeat)
             else:

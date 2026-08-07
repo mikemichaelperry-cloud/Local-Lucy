@@ -152,6 +152,23 @@ class TestPromptInjectionDetector:
         detected, reasons = PromptInjectionDetector.detect("aaaa")
         assert detected is False
 
+    def test_excessive_repetition_ignores_markdown_tables(self):
+        # Pasted documents with Markdown tables/separators should not be rejected.
+        markdown_doc = (
+            "# Report\n\n"
+            "| Stage | Status |\n"
+            "|-------|--------|\n"
+            "| 00    | PASS   |\n"
+            "| 01    | PASS   |\n\n"
+            "Some explanation text here."
+        )
+        detected, reasons = PromptInjectionDetector.detect(markdown_doc)
+        assert detected is False
+
+    def test_excessive_repetition_ignores_horizontal_rules(self):
+        detected, reasons = PromptInjectionDetector.detect("---\n" * 5 + "content")
+        assert detected is False
+
     def test_benign_query_passes(self):
         detected, _ = PromptInjectionDetector.detect("What is the capital of France?")
         assert detected is False

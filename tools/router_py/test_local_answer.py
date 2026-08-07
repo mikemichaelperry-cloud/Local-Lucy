@@ -115,6 +115,31 @@ class TestQueryClassification(unittest.TestCase):
         self.assertTrue(self.answer._context_followup_requested("as you said earlier"))
         self.assertFalse(self.answer._context_followup_requested("new question"))
 
+    def test_is_social_greeting(self):
+        """Test social greeting detection."""
+        self.assertTrue(self.answer._is_social_greeting("How are you?"))
+        self.assertTrue(self.answer._is_social_greeting("How are you today?"))
+        self.assertTrue(self.answer._is_social_greeting("Good evening Lucy"))
+        self.assertTrue(self.answer._is_social_greeting("What's up?"))
+        self.assertTrue(self.answer._is_social_greeting("hi"))
+        # Genuine questions that contain "how are you" must not be treated as greetings.
+        self.assertFalse(self.answer._is_social_greeting("How are you going to fix the economy?"))
+        self.assertFalse(self.answer._is_social_greeting("How are you different from ChatGPT?"))
+
+    def test_social_greeting_prompt_omits_live_data(self):
+        """Social greetings receive an instruction that suppresses weather/location additions."""
+        prompt = self.answer._build_prompt(
+            query="Good evening Lucy, how are you?",
+            session_memory="",
+            generation_profile="chat",
+            budget_instruction="",
+            conversation_mode_active=False,
+            conversation_system_block=False,
+            augmented_context="",
+        )
+        self.assertIn("Answer the greeting", prompt)
+        self.assertIn("Do not add weather", prompt)
+
     def test_is_budget_brief(self):
         """Test brief budget detection."""
         self.assertTrue(self.answer._is_budget_brief("brief answer"))

@@ -429,6 +429,27 @@ class LocalAnswer:
             return True
         return False
 
+    def _is_social_greeting(self, query: str) -> bool:
+        """Check if the query is a social greeting rather than a factual request.
+
+        Must avoid matching phrases like "How are you going to fix the economy?"
+        which are genuine questions, not greetings.
+        """
+        q = query.strip().lower().rstrip("?!")
+        # Standalone greetings
+        if q in {"hi", "hello", "hey", "good morning", "good afternoon", "good evening", "good night", "what's up", "whats up"}:
+            return True
+        # "how are you" variants that are not followed by action words
+        if re.match(r"^how\s+are\s+you\s*(today|doing|feeling|now)?\s*$", q):
+            return True
+        # Greeting + optional name + optional "how are you" (e.g., "good evening Lucy, how are you?")
+        if re.match(r"^(good\s+(morning|afternoon|evening)|hi|hello|hey)(\s+\w+)?[,.]?\s+how\s+are\s+you\s*$", q):
+            return True
+        # Greeting + name (e.g., "good evening Lucy")
+        if re.match(r"^(good\s+(morning|afternoon|evening)|hi|hello|hey)\s+\w+\s*$", q):
+            return True
+        return False
+
     def _last_assistant_turn_was_truncated(self, session_memory: str) -> bool:
         """Return True when the most recent assistant turn in session memory was truncated.
 
@@ -1429,6 +1450,14 @@ class LocalAnswer:
                 "Answer from your own knowledge. "
                 "If the user asks for live data (news, weather, time, stock prices), answer from what you know. "
                 "The router decides whether to fetch live data; your job is to answer the query you received."
+            )
+
+        # Social greetings should be answered directly; the model should not
+        # hallucinate weather, location, or current-events details.
+        if self._is_social_greeting(query):
+            instruction = (
+                "Answer the greeting or social question directly. "
+                "Do not add weather, location, time, news, or other live-data information to your answer."
             )
 
         # Tone
