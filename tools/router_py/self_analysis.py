@@ -78,7 +78,23 @@ class SelfAnalysisEngine:
         return analysis
 
     async def suggest_improvements(self, relative_path: str, model: str | None = None) -> str:
-        """Generate staged code-review suggestions for the given file or directory."""
+        """Generate staged review suggestions for the given file or directory.
+
+        Accepts both project-relative paths (existing code-review behaviour) and
+        absolute paths to arbitrary local files (Engineering mode read-only).
+        """
+        raw_path = Path(relative_path)
+        if raw_path.is_absolute():
+            analysis = self._analyze_arbitrary_file(raw_path)
+            local_analysis = self._local_analysis_summary(analysis)
+            stage1_prompt = self._build_document_review_prompt(analysis)
+            stage1_result = await self._run_llm(
+                stage1_prompt,
+                route_mode="SELF_REVIEW",
+                model=model,
+            )
+            return f"LOCAL analysis:\n{local_analysis}\n\nAUGMENTED suggestions:\n{stage1_result}"
+
         path = self._resolve_path(relative_path)
         if path.is_dir():
             return await self._review_directory(relative_path, model=model)
@@ -356,6 +372,71 @@ Begin deep investigation and fix planning.
         if ruff_on_path:
             return Path(ruff_on_path)
         return None
+
+    def _analyze_arbitrary_file(self, file_path: Path) -> FileAnalysis:
+        """Read and summarize an arbitrary local file (read-only Engineering mode).
+
+        This bypasses the project-root restriction because the user explicitly
+        supplied an absolute path. Non-Python files are not parsed with AST or ruff;
+        they are returned as plain text with basic metadata.
+        """
+        file_path = file_path.expanduser().resolve()
+        if not file_path.exists():
+            raise FileNotFoundError(f"Path not found: {file_path}")
+        if not file_path.is_file():
+            raise ValueError(f"Not a regular file: {file_path}")
+        source = self._read_source(file_path, str(file_path))
+        lines = source.splitlines()
+        analysis = FileAnalysis(
+            path=str(file_path),
+            metrics={"lines": len(lines), "functions": 0, "classes": 0, "imports": 0},
+            source=source,
+        )
+        analysis.prompt_context = self._build_arbitrary_file_context(analysis, file_path)
+        return analysis
+
+    def _build_arbitrary_file_context(
+        self, analysis: FileAnalysis, file_path: Path
+    ) -> str:
+        source = analysis.source
+        truncated = False
+        max_chars = self._self_review_context_chars
+        truncated_source = source
+        if len(source) > max_chars:
+            truncated_source = source[:max_chars]
+            last_nl = truncated_source.rfind("\n")
+            if last_nl > max_chars * 0.9:
+                truncated_source = truncated_source[:last_nl]
+            truncated_source += (
+                f"\n\n[truncated at {max_chars} characters; file exceeded review context limit]"
+            )
+            truncated = True
+        analysis.truncated = truncated
+        lines = [
+            f"File: {file_path}",
+            f"Size: {len(source)} characters",
+            f"Lines: {analysis.metrics['lines']}",
+            "Source text:",
+            "`````",
+            truncated_source,
+            "`````",
+        ]
+        if truncated:
+            lines.append("WARNING: File text was truncated before review.")
+        return "\n".join(lines)
+
+    def _build_document_review_prompt(self, analysis: FileAnalysis) -> str:
+        return (
+            "You are reviewing a document or file that the user has supplied from their local system. "
+            "This is a READ-ONLY review. Do not edit files, apply patches, run commands, install dependencies, "
+            "delete files, commit, or push changes unless the user explicitly asks for implementation afterwards.\n\n"
+            "Provide a balanced summary and critique: identify the main purpose and structure, note any obvious "
+            "errors, inconsistencies, omissions, or points that need clarification, and suggest concrete improvements. "
+            "If the file is a report or plan, evaluate its completeness, accuracy, and actionability. "
+            "Do not spend more than a few sentences describing what the text already says; focus on what should change, "
+            "what is missing, and why.\n\n"
+            f"{analysis.prompt_context}"
+        )
 
     def _build_context(self, analysis: FileAnalysis) -> str:
         file_path = self._resolve_file(analysis.path)

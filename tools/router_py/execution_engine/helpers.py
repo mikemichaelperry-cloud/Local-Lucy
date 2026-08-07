@@ -133,7 +133,12 @@ def extract_self_analysis_file_reference(
     last_file: str | None = None,
     project_root: Path | None = None,
 ) -> str | None:
-    """Return a relative path if *question* asks to analyze/review/improve a file.
+    """Return a file reference if *question* asks to analyze/review/improve a file.
+
+    In Engineering / self-analysis mode this also accepts explicit ``file://``
+    URLs and absolute paths so users can point at arbitrary local files (read-only).
+    Project-internal paths are returned relative to *project_root*; external paths
+    are returned as absolute filesystem paths.
 
     This is the module-level implementation shared by the execution engine and
     the request pipeline.  It must stay independent of engine instance state so
@@ -141,7 +146,32 @@ def extract_self_analysis_file_reference(
     """
     root = project_root or _get_root()
     q = question.lower()
-    if not any(k in q for k in ("analyze", "analyse", "review", "improve", "inspect")):
+    has_review_keyword = any(k in q for k in ("analyze", "analyse", "review", "improve", "inspect"))
+
+    # Explicit file:// URLs are treated as file references even without review keywords.
+    file_url_match = re.search(r"file://(/[^\s\"'<>]+)", question)
+    if file_url_match:
+        raw_path = Path(file_url_match.group(1))
+        if raw_path.is_file():
+            resolved = raw_path.resolve()
+            try:
+                return str(resolved.relative_to(root))
+            except ValueError:
+                return str(resolved)
+        return None
+
+    # Absolute filesystem paths to files are treated as explicit file references.
+    abs_path_match = re.search(r"(/[\w\-./]+(?:\.\w+)?)", question)
+    if abs_path_match:
+        raw_path = Path(abs_path_match.group(1))
+        if raw_path.is_file():
+            resolved = raw_path.resolve()
+            try:
+                return str(resolved.relative_to(root))
+            except ValueError:
+                return str(resolved)
+
+    if not has_review_keyword:
         return None
 
     # Look for quoted or bare file paths ending in .py.  Accept both relative

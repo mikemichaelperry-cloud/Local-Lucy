@@ -113,6 +113,30 @@ def test_extract_self_analysis_file_reference_detects_directories(tmp_path):
     assert ref == "pkg"
 
 
+def test_extract_self_analysis_file_reference_detects_file_url(tmp_path):
+    from router_py.execution_engine import extract_self_analysis_file_reference
+
+    report = tmp_path / "report.md"
+    report.write_text("# Report\n")
+
+    ref = extract_self_analysis_file_reference(
+        f"file://{report} what is your opinion?", project_root=tmp_path / "project"
+    )
+    assert ref == str(report.resolve())
+
+
+def test_extract_self_analysis_file_reference_detects_absolute_path(tmp_path):
+    from router_py.execution_engine import extract_self_analysis_file_reference
+
+    report = tmp_path / "report.md"
+    report.write_text("# Report\n")
+
+    ref = extract_self_analysis_file_reference(
+        f"{report} what is your opinion?", project_root=tmp_path / "project"
+    )
+    assert ref == str(report.resolve())
+
+
 def test_extract_self_analysis_file_reference_rejects_external_directories(tmp_path):
     from router_py.execution_engine import extract_self_analysis_file_reference
 
@@ -188,6 +212,35 @@ def test_analyze_file_accepts_exact_max_size(tmp_path):
 
     assert isinstance(result, FileAnalysis)
     assert result.path == "boundary.py"
+
+
+def test_analyze_arbitrary_file_reads_markdown_document(tmp_path):
+    report = tmp_path / "report.md"
+    report.write_text("# Completion Report\n\nAll stages passed.\n")
+
+    engine = SelfAnalysisEngine(project_root=tmp_path / "project")
+    analysis = engine._analyze_arbitrary_file(report)
+
+    assert analysis.path == str(report.resolve())
+    assert "Completion Report" in analysis.source
+    assert "Source text:" in analysis.prompt_context
+    assert analysis.metrics["lines"] == 3
+
+
+def test_suggest_improvements_document_review_for_absolute_path(tmp_path, monkeypatch):
+    report = tmp_path / "report.md"
+    report.write_text("# Report\n")
+
+    async def fake_run_llm(prompt, route_mode="SELF_REVIEW", model=None):
+        assert "document or file" in prompt
+        assert str(report.resolve()) in prompt
+        return "MOCK REVIEW"
+
+    engine = SelfAnalysisEngine(project_root=tmp_path / "project")
+    monkeypatch.setattr(engine, "_run_llm", fake_run_llm)
+
+    result = asyncio.run(engine.suggest_improvements(str(report.resolve())))
+    assert "MOCK REVIEW" in result
 
 
 def test_suggest_improvements_local_when_import_missing(tmp_path, monkeypatch):
