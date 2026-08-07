@@ -1,8 +1,8 @@
 {
   "programme": "Local Lucy V11 Qualification",
-  "current_stage": "PHASE_03_VERIFICATION",
-  "current_task": "TASK_17",
-  "last_completed_task": "TASK_17",
+  "current_stage": "PHASE_04_REPORTING",
+  "current_task": "TASK_19",
+  "last_completed_task": "TASK_19",
   "stages": {
     "STAGE_00": {
       "status": "PASSED",
@@ -141,6 +141,12 @@
       "completed_tasks": 6,
       "failed_tasks": 0,
       "blocked_tasks": 0
+    },
+    "PHASE_04": {
+      "status": "PASSED",
+      "completed_tasks": 1,
+      "failed_tasks": 0,
+      "blocked_tasks": 0
     }
   },
   "active_defects": [],
@@ -150,14 +156,22 @@
     "Generic low-confidence -> AUGMENTED fallback is not implemented and is not being added during stabilisation."
   ],
   "last_baseline_metrics": "validation 21/21 = 1.000, holdout 13/15 = 0.867, combined 34/36 = 0.944",
-  "last_full_regression": "tools/router_py full deterministic regression: 1233 passed, 7 skipped, 274 deselected, 188 subtests passed (2026-08-06T16:39Z).",
+  "last_full_regression": "tools/router_py full deterministic regression: 1314 passed, 7 skipped, 275 deselected, 188 subtests passed (2026-08-07T07:54Z).",
+  "last_task18_regression": "tools/router_py full deterministic regression: 1314 passed, 7 skipped, 275 deselected, 188 subtests passed (2026-08-07T07:54Z).",
+  "last_task18_clean_run": "tools/router_py/stage_19_clean_run.py: 7/7 stages passed, no dual-model residency (2026-08-07T13:40Z on commit ed26695).",
+  "last_task18_fix_commit": "5591c1a fix(memory): continuation detection, cache key, reserve protection, session isolation",
   "last_phase1_regression": "Memory-service regression: 92 passed, 75 deselected, 8 subtests passed; router_py fast deterministic regression: 1244 passed, 7 skipped, 275 deselected, 188 subtests passed (2026-08-07T07:54Z).",
   "last_phase2_regression": "Travel/tourism regression gate: tools/router_py/test_travel_routing.py, test_travel_israel.py, test_travel_general.py, test_policy_router.py — 95 passed, 0 failed (2026-08-07T10:00:51Z).",
-  "last_model_verification": "Task 17 Phase 3 regression gate: Gemma smoke 3/3 passed; Llama smoke 3/3 passed; model switch Gemma->Llama->Gemma 4/4 passed with cross-model memory continuity; no dual-model residency observed (2026-08-07T11:06Z).",
+  "last_model_verification": "Task 18 final clean run: Gemma smoke 3/3 passed; Gemma scenario suite 16/16 passed; Llama smoke 3/3 passed; Llama scenario suite 16/16 passed with 16/16 route/outcome/entity parity; model switch Gemma->Llama->Gemma 4/4 passed with cross-model memory continuity; HMI soak 6/6 passed; weather boundary 6/6 passed; final clean run 7/7 passed; no dual-model residency observed (2026-08-07T13:40Z on commit ed26695).",
+  "last_memory_continuity_verification": "Story continuation (Spark) and cross-model memory continuity (Oscar) both pass after fixes in commit 5591c1a (2026-08-07T13:40Z on commit ed26695).",
+  "last_tourism_verification": "Travel/tourism regression gate: tools/router_py/test_travel_routing.py, test_travel_israel.py, test_travel_general.py, test_policy_router.py — 95 passed, 0 failed (2026-08-07T10:00:51Z).",
+  "last_phase3_regression": "Phase 3 regression gate: Gemma smoke 3/3 passed; Llama smoke 3/3 passed; model switch 4/4 passed with cross-model memory continuity; no dual-model residency observed (2026-08-07T11:06Z).",
+  "last_phase4_status": "Reporting and handoff complete; completion report, session handoff, TEST_STATUS.json and TEST_TODO.md updated (2026-08-07T13:41Z).",
   "last_privacy_fault_verification": "planner security 10 passed; untrusted web 1 passed; fault injection 5 passed; privacy audit 4 passed; PII redaction 5 passed; synthetic canary 5 passed; LUCY_FORCE_LOCAL honored (2026-08-06T16:59Z).",
-  "last_soak_and_clean_run": "HMI soak 6/6 passed; weather/time boundary 6/6 passed; final clean run 7/7 passed; no dual-model residency observed (2026-08-06T17:21Z on commit 423e5dd).",
+  "last_session_end": "2026-08-07T13:41:09Z",
+  "resume_command": "cd /home/mike/lucy-v11 && cat qualification/COMPLETION_REPORT_2026-08-07_MEMORY_TOURISM.md qualification/TEST_TODO.md qualification/TEST_STATUS.json qualification/SESSION_HANDOFF.md",
+  "last_soak_and_clean_run": "HMI soak 6/6 passed; weather/time boundary 6/6 passed; final clean run 7/7 passed; no dual-model residency observed (2026-08-07T13:40Z on commit ed26695).",
+  "final_candidate_commit": "ed26695b7bf647a0096c0a0a4c62eb92f5a991c6",
   "last_hmi_smoke": "24/24 passed",
-  "final_qualification_manifest": "qualification/FINAL_QUALIFICATION_MANIFEST.json, qualification/FINAL_QUALIFICATION_MANIFEST.md (generated on manifest commit 4495f83; behavioural candidate commit 423e5dd).",
-  "last_session_end": "2026-08-07T11:06:40Z",
-  "resume_command": "cd /home/mike/lucy-v11 && cat qualification/ROUTING_IMPROVEMENT_REPORT.md qualification/TEST_TODO.md qualification/TEST_STATUS.json qualification/SESSION_HANDOFF.md"
+  "final_qualification_manifest": "qualification/FINAL_QUALIFICATION_MANIFEST.json, qualification/FINAL_QUALIFICATION_MANIFEST.md (generated on manifest commit 4495f83; behavioural candidate commit 423e5dd; final verified candidate commit ed26695)."
 }
