@@ -1,3 +1,6 @@
+# Trust domain allowlist for travel/tourism queries.
+# Wikivoyage is the universal fallback. Additional per-country ministry sites
+# can be appended here and handled in _try_direct_fetch without changing routing.
 goisrael.com
 www.goisrael.com
 israel.travel

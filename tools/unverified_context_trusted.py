@@ -19,7 +19,6 @@ import os
 import re
 import sys
 import time
-import urllib.parse
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -219,6 +218,12 @@ _TRAVEL_DESTINATION_MAP: dict[str, str] = {
     "greece": "Greece",
     "thailand": "Thailand",
     "japan": "Japan",
+    "france": "France",
+    "germany": "Germany",
+    "italy": "Italy",
+    "spain": "Spain",
+    "canada": "Canada",
+    "australia": "Australia",
     "iran": "Iran",
     "egypt": "Egypt",
     "jordan": "Jordan",
@@ -618,27 +623,13 @@ def _search_travel(query: str, domains: list[str], max_results: int = 3) -> list
     return []
 
 
-def _fetch_wikivoyage_summary(page: str) -> dict[str, Any] | None:
+def _fetch_wikivoyage_summary(destination: str) -> dict[str, Any] | None:
     """Fetch a clean summary from Wikivoyage's REST API."""
-    try:
-        import urllib.request
-        import json
-
-        encoded = urllib.parse.quote(page.replace(" ", "_"))
-        url = f"https://en.wikivoyage.org/api/rest_v1/page/summary/{encoded}"
-        req = urllib.request.Request(url, headers={"User-Agent": "Local-Lucy/1.0"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        extract = data.get("extract", "").strip()
-        if extract:
-            return {
-                "title": data.get("title", page),
-                "url": f"https://en.wikivoyage.org/wiki/{encoded}",
-                "snippet": extract,
-                "content": extract,
-            }
-    except Exception:
-        pass
+    page = destination.replace(" ", "_")
+    url = f"https://en.wikivoyage.org/api/rest_v1/page/summary/{page}"
+    data = _fetch_json(url, timeout=10)
+    if data and "extract" in data:
+        return {"source": url, "text": data["extract"], "title": data.get("title", destination)}
     return None
 
 
@@ -650,6 +641,21 @@ def _fetch_url_text(url: str, timeout: int = 10) -> str | None:
         reason, text = fetch_gate.fetch_url_text(url, timeout=timeout)
         if reason == fetch_gate.OK and text:
             return text
+    except Exception:
+        pass
+    return None
+
+
+def _fetch_json(url: str, timeout: int = 10) -> dict[str, Any] | None:
+    """Fetch and parse JSON from a URL."""
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(url, headers={"User-Agent": "Local-Lucy/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if isinstance(data, dict):
+            return data
     except Exception:
         pass
     return None
@@ -1087,6 +1093,8 @@ def _try_direct_fetch(question: str, category: str) -> tuple[str, str] | None:
 
     elif category == "travel":
         # --- Go Israel (Israel Ministry of Tourism) ---
+        # NOTE: Per-country ministry fallbacks can be added here and to
+        # config/trust/generated/travel_runtime.txt without changing routing.
         candidates.append(
             (
                 f"https://www.goisrael.com/?s={q_encoded}",
@@ -1618,7 +1626,6 @@ def _format_travel_response(
     include_metadata: bool = False,
 ) -> str | tuple[str, dict[str, Any]]:
     """Format travel response from trusted Wikivoyage sources."""
-    q_lower = question.lower()
     deduped = _dedupe_domains(domains)
 
     destination = _extract_travel_destination(question)
@@ -1635,11 +1642,15 @@ def _format_travel_response(
 
     # Build a destination-relevant source list. Wikivoyage is the universal trusted
     # source; official tourism boards are included only for matching destinations.
+    # NOTE: Additional per-country ministry sites can be added to
+    # config/trust/generated/travel_runtime.txt and to _try_direct_fetch below
+    # without changing routing logic.
     sources = ["wikivoyage.org", "en.wikivoyage.org"]
     if destination in _ISRAEL_DESTINATIONS:
         sources.extend(["goisrael.com", "israel.travel"])
 
-    # For Israel destinations, prefer the official Ministry of Tourism sources.
+    # For Israel destinations, prefer the official Ministry of Tourism sources,
+    # then fall back to Wikivoyage.
     if destination in _ISRAEL_DESTINATIONS:
         israel_summary = _fetch_israel_travel_summary(destination)
         if israel_summary and israel_summary.get("text"):
@@ -1667,19 +1678,22 @@ def _format_travel_response(
                 confidence="normal",
             )
 
-    # Fetch the destination overview from Wikivoyage.
+    # Fetch the destination overview from Wikivoyage (primary source for
+    # non-Israel destinations and Israel fallback).
     summary = _fetch_wikivoyage_summary(destination)
-    if summary and summary.get("content"):
-        content = summary["content"]
+    if summary and summary.get("text"):
+        content = summary["text"]
+        title = summary.get("title", destination)
+        url = summary.get("source", f"https://en.wikivoyage.org/wiki/{destination.replace(' ', '_')}")
         # Relevance booster: echo the destination and the user's likely intent so
         # the context guard accepts the evidence even for conversational queries.
         relevance_lead = (
-            f"Interesting places to visit in {summary['title']} include cities, landmarks, "
+            f"Interesting places to visit in {title} include cities, landmarks, "
             f"natural attractions, and cultural sites described in the travel guide below."
         )
         lines = [
-            f"Source: {summary['title']} – Wikivoyage",
-            f"URL: {summary['url']}",
+            f"Source: {title} – Wikivoyage",
+            f"URL: {url}",
             "",
             relevance_lead,
             "",
@@ -1695,9 +1709,10 @@ def _format_travel_response(
             confidence="normal",
         )
 
-    # Last resort: list the trusted domains so the user can browse directly.
+    # All fetch attempts failed — ask the user to specify a country or region.
     return _with_trusted_metadata(
-        f"Travel information for {destination} is available from trusted tourism sources.\n\n"
+        f"I couldn't retrieve travel information for {destination}. "
+        "Please specify a country or region so I can look it up from trusted sources.\n\n"
         "Trusted sources:\n" + "\n".join(f"- {src}" for src in sources[:6]),
         include_metadata=include_metadata,
         answer_basis="trusted_domain_fallback",
