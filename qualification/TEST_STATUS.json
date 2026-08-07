@@ -1,8 +1,8 @@
 {
   "programme": "Local Lucy V11 Qualification",
-  "current_stage": "PHASE_02_TOURISM_SOURCES",
-  "current_task": "PH2-TOUR-004",
-  "last_completed_task": "PH2-TOUR-004",
+  "current_stage": "PHASE_03_VERIFICATION",
+  "current_task": "TASK_17",
+  "last_completed_task": "TASK_17",
   "stages": {
     "STAGE_00": {
       "status": "PASSED",
@@ -35,25 +35,25 @@
       "blocked_tasks": 0
     },
     "STAGE_05": {
-      "status": "IN_PROGRESS",
+      "status": "PASSED",
       "completed_tasks": 13,
       "failed_tasks": 0,
       "blocked_tasks": 0
     },
     "STAGE_06": {
-      "status": "IN_PROGRESS",
+      "status": "PASSED",
       "completed_tasks": 3,
       "failed_tasks": 0,
       "blocked_tasks": 0
     },
     "STAGE_07": {
-      "status": "IN_PROGRESS",
+      "status": "PASSED",
       "completed_tasks": 5,
       "failed_tasks": 0,
       "blocked_tasks": 0
     },
     "STAGE_08": {
-      "status": "IN_PROGRESS",
+      "status": "PASSED",
       "completed_tasks": 3,
       "failed_tasks": 0,
       "blocked_tasks": 0
@@ -135,6 +135,12 @@
       "completed_tasks": 4,
       "failed_tasks": 0,
       "blocked_tasks": 0
+    },
+    "PHASE_03": {
+      "status": "PASSED",
+      "completed_tasks": 6,
+      "failed_tasks": 0,
+      "blocked_tasks": 0
     }
   },
   "active_defects": [],
@@ -147,11 +153,11 @@
   "last_full_regression": "tools/router_py full deterministic regression: 1233 passed, 7 skipped, 274 deselected, 188 subtests passed (2026-08-06T16:39Z).",
   "last_phase1_regression": "Memory-service regression: 92 passed, 75 deselected, 8 subtests passed; router_py fast deterministic regression: 1244 passed, 7 skipped, 275 deselected, 188 subtests passed (2026-08-07T07:54Z).",
   "last_phase2_regression": "Travel/tourism regression gate: tools/router_py/test_travel_routing.py, test_travel_israel.py, test_travel_general.py, test_policy_router.py — 95 passed, 0 failed (2026-08-07T10:00:51Z).",
-  "last_model_verification": "Gemma smoke 3/3 passed; Gemma shared suite 12/12 passed; Llama smoke 3/3 passed; Llama shared suite 12/12 passed with 12/12 route and outcome parity; model switch Gemma->Llama->Gemma 3/3 passed; no dual-model residency observed (2026-08-06T16:54Z).",
+  "last_model_verification": "Task 17 Phase 3 regression gate: Gemma smoke 3/3 passed; Llama smoke 3/3 passed; model switch Gemma->Llama->Gemma 4/4 passed with cross-model memory continuity; no dual-model residency observed (2026-08-07T11:06Z).",
   "last_privacy_fault_verification": "planner security 10 passed; untrusted web 1 passed; fault injection 5 passed; privacy audit 4 passed; PII redaction 5 passed; synthetic canary 5 passed; LUCY_FORCE_LOCAL honored (2026-08-06T16:59Z).",
   "last_soak_and_clean_run": "HMI soak 6/6 passed; weather/time boundary 6/6 passed; final clean run 7/7 passed; no dual-model residency observed (2026-08-06T17:21Z on commit 423e5dd).",
   "last_hmi_smoke": "24/24 passed",
   "final_qualification_manifest": "qualification/FINAL_QUALIFICATION_MANIFEST.json, qualification/FINAL_QUALIFICATION_MANIFEST.md (generated on manifest commit 4495f83; behavioural candidate commit 423e5dd).",
-  "last_session_end": "2026-08-07T10:00:51Z",
+  "last_session_end": "2026-08-07T11:06:40Z",
   "resume_command": "cd /home/mike/lucy-v11 && cat qualification/ROUTING_IMPROVEMENT_REPORT.md qualification/TEST_TODO.md qualification/TEST_STATUS.json qualification/SESSION_HANDOFF.md"
 }

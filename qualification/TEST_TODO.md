@@ -299,4 +299,23 @@
 
 ---
 
-**Qualification status:** STAGE_00–STAGE_19 complete. Final requalification verification complete. Decision: **QUALIFIED**. Phase 1 memory-first intelligence core complete. Phase 2 tourism sources complete.
+## Phase 3 — Verification & Cross-Model Guarantees
+
+- [PH3-T12-001] PASSED — Add model residency helper (`tools/router_py/model_residency.py`) with tests.
+  Evidence: tools/router_py/test_model_residency.py
+- [PH3-T13-001] PASSED — Enforce single-model residency assertions in all model stages (stage_08, stage_09, stage_10, stage_11, stage_13, stage_16).
+  Evidence: tools/router_py/stage_08_gemma_smoke.py, stage_09_gemma_scenario_suite.py, stage_10_llama_smoke.py, stage_11_llama_scenario_suite.py, stage_13_model_switch.py, stage_16_hmi_soak.py
+- [PH3-T14-001] PASSED — Extend Gemma and Llama shared scenario suites with cross-model memory continuity cases.
+  Evidence: tools/router_py/stage_09_gemma_scenario_suite.py, stage_11_llama_scenario_suite.py
+- [PH3-T15-001] PASSED — Extend model switch stage with memory continuity (Gemma seed story, Llama continuation).
+  Evidence: tools/router_py/stage_13_model_switch.py
+- [PH3-T16-001] PASSED — Assert single-model residency in HMI real-routing tests.
+  Evidence: tools/router_py/test_hmi_real_routing.py
+- [PH3-T17-001] PASSED — Phase 3 regression gate: Gemma smoke, Llama smoke, and model switch stages pass with no dual-model residency.
+  Evidence: tools/router_py/stage_08_gemma_smoke.py (3/3 passed); tools/router_py/stage_10_llama_smoke.py (3/3 passed); tools/router_py/stage_13_model_switch.py (4/4 passed)
+
+**Phase 3 status:** PASSED — verification and cross-model guarantees regression gate cleared. Phase 4 ready.
+
+---
+
+**Qualification status:** STAGE_00–STAGE_19 complete. Final requalification verification complete. Decision: **QUALIFIED**. Phase 1 memory-first intelligence core complete. Phase 2 tourism sources complete. Phase 3 verification and cross-model guarantees complete.
