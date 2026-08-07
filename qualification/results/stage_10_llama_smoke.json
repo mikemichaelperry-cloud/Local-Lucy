@@ -39,7 +39,7 @@
     "passed": true,
     "outcome": {
       "status": "ok",
-      "stdout": "The product of 17 and 23 is 391. I can calculate this using basic arithmetic operations within my parametric knowledge.",
+      "stdout": "The product of 17 and 23 is 391. I can perform basic arithmetic calculations like this one using my parametric knowledge.",
       "stderr": "",
       "payload": {
         "accepted": true,
@@ -51,11 +51,11 @@
           "legacy_runtime_namespace_present": false,
           "legacy_runtime_namespace_status": "absent"
         },
-        "completed_at": "2026-08-07T12:04:29Z",
+        "completed_at": "2026-08-07T13:35:52Z",
         "control_state": {
           "mode": "auto",
           "conversation": "off",
-          "memory": "off",
+          "memory": "on",
           "evidence": "off",
           "voice": "on",
           "augmentation_policy": "direct_allowed",
@@ -115,12 +115,12 @@
           "evidence_created": "false",
           "outcome_code": "answered",
           "rc": null,
-          "utc": "2026-08-07T12:04:29Z",
-          "execution_time_ms": 540
+          "utc": "2026-08-07T13:35:52Z",
+          "execution_time_ms": 810
         },
-        "request_id": "2026-08-07T12:04:27.260721556Z-600536",
+        "request_id": "2026-08-07T13:35:45.436575919Z-616365",
         "request_text": "What is 17 times 23?",
-        "response_text": "The product of 17 and 23 is 391. I can calculate this using basic arithmetic operations within my parametric knowledge.",
+        "response_text": "The product of 17 and 23 is 391. I can perform basic arithmetic calculations like this one using my parametric knowledge.",
         "route": {
           "mode": "LOCAL",
           "selected_route": "LOCAL",
@@ -135,8 +135,8 @@
           "winning_signal": "",
           "query": "What is 17 times 23?",
           "reason": "router_local",
-          "session_id": "2026-08-07T12:04:27.260721556Z-600536",
-          "utc": "2026-08-07T12:04:29Z"
+          "session_id": "2026-08-07T13:35:45.436575919Z-616365",
+          "utc": "2026-08-07T13:35:52Z"
         },
         "status": "completed",
         "model_recommendation": "local-lucy-llama31:latest",

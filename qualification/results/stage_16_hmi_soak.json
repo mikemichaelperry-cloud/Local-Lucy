@@ -8,7 +8,7 @@
       "route": "LOCAL",
       "stdout_len": 31,
       "stderr": "",
-      "elapsed_s": 12.22
+      "elapsed_s": 8.29
     },
     "loaded_models": [
       "local-lucy-gemma4:latest"
@@ -23,7 +23,7 @@
       "route": "LOCAL",
       "stdout_len": 19,
       "stderr": "",
-      "elapsed_s": 11.68
+      "elapsed_s": 13.28
     },
     "loaded_models": [
       "local-lucy-gemma4:latest"
@@ -38,7 +38,7 @@
       "route": "LOCAL",
       "stdout_len": 79,
       "stderr": "",
-      "elapsed_s": 19.96
+      "elapsed_s": 10.4
     },
     "loaded_models": [
       "local-lucy-gemma4:latest"
@@ -53,7 +53,7 @@
       "route": "LOCAL",
       "stdout_len": 253,
       "stderr": "",
-      "elapsed_s": 2.48
+      "elapsed_s": 0.07
     },
     "loaded_models": [
       "local-lucy-llama31:latest"
@@ -68,7 +68,7 @@
       "route": "LOCAL",
       "stdout_len": 262,
       "stderr": "",
-      "elapsed_s": 5.35
+      "elapsed_s": 5.28
     },
     "loaded_models": [
       "local-lucy-llama31:latest"
@@ -81,9 +81,9 @@
     "outcome": {
       "status": "ok",
       "route": "LOCAL",
-      "stdout_len": 204,
+      "stdout_len": 203,
       "stderr": "",
-      "elapsed_s": 0.16
+      "elapsed_s": 0.13
     },
     "loaded_models": []
   }
