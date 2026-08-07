@@ -40,6 +40,11 @@ LLAMA_MODEL = os.environ.get("LUCY_LLAMA_MODEL", "local-lucy-llama31:latest")
 DEFAULT_OLLAMA_URL = os.environ.get("LUCY_OLLAMA_API_URL", "http://127.0.0.1:11434").rstrip("/")
 REPORT_PATH = ROOT / "qualification" / "results" / "stage_13_model_switch.json"
 
+# Fixed session ID for the cross-model memory continuity step.
+MEMORY_SESSION_ID = "stage-13-memory-continuity"
+MEMORY_STORY_PROMPT = "Tell me a short story about Oscar."
+MEMORY_CONTINUE_PROMPT = "Continue the story."
+
 
 def _api_ps() -> list[str]:
     with urllib.request.urlopen(f"{DEFAULT_OLLAMA_URL}/api/ps", timeout=5.0) as resp:
@@ -102,19 +107,21 @@ def _load_model_exclusively(model: str) -> None:
         raise RuntimeError(f"Other Local Lucy models loaded alongside {model}: {others}")
 
 
-def _set_state_model(model: str) -> None:
+def _set_state_model(model: str, memory: str = "off") -> None:
     from router_py.main import load_state_from_file
 
     state = load_state_from_file() or {}
     state["model"] = model
-    state["memory"] = "off"
+    state["memory"] = memory
     state["conversation"] = "off"
 
     namespace_root = os.environ.get("LUCY_RUNTIME_NAMESPACE_ROOT", "").strip()
     if namespace_root:
         state_file = Path(namespace_root).expanduser() / "state" / "current_state.json"
     else:
-        state_file = Path.home() / ".local" / "share" / "local-lucy-v11" / "state" / "current_state.json"
+        state_file = (
+            Path.home() / ".local" / "share" / "local-lucy-v11" / "state" / "current_state.json"
+        )
 
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
@@ -138,12 +145,113 @@ def _run_step(model: str, question: str) -> dict:
         "route": outcome.route,
         "status": outcome.status,
         "outcome_code": outcome.outcome_code,
+        "response_text": outcome.response_text or "",
         "response_len": len(outcome.response_text or ""),
         "loaded_models": loaded,
         "elapsed_s": round(elapsed, 2),
         "passed": passed,
         "notes": [] if passed else [f"others={others}"] if others else [f"status={outcome.status}"],
     }
+
+
+def _run_memory_continuation_step() -> dict:
+    """Cross-model memory continuity: Gemma seeds a story, Llama continues it.
+
+    Uses a fixed session ID so the chat-memory context persists across the
+    model switch.  The step passes only if Llama's continuation references
+    Oscar and appears to advance the prior narrative.
+    """
+    previous_session_memory = os.environ.get("LUCY_SESSION_MEMORY")
+    previous_session_id = os.environ.get("LUCY_SESSION_ID")
+
+    try:
+        os.environ["LUCY_SESSION_MEMORY"] = "1"
+        os.environ["LUCY_SESSION_ID"] = MEMORY_SESSION_ID
+
+        # Step 1: Gemma tells the story.
+        print(f"Switching to {GEMMA_MODEL} for memory story seed ...")
+        _load_model_exclusively(GEMMA_MODEL)
+        os.environ["LUCY_LOCAL_MODEL"] = GEMMA_MODEL
+        os.environ["LUCY_MODEL"] = GEMMA_MODEL
+        _set_state_model(GEMMA_MODEL, memory="on")
+
+        print(f"Running on {GEMMA_MODEL}: {MEMORY_STORY_PROMPT}")
+        gemma_result = _run_step(GEMMA_MODEL, MEMORY_STORY_PROMPT)
+        print(
+            f"  route={gemma_result['route']} passed={gemma_result['passed']} "
+            f"loaded={gemma_result['loaded_models']}"
+        )
+
+        # Step 2: Switch to Llama and continue the same session.
+        print(f"Switching to {LLAMA_MODEL} for memory continuation ...")
+        _load_model_exclusively(LLAMA_MODEL)
+        os.environ["LUCY_LOCAL_MODEL"] = LLAMA_MODEL
+        os.environ["LUCY_MODEL"] = LLAMA_MODEL
+        _set_state_model(LLAMA_MODEL, memory="on")
+
+        print(f"Running on {LLAMA_MODEL}: {MEMORY_CONTINUE_PROMPT}")
+        llama_result = _run_step(LLAMA_MODEL, MEMORY_CONTINUE_PROMPT)
+        print(
+            f"  route={llama_result['route']} passed={llama_result['passed']} "
+            f"loaded={llama_result['loaded_models']}"
+        )
+
+        # Step 3: Verify the continuation references Oscar and advances the story.
+        response_text = (llama_result.get("response_text") or "").lower()
+        mentions_oscar = "oscar" in response_text
+        continuation_markers = [
+            "continued",
+            "continues",
+            "continue",
+            "next",
+            "later",
+            "then",
+            "after",
+            "soon",
+            "meanwhile",
+            "following",
+            "sequel",
+            "picked up",
+            "adventure",
+            "story",
+            "tale",
+            "journey",
+            "again",
+        ]
+        continues_narrative = any(marker in response_text for marker in continuation_markers)
+
+        notes: list[str] = []
+        if not mentions_oscar:
+            notes.append("continuation does not reference Oscar")
+        if not continues_narrative:
+            notes.append("continuation does not appear to advance the narrative")
+
+        combined_passed = (
+            gemma_result["passed"]
+            and llama_result["passed"]
+            and mentions_oscar
+            and continues_narrative
+        )
+
+        return {
+            "model": f"{GEMMA_MODEL} -> {LLAMA_MODEL}",
+            "question": f"{MEMORY_STORY_PROMPT} / {MEMORY_CONTINUE_PROMPT}",
+            "gemma_result": gemma_result,
+            "llama_result": llama_result,
+            "mentions_oscar": mentions_oscar,
+            "continues_narrative": continues_narrative,
+            "passed": combined_passed,
+            "notes": notes,
+        }
+    finally:
+        if previous_session_memory is None:
+            os.environ.pop("LUCY_SESSION_MEMORY", None)
+        else:
+            os.environ["LUCY_SESSION_MEMORY"] = previous_session_memory
+        if previous_session_id is None:
+            os.environ.pop("LUCY_SESSION_ID", None)
+        else:
+            os.environ["LUCY_SESSION_ID"] = previous_session_id
 
 
 def main() -> int:
@@ -179,9 +287,23 @@ def main() -> int:
             print(f"Running on {model}: {question}")
             result = _run_step(model, question)
             results.append(result)
-            print(f"  route={result['route']} passed={result['passed']} loaded={result['loaded_models']}")
+            print(
+                f"  route={result['route']} passed={result['passed']} loaded={result['loaded_models']}"
+            )
             if not result["passed"]:
                 passed = False
+
+        # Step 4: cross-model memory continuity (Gemma -> Llama, fixed session).
+        print("Running cross-model memory continuity step ...")
+        memory_result = _run_memory_continuation_step()
+        results.append(memory_result)
+        print(
+            f"  mentions_oscar={memory_result['mentions_oscar']} "
+            f"continues_narrative={memory_result['continues_narrative']} "
+            f"passed={memory_result['passed']}"
+        )
+        if not memory_result["passed"]:
+            passed = False
     finally:
         unload_all_lucy_models()
 
