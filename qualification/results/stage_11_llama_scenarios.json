@@ -1,11 +1,12 @@
 {
   "llama_model": "local-lucy-llama31:latest",
   "gemma_model": "local-lucy-gemma4:latest",
-  "total_scenarios": 12,
-  "passed_scenarios": 12,
+  "total_scenarios": 16,
+  "passed_scenarios": 16,
   "failed_scenarios": 0,
-  "route_parity": "12/12",
-  "outcome_parity": "12/12",
+  "route_parity": "16/16",
+  "outcome_parity": "16/16",
+  "entity_parity": "4/4",
   "results": [
     {
       "scenario_id": "S09-GEM-001",
@@ -21,7 +22,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 2.51,
+      "elapsed_s": 2.56,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -29,7 +30,10 @@
         "gemma_route": "LOCAL",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -46,7 +50,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.04,
+      "elapsed_s": 0.05,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -54,7 +58,10 @@
         "gemma_route": "LOCAL",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -80,7 +87,10 @@
         "gemma_route": "LOCAL",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -95,7 +105,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 8.02,
+      "elapsed_s": 10.88,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -103,7 +113,10 @@
         "gemma_route": "EVIDENCE",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -113,12 +126,12 @@
       "actual_route": "NEWS",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 11767,
+      "response_len": 11673,
       "required_concepts_found": [],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.87,
+      "elapsed_s": 1.34,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -126,7 +139,10 @@
         "gemma_route": "NEWS",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -141,7 +157,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.97,
+      "elapsed_s": 1.98,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -149,7 +165,10 @@
         "gemma_route": "LOCAL",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -159,7 +178,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 1054,
+      "response_len": 1044,
       "required_concepts_found": [
         "because",
         "since",
@@ -168,7 +187,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 3.75,
+      "elapsed_s": 3.56,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -176,7 +195,10 @@
         "gemma_route": "LOCAL",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -191,7 +213,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.68,
+      "elapsed_s": 0.69,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -199,7 +221,10 @@
         "gemma_route": "LOCAL",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -214,7 +239,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.27,
+      "elapsed_s": 0.25,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -222,7 +247,10 @@
         "gemma_route": "WEATHER",
         "route_matches": true,
         "gemma_outcome_code": "error",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -232,14 +260,14 @@
       "actual_route": "AUGMENTED",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 319,
+      "response_len": 332,
       "required_concepts_found": [
         "pizza"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 2.01,
+      "elapsed_s": 2.06,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -247,7 +275,10 @@
         "gemma_route": "AUGMENTED",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -257,7 +288,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 205,
+      "response_len": 204,
       "required_concepts_found": [
         "Local Lucy",
         "llama"
@@ -265,7 +296,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.29,
+      "elapsed_s": 1.31,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -273,7 +304,10 @@
         "gemma_route": "LOCAL",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
       }
     },
     {
@@ -283,12 +317,12 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 135,
+      "response_len": 66,
       "required_concepts_found": [],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.89,
+      "elapsed_s": 0.78,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -296,7 +330,134 @@
         "gemma_route": "LOCAL",
         "route_matches": true,
         "gemma_outcome_code": "answered",
-        "outcome_matches": true
+        "outcome_matches": true,
+        "gemma_entities": [],
+        "entity_matches": null,
+        "missing_entities": []
+      }
+    },
+    {
+      "scenario_id": "S09-MEM-001",
+      "category": "memory_continuation",
+      "expected_route": "LOCAL",
+      "actual_route": "LOCAL",
+      "status": "completed",
+      "outcome_code": "answered",
+      "response_len": 269,
+      "required_concepts_found": [
+        "Spark"
+      ],
+      "forbidden_claims_found": [],
+      "passed": true,
+      "notes": [],
+      "elapsed_s": 14.19,
+      "loaded_models": [
+        "local-lucy-llama31:latest"
+      ],
+      "parity": {
+        "gemma_route": "LOCAL",
+        "route_matches": true,
+        "gemma_outcome_code": "answered",
+        "outcome_matches": true,
+        "gemma_entities": [
+          "Spark"
+        ],
+        "entity_matches": true,
+        "missing_entities": []
+      }
+    },
+    {
+      "scenario_id": "S09-MEM-002",
+      "category": "memory_explicit_recall",
+      "expected_route": "LOCAL",
+      "actual_route": "LOCAL",
+      "status": "completed",
+      "outcome_code": "answered",
+      "response_len": 125,
+      "required_concepts_found": [
+        "capital",
+        "Japan"
+      ],
+      "forbidden_claims_found": [],
+      "passed": true,
+      "notes": [],
+      "elapsed_s": 5.4,
+      "loaded_models": [
+        "local-lucy-llama31:latest"
+      ],
+      "parity": {
+        "gemma_route": "LOCAL",
+        "route_matches": true,
+        "gemma_outcome_code": "answered",
+        "outcome_matches": true,
+        "gemma_entities": [
+          "capital",
+          "Japan"
+        ],
+        "entity_matches": true,
+        "missing_entities": []
+      }
+    },
+    {
+      "scenario_id": "S09-MEM-003",
+      "category": "memory_identity_recall",
+      "expected_route": "LOCAL",
+      "actual_route": "LOCAL",
+      "status": "completed",
+      "outcome_code": "answered",
+      "response_len": 152,
+      "required_concepts_found": [
+        "Local Lucy",
+        "assistant"
+      ],
+      "forbidden_claims_found": [],
+      "passed": true,
+      "notes": [],
+      "elapsed_s": 2.37,
+      "loaded_models": [
+        "local-lucy-llama31:latest"
+      ],
+      "parity": {
+        "gemma_route": "LOCAL",
+        "route_matches": true,
+        "gemma_outcome_code": "answered",
+        "outcome_matches": true,
+        "gemma_entities": [
+          "Local Lucy",
+          "assistant"
+        ],
+        "entity_matches": true,
+        "missing_entities": []
+      }
+    },
+    {
+      "scenario_id": "S09-MEM-004",
+      "category": "memory_correction",
+      "expected_route": "LOCAL",
+      "actual_route": "LOCAL",
+      "status": "completed",
+      "outcome_code": "answered",
+      "response_len": 91,
+      "required_concepts_found": [
+        "blue"
+      ],
+      "forbidden_claims_found": [],
+      "passed": true,
+      "notes": [],
+      "elapsed_s": 2.41,
+      "loaded_models": [
+        "local-lucy-llama31:latest"
+      ],
+      "parity": {
+        "gemma_route": "LOCAL",
+        "route_matches": true,
+        "gemma_outcome_code": "answered",
+        "outcome_matches": true,
+        "gemma_entities": [
+          "blue"
+        ],
+        "entity_matches": true,
+        "missing_entities": []
       }
     }
   ]

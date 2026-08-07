@@ -51,11 +51,11 @@
           "legacy_runtime_namespace_present": false,
           "legacy_runtime_namespace_status": "absent"
         },
-        "completed_at": "2026-08-06T17:20:29Z",
+        "completed_at": "2026-08-07T12:04:29Z",
         "control_state": {
-          "mode": "online",
-          "conversation": "on",
-          "memory": "on",
+          "mode": "auto",
+          "conversation": "off",
+          "memory": "off",
           "evidence": "off",
           "voice": "on",
           "augmentation_policy": "direct_allowed",
@@ -115,10 +115,10 @@
           "evidence_created": "false",
           "outcome_code": "answered",
           "rc": null,
-          "utc": "2026-08-06T17:20:29Z",
-          "execution_time_ms": 759
+          "utc": "2026-08-07T12:04:29Z",
+          "execution_time_ms": 540
         },
-        "request_id": "2026-08-06T17:20:27.758780204Z-497046",
+        "request_id": "2026-08-07T12:04:27.260721556Z-600536",
         "request_text": "What is 17 times 23?",
         "response_text": "The product of 17 and 23 is 391. I can calculate this using basic arithmetic operations within my parametric knowledge.",
         "route": {
@@ -135,8 +135,8 @@
           "winning_signal": "",
           "query": "What is 17 times 23?",
           "reason": "router_local",
-          "session_id": "2026-08-06T17:20:27.758780204Z-497046",
-          "utc": "2026-08-06T17:20:29Z"
+          "session_id": "2026-08-07T12:04:27.260721556Z-600536",
+          "utc": "2026-08-07T12:04:29Z"
         },
         "status": "completed",
         "model_recommendation": "local-lucy-llama31:latest",

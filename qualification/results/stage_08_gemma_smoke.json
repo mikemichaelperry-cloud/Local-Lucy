@@ -26,7 +26,7 @@
       "status": "completed",
       "route": "LOCAL",
       "outcome_code": "answered",
-      "response_len": 253
+      "response_len": 213
     },
     "loaded_models": [
       "local-lucy-gemma4:latest"
@@ -51,11 +51,11 @@
           "legacy_runtime_namespace_present": false,
           "legacy_runtime_namespace_status": "absent"
         },
-        "completed_at": "2026-08-06T17:17:43Z",
+        "completed_at": "2026-08-07T12:00:45Z",
         "control_state": {
-          "mode": "online",
-          "conversation": "on",
-          "memory": "on",
+          "mode": "auto",
+          "conversation": "off",
+          "memory": "off",
           "evidence": "off",
           "voice": "on",
           "augmentation_policy": "direct_allowed",
@@ -115,10 +115,10 @@
           "evidence_created": "false",
           "outcome_code": "answered",
           "rc": null,
-          "utc": "2026-08-06T17:17:43Z",
-          "execution_time_ms": 719
+          "utc": "2026-08-07T12:00:45Z",
+          "execution_time_ms": 549
         },
-        "request_id": "2026-08-06T17:17:42.606571300Z-496575",
+        "request_id": "2026-08-07T12:00:39.746140706Z-599854",
         "request_text": "What is 17 times 23?",
         "response_text": "17 times 23 is 391.",
         "route": {
@@ -135,8 +135,8 @@
           "winning_signal": "",
           "query": "What is 17 times 23?",
           "reason": "router_local",
-          "session_id": "2026-08-06T17:17:42.606571300Z-496575",
-          "utc": "2026-08-06T17:17:43Z"
+          "session_id": "2026-08-07T12:00:39.746140706Z-599854",
+          "utc": "2026-08-07T12:00:45Z"
         },
         "status": "completed",
         "model_recommendation": "local-lucy-llama31:latest",
