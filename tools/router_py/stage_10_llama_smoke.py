@@ -28,6 +28,10 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "ui-v10"))
 sys.path.insert(0, str(ROOT / "tools"))
 
+from router_py.model_residency import (
+    assert_single_local_lucy_model,
+    get_local_lucy_loaded_models,
+)
 from router_py.ollama_cleanup import (
     is_lucy_model,
     list_loaded_models,
@@ -135,6 +139,8 @@ def _set_state_model_to_llama() -> None:
 
 
 def main() -> int:
+    assert_single_local_lucy_model("start")
+
     if "LUCY_RUNTIME_NAMESPACE_ROOT" not in os.environ:
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(
             Path.home() / ".local" / "share" / "local-lucy-v11"
@@ -232,6 +238,10 @@ def main() -> int:
 
     for r in results:
         print(f"  {r['case_id']}: {r['actual_route']} (expected {r['expected_route']}) passed={r['passed']}")
+
+    assert_single_local_lucy_model("end")
+    loaded_after = get_local_lucy_loaded_models()
+    assert len(loaded_after) <= 1, loaded_after
 
     return 0 if passed else 1
 

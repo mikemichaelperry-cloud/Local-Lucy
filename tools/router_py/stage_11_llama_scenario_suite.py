@@ -26,6 +26,10 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from router_py.main import execute_plan_python
+from router_py.model_residency import (
+    assert_single_local_lucy_model,
+    get_local_lucy_loaded_models,
+)
 from router_py.ollama_cleanup import (
     is_lucy_model,
     ollama_load_lock,
@@ -262,6 +266,8 @@ def _run_scenario(scenario: dict, gemma_report: dict[str, dict]) -> dict:
 
 
 def main() -> int:
+    assert_single_local_lucy_model("start")
+
     with tempfile.TemporaryDirectory(prefix="lucy-stage11-") as tmp:
         namespace_root = Path(tmp)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(namespace_root)
@@ -317,6 +323,10 @@ def main() -> int:
 
         REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
         REPORT_PATH.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+        assert_single_local_lucy_model("end")
+        loaded_after = get_local_lucy_loaded_models()
+        assert len(loaded_after) <= 1, loaded_after
 
         print(f"\nSummary: {summary['passed_scenarios']}/{summary['total_scenarios']} scenarios passed")
         print(f"Route parity with Gemma: {summary['route_parity']}")

@@ -25,6 +25,10 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from router_py.main import execute_plan_python
+from router_py.model_residency import (
+    assert_single_local_lucy_model,
+    get_local_lucy_loaded_models,
+)
 from router_py.ollama_cleanup import (
     is_lucy_model,
     ollama_load_lock,
@@ -227,6 +231,8 @@ def _run_scenario(scenario: dict) -> dict:
 
 
 def main() -> int:
+    assert_single_local_lucy_model("start")
+
     with tempfile.TemporaryDirectory(prefix="lucy-stage09-") as tmp:
         namespace_root = Path(tmp)
         os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(namespace_root)
@@ -262,6 +268,10 @@ def main() -> int:
 
         REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
         REPORT_PATH.write_text(json.dumps(results, indent=2), encoding="utf-8")
+
+        assert_single_local_lucy_model("end")
+        loaded_after = get_local_lucy_loaded_models()
+        assert len(loaded_after) <= 1, loaded_after
 
         passed_count = sum(1 for r in results if r["passed"])
         print(f"\nSummary: {passed_count}/{len(results)} scenarios passed")
