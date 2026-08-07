@@ -1557,10 +1557,17 @@ class ExecutionEngine:
                     prompt, context, session_memory, route_mode=route.route
                 )
             elif route.provider in ("openai", "kimi"):
-                # Prepend session memory to the prompt so API providers also see it
+                # Prepend session memory to the prompt so API providers also see it.
+                # The stronger preamble tells the model to treat the history as
+                # authoritative and to consult it when the user refers to earlier turns.
                 api_prompt = prompt
                 if session_memory.strip():
-                    api_prompt = f"Session memory:\n{session_memory}\n\n{prompt}"
+                    api_prompt = (
+                        "The conversation history below is authoritative. Use it to answer the user's question.\n"
+                        "If the user refers to something earlier, look at the history first.\n\n"
+                        f"{session_memory}\n\n"
+                        f"{prompt}"
+                    )
                 response = await self._call_api_provider_async(route.provider, api_prompt, context)
                 # Fallback to local model if paid provider returns an error
                 if isinstance(response, str) and response.strip().lower().startswith("error"):

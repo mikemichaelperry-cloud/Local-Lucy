@@ -11,11 +11,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 
+from unittest.mock import patch
+
 from memory.memory_service import MemoryService
+from router_py.execution_engine import ExecutionEngine
 from router_py.execution_engine.helpers import (
     _is_memory_or_followup_query,
     _load_session_memory_context_with_telemetry,
 )
+from router_py.request_types import ClassificationResult, RoutingDecision
 
 
 class TestExecutionEngineMemoryBudget:
@@ -118,3 +122,65 @@ class TestMemoryOrFollowupQuery:
     )
     def test_allows_unrelated_queries(self, query: str) -> None:
         assert _is_memory_or_followup_query(query) is False
+
+
+class TestExecutionEngineMemoryPrompt:
+    """Execution engine prepends session memory with the authoritative preamble."""
+
+    @pytest.mark.asyncio
+    async def test_augmented_api_path_uses_authoritative_memory_preamble(self, monkeypatch):
+        monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
+
+        engine = ExecutionEngine()
+        intent = ClassificationResult(
+            intent="question",
+            intent_family="general",
+        )
+        route = RoutingDecision(
+            route="AUGMENTED",
+            mode="FORCED",
+            intent_family="general",
+            confidence=1.0,
+            provider="openai",
+            provider_usage_class="paid",
+            evidence_mode="",
+            evidence_reason="",
+        )
+        context = {"question": "what did I say earlier?", "request_id": "req-1"}
+
+        captured_prompt = None
+
+        async def fake_call_api(provider: str, prompt: str, ctx: dict):
+            nonlocal captured_prompt
+            captured_prompt = prompt
+            return "mocked response"
+
+        with patch.object(
+            engine,
+            "_fetch_evidence",
+            return_value={
+                "context": "Some background.",
+                "title": "Test",
+                "url": "http://example.com",
+                "provider": "test",
+            },
+        ):
+            with patch(
+                "router_py.execution_engine.is_evidence_relevant",
+                return_value=True,
+            ):
+                with patch(
+                    "router_py.execution_engine._load_session_memory_context_with_telemetry",
+                    return_value=("User: hello\nAssistant: hi", {}),
+                ):
+                    with patch.object(
+                        engine,
+                        "_call_api_provider_async",
+                        side_effect=fake_call_api,
+                    ):
+                        await engine.execute_async(intent, route, context)
+
+        assert captured_prompt is not None
+        assert "authoritative" in captured_prompt
+        assert "look at the history first" in captured_prompt
+        assert captured_prompt.find("authoritative") < captured_prompt.find("Question:")

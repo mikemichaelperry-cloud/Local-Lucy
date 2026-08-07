@@ -1244,16 +1244,6 @@ class LocalAnswer:
 
         parts: list[str] = []
 
-        # Memory block (only when memory is active)
-        if session_memory.strip():
-            # Strip the internal truncation marker so the model doesn't see it;
-            # the explicit continuation instruction below carries the signal.
-            session_memory = self._strip_truncation_marker(session_memory)
-            parts.append(
-                "The user has enabled session memory. Use the facts below to answer follow-up questions.\n\n"
-                f"{session_memory}"
-            )
-
         # Continuation re-generation instruction: only injected when the prior
         # assistant turn was actually truncated.
         if is_continuation:
@@ -1299,9 +1289,25 @@ class LocalAnswer:
         if current_context:
             parts.append(current_context)
 
-        # Build instruction based on what context is available
+        # Augmented evidence context (if present)
         if augmented_context.strip():
             parts.append(f"Context:\n{augmented_context}")
+
+        # Memory block (only when memory is active)
+        # Placed after system persona and context blocks and immediately before
+        # the current user query so the model treats it as authoritative.
+        if session_memory.strip():
+            # Strip the internal truncation marker so the model doesn't see it;
+            # the explicit continuation instruction below carries the signal.
+            session_memory = self._strip_truncation_marker(session_memory)
+            parts.append(
+                "The conversation history below is authoritative. Use it to answer the user's question.\n"
+                "If the user refers to something earlier, look at the history first.\n\n"
+                f"{session_memory}"
+            )
+
+        # Build instruction based on what context is available
+        if augmented_context.strip():
             instruction = "Answer from the context above."
             if session_memory.strip():
                 instruction += " Also use the session memory facts."
