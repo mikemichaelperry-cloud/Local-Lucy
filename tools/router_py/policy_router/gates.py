@@ -1640,28 +1640,72 @@ _TRAVEL_PLACE_RE = re.compile(
     r")\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)"
 )
 
+# Safety/advisory phrasing that must keep travel queries on EVIDENCE/trusted
+# rather than the lighter AUGMENTED/trusted tourism path.
+_TRAVEL_SAFETY_KEYWORDS = (
+    "dangerous",
+    "safe",
+    "warning",
+    "advisory",
+    "current situation",
+    "war",
+    "conflict",
+    "terrorism",
+)
+
+
+def _has_travel_safety_keyword(query: str) -> bool:
+    """Return True when the query asks for safety or travel-advisory information."""
+    if not query:
+        return False
+    q = query.lower()
+    for keyword in _TRAVEL_SAFETY_KEYWORDS:
+        if " " in keyword:
+            if keyword in q:
+                return True
+        elif re.search(rf"\b{re.escape(keyword)}", q):
+            return True
+    return False
+
 
 def gate_travel_tourism(
     query: str, _classification: ClassificationResult, _context: dict[str, Any] | None
 ) -> PolicyDecision | None:
-    """Travel / tourism destination queries -> AUGMENTED (Wikipedia first)."""
+    """Travel / tourism destination queries -> AUGMENTED (trusted provider).
+
+    Safety/advisory variants of the same travel pattern are routed to
+    EVIDENCE/trusted so they use the strict trusted-sources path.
+    """
     if not query:
         return None
     q = query.strip()
     # Require a capitalized place name so we don't catch generic "places to visit".
-    if _TRAVEL_PLACE_RE.search(q):
+    if not _TRAVEL_PLACE_RE.search(q):
+        return None
+    # Safety/advisory queries must stay on the stricter EVIDENCE/trusted path.
+    if _has_travel_safety_keyword(q):
         return PolicyDecision(
-            route="AUGMENTED",
-            reason_code="policy:travel_tourism",
-            matched_rule="travel_tourism",
+            route="EVIDENCE",
+            reason_code="policy:travel_advisory",
+            matched_rule="travel_advisory",
             evidence_mode="required",
-            evidence_reason="travel_tourism",
+            evidence_reason="travel_advisory",
             requires_evidence=True,
-            provider="wikipedia",
+            provider="trusted",
             provider_usage_class="free",
-            policy_reason="travel_tourism_lookup",
+            policy_reason="travel_advisory_lookup",
         )
-    return None
+    return PolicyDecision(
+        route="AUGMENTED",
+        reason_code="policy:travel_tourism",
+        matched_rule="travel_tourism",
+        evidence_mode="required",
+        evidence_reason="travel_tourism",
+        requires_evidence=True,
+        provider="trusted",
+        provider_usage_class="free",
+        policy_reason="travel_tourism_lookup",
+    )
 
 
 def _is_factual_lookup_query(query: str) -> bool:

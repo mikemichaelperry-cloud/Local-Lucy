@@ -1715,9 +1715,8 @@ def _format_travel_response(
 
     # All fetch attempts failed — ask the user to specify a country or region.
     return _with_trusted_metadata(
-        f"I couldn't retrieve travel information for {destination}. "
-        "Please specify a country or region so I can look it up from trusted sources.\n\n"
-        "Trusted sources:\n" + "\n".join(f"- {src}" for src in sources[:6]),
+        "I don't have current trusted travel information for that destination. "
+        "Please specify the country or region, or enable a broader source.",
         include_metadata=include_metadata,
         answer_basis="trusted_domain_fallback",
         live_fetch_status="failed",

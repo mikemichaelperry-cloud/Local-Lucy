@@ -32,7 +32,7 @@ if str(ROOT_DIR / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT_DIR / "tools"))
 
 from router_py.request_types import ClassificationResult, RouterOutcome, RoutingDecision
-from router_py.classify import select_route
+from router_py.classify import classify_intent, select_route
 from router_py.escalation.critical_guard import (
     get_default_trusted_domains_file,
     get_trusted_domains_file,
@@ -46,21 +46,30 @@ logger = logging.getLogger(__name__)
 
 
 def select_route_for_question(
-    classification: ClassificationResult,
-    question: str,
-    policy: str,
-    context: dict[str, Any] | None,
+    classification_or_question: ClassificationResult | str,
+    question: str | None = None,
+    policy: str = "fallback_only",
+    context: dict[str, Any] | None = None,
 ) -> RoutingDecision | RouterOutcome:
     """
-    Select the raw route for a classified question.
+    Select the raw route for a question.
+
+    This helper can be called in two ways:
+
+    * With a pre-computed ``ClassificationResult`` and the original question
+      (used by the pipeline facade).
+    * With just the user's query string (convenience for tests and callers
+      that want classify + route in one step).
 
     Normalization (route prefix, augmented_direct_once, provider resolution,
     request constraints) is intentionally applied by the facade so that bypass
     decisions receive the same treatment as router-produced decisions.
 
     Args:
-        classification: The classified intent.
-        question: The user's query text.
+        classification_or_question: Either a classified intent or the raw
+            user query text.
+        question: The user's query text, required when the first argument is
+            a ``ClassificationResult``.
         policy: Augmentation policy name (e.g. ``fallback_only``).
         context: Extra execution context from caller.
 
@@ -71,6 +80,32 @@ def select_route_for_question(
     import time as _time
 
     start_time = _time.time()
+
+    if isinstance(classification_or_question, str):
+        question = classification_or_question
+        try:
+            surface = (context or {}).get("surface", "cli")
+            classification = classify_intent(question, surface=surface)
+        except Exception as exc:
+            logger.exception("Classification failed")
+            execution_time = int((_time.time() - start_time) * 1000)
+            return RouterOutcome(
+                status="failed",
+                outcome_code="classification_error",
+                route="LOCAL",
+                provider="local",
+                provider_usage_class="local",
+                intent_family="unknown",
+                confidence=0.0,
+                error_message=f"Classification failed: {exc}",
+                execution_time_ms=execution_time,
+                evidence_reason="",
+                policy_reason="classification_failed",
+            )
+    else:
+        classification = classification_or_question
+        if question is None:
+            raise TypeError("question is required when classification is provided")
 
     try:
         normalized_policy = normalize_augmentation_policy(policy)
@@ -199,9 +234,25 @@ def apply_critical_source_policy(
         )
 
     if decision.route == "AUGMENTED":
-        # Travel advisories need strict trusted sources; do not race Wikipedia
-        # or other general providers against the trusted travel provider.
+        # Travel advisories need strict trusted sources; do not race general
+        # providers against the trusted travel provider. Tourism recommendations
+        # that already come from the trusted provider stay on AUGMENTED.
         if classification.category == "travel_advisory":
+            if decision.evidence_reason == "travel_tourism":
+                logger.info(
+                    "critical_source_policy_travel_tourism_trusted",
+                    extra={"category": classification.category},
+                )
+                return dataclasses.replace(
+                    decision,
+                    provider="trusted",
+                    provider_usage_class="free",
+                    evidence_mode="required",
+                    evidence_reason="travel_tourism",
+                    requires_evidence=True,
+                    policy_reason="critical_trusted_sources_only",
+                    reason_code="travel_tourism_trusted",
+                )
             logger.info(
                 "critical_source_policy_travel_to_evidence",
                 extra={"category": classification.category},

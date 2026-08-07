@@ -17,6 +17,8 @@ from router_py.pipeline.config import CapabilityFlags
 from router_py.pipeline.route import apply_critical_source_policy
 from router_py.request_types import ClassificationResult, RoutingDecision
 
+from unverified_context_trusted import _extract_travel_destination, _format_travel_response
+
 
 def _classification(category: str, evidence_reason: str = "") -> ClassificationResult:
     return ClassificationResult(
@@ -109,8 +111,6 @@ def test_travel_allowlist_exists():
 
 
 def test_travel_destination_extraction():
-    from unverified_context_trusted import _extract_travel_destination
-
     assert _extract_travel_destination("What should I see in Japan?") == "Japan"
     assert _extract_travel_destination("Best places to visit in France") == "France"
     assert _extract_travel_destination("Travel guide to Italy") == "Italy"
@@ -149,6 +149,48 @@ def test_travel_provider_returns_wikivoyage_content(monkeypatch):
     assert evidence["provider"] == "trusted"
     assert "France" in evidence.get("context", "")
     assert "wikivoyage.org" in evidence.get("context", "").lower()
+
+
+def test_tourism_recommendation_routes_augmented_trusted():
+    from router_py.pipeline.route import select_route_for_question
+
+    result = select_route_for_question("recommend places to visit in Israel")
+    assert result.route == "AUGMENTED"
+    assert result.provider == "trusted"
+    assert result.evidence_reason == "travel_tourism"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Is it safe to travel to Turkey?",
+        "Is it dangerous to travel to France?",
+    ],
+)
+def test_travel_safety_query_routes_to_evidence_trusted(query: str):
+    from router_py.pipeline.route import select_route_for_question
+
+    result = select_route_for_question(query)
+    assert result.route == "EVIDENCE"
+    assert result.provider == "trusted"
+    assert result.evidence_reason == "travel_advisory"
+
+
+def test_travel_fetch_failure_returns_clear_message(monkeypatch):
+    monkeypatch.setattr("unverified_context_trusted._fetch_json", lambda url, timeout: None)
+    monkeypatch.setattr(
+        "unverified_context_trusted._fetch_israel_travel_summary", lambda destination: None
+    )
+
+    content, metadata = _format_travel_response(
+        ["wikivoyage.org"], "Travel guide to France", include_metadata=True
+    )
+    assert (
+        "I don't have current trusted travel information for that destination."
+        in content
+    )
+    assert "Please specify the country or region, or enable a broader source." in content
+    assert metadata["LIVE_FETCH_STATUS"] == "failed"
 
 
 if __name__ == "__main__":
