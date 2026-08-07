@@ -1480,6 +1480,10 @@ def gate_news(
 
     if not query:
         return None
+    # Travel safety/advisory queries (e.g. "current situation for travel to
+    # Israel") should be handled by gate_travel_tourism, not routed to NEWS.
+    if _TRAVEL_PLACE_RE.search(query) and _has_travel_safety_keyword(query):
+        return None
     if _is_clear_news_query(query) or _is_news_query_typos(query):
         return PolicyDecision(
             route="NEWS",
@@ -1663,7 +1667,7 @@ def _has_travel_safety_keyword(query: str) -> bool:
         if " " in keyword:
             if keyword in q:
                 return True
-        elif re.search(rf"\b{re.escape(keyword)}", q):
+        elif re.search(rf"\b{re.escape(keyword)}\b", q):
             return True
     return False
 

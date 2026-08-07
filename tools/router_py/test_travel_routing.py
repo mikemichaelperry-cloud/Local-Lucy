@@ -165,6 +165,12 @@ def test_tourism_recommendation_routes_augmented_trusted():
     [
         "Is it safe to travel to Turkey?",
         "Is it dangerous to travel to France?",
+        "Is there a travel warning for travel to Turkey?",
+        "What is the travel advisory for travel to France?",
+        "What is the current situation for travel to Israel?",
+        "Is the war affecting travel to Ukraine?",
+        "Is the conflict affecting travel to Gaza?",
+        "Is terrorism a risk for travel to France?",
     ],
 )
 def test_travel_safety_query_routes_to_evidence_trusted(query: str):
