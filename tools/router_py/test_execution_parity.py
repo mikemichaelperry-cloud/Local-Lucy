@@ -355,12 +355,6 @@ class ExecutionEngine:
         if extra_env:
             env.update(extra_env)
 
-        # Set implementation-specific env vars
-        if implementation == "python":
-            env["LUCY_ROUTER_PY"] = "1"
-        else:
-            env["LUCY_ROUTER_PY"] = "0"
-
         try:
             # Use subprocess to run the implementation
             # execute_plan.sh takes query as arguments or stdin

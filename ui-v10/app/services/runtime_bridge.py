@@ -276,18 +276,6 @@ class RuntimeBridge:
         )
         if include_voice_python and self.voice_python_bin:
             env.setdefault("LUCY_VOICE_PYTHON_BIN", self.voice_python_bin)
-        # Always include Python router settings so they're propagated to subprocesses
-        # These are only active when LUCY_ROUTER_PY=1
-        env.setdefault("LUCY_ROUTER_PY", os.environ.get("LUCY_ROUTER_PY", "0"))
-        env.setdefault(
-            "LUCY_ROUTER_PY_PERCENTAGE", os.environ.get("LUCY_ROUTER_PY_PERCENTAGE", "0")
-        )
-        env.setdefault(
-            "LUCY_ROUTER_PY_DETERMINISTIC", os.environ.get("LUCY_ROUTER_PY_DETERMINISTIC", "true")
-        )
-        env.setdefault(
-            "LUCY_ROUTER_PY_EMERGENCY_KILL", os.environ.get("LUCY_ROUTER_PY_EMERGENCY_KILL", "0")
-        )
         # Python Voice Pipeline toggle (V8)
         # Set LUCY_VOICE_PY=1 to use Python-native voice pipeline instead of shell
         env.setdefault("LUCY_VOICE_PY", os.environ.get("LUCY_VOICE_PY", "0"))

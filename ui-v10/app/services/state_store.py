@@ -233,17 +233,8 @@ def _contract_required() -> bool:
 
 
 def _detect_router() -> str:
-    """Detect which router is being used."""
-    # Check environment variables that indicate Python router usage
-    router_py = os.environ.get("LUCY_ROUTER_PY", "0")
-    exec_py = os.environ.get("LUCY_EXEC_PY", "0")
-
-    if router_py == "1" and exec_py == "1":
-        return "Python"
-    elif router_py == "1":
-        return "Python-Router"
-    else:
-        return "Shell"
+    """Report which router is being used (Python-native is authoritative)."""
+    return "Python"
 
 
 def _validate_within_namespace(path: Path, namespace_root: Path, *, label: str) -> Path:

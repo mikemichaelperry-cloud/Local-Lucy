@@ -17,8 +17,6 @@ os.environ["LUCY_RUNTIME_NAMESPACE_ROOT"] = str(
     Path.home() / ".codex-api-home" / "lucy" / "runtime-v10"
 )
 os.environ["LUCY_UI_ROOT"] = str(Path(__file__).parent.parent.parent)
-os.environ["LUCY_ROUTER_PY"] = "1"
-os.environ["LUCY_EXEC_PY"] = "1"
 os.environ["LUCY_USE_CONSOLIDATED_BRIDGE"] = "1"
 
 

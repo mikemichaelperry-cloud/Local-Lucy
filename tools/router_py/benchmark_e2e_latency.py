@@ -40,8 +40,6 @@ os.environ.setdefault("LUCY_RUNTIME_AUTHORITY_ROOT", str(PROJECT_ROOT))
 os.environ.setdefault("LUCY_RUNTIME_NAMESPACE_ROOT", str(PROJECT_ROOT))
 os.environ.setdefault("LUCY_UI_ROOT", str(PROJECT_ROOT / "ui-v10"))
 os.environ.setdefault("LUCY_LATENCY_PROFILE", "1")
-os.environ.setdefault("LUCY_ROUTER_PY", "1")
-os.environ.setdefault("LUCY_EXEC_PY", "1")
 os.environ.setdefault("LUCY_SESSION_MEMORY", "0")  # Disable memory for pure benchmark
 
 from router_py.main import run

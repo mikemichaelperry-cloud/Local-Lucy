@@ -15,8 +15,6 @@ import sys
 import time
 from pathlib import Path
 
-os.environ["LUCY_EXEC_PY"] = "1"
-os.environ["LUCY_ROUTER_PY"] = "1"
 os.environ["LUCY_SESSION_MEMORY"] = "1"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))

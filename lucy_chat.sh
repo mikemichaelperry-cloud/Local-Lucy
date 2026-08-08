@@ -37,8 +37,6 @@ export LUCY_OLLAMA_API_URL="${LUCY_OLLAMA_API_URL:-http://127.0.0.1:11434/api/ge
 # Control toggles (evidence/augmentation) are loaded from current_state.json by
 # the Python router.  Do not hard-code defaults here; that prevents the state
 # file from being the single source of truth and breaks test overrides.
-export LUCY_ROUTER_PY="${LUCY_ROUTER_PY:-1}"
-export LUCY_EXEC_PY="${LUCY_EXEC_PY:-1}"
 
 # Ensure state directories exist
 mkdir -p "$LUCY_RUNTIME_NAMESPACE_ROOT/state/namespaces/default"

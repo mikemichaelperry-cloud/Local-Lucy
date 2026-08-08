@@ -70,8 +70,6 @@ export PYTHONPATH="${SCRIPT_DIR}/ui-v10/app:${PYTHONPATH:-}"
 export LUCY_ROUTER_LOG_DIR="${LUCY_RUNTIME_NAMESPACE_ROOT}/logs"
 
 # Runtime configuration
-export LUCY_ROUTER_PY=1
-export LUCY_EXEC_PY=1
 export LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
 
 # Read model from persistent state so the HMI toggle survives restarts.

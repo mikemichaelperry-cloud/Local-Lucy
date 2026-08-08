@@ -46,7 +46,6 @@ def _run_subprocess(
     """Run a Python snippet in the target project venv and return parsed JSON."""
     env = {
         "PYTHONPATH": "tools:models/router",
-        "LUCY_EXEC_PY": "1",
         "LUCY_SESSION_MEMORY": "0",
     }
     cmd = [str(python), "-c", code]

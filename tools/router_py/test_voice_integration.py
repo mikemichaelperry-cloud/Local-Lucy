@@ -63,12 +63,6 @@ def _make_outcome(**kwargs: Any) -> Any:
 class TestVoiceSubmitFlow:
     """Test voice transcript submission through the unified pipeline."""
 
-    @pytest.fixture(autouse=True)
-    def _ensure_env(self, monkeypatch):
-        """Set LUCY_EXEC_PY for Python-native path."""
-        monkeypatch.setenv("LUCY_EXEC_PY", "1")
-        yield
-
     def test_voice_submit_routes_to_local(self):
         """Voice query 'What is 2+2?' should route LOCAL."""
         with patch("router_py.request_pipeline.process") as mock_process:

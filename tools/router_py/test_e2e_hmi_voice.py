@@ -102,7 +102,6 @@ def tmp_state_dir():
 @pytest.fixture
 def engine(tmp_state_dir, monkeypatch):
     """Real ExecutionEngine with mocked external dependencies."""
-    monkeypatch.setenv("LUCY_EXEC_PY", "1")
     monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
     eng = ExecutionEngine(
         config={
@@ -445,7 +444,6 @@ class TestFullVoiceTurn:
         Full voice turn: instantiate real engine, execute LOCAL route,
         verify both file and SQLite state are consistent.
         """
-        monkeypatch.setenv("LUCY_EXEC_PY", "1")
         monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
         engine = ExecutionEngine(
             config={
@@ -485,7 +483,6 @@ class TestFullVoiceTurn:
         """
         Full voice turn: WEATHER route with evidence fetching mocked.
         """
-        monkeypatch.setenv("LUCY_EXEC_PY", "1")
         monkeypatch.setenv("LUCY_UI_STATE_DIR", str(tmp_state_dir))
         engine = ExecutionEngine(
             config={
