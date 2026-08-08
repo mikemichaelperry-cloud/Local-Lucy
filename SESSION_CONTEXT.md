@@ -1,7 +1,7 @@
 # Local Lucy — Session Context (Auto-Updated)
 
 > **READ THIS FIRST** at every session start. Updated at every handoff.
-> Latest change: Engineering-mode context limit raised to 200,000 characters (2026-08-07).
+> Latest change: Final requalification complete — STAGE_19 clean run 7/7 on HEAD `8c80cdb` (2026-08-07); documentation-review corrections and AGENTS.md/SESSION_CONTEXT.md accuracy pass (2026-08-08).
 
 ---
 
@@ -10,13 +10,13 @@
 | | |
 |---|---|
 | **Repository** | `~/lucy-v11` (also `LUCY_ROOT`) |
-| **Branch** | `v10-dev` |
-| **Last tag** | `v11.0.0-dev` |
+| **Branch** | `main` |
+| **Last tag** | `v11-provisional-runnable-2026-07-21` |
 | **Version** | `11.0.0-dev` |
-| **Model** | `local-lucy-llama31` (llama3.1:8b via Ollama) |
-| **Handoff file** | `~/Desktop/Local_Lucy_v11_Session_Handoff_<date>.md` |
-| **Default branch on origin** | `v10-dev` ✅ |
-| **Working tree** | Clean (commit `7135801`; only untracked `tools/router_py/state/__pycache__/`) |
+| **Models** | `local-lucy-llama31` (default) and `local-lucy-gemma4` — both QUALIFIED |
+| **Handoff file** | `~/Desktop/Local Lucy V11/SESSION_HANDOFF.md` (repo master: `qualification/SESSION_HANDOFF.md`; old versions in `Local_Lucy_V11_Archive/`) |
+| **Default branch on origin** | `main` ✅ |
+| **Working tree** | Modified — doc corrections + requal results uncommitted (see Git State) |
 
 ---
 
@@ -25,13 +25,15 @@
 ```
 lucy-v11/
 ├── tools/                    # Core backend (router, execution, voice, memory, internet)
-│   ├── router_py/            # Main execution engine (~50 modules)
+│   ├── router_py/            # Main execution engine (~50 modules; several are packages:
+│   │                         #   execution_engine/, classify_core/, policy_router/,
+│   │                         #   local_answer_core/, feedback_parser/)
 │   ├── lora/                 # Persona LoRA training, conversion, evaluation
 │   ├── internet/             # Web search (DuckDuckGo, SearXNG, Brave)
-│   ├── voice/                # TTS (Kokoro), STT (Whisper), playback
+│   ├── voice/                # TTS (Kokoro/Piper/edge-tts), STT (whisper.cpp server), playback
 │   ├── memory/               # SQLite memory service
 │   └── xdg_paths.py          # XDG-compliant path resolution
-├── ui-v10/                   # PySide6 HMI
+├── ui-v10/                   # PySide6 HMI (directory name predates v11; still the current HMI)
 │   ├── app/                  # Main window, panels, widgets, services
 │   │   ├── backend/          # Thin re-exports from router_py
 │   │   ├── panels/           # Control, conversation, status, event log
@@ -43,10 +45,12 @@ lucy-v11/
 │   ├── static.py             # Dependency-free frontend page
 │   └── test_web_adapter.py   # Web adapter tests
 ├── models/router/            # Embedding router, training data, background learner
-├── config/                   # Modelfiles, prompts, trust rules, policies
+├── config/                   # Modelfiles, prompts, trust rules, policies, personas/
 ├── services/searxng/         # Docker Compose + settings.yml for local search proxy
 ├── scripts/                  # Operational scripts (check_environment.py, migrate_db.py)
-├── docs/runbooks/            # INSTALL.md, SECURITY.md
+├── qualification/            # Qualification programme: master plan, runbook, decisions,
+│                             #   status, results/, completion reports, session handoff
+├── docs/runbooks/            # INSTALL.md, SECURITY.md, PERSONAS.md, OLLAMA_SECURITY.md
 ├── README.md                 # Project overview, usage, features
 ├── ARCHITECTURE.md           # System architecture
 ├── CHANGELOG.md              # Keep a Changelog format
@@ -57,7 +61,6 @@ lucy-v11/
 ├── lucy_chat.sh              # CLI chat entry point
 ├── Makefile                  # install, test, lint, run, clean, check-env
 ├── VERSION                   # 11.0.0-dev
-├── CHANGELOG.md              # Keep a Changelog format
 └── pyproject.toml            # Packaging, dependencies, tool configs
 ```
 
@@ -68,13 +71,16 @@ lucy-v11/
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `LUCY_ROOT` | derived from `START_LUCY.sh` | Project root |
-| `LUCY_RUNTIME_NAMESPACE_ROOT` | `~/.local/share/local-lucy` (XDG) or legacy `~/.codex-api-home/...` | Runtime state, DBs, logs |
+| `LUCY_RUNTIME_NAMESPACE_ROOT` | `~/.local/share/local-lucy-v11` (XDG) | Runtime state, DBs, logs |
 | `LUCY_RUNTIME_AUTHORITY_ROOT` | `$LUCY_ROOT` | Code authority validation |
 | `LUCY_UI_ROOT` | `$LUCY_ROOT/ui-v10` | HMI path |
 | `LUCY_OLLAMA_API_URL` | `http://127.0.0.1:11434/api/generate` | Local LLM endpoint |
 | `LUCY_LOCAL_MODEL` | `local-lucy-llama31` | Default Ollama model |
 | `LUCY_STATE_DB` | `$LUCY_RUNTIME_NAMESPACE_ROOT/state/lucy_state.db` | SQLite state DB |
 | `LUCY_MEMORY_DB_PATH` | `$LUCY_RUNTIME_NAMESPACE_ROOT/state/memory.db` | SQLite memory DB |
+| `LUCY_SESSION_MEMORY` | `0` (HMI memory toggle sets `1`) | Session-memory injection |
+| `LUCY_MEMORY_*` | see `AGENTS.md` | Retrieval knobs: recent turns 12, semantic turns 8, max chars 2000 (engine passes 2400), similarity 0.70, topic-shift 0.50 |
+| `LUCY_AUTO_LEARN` | effectively ON (`runtime_control.py`) | Set `0` during development |
 | `QT_QPA_PLATFORM` | `xcb` | Qt platform plugin |
 
 ---
@@ -90,6 +96,7 @@ lucy-v11/
 | DB migration | `python scripts/migrate_db.py` |
 | Optional web UI | `LUCY_WEB_ENABLED=1 python -m web_adapter` |
 | Pytest (full) | `make test` |
+| Qualification | `python3 qualification/run_full_qualification.py --no-production-data` (see `qualification/RUNBOOK.md`) |
 | Lint | `make lint` |
 
 ---
@@ -97,16 +104,31 @@ lucy-v11/
 ## Git State
 
 ```bash
-# Current state (auto-generated)
+# Current state (verified 2026-08-08)
 Branch: main
 Origin HEAD: main (not checked against remote)
-Latest tag: v11.0.0-dev
-Commits since tag: 67+
-Working tree: clean (untracked `tools/router_py/state/__pycache/` only)
+Latest tag: v11-provisional-runnable-2026-07-21
+Commits since tag: 201
+Working tree: modified (see below)
+```
+
+Uncommitted changes (documentation-review + final-requal session, 2026-08-07/08):
+
+```
+ M qualification/COMPLETION_REPORT_2026-08-06.md   # accuracy corrections, DEC-016 ref
+ M qualification/DECISIONS.md                      # DEC-016 added
+ M qualification/SESSION_HANDOFF.md                # rewritten for requal session
+ M qualification/results/stage_*.json              # regenerated by STAGE_19 re-runs
+ M tools/memory/memory_service.py                  # docstring default 0.55 -> 0.70
+ M tools/router_py/stage_09_gemma_scenario_suite.py # records response_text diagnostics
+?? qualification/COMPLETION_REPORT_2026-08-07_FINAL_REQUAL.md
+?? tools/router_py/state/__pycache__/
 ```
 
 ### Recent Commits (last 16)
 ```
+8c80cdb docs: update AGENTS.md active branch to main
+9c475c2 docs: align session context and self-knowledge with 200k Engineering-mode limit
 7135801 docs: remove self-referential HEAD line from SESSION_HANDOFF.md
 f44bd98 docs: record current HEAD in SESSION_HANDOFF.md
 568fa7e docs: record docs commit hash in SESSION_HANDOFF.md
@@ -121,23 +143,29 @@ a5aee0c test(memory): expanded memory retrieval, explicit recall, topic-shift, c
 6f8d4b5 fix(memory): privacy canary tests and outbound-capture harness
 7c4f9a1 fix(voice): reproduce and fix voice text-display regression
 8a3d0e2 test(guards): boundary tests for evidence/restaurant/weather/residence gates
-4b8c1a0 docs: KNOWN_LIMITATIONS and accepted holdout cases
-2e1f0a9 fix(router): guard weather/time low-confidence fallback to actual intent
 ```
+
+### Documentation Review & Final Requalification — 2026-08-07/08 (latest)
+- **Trigger:** external review of the 2026-08-06 completion report/handoff found documentation defects and a qualification gap (memory-retrieval expansion `1930946` landed after the original STAGE_19 pass).
+- **Doc corrections:** `COMPLETION_REPORT_2026-08-06.md` (qualified overstated claims; max_chars story corrected to 500 → 2000 env / 2400 engine; path fix); `SESSION_HANDOFF.md` rollback rewritten (pre-change commit `3249092`; env-var approximation cannot undo the code-only topic-shift bypass); `DECISIONS.md` gained DEC-016 (S09-GEM-007 any-single-marker relaxation); `memory_service.py` docstring default fixed (0.55 → 0.70).
+- **STAGE_19 re-run #1 (HEAD `8c80cdb`):** 6/7 — S09-MEM-003 flake ("missing required concept: Local Lucy"). Root cause: model-wording flake, not retrieval — proven by STAGE_09 standalone 16/16 with near-verbatim recall. Harness now records `response_text`/`turn_responses` per scenario for diagnosability.
+- **STAGE_19 re-run #2:** **7/7 passed, no dual-model residency, `final_loaded_models=[]`** → **QUALIFIED on HEAD `8c80cdb`**. Full story: `qualification/COMPLETION_REPORT_2026-08-07_FINAL_REQUAL.md`.
+- **AGENTS.md rewritten** for current v11 reality (removed Qwen/Mistral persona tables, dead `LUCY_ROUTER_PY`/`LUCY_EXEC_PY`, package paths, memory knobs, GPU sequential-discipline rule); **SESSION_CONTEXT.md corrected** (this update).
+- **Desktop docs:** current copies in `~/Desktop/Local Lucy V11/`; stale loose files were byte-identical to archive copies and removed; stale DECISIONS snapshot archived as `Local_Lucy_V11_DECISIONS_2026-08-01_stale.md`.
 
 ### Persona LoRA Pipeline — Completed Within Hardware Limits
 - Phase 1 (prompt-level personas) previously complete and tested.
 - Phase 2–5 completed for hardware-feasible models:
   - `tools/lora/` scripts for dataset generation, QLoRA training, GGUF conversion, Modelfile generation, and Ollama tag creation.
   - Persona datasets generated at `data/lora/datasets/{michael,racheli}.jsonl`.
-  - Persona-aware model resolution added to `tools/router_py/local_answer.py`.
+  - Persona-aware model resolution in `tools/router_py/model_selector.py` (`_resolve_persona_model`; allowed bases `local-lucy-llama31`, `local-lucy-gemma4`).
   - HMI persona selector (`auto` / `Michael` / `Racheli`) added to Control Panel, plus indicator and clear button, forcing the active identity for all models.
   - Golden test cases expanded with `contains_any` / `not_contains_any` checks and evaluator hardened with `--min-pass-rate` and `--json` output.
   - `local-lucy-llama31-michael` and `local-lucy-llama31-racheli` adapters trained, converted to GGUF, and registered as Ollama tags.
 - Hardware limitation on RTX 3060 12 GB:
   - `Qwen/Qwen3-14B` OOMs during `prepare_model_for_kbit_training` even at rank 4 / seq 512.
   - `mistralai/Mistral-Nemo-Instruct-2407` also OOMs at the same step, even at rank 4 / seq 512 / `q_proj,v_proj` only.
-  - Therefore `local-lucy`, `local-lucy-fast`, `local-lucy-qwen3`, and `local-lucy-mistral` use prompt-level persona injection at runtime.
+  - Qwen3/Mistral tags remain on the host but are legacy; they are not in the active model-selection path.
   - `train_all_personas.sh` now trains only Llama 3.1 adapters; docs/README/AGENTS/gpu_resource_allocation updated with the final adapter matrix.
 - Docs updated:
   - New `docs/runbooks/PERSONAS.md` runbook with validation results.
@@ -159,7 +187,7 @@ a5aee0c test(memory): expanded memory retrieval, explicit recall, topic-shift, c
 
 ### Self-Analysis Mode — Hardened
 - New `tools/router_py/self_analysis.py` parses Local Lucy's Python source with stdlib `ast` and existing `ruff`, then uses the configured local LLM via `LocalAnswer` to suggest improvements.
-- `tools/router_py/execution_engine.py` dispatches self-analysis queries when `self_analysis_mode` is `"on"` and the query references a Python file.
+- `tools/router_py/execution_engine/` dispatches self-analysis queries when `self_analysis_mode` is `"on"` and the query references a Python file.
 - **Fixes applied:**
   - Self-analysis results now write state files (`_write_state_files` / `_write_json_state_files`) so the HMI can display them.
   - Results are reported with route `SELF_REVIEW` (not `LOCAL`) and `policy_reason="self_analysis_mode"`.
@@ -182,7 +210,7 @@ a5aee0c test(memory): expanded memory retrieval, explicit recall, topic-shift, c
   - `_resolve_file` rejects path traversal, non-existent paths, directories, non-`.py` files, and files larger than 5 MB.
   - `_read_source` enforces the 5 MB cap at the read boundary (TOCTOU-safe) and uses `errors="replace"` for non-UTF-8 bytes.
   - Source longer than `self_review_context_chars` is truncated with a `[truncated at N characters; consider reviewing a smaller module]` notice.
-- **Dedicated `SELF_REVIEW` route (`tools/router_py/local_answer.py`):**
+- **Dedicated `SELF_REVIEW` route (`tools/router_py/local_answer_core/`):**
   - `LocalAnswerConfig` exposes `self_review_max_tokens` (default 4096) and `self_review_context_chars` (default 200000), overridable via `LUCY_SELF_REVIEW_MAX_TOKENS` and `LUCY_SELF_REVIEW_CONTEXT_CHARS`.
   - `_set_generation_profile("SELF_REVIEW", ...)` returns a `("self_review", self_review_max_tokens, "- Provide a thorough, detailed code review with concrete, minimal improvements.")` profile.
   - `_call_ollama` raises the `num_predict` ceiling only for `SELF_REVIEW`, so the budget is not capped by `num_predict_long`.
@@ -191,7 +219,7 @@ a5aee0c test(memory): expanded memory retrieval, explicit recall, topic-shift, c
   - `generate_answer` bypasses the local repeat cache for `SELF_REVIEW`.
   - General Q&A short-circuits (policy, 807, tube-DB, personal-fact) and the 807 post-processing override are skipped for `SELF_REVIEW`.
 - **Config unification:**
-  - `SelfAnalysisEngine` accepts `self_review_context_chars` and obtains the default from `LocalAnswerConfig.from_env()`; `execution_engine.py` passes the authoritative config value.
+  - `SelfAnalysisEngine` accepts `self_review_context_chars` and obtains the default from `LocalAnswerConfig.from_env()`; `execution_engine/` passes the authoritative config value.
 - **Documentation:**
   - Updated `docs/superpowers/specs/2026-07-15-self-analysis-large-files-design.md` to match implementation wording.
 - **Tests:**
@@ -236,7 +264,7 @@ a5aee0c test(memory): expanded memory retrieval, explicit recall, topic-shift, c
   - `test_gemma4_identity.py`, `test_security_guard.py`, `test_local_answer.py::TestQueryClassification` -m slow → 9 passed
   - `test_self_analysis.py::test_specialist_model_identity_exists` → passed
 - **HMI:** Restarted after the config change so the new default is active.
-- **Qualification note:** This is a post-qualification behavioural default change. The previous `QUALIFIED` decision in `qualification/SESSION_HANDOFF.md` applies to commit `ed26695`; current HEAD (`7135801`) should be treated as a release candidate until a full clean run is repeated.
+- **Qualification note:** RESOLVED — the full clean run was repeated on HEAD `8c80cdb` (which includes this change) and passed 7/7; see `qualification/COMPLETION_REPORT_2026-08-07_FINAL_REQUAL.md`. The `QUALIFIED` decision is current.
 
 ---
 
@@ -306,7 +334,7 @@ Live market-data fetcher with source citations:
 
 ## Known Risks / TODOs
 
-1. ~~Origin default branch~~ ✅ now `v10-dev`
+1. ~~Origin default branch~~ ✅ now `main`
 2. ~~Dependency lockfile~~ ✅ `requirements-lock.txt` generated
 3. ~~Pre-commit hooks~~ ✅ `.pre-commit-config.yaml` created and installed
 4. ~~GitHub release workflow~~ ✅ `.github/workflows/release.yml` created; `.deb` packaging added
@@ -330,6 +358,13 @@ Live market-data fetcher with source citations:
 22. ~~Startup CUDA 804 warning + MiniLM loading spam~~ ✅ `_cuda_available_safely()`, warning-filtered policy/kokoro checks, `HF_HUB_DISABLE_PROGRESS_BARS` + `TRANSFORMERS_VERBOSITY`
 23. ~~Memory summarization timeouts~~ ✅ timeout raised to 60 s, configurable model via `LUCY_MEMORY_SUMMARIZE_MODEL`
 
+**Open:**
+24. v10-era naming still present in v11 (`ui-v10/` directory, some file references) — cosmetic cleanup pending.
+25. `config/personas/racheli.txt` missing — prompt-level Racheli persona has no fragment (her LoRA tag exists); only `michael.txt` present.
+26. Memory retrieval knobs (`LUCY_MEMORY_*`) not yet exposed in the HMI.
+27. S09-MEM-003 uses literal substring concept checks on free-form model output; rare wording flakes possible (now diagnosable via recorded `response_text`; see DEC-016). If it recurs, relax via a DEC entry — not silently.
+28. Uncommitted requal-session changes (see Git State) — commit or roll back deliberately.
+
 ---
 
 ## Session Handoff Instructions
@@ -347,5 +382,5 @@ cd ~/lucy-v11 && git add SESSION_CONTEXT.md && git commit -m "docs: update SESSI
 
 ---
 
-*Last updated: 2026-08-07T16:33:17Z*
-*Session: Aligned Engineering-mode context limits with design spec (32,768 → 200,000 chars); updated self-knowledge, architecture docs, session handoff, and SESSION_CONTEXT.md; restarted HMI; targeted tests passed. Full qualification clean run still pending on current HEAD.*
+*Last updated: 2026-08-08T05:42Z*
+*Session: Documentation-review corrections + final requalification — STAGE_19 7/7 on HEAD `8c80cdb` (QUALIFIED); AGENTS.md rewritten and SESSION_CONTEXT.md corrected for current v11 reality; DEC-016 added; STAGE_09 runner records response_text; Desktop docs re-synced and stale copies archived. Requal-session changes are uncommitted.*
