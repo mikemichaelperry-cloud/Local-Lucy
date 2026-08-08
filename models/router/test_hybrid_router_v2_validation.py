@@ -193,6 +193,79 @@ class TestExampleValidation(unittest.TestCase):
         self.assertNotIn("this is not a dict", queries)
         self.assertEqual(len(router.examples), 2)
 
+    def test_rebuilds_embeddings_on_row_count_mismatch(self):
+        """A cached .npy whose row count != len(examples) must be rebuilt.
+
+        Regression guard for stale embedding caches after the examples file
+        changes (e.g. learner-applied feedback corrections): a silent
+        misalignment would pair embeddings with the wrong examples.
+        """
+        import numpy as np
+        from unittest.mock import patch
+
+        self._write_examples(
+            [
+                {
+                    "query": "What is Python?",
+                    "labels": {"route": "LOCAL", "intent_family": "local_answer"},
+                    "metadata": {},
+                },
+                {
+                    "query": "What time is it?",
+                    "labels": {"route": "TIME", "intent_family": "time_query"},
+                    "metadata": {},
+                },
+            ]
+        )
+
+        # Pre-seed a stale cache: correct dimension (384) but one row short.
+        np.save(self.embeddings_path, np.zeros((1, 384), dtype=np.float32))
+
+        router = HybridRouterV2(
+            embeddings_path=str(self.embeddings_path),
+            examples_path=str(self.examples_path),
+        )
+        with patch.object(
+            router, "_build_embeddings_from_examples", wraps=router._build_embeddings_from_examples
+        ) as rebuild_spy:
+            router._lazy_init()
+
+        rebuild_spy.assert_called_once()
+        self.assertEqual(router.embeddings.shape[0], len(router.examples))
+        # The rebuilt cache must have been persisted with the right row count.
+        reloaded = np.load(self.embeddings_path)
+        self.assertEqual(reloaded.shape[0], len(router.examples))
+
+    def test_rebuilds_embeddings_on_extra_row(self):
+        """A cached .npy with one row too many must also be rebuilt."""
+        import numpy as np
+        from unittest.mock import patch
+
+        self._write_examples(
+            [
+                {
+                    "query": "What is Python?",
+                    "labels": {"route": "LOCAL", "intent_family": "local_answer"},
+                    "metadata": {},
+                },
+            ]
+        )
+
+        # Stale cache with an extra row.
+        np.save(self.embeddings_path, np.zeros((2, 384), dtype=np.float32))
+
+        router = HybridRouterV2(
+            embeddings_path=str(self.embeddings_path),
+            examples_path=str(self.examples_path),
+        )
+        with patch.object(
+            router, "_build_embeddings_from_examples", wraps=router._build_embeddings_from_examples
+        ) as rebuild_spy:
+            router._lazy_init()
+
+        rebuild_spy.assert_called_once()
+        self.assertEqual(router.embeddings.shape[0], 1)
+
     def test_python_query_routes_local(self):
         """After fixing the mislabeled example, 'What is Python?' must route LOCAL."""
         router = HybridRouterV2(

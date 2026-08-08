@@ -623,6 +623,7 @@ class RuntimeBridge:
             state.get("gemma4_smart_routing", "off")
         )
         os.environ["LUCY_SELF_ANALYSIS_MODE"] = _bool_env(state.get("self_analysis_mode", "off"))
+        os.environ["LUCY_AUTO_LEARN"] = _bool_env(state.get("learner", "off"))
         # Default Ollama keep-alive to 0 so models unload after each request.
         # This is the HMI's contract with the limited GPU: only one large local
         # model may be resident at a time. A user can override via the env var.

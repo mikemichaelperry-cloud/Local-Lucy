@@ -120,7 +120,7 @@ class TestMemoryRecallQuery:
     C. Memory recall query.
     """
 
-    def test_memory_recall_uses_stored_fact(self, monkeypatch, tmp_path):
+    def test_memory_recall_empty_sqlite_result_is_honored(self, monkeypatch, tmp_path):
         """An empty SQLite result is honored; the text file must not leak in."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
         # Use a temp memory file
@@ -144,7 +144,6 @@ class TestMemoryRecallQuery:
             "What is my favorite color?"
         )
         assert context == ""
-        assert "blue" not in context.lower()
         assert telemetry["memory_context_used"] == "false"
 
     def test_memory_recall_falls_back_to_text_file_on_sqlite_error(self, monkeypatch, tmp_path):

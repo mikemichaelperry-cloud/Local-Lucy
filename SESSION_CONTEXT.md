@@ -143,6 +143,7 @@ d99b48e docs: update handoff and architecture for 200k Engineering-mode context 
   - Full CPU suite (restricted markers): **1637 passed, 0 failed**, 7 skipped (10:47); `test_local_answer.py` also green with `-m ""` (78 passed). Unrestricted slow/live subset: 20 pre-existing live/environment failures (verified identical at base `bdfdfad`; see task-7 report).
   - Desktop docs re-synced (`SESSION_CONTEXT.md`, `Local_Lucy_V11_DECISIONS.md`).
 - **TODO changes:** #24 partially advanced (dead vars/config pruned; rename deferred → #29), #27 resolved (DEC-018), #28 resolved (requal-session changes committed), #29 added.
+- **Deviation:** commit `696f82f` (learner-applied feedback corrections: +5 examples, 2+2 relabel WEATHER→LOCAL) rode along outside the plan; embeddings were rebuilt and verified aligned (1379 rows), and a row-count guard in `hybrid_router_v2.py` now prevents silent misalignment (regression-tested in `test_hybrid_router_v2_validation.py`).
 
 ### Documentation Review & Final Requalification — 2026-08-07/08
 - **Trigger:** external review of the 2026-08-06 completion report/handoff found documentation defects and a qualification gap (memory-retrieval expansion `1930946` landed after the original STAGE_19 pass).
@@ -364,6 +365,8 @@ Live market-data fetcher with source citations:
 27. ~~S09-MEM-003 literal substring concept checks~~ ✅ resolved 2026-08-08 via DEC-018 — evaluation deduplicated into `tools/router_py/scenario_checks.py`; any-of relaxations now use the `required_answer_concepts_any` scenario JSON field; S09-MEM-003 stays strict.
 28. ~~Uncommitted requal-session changes~~ ✅ committed (consolidation session, 2026-08-08).
 29. `ui-v10/` directory rename deferred — cosmetic; see `docs/superpowers/plans/2026-08-08-consolidation-and-hardening.md` (Task 6).
+30. Rebuild live Ollama tags from corrected Modelfiles (`ollama create`) — operator-approved, then re-run stage_08/10 smoke.
+31. Refresh or delete `dist/AppDir` before next AppImage packaging (contains pre-prune snapshots).
 
 ---
 

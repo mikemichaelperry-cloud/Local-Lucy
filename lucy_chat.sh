@@ -32,7 +32,7 @@ ROUTER_PY="${SCRIPT_DIR}/tools/router_py/main.py"
 LOCAL_WORKER="${SCRIPT_DIR}/tools/local_worker.py"
 
 # Environment defaults - NOW DEFAULT TO PYTHON
-export LUCY_LOCAL_MODEL="${LUCY_LOCAL_MODEL:-local-lucy}"
+export LUCY_LOCAL_MODEL="${LUCY_LOCAL_MODEL:-local-lucy-llama31}"
 export LUCY_OLLAMA_API_URL="${LUCY_OLLAMA_API_URL:-http://127.0.0.1:11434/api/generate}"
 # Control toggles (evidence/augmentation) are loaded from current_state.json by
 # the Python router.  Do not hard-code defaults here; that prevents the state

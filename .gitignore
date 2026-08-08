@@ -106,4 +106,6 @@ generate_test_report.py
 # Do not ignore the state Python package under router_py
 !tools/router_py/state/
 !tools/router_py/state/**
+# ...but never track its bytecode cache
+tools/router_py/state/__pycache__/
 .worktrees/

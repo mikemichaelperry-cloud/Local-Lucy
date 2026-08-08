@@ -158,8 +158,8 @@
     "Generic low-confidence -> AUGMENTED fallback is not implemented and is not being added during stabilisation."
   ],
   "last_baseline_metrics": "validation 21/21 = 1.000, holdout 13/15 = 0.867, combined 34/36 = 0.944",
-  "last_full_regression": "tools/router_py full deterministic regression: 1314 passed, 7 skipped, 275 deselected, 188 subtests passed (2026-08-07T07:54Z).",
-  "last_task18_regression": "tools/router_py full deterministic regression: 1314 passed, 7 skipped, 275 deselected, 188 subtests passed (2026-08-07T07:54Z).",
+  "last_full_regression": "Full CPU suite (restricted markers): 1637 passed, 0 failed, 7 skipped (2026-08-08).",
+  "last_task18_regression": "Full CPU suite (restricted markers): 1637 passed, 0 failed, 7 skipped (2026-08-08).",
   "last_task18_clean_run": "tools/router_py/stage_19_clean_run.py: 7/7 stages passed, no dual-model residency (2026-08-07T13:40Z on commit ed26695).",
   "last_task18_fix_commit": "5591c1a fix(memory): continuation detection, cache key, reserve protection, session isolation",
   "last_phase1_regression": "Memory-service regression: 92 passed, 75 deselected, 8 subtests passed; router_py fast deterministic regression: 1244 passed, 7 skipped, 275 deselected, 188 subtests passed (2026-08-07T07:54Z).",
