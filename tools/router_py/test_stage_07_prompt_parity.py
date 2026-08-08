@@ -60,11 +60,11 @@ def test_s07_pp_001_prompts_differ_only_by_identity():
 
     # Identity-specific text must be present in the correct prompt only.
     assert "llama3.1:8b" in llama_prompt
-    assert "~8B parameters, 4096-token context" in llama_prompt
+    assert "~8B parameters, 8192-token context" in llama_prompt
     assert "gemma4:12b-it-qat" not in llama_prompt
 
     assert "gemma4:12b-it-qat" in gemma_prompt
-    assert "~12B parameters, 128k-token context" in gemma_prompt
+    assert "~12B parameters, 8192-token context (128k architectural ceiling)" in gemma_prompt
     assert "llama3.1:8b" not in gemma_prompt
 
     # Everything else must be identical.
