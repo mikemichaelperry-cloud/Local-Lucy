@@ -25,7 +25,7 @@ Environment:
     LUCY_SYNTHETIC_CASES_PATH     Path to JSONL cases (default: tests/synthetic_adversarial_cases.jsonl)
     LUCY_SYNTHETIC_DIAGNOSTIC     Set to "1" to also load diagnostic policy-conflict cases.
     LUCY_SYNTHETIC_FULL_ANSWER    Set to "1" to enable full-answer tests.
-    LUCY_LOCAL_MODEL              Model name for full-answer tests (default: local-lucy-fast)
+    LUCY_LOCAL_MODEL              Model name for full-answer tests (default: local-lucy-llama31)
     LUCY_FORCE_LOCAL              Set to "1" to force local routing.
 """
 
@@ -63,7 +63,7 @@ DIAGNOSTIC_PATH = Path(
     )
 )
 ENABLE_DIAGNOSTIC = os.environ.get("LUCY_SYNTHETIC_DIAGNOSTIC", "") in ("1", "true", "yes")
-LOCAL_MODEL = os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-fast")
+LOCAL_MODEL = os.environ.get("LUCY_LOCAL_MODEL", "local-lucy-llama31")
 
 # ---------------------------------------------------------------------------
 # Lazy imports (router may not be available in all test environments)

@@ -262,7 +262,7 @@ class RuntimeBridge:
         return ""
 
     def _command_env(self, *, include_voice_python: bool = False) -> dict[str, str]:
-        """Build command environment with Python router settings."""
+        """Build the command environment for backend tool subprocesses."""
         env = os.environ.copy()
         # Pin the authority/namespace contract so backend tools resolve the same
         # paths even if the spawned process sanitizes its environment.
