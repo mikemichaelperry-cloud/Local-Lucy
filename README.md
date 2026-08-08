@@ -248,7 +248,7 @@ See [docs/runbooks/PERSONAS.md](docs/runbooks/PERSONAS.md) for the historical ad
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LUCY_LOCAL_MODEL` | `local-lucy-llama31` | Default Ollama model |
-| `LUCY_AUTO_LEARN` | `1` | Allow background learning from explicit user feedback |
+| `LUCY_AUTO_LEARN` | `0` | Background learning from explicit user feedback is OFF by default (opt-in, DEC-017); set to `1` to enable |
 | `LUCY_RUNTIME_NAMESPACE_ROOT` | `~/.local/share/local-lucy-v11` | XDG runtime state directory |
 | `LUCY_RUNTIME_AUTHORITY_ROOT` | project root | Project root for contract validation |
 | `LUCY_OLLAMA_API_URL` | `http://127.0.0.1:11434/api/generate` | Local LLM endpoint |

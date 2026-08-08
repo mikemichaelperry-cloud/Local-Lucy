@@ -247,9 +247,9 @@ class TestCache(unittest.TestCase):
 
     def test_cache_key_changes_with_active_persona(self):
         """Switching the active persona must bust the cache."""
-        with patch("local_answer._get_current_user_identity", return_value=None):
+        with patch("router_py.local_answer_core.engine._get_current_user_identity", return_value=None):
             key_no_persona = self.answer._cache_key("test query", "variant1")
-        with patch("local_answer._get_current_user_identity", return_value="Michael"):
+        with patch("router_py.local_answer_core.engine._get_current_user_identity", return_value="Michael"):
             key_with_persona = self.answer._cache_key("test query", "variant1")
         self.assertNotEqual(key_no_persona, key_with_persona)
 
@@ -365,7 +365,7 @@ class TestPromptBuilding(unittest.TestCase):
     def test_build_basic_prompt(self):
         """Test basic prompt building."""
         # Mock away persistent facts so the test is deterministic
-        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
+        with patch("router_py.local_answer_core.engine._get_relevant_persistent_facts", return_value=[]):
             prompt = self.answer._build_prompt(
                 "what is Python", "", "chat", "- Be concise.", False, False
             )
@@ -374,7 +374,7 @@ class TestPromptBuilding(unittest.TestCase):
 
     def test_build_prompt_with_memory(self):
         """Test prompt building with session memory."""
-        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
+        with patch("router_py.local_answer_core.engine._get_relevant_persistent_facts", return_value=[]):
             prompt = self.answer._build_prompt(
                 "what about that",
                 "Previously discussed Python.",
@@ -397,13 +397,29 @@ class TestPromptBuilding(unittest.TestCase):
             False,
         )
         self.assertIn("authoritative", prompt)
-        self.assertIn("look at the history first", prompt)
+        # The "look at the history first" hint is Gemma-only (_PromptShaper);
+        # the default llama31 model gets the base preamble.
+        self.assertNotIn("look at the history first", prompt)
         final_user_turn = prompt.rfind("User:")
         self.assertLess(prompt.find("authoritative"), final_user_turn)
 
+    def test_memory_preamble_gemma_adds_history_first_hint(self):
+        """Gemma-family models get the extra history-first hint (_PromptShaper)."""
+        self.answer.config.model = "local-lucy-gemma4"
+        prompt = self.answer._build_prompt(
+            "what did I say earlier?",
+            "user: hello",
+            "chat",
+            "",
+            False,
+            False,
+        )
+        self.assertIn("authoritative", prompt)
+        self.assertIn("look at the history first", prompt)
+
     def test_build_prompt_conversation_mode(self):
         """Test prompt building with conversation mode."""
-        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
+        with patch("router_py.local_answer_core.engine._get_relevant_persistent_facts", return_value=[]):
             prompt = self.answer._build_prompt(
                 "what is Python", "", "chat", "- Be concise.", True, True
             )
@@ -413,7 +429,7 @@ class TestPromptBuilding(unittest.TestCase):
     def test_build_prompt_injects_only_relevant_pet_fact(self):
         """Test only relevant persistent facts are injected for a pet query."""
         with patch(
-            "local_answer._get_relevant_persistent_facts", return_value=["Rex is your dog."]
+            "router_py.local_answer_core.engine._get_relevant_persistent_facts", return_value=["Rex is your dog."]
         ):
             prompt = self.answer._build_prompt(
                 "What is my dog's name?", "", "chat", "- Be concise.", False, False
@@ -425,7 +441,7 @@ class TestPromptBuilding(unittest.TestCase):
     def test_build_prompt_injects_only_relevant_family_fact(self):
         """Test family query gets family facts rather than unrelated ones."""
         with patch(
-            "local_answer._get_relevant_persistent_facts",
+            "router_py.local_answer_core.engine._get_relevant_persistent_facts",
             return_value=["Your daughter Anna lives in Haifa."],
         ):
             prompt = self.answer._build_prompt(
@@ -438,10 +454,10 @@ class TestPromptBuilding(unittest.TestCase):
         """Test retrieval failure falls back to direct SQLite load for family queries."""
         with (
             patch(
-                "local_answer._get_relevant_persistent_facts",
+                "router_py.local_answer_core.engine._get_relevant_persistent_facts",
                 side_effect=RuntimeError("embed failed"),
             ),
-            patch("local_answer._load_family_facts_direct", return_value=["Oscar is Mike's dog."]),
+            patch("router_py.local_answer_core.engine._load_family_facts_direct", return_value=["Oscar is Mike's dog."]),
         ):
             prompt = self.answer._build_prompt(
                 "What is my dog's name?", "", "chat", "- Be concise.", False, False
@@ -453,7 +469,7 @@ class TestPromptBuilding(unittest.TestCase):
     def test_build_prompt_general_knowledge_skips_personal_facts(self):
         """General-knowledge queries must not be restricted by retrieved personal facts."""
         with patch(
-            "local_answer._get_relevant_persistent_facts",
+            "router_py.local_answer_core.engine._get_relevant_persistent_facts",
             return_value=["Mike is 66 years old."],
         ):
             prompt = self.answer._build_prompt(
@@ -485,10 +501,10 @@ class TestPersonaInjection(unittest.TestCase):
     def test_build_prompt_injects_active_persona(self):
         """When an identity is active, its persona fragment is injected."""
         test_fragment = "You are answering Michael. Be direct and pragmatic."
-        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
-            with patch("local_answer._get_current_user_identity", return_value="Michael"):
+        with patch("router_py.local_answer_core.engine._get_relevant_persistent_facts", return_value=[]):
+            with patch("router_py.local_answer_core.self_knowledge._get_current_user_identity", return_value="Michael"):
                 with patch(
-                    "local_answer._load_persona_fragments",
+                    "router_py.local_answer_core.self_knowledge._load_persona_fragments",
                     return_value={"michael": test_fragment},
                 ):
                     prompt = self.answer._build_prompt(
@@ -499,9 +515,9 @@ class TestPersonaInjection(unittest.TestCase):
 
     def test_build_prompt_skips_missing_persona(self):
         """When no matching persona fragment exists, the prompt is unchanged."""
-        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
-            with patch("local_answer._get_current_user_identity", return_value="Unknown"):
-                with patch("local_answer._load_persona_fragments", return_value={}):
+        with patch("router_py.local_answer_core.engine._get_relevant_persistent_facts", return_value=[]):
+            with patch("router_py.local_answer_core.self_knowledge._get_current_user_identity", return_value="Unknown"):
+                with patch("router_py.local_answer_core.self_knowledge._load_persona_fragments", return_value={}):
                     prompt = self.answer._build_prompt(
                         "what is Python", "", "chat", "- Be concise.", False, False
                     )
@@ -510,9 +526,9 @@ class TestPersonaInjection(unittest.TestCase):
 
     def test_build_prompt_no_identity_no_persona(self):
         """When no identity is active, no persona fragment is injected."""
-        with patch("local_answer._get_relevant_persistent_facts", return_value=[]):
-            with patch("local_answer._get_current_user_identity", return_value=None):
-                with patch("local_answer._load_persona_fragments", return_value={"michael": "..."}):
+        with patch("router_py.local_answer_core.engine._get_relevant_persistent_facts", return_value=[]):
+            with patch("router_py.local_answer_core.self_knowledge._get_current_user_identity", return_value=None):
+                with patch("router_py.local_answer_core.self_knowledge._load_persona_fragments", return_value={"michael": "..."}):
                     prompt = self.answer._build_prompt(
                         "what is Python", "", "chat", "- Be concise.", False, False
                     )
@@ -881,7 +897,7 @@ class TestIntegration(unittest.TestCase):
         with patch.object(answer, "_call_ollama") as mock_call:
             mock_call.return_value = "Mocked response"
 
-            with patch("local_answer.filter_memory_context") as mock_filter:
+            with patch("router_py.local_answer_core.engine.filter_memory_context") as mock_filter:
                 mock_filter.return_value = "Filtered memory"
 
                 await answer.generate_answer(
@@ -935,7 +951,7 @@ class TestPersonalFamilyFactResolver(unittest.TestCase):
 
     def test_resolve_children_from_facts(self):
         with patch(
-            "local_answer._load_family_facts_direct",
+            "router_py.local_answer_core.engine._load_family_facts_direct",
             return_value=[
                 "Your biological children are Tom, Sahar, and Kim.",
             ],
@@ -946,7 +962,7 @@ class TestPersonalFamilyFactResolver(unittest.TestCase):
 
     def test_resolve_grandchildren_from_facts(self):
         with patch(
-            "local_answer._load_family_facts_direct",
+            "router_py.local_answer_core.engine._load_family_facts_direct",
             return_value=[
                 "Your grandchildren are Nibar and Arbel.",
             ],
@@ -957,7 +973,7 @@ class TestPersonalFamilyFactResolver(unittest.TestCase):
 
     def test_resolve_dog_name_from_facts(self):
         with patch(
-            "local_answer._load_family_facts_direct",
+            "router_py.local_answer_core.engine._load_family_facts_direct",
             return_value=[
                 "Your dog's name is Oscar.",
             ],
@@ -967,7 +983,7 @@ class TestPersonalFamilyFactResolver(unittest.TestCase):
 
     def test_resolve_partner_from_facts(self):
         with patch(
-            "local_answer._load_family_facts_direct",
+            "router_py.local_answer_core.engine._load_family_facts_direct",
             return_value=[
                 "Sarah is your life partner.",
             ],
@@ -977,7 +993,7 @@ class TestPersonalFamilyFactResolver(unittest.TestCase):
 
     def test_resolve_specific_person_from_facts(self):
         with patch(
-            "local_answer._load_family_facts_direct",
+            "router_py.local_answer_core.engine._load_family_facts_direct",
             return_value=[
                 "Sarah is your life partner.",
             ],
@@ -986,7 +1002,7 @@ class TestPersonalFamilyFactResolver(unittest.TestCase):
         self.assertIn("Sarah", result or "")
 
     def test_resolve_returns_none_for_unknown(self):
-        with patch("local_answer._load_family_facts_direct", return_value=[]):
+        with patch("router_py.local_answer_core.engine._load_family_facts_direct", return_value=[]):
             result = self.answer._resolve_personal_family_fact("Who are my children?")
         self.assertIsNone(result)
 
