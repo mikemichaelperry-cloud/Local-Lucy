@@ -1,129 +1,78 @@
 # Local Lucy V11 Qualification — Session Handoff
 
-**Session end:** 2026-08-07T16:33:17Z  
-**Final qualification decision:** `QUALIFIED` (for commit `ed26695b7bf647a0096c0a0a4c62eb92f5a991c6`; see Post-qualification update below)  
-**Final verified candidate commit:** `ed26695b7bf647a0096c0a0a4c62eb92f5a991c6`  
-**Task 18 memory-continuity fix commit:** `5591c1a fix(memory): continuation detection, cache key, reserve protection, session isolation`  
-**Post-qualification config commit:** `30e9629 Raise Engineering-mode context limits to 200000 chars`  
-**Post-qualification docs commit:** `d99b48e docs: update handoff and architecture for 200k Engineering-mode context limit`  
-**Previous manifest commit:** `4495f833c8f18fcb361db9db982c504ce6f3607e` (behavioural candidate `423e5dd`)  
-**Working tree:** clean (untracked `tools/router_py/state/__pycache__/` only)  
+**Session end:** 2026-08-07T18:17Z  
+**Final qualification decision:** `QUALIFIED` on HEAD `8c80cdb docs: update AGENTS.md active branch to main` (STAGE_19 re-run #2: 7/7, no dual-model residency)  
+**HEAD commit (unchanged throughout session):** `8c80cdb`  
+**Previous qualification:** `ed26695` (memory-tourism phase; superseded by this requalification on HEAD)  
+**Working tree:** uncommitted documentation/harness changes only (see Modified files); no commits made this session  
 **V10 status:** untouched  
-
----
-
-## Post-qualification update (2026-08-07T16:33:17Z)
-
-After the final clean run recorded above, the following config-only change was applied to align the implementation with the v11 design documents:
-
-- **Commit:** `30e9629 Raise Engineering-mode context limits to 200000 chars`
-- **Files changed:**
-  - `tools/router_py/local_answer_core/config.py`
-  - `tools/router_py/test_self_analysis.py`
-  - `Architecture.md`
-  - `qualification/SESSION_HANDOFF.md` (this file)
-- **Change:** `self_review_context_chars` and `code_review_context_chars` defaults and env fallbacks raised from `32,768` to `200,000` characters.
-- **Reason:** The design documents (`SESSION_CONTEXT.md`, `docs/superpowers/specs/2026-07-16-gemma4-code-review-model-design.md`) already specified `200,000`; the implementation was still using `32,768`, which truncated ~1,500-line files in Engineering mode.
-- **Tests run:**
-  - `tools/router_py/test_self_analysis.py -k "config or truncates_very_long" -m slow` → 3 passed
-  - `tools/router_py/test_gemma4_identity.py`, `test_security_guard.py`, `test_local_answer.py::TestQueryClassification` -m slow → 9 passed
-- **HMI:** Restarted with PID 634305 after the change so the new default is loaded.
-- **Qualification impact:** This is a behavioural default change. The previous `QUALIFIED` decision applies strictly to commit `ed26695`; the current HEAD (`30e9629`) should be treated as a release candidate until a full clean run is repeated on it.
 
 ---
 
 ## Work completed this session
 
-### 1. Task 18 — Memory-continuity failure fixes and clean-run requalification
+### 1. Documentation corrections (triggered by external review of the 2026-08-06 report/handoff)
 
-- Fixed story-continuation and cross-model memory continuity failures in commit `5591c1a`.
-- Re-ran the Phase 4 final clean run on commit `ed26695`.
-- Recorded passing clean-run results under `qualification/results/`.
-- Confirmed `/home/mike/lucy-v10` working tree remains empty throughout.
+- `qualification/COMPLETION_REPORT_2026-08-06.md`: overstated "all stages pass" claims qualified (STAGE_00–03 never ran standalone; pointers added to `STAGE_00_03_TRACEABILITY.md` and the `_REVISED` report); memory `max_chars` history corrected (memory-service default 500 → 2000 via new `LUCY_MEMORY_MAX_CHARS`; execution-engine caller passes 2400); wrong path `execution_engine_helpers.py` → `execution_engine/helpers.py`; S09-GEM-007 row now references DEC-016.
+- `qualification/SESSION_HANDOFF.md` (previous revision): rollback block rewritten — env approximation `LUCY_MEMORY_RECENT_TURN_LIMIT=4` / `LUCY_MEMORY_MAX_INJECTED_TURNS=4` / `LUCY_MEMORY_MAX_CHARS=500` with note that env vars cannot undo the code-only topic-shift bypass; git rollback corrected to `git checkout 3249092 -- tools/memory/memory_service.py` (`3249092` = parent of memory-expansion commit `1930946`; previously documented `ed26695` already contained the change, verified via `git merge-base`). That revision is archived on the desktop (see Deliverables).
+- `qualification/DECISIONS.md`: new DEC-016 recording the S09-GEM-007 relaxation (accept any single reasoning marker of because/since/therefore in stage_09/stage_11 suites).
+- `tools/memory/memory_service.py`: stale docstring fixed — `LUCY_MEMORY_SIMILARITY_THRESHOLD` default 0.55 → 0.70 (matches code at ~line 1628).
 
-### 2. Task 19 — Final reporting and handoff
+### 2. Qualification gap closed — STAGE_19 re-run on HEAD
 
-- Updated `qualification/TEST_STATUS.json` with final Task 19 state, PHASE_04 status, and latest verification timestamps.
-- Updated `qualification/TEST_TODO.md` with Phase 4 reporting/handoff tasks.
-- Created `qualification/COMPLETION_REPORT_2026-08-07_MEMORY_TOURISM.md`.
-- Updated this handoff file.
-- Copied the completion report and handoff to the desktop; archived stale desktop copies.
+The memory-retrieval expansion (`1930946`) landed after the original STAGE_19 pass on `ed26695`, so HEAD was requalified:
+
+- **Re-run #1:** 6/7 — STAGE_09 failed only on S09-MEM-003 ("Recall a stated fact about assistant identity"): literal concept `"Local Lucy"` missing from a 49-char Gemma response ("assistant" present).
+- **Root cause:** retrieval path healthy (memory code unchanged since the passing `ed26695` run, 2400-char budget ample, no dual residency). Concluded model-wording flake under temperature-0 near-tie nondeterminism, not a retrieval defect. Evidence: `qualification/results/stage_09_gemma_scenarios.json`.
+- **Harness improvement:** `tools/router_py/stage_09_gemma_scenario_suite.py` now records `response_text` and `turn_responses` per scenario in the results JSON (diagnostics only; no pass criteria changed).
+- **STAGE_09 standalone re-run:** 16/16 passed; S09-MEM-003 passed with near-verbatim recall `"You said that I am Local Lucy, your personal AI assistant."` — flake hypothesis confirmed.
+- **Re-run #2 (full STAGE_19):** **7/7 PASSED**, `all_passed=true`, no dual-model residency at any point, `final_loaded_models=[]`. Evidence: `qualification/results/stage_19_clean_run.json`.
 
 ### 3. Verification evidence
 
 | Command | Result |
 |---|---|
-| `python3 -m pytest tools/router_py -v --tb=short` | 1314 passed, 7 skipped, 275 deselected, 188 subtests passed |
-| `python3 tools/router_py/stage_08_gemma_smoke.py` | 3/3 passed |
-| `python3 tools/router_py/stage_09_gemma_scenario_suite.py` | 16/16 passed |
-| `python3 tools/router_py/stage_10_llama_smoke.py` | 3/3 passed |
-| `python3 tools/router_py/stage_11_llama_scenario_suite.py` | 16/16 passed, 16/16 route parity, 16/16 outcome parity, 4/4 entity parity |
-| `python3 tools/router_py/stage_13_model_switch.py` | 4/4 passed |
-| `python3 tools/router_py/stage_16_hmi_soak.py` | 6/6 passed |
-| `python3 tools/router_py/stage_16_hmi_weather_boundary.py` | 6/6 passed |
-| `python3 tools/router_py/stage_19_clean_run.py` | **7/7 stages passed** |
-| Privacy/fault/canary suite | 30 passed |
-| Routing metrics | validation 21/21 = 1.000, holdout 13/15 = 0.867, combined 34/36 = 0.944 |
+| `python3 tools/router_py/stage_09_gemma_scenario_suite.py` (standalone re-run) | 16/16 passed (S09-MEM-003 passed) |
+| `python3 tools/router_py/stage_19_clean_run.py` (re-run #2 on `8c80cdb`) | **7/7 passed**, `all_passed=true`, `final_loaded_models=[]` |
 
-All model stages ran sequentially; no dual-model residency was observed at any switch point.
+Per-stage elapsed in re-run #2: STAGE_08 50s, STAGE_09 271s, STAGE_10 18s, STAGE_11 65s, STAGE_13 95s, STAGE_16 42s, STAGE_16_WX 28s.
 
-### 4. Stage-status reconciliation
+### 4. Desktop housekeeping
 
-- `STAGE_00` marked `PASSED`.
-- `STAGE_01`, `STAGE_02`, `STAGE_03` marked `SUPERSEDED_WITH_EVIDENCE` with full requirement-to-evidence mapping in `qualification/STAGE_00_03_TRACEABILITY.md`.
-- `STAGE_04` through `STAGE_19` completed and recorded in `qualification/TEST_STATUS.json`.
-- `PHASE_01` (Memory-First Intelligence Core), `PHASE_02` (Tourism Sources), `PHASE_03` (Verification & Cross-Model Guarantees), and `PHASE_04` (Reporting & Handoff) all marked `PASSED`.
-
-### 5. Key fixes verified
-
-- Memory retrieval window widened: 12 recent verbatim turns + 8 semantic older turns.
-- Explicit recall queries bypass topic-shift detection.
-- Story continuation queries bypass the short-response budget and receive an explicit continuation instruction.
-- Response cache keys include `session_memory` so continuations are not reused across contexts.
-- Text-file fallback in `helpers.py` no longer leaks context when SQLite returns empty results.
-- Weather/time low-confidence fallback gated by actual weather/time intent.
-- Routing metrics corrected and self-consistent.
-- Two holdout misroutes investigated, documented as accepted limitations with no safety/privacy boundary violation.
-- Voice text-display issue could not be reproduced; recorded as `UNREPRODUCED` in `qualification/KNOWN_LIMITATIONS.md`.
-- Tourism sources for Israel (Ministry of Tourism) and arbitrary destinations (Wikivoyage) implemented with allowlist/caching.
-- Single-model residency assertions enforced across all model stages.
+- Loose stale `~/Desktop/COMPLETION_REPORT_2026-08-06.md` and `~/Desktop/SESSION_HANDOFF.md` were byte-identical duplicates of files already in `Local_Lucy_V11_Archive/` and were removed.
+- Stale `Local_Lucy_V11_DECISIONS.md` archived as `Local_Lucy_V11_Archive/Local_Lucy_V11_DECISIONS_2026-08-01_stale.md` and replaced with the current repo `DECISIONS.md`.
 
 ---
 
 ## Deliverables
 
-- `qualification/FINAL_REQUALIFICATION_BASELINE.md`
-- `qualification/STAGE_00_03_TRACEABILITY.md`
-- `qualification/KNOWN_LIMITATIONS.md`
-- `qualification/FINAL_QUALIFICATION_MANIFEST.json`
-- `qualification/FINAL_QUALIFICATION_MANIFEST.md`
-- `qualification/COMPLETION_REPORT_2026-08-07_MEMORY_TOURISM.md`
-- `qualification/SESSION_HANDOFF.md` (this file)
-- `qualification/TEST_STATUS.json`
-- `qualification/TEST_TODO.md`
+- `qualification/COMPLETION_REPORT_2026-08-07_FINAL_REQUAL.md` — this session's completion report
+- `qualification/SESSION_HANDOFF.md` — this file
+- `qualification/results/stage_19_clean_run.json` — final 7/7 clean run
+- `qualification/results/stage_09_gemma_scenarios.json` — scenario results with recorded responses
 
-Copies of the completion report and handoff are on the desktop at:
+Copies on the desktop:
 
 ```text
-~/Desktop/Local Lucy V11/COMPLETION_REPORT_2026-08-07_MEMORY_TOURISM.md
+~/Desktop/Local Lucy V11/COMPLETION_REPORT_2026-08-07_FINAL_REQUAL.md
 ~/Desktop/Local Lucy V11/SESSION_HANDOFF.md
 ```
 
-Stale desktop copies are archived at:
+Archived this session:
 
 ```text
-~/Desktop/Local Lucy V11/Local_Lucy_V11_Archive/COMPLETION_REPORT_2026-08-06_REVISED_2026-08-07.md
-~/Desktop/Local Lucy V11/Local_Lucy_V11_Archive/SESSION_HANDOFF_2026-08-06_2026-08-07.md
+~/Desktop/Local Lucy V11/Local_Lucy_V11_Archive/SESSION_HANDOFF_2026-08-07_pre_final_requal.md
+~/Desktop/Local Lucy V11/Local_Lucy_V11_Archive/Local_Lucy_V11_DECISIONS_2026-08-01_stale.md
 ```
 
 ---
 
-## Modified files in final commits
+## Modified files (uncommitted working-tree changes)
 
-- `qualification/COMPLETION_REPORT_2026-08-07_MEMORY_TOURISM.md`
-- `qualification/SESSION_HANDOFF.md`
-- `qualification/TEST_STATUS.json`
-- `qualification/TEST_TODO.md`
+- `qualification/COMPLETION_REPORT_2026-08-06.md`
+- `qualification/COMPLETION_REPORT_2026-08-07_FINAL_REQUAL.md` (new)
+- `qualification/DECISIONS.md` (DEC-016)
+- `qualification/SESSION_HANDOFF.md` (this file)
 - `qualification/results/stage_08_gemma_smoke.json`
 - `qualification/results/stage_09_gemma_scenarios.json`
 - `qualification/results/stage_10_llama_smoke.json`
@@ -131,14 +80,14 @@ Stale desktop copies are archived at:
 - `qualification/results/stage_13_model_switch.json`
 - `qualification/results/stage_16_hmi_soak.json`
 - `qualification/results/stage_19_clean_run.json`
-- `tools/router_py/local_answer_core/config.py` (post-qualification: context limits)
-- `tools/router_py/test_self_analysis.py` (post-qualification: context-limit default test)
-- `Architecture.md` (post-qualification: context-limit documentation)
+- `tools/memory/memory_service.py` (docstring only)
+- `tools/router_py/stage_09_gemma_scenario_suite.py` (diagnostics only)
 
 ---
 
 ## What is safe to run next
 
+- Commit this session's documentation, harness, and results changes (not yet committed; see Modified files).
 - HMI live testing of memory recall and tourism/travel queries.
 - Routing failure corpus expansion and classifier-head retraining.
 - v10-labelled file cleanup in v11.
@@ -153,26 +102,28 @@ Stale desktop copies are archived at:
 
 ## Rollback
 
-If memory retrieval regresses:
+If memory retrieval regresses (env-var approximation only; env vars cannot undo the topic-shift bypass for explicit recall queries, which is a code-only change with no env gate):
 
 ```bash
 cd /home/mike/lucy-v11
 export LUCY_MEMORY_RECENT_TURN_LIMIT=4
 export LUCY_MEMORY_MAX_INJECTED_TURNS=4
-export LUCY_MEMORY_MAX_CHARS=1200
+export LUCY_MEMORY_MAX_CHARS=500
 ```
 
-Or revert the two files:
+Or revert the memory-service change (commit 1930946) via its parent:
 
 ```bash
-git checkout ed26695 -- tools/memory/memory_service.py tools/router_py/execution_engine/helpers.py
+git checkout 3249092 -- tools/memory/memory_service.py
 ```
 
-Full rollback to the qualified candidate:
+(Only this file matters for that change; the `max_chars=2400` in `tools/router_py/execution_engine/helpers.py` came later in b4cb9f9.)
+
+Full rollback to the last qualified state:
 
 ```bash
 cd /home/mike/lucy-v11
-git checkout ed26695
+git checkout 8c80cdb
 ```
 
 ---
@@ -181,7 +132,10 @@ git checkout ed26695
 
 - See `qualification/KNOWN_LIMITATIONS.md` for the complete list.
 - Active defects: **none**.
-- Accepted limitations:
+- New residual notes from this session:
+  - S09-MEM-003 uses a literal case-insensitive substring check on free-form model output; rare wording flakes remain possible, now diagnosable via recorded `response_text`. If it recurs, consider a DEC entry relaxing the concept check — do not relax silently.
+  - STAGE_16_WX stderr shows benign `[FACTS] Direct SQLite location fallback failed: no such table: persistent_facts` noise from an unseeded namespace DB; the stage passes; cosmetic.
+- Accepted limitations carried forward:
   - Two locked-holdout routing cases remain misclassified at the raw classifier level; final guards keep them acceptable.
   - Voice text-display issue remains `UNREPRODUCED`.
   - Expanded memory window increases privacy surface; mitigated by existing redaction and canary tests.
@@ -193,5 +147,5 @@ git checkout ed26695
 ## Resume command
 
 ```bash
-cd /home/mike/lucy-v11 && cat qualification/COMPLETION_REPORT_2026-08-07_MEMORY_TOURISM.md qualification/TEST_TODO.md qualification/TEST_STATUS.json qualification/SESSION_HANDOFF.md qualification/KNOWN_LIMITATIONS.md
+cd /home/mike/lucy-v11 && cat qualification/COMPLETION_REPORT_2026-08-07_FINAL_REQUAL.md qualification/SESSION_HANDOFF.md qualification/TEST_STATUS.json qualification/KNOWN_LIMITATIONS.md
 ```

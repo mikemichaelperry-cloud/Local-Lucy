@@ -10,7 +10,7 @@
     "loaded_models": [
       "local-lucy-gemma4:latest"
     ],
-    "elapsed_s": 10.31,
+    "elapsed_s": 10.92,
     "passed": true,
     "notes": []
   },
@@ -20,12 +20,12 @@
     "route": "LOCAL",
     "status": "completed",
     "outcome_code": "answered",
-    "response_text": "The product of 17 and 23 is 391. I can perform basic arithmetic calculations like this one using my parametric knowledge.",
-    "response_len": 121,
+    "response_text": "The product of 17 and 23 is 391. This result comes from basic arithmetic multiplication rules.",
+    "response_len": 94,
     "loaded_models": [
       "local-lucy-llama31:latest"
     ],
-    "elapsed_s": 1.11,
+    "elapsed_s": 1.35,
     "passed": true,
     "notes": []
   },
@@ -35,12 +35,12 @@
     "route": "LOCAL",
     "status": "completed",
     "outcome_code": "answered",
-    "response_text": "Marie Curie was a pioneering Polish and French physicist and chemist who conducted groundbreaking research on radioactivity. She remains the only person to ever win Nobel Prizes in two different scientific fields: Physics and Chemistry.",
-    "response_len": 236,
+    "response_text": "Marie Curie was a pioneering Polish and French physicist who conducted groundbreaking research on radioactivity. This work resulted in becoming the first woman to win a Nobel Prize, eventually winning two across different scientific fields.",
+    "response_len": 240,
     "loaded_models": [
       "local-lucy-gemma4:latest"
     ],
-    "elapsed_s": 10.02,
+    "elapsed_s": 44.82,
     "passed": true,
     "notes": []
   },
@@ -53,12 +53,12 @@
       "route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_text": "Oscar found an old key in the garden and spent his afternoon wondering which door it might open. He eventually discovered it belonged to a small wooden chest hidden beneath the porch.",
-      "response_len": 183,
+      "response_text": "Oscar found an old key in the garden that unlocked a hidden door leading to a forest of silver trees. He spent his afternoon wandering through the shimmering leaves, feeling as though he had finally discovered home.",
+      "response_len": 215,
       "loaded_models": [
         "local-lucy-gemma4:latest"
       ],
-      "elapsed_s": 12.83,
+      "elapsed_s": 11.26,
       "passed": true,
       "notes": []
     },
@@ -68,12 +68,12 @@
       "route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_text": "As Oscar opened the small wooden chest, he was met with an eerie silence. The afternoon sun cast long shadows across the porch, making it seem as though the key itself had awakened some ancient secret. Inside the chest lay a yellowed letter, tied with a faded ribbon, and a silver locket adorned with a family crest. Oscar's curiosity piqued, he carefully untied the ribbon to reveal the contents of the letter. The words danced across the page in elegant script: \"To my dearest sister, I leave behind this token as a reminder of our bond. May it bring you solace and guidance on your own path.\" A sudden chill ran down his spine as he wondered who had written these poignant lines. As Oscar cradled the locket in his palm, the silver seemed to warm against his skin, releasing an otherworldly energy that filled him with a sense of belonging. He turned it over several times, searching for any hidden marks or symbols, but there was nothing \u2013 only the gentle hum of memories long past. The porch creaked softly beneath Oscar's feet as he stood up, lost in thought. The sun dipped lower into the horizon, painting the sky with hues of crimson and gold. He knew then that his discovery had awakened more than just a curiosity; it had set him on an unexpected journey to unravel the mysteries hidden within these artifacts. Oscar took one last look at the chest before closing the lid, feeling as though he'd caught only glimpses of something far greater waiting beneath its surface \u2013 like peering into a vast ocean from a small boat.",
-      "response_len": 1532,
+      "response_text": "As Oscar walked deeper into the forest of silver trees, he began to notice that their shimmering leaves were actually tiny mirrors, reflecting every detail of his surroundings with crystal clarity. He saw himself as if from afar, tall and slender with eyes that sparkled like dew on a spider's web. The sight took him aback at first, but soon he felt a sense of wonder wash over him. With each step, the forest seemed to grow more vibrant, its colors deepening into an emerald green so rich it was almost purple. Oscar wandered further still, his feet carrying him along winding paths that twisted and turned through the trees like a river flowing down from some hidden source high in the hills. Eventually, he came upon a clearing where tall silver trunks gave way to a glade of wildflowers as colorful as any he had ever seen. In their midst stood an ancient tree with branches heavy-laden with crystal flowers that glistened softly in the fading light. Oscar felt drawn to this tree, its energy resonating deep within him like a gentle hum. As if sensing his presence, the silver leaves of the forest began to stir and rustle, releasing tiny whispers on the wind. The ancient tree spoke up then, its voice low and rumbling as thunder in springtime: \"Oscar, you have found this place by chance, but also perhaps not.\"",
+      "response_len": 1319,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
-      "elapsed_s": 6.78,
+      "elapsed_s": 6.14,
       "passed": true,
       "notes": []
     },

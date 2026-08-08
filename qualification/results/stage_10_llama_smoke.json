@@ -8,7 +8,7 @@
       "status": "completed",
       "route": "LOCAL",
       "outcome_code": "answered",
-      "response_len": 89
+      "response_len": 94
     },
     "loaded_models": [
       "local-lucy-llama31:latest"
@@ -17,8 +17,8 @@
   {
     "case_id": "llama_augmented_fact",
     "expected_route": [
-      "LOCAL",
-      "AUGMENTED"
+      "AUGMENTED",
+      "LOCAL"
     ],
     "actual_route": "LOCAL",
     "passed": true,
@@ -26,7 +26,7 @@
       "status": "completed",
       "route": "LOCAL",
       "outcome_code": "answered",
-      "response_len": 253
+      "response_len": 282
     },
     "loaded_models": [
       "local-lucy-llama31:latest"
@@ -39,7 +39,7 @@
     "passed": true,
     "outcome": {
       "status": "ok",
-      "stdout": "The product of 17 and 23 is 391. I can perform basic arithmetic calculations like this one using my parametric knowledge.",
+      "stdout": "The product of 17 and 23 is 391. This result comes from basic arithmetic multiplication rules.",
       "stderr": "",
       "payload": {
         "accepted": true,
@@ -51,12 +51,12 @@
           "legacy_runtime_namespace_present": false,
           "legacy_runtime_namespace_status": "absent"
         },
-        "completed_at": "2026-08-07T13:35:52Z",
+        "completed_at": "2026-08-07T18:10:53Z",
         "control_state": {
           "mode": "auto",
-          "conversation": "off",
+          "conversation": "on",
           "memory": "on",
-          "evidence": "off",
+          "evidence": "on",
           "voice": "on",
           "augmentation_policy": "direct_allowed",
           "augmented_provider": "openai",
@@ -115,12 +115,12 @@
           "evidence_created": "false",
           "outcome_code": "answered",
           "rc": null,
-          "utc": "2026-08-07T13:35:52Z",
-          "execution_time_ms": 810
+          "utc": "2026-08-07T18:10:53Z",
+          "execution_time_ms": 609
         },
-        "request_id": "2026-08-07T13:35:45.436575919Z-616365",
+        "request_id": "2026-08-07T18:10:51.266077958Z-643293",
         "request_text": "What is 17 times 23?",
-        "response_text": "The product of 17 and 23 is 391. I can perform basic arithmetic calculations like this one using my parametric knowledge.",
+        "response_text": "The product of 17 and 23 is 391. This result comes from basic arithmetic multiplication rules.",
         "route": {
           "mode": "LOCAL",
           "selected_route": "LOCAL",
@@ -135,8 +135,8 @@
           "winning_signal": "",
           "query": "What is 17 times 23?",
           "reason": "router_local",
-          "session_id": "2026-08-07T13:35:45.436575919Z-616365",
-          "utc": "2026-08-07T13:35:52Z"
+          "session_id": "2026-08-07T18:10:51.266077958Z-643293",
+          "utc": "2026-08-07T18:10:53Z"
         },
         "status": "completed",
         "model_recommendation": "local-lucy-llama31:latest",

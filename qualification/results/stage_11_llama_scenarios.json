@@ -15,14 +15,14 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 121,
+      "response_len": 94,
       "required_concepts_found": [
         "391"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 2.39,
+      "elapsed_s": 2.38,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -43,7 +43,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 89,
+      "response_len": 94,
       "required_concepts_found": [
         "Paris"
       ],
@@ -71,7 +71,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 253,
+      "response_len": 282,
       "required_concepts_found": [
         "Nobel",
         "radioactivity"
@@ -105,7 +105,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 8.62,
+      "elapsed_s": 8.55,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -126,12 +126,12 @@
       "actual_route": "NEWS",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 11576,
+      "response_len": 12094,
       "required_concepts_found": [],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.82,
+      "elapsed_s": 0.74,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -157,7 +157,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.91,
+      "elapsed_s": 2.01,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -178,15 +178,16 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 808,
+      "response_len": 1054,
       "required_concepts_found": [
+        "because",
         "since",
         "therefore"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 2.91,
+      "elapsed_s": 3.65,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -238,7 +239,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.25,
+      "elapsed_s": 0.24,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -259,14 +260,14 @@
       "actual_route": "AUGMENTED",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 389,
+      "response_len": 382,
       "required_concepts_found": [
         "pizza"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 2.17,
+      "elapsed_s": 1.85,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -287,7 +288,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 203,
+      "response_len": 218,
       "required_concepts_found": [
         "Local Lucy",
         "llama"
@@ -295,7 +296,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.25,
+      "elapsed_s": 1.17,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -316,12 +317,12 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 66,
+      "response_len": 175,
       "required_concepts_found": [],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.76,
+      "elapsed_s": 1.02,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -342,14 +343,14 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 2397,
+      "response_len": 1917,
       "required_concepts_found": [
         "Spark"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 20.41,
+      "elapsed_s": 18.86,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -372,7 +373,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 125,
+      "response_len": 100,
       "required_concepts_found": [
         "capital",
         "Japan"
@@ -380,7 +381,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.81,
+      "elapsed_s": 1.8,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -404,7 +405,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 152,
+      "response_len": 149,
       "required_concepts_found": [
         "Local Lucy",
         "assistant"
@@ -412,7 +413,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 9.42,
+      "elapsed_s": 9.29,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -436,14 +437,14 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 154,
+      "response_len": 246,
       "required_concepts_found": [
         "blue"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 2.49,
+      "elapsed_s": 3.01,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],

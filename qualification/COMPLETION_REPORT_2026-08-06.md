@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-The Local Lucy V11 qualification programme has been completed. Every mandatory and optional stage in `qualification/TEST_MASTER_PLAN.md` has been executed and passed. The work covered:
+The Local Lucy V11 qualification programme has been completed. Every stage executed under the programme passed; STAGE_00–STAGE_03 were not run as standalone stages and their coverage is traced in `qualification/STAGE_00_03_TRACEABILITY.md`. See `qualification/COMPLETION_REPORT_2026-08-06_REVISED.md` for the corrected final report. The work covered:
 
 - Rebuilding the test harness and resumability framework.
 - Fixing routing, classifier, policy-guard and memory defects.
@@ -17,7 +17,7 @@ The Local Lucy V11 qualification programme has been completed. Every mandatory a
 - Validating HMI, voice, live-network, privacy, fault-injection and model-switch behaviour.
 - Running a final clean-run qualification from a clean process state.
 
-**Final qualification decision:** **QUALIFIED** — all stages pass, no active defects, no dual-model residency regressions.
+**Final qualification decision:** **QUALIFIED** — all executed stages pass, no active defects, no dual-model residency regressions. STAGE_00–03 traceability: `qualification/STAGE_00_03_TRACEABILITY.md`.
 
 ---
 
@@ -111,14 +111,14 @@ Evidence: `tools/router_py/test_stage_15_privacy_audit.py`, `tools/router_py/sta
 ### 3.7 Memory retrieval fix (added after STAGE_19)
 
 - Verified that all user/assistant turns are stored in `~/.local/share/local-lucy-v11/state/memory.db`.
-- Identified that retrieval was limited to 4 recent turns + 4 semantic older turns, with `max_chars=1200`, and that explicit memory-recall queries were blocked by topic-shift detection.
+- Identified that retrieval was limited to 4 recent turns + 4 semantic older turns, with `max_chars=500`, and that explicit memory-recall queries were blocked by topic-shift detection.
 - Changed defaults:
   - `recent_turn_limit`: 4 → 12 (`LUCY_MEMORY_RECENT_TURN_LIMIT`)
   - semantic older turns: 4 → 8 (`LUCY_MEMORY_MAX_INJECTED_TURNS`)
-  - `max_chars`: 1200 → 2400 via execution-engine caller (`LUCY_MEMORY_MAX_CHARS`)
+  - `max_chars`: memory-service default 500 → 2000 via new env var `LUCY_MEMORY_MAX_CHARS`; execution-engine caller passes 2400
   - Explicit recall queries bypass topic-shift detection.
 
-Evidence: `tools/memory/memory_service.py`, `tools/router_py/execution_engine_helpers.py`; diagnostic with 16 stored turns returns 12 verbatim turns.
+Evidence: `tools/memory/memory_service.py`, `tools/router_py/execution_engine/helpers.py`; diagnostic with 16 stored turns returns 12 verbatim turns.
 
 ---
 
@@ -128,7 +128,7 @@ Evidence: `tools/memory/memory_service.py`, `tools/router_py/execution_engine_he
 |-------|------------|-----|---------|
 | Weather/time fallback misrouting | Low-confidence fallback routed to WEATHER/TIME based only on `evidence_reason` | Gate fallback on actual `_is_weather_query()` / `_is_time_query()` match | `tools/router_py/classify_core/select.py` |
 | Gemma/Llama dual residency | Model loading/unloading race and default model name drift | `ollama_load_lock`, explicit unload, respect `LUCY_LOCAL_MODEL` | `tools/router_py/ollama_cleanup.py`, `tools/memory/memory_service.py`, `tools/router_py/execution_engine_state.py` |
-| Stage 11 reasoning-marker flake | Scenario required exact word "because" | Accept any reasoning marker (because/since/therefore) for S09-GEM-007 | `tools/router_py/stage_11_llama_scenario_suite.py`, `tools/router_py/stage_09_gemma_scenario_suite.py` |
+| Stage 11 reasoning-marker flake | Scenario required exact word "because" | Accept any reasoning marker (because/since/therefore) for S09-GEM-007 (see DEC-016 in `qualification/DECISIONS.md`) | `tools/router_py/stage_11_llama_scenario_suite.py`, `tools/router_py/stage_09_gemma_scenario_suite.py` |
 | Memory only uses last ~5 turns | Hard-coded `recent_turn_limit=4`, small `max_chars`, topic-shift gate blocked recall queries | Widen limits, add env overrides, bypass topic shift for explicit recall | `tools/memory/memory_service.py`, `tools/router_py/execution_engine/helpers.py` |
 | Location/time misrouting | Residence/location statements and restaurant queries hit weather/time guards | New `gate_residence_statement`, broader restaurant signal, weather yields to travel | `tools/router_py/policy_router/gates.py`, `tools/router_py/request_constraints.py` |
 | Test-isolation leaks (DEF-001/002) | `main.py` set env vars globally | Scoped fixtures reset env per test | Multiple test fixtures |

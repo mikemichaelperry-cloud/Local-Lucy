@@ -1349,7 +1349,7 @@ def find_relevant_sessions(
     Find past sessions whose summaries are semantically similar to the query.
 
     Uses environment-configured thresholds if parameters are not provided:
-      - LUCY_MEMORY_SIMILARITY_THRESHOLD (default 0.55)
+      - LUCY_MEMORY_SIMILARITY_THRESHOLD (default 0.70)
       - LUCY_MEMORY_MAX_INJECTED_SESSIONS (default 1)
       - LUCY_MEMORY_REQUIRE_TOP_GAP (default disabled)
 
