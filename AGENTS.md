@@ -124,7 +124,7 @@ LUCY_SESSION_MEMORY=1                   # enable session-memory injection (HMI m
 LUCY_ROUTER_DIAGNOSTICS=1               # lightweight routing trace
 ```
 
-`LUCY_ROUTER_PY` / `LUCY_EXEC_PY` are dead — nothing reads them; do not reintroduce.
+`LUCY_ROUTER_PY` / `LUCY_EXEC_PY` were removed on 2026-08-08 (nothing read them); do not reintroduce.
 
 ---
 
@@ -198,7 +198,7 @@ Local Lucy learns from natural-language user feedback.
 
 6. **CPU tests mock; GPU tests are sequential** — Router/unit tests mock the model. Stage scripts use the real GPU models and must run one at a time (see GPU discipline above).
 
-7. **Scenario suites record `response_text`** — When a stage-09/11 scenario fails, check `qualification/results/stage_*_scenarios.json` for the captured model response before suspecting retrieval; literal-substring concept checks can flake on model phrasing (see DEC-016).
+7. **Scenario evaluation is shared** — The stage-09/11 scenario suites both evaluate responses through `tools/router_py/scenario_checks.py` (`evaluate_response`); any-of concept relaxations are expressed via the `required_answer_concepts_any` scenario JSON field, not code special cases (DEC-016, DEC-018). When a scenario fails, check `qualification/results/stage_*_scenarios.json` for the captured `response_text` before suspecting retrieval; literal-substring concept checks can still flake on model phrasing.
 
 ---
 

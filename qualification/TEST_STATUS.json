@@ -150,6 +150,8 @@
     }
   },
   "active_defects": [],
+  "known_failing_tests": [],
+  "known_failing_tests_note": "Must stay empty; any carried failure needs a DEC entry.",
   "accepted_limitations": [
     "HMI-ANAPH-001: 'Use DuckDuckGo search' holdout expectation assumes main.py anaphora context that compute_baseline_metrics.py excludes; classified as TEST_EXPECTATION_ERROR.",
     "Persistent-fact correction authority is not enforced automatically; newer contradictory facts are stored and retrieved but not preferred over older facts without explicit user management.",

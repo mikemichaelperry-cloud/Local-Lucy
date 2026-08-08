@@ -294,6 +294,26 @@ Keep the original stage structure; add the new concerns as explicit tasks inside
 
 ---
 
+## DEC-018 — 2026-08-08 — Shared scenario evaluation and any-of concept checks
+
+**Context:** The STAGE_09 (Gemma) and STAGE_11 (Llama) scenario suites each carried their own copy of the response-evaluation logic (literal-substring concept checks), and the two copies had already drifted: the S09-MEM-003 flake on 2026-08-07 (model-wording variance on the required concept "Local Lucy") had to be diagnosed against two near-identical implementations, and the DEC-016 relaxation for S09-GEM-007 existed only as a hardcoded per-scenario special case in code.
+
+**Decision:**
+
+1. Deduplicate scenario evaluation into a single shared implementation: `tools/router_py/scenario_checks.py` (`evaluate_response`), used by both stage_09 and stage_11 suites.
+2. Add a declarative `required_answer_concepts_any` JSON field (any one of the listed concepts satisfies the check), so any-of relaxations are scenario-schema changes, not code special cases. The hardcoded S09-GEM-007 special case is expressed via this field.
+3. S09-MEM-003 stays strict: it keeps its all-concepts check on "Local Lucy".
+
+**Alternatives considered:**
+
+- Relaxing S09-MEM-003 to accept "Lucy" as the identity concept — rejected: the identity name is the point of the scenario; a model that answers with the wrong name should fail.
+
+**Consequences:** The flake surface is reduced to one implementation; future assertion relaxations are schema changes recorded in scenario JSON, not code edits. Scenario JSON schemas gain one optional field; existing scenarios are unchanged.
+
+**Related test repair (same closeout):** the 16 carried failures in `tools/router_py/test_local_answer.py` (visible only with markers unrestricted, `-m ""`) were stale `unittest.mock.patch` targets left over from the `local_answer.py` → `local_answer_core/` package split. The attributes had moved, so patches were repointed mechanically to the module namespace that actually consumes each symbol (`router_py.local_answer_core.engine.*` for engine-bound helpers, `router_py.local_answer_core.self_knowledge.*` for persona/identity helpers). No test was deleted; no product behavior was changed to satisfy a test, with two exceptions worth recording: (a) `test_memory_preamble_is_authoritative` was updated to match the deliberate Gemma-only `_PromptShaper` hint (commit `18b8bbb`) and a companion test now covers the Gemma branch; (b) the tests exposed a genuine latent product bug — `local_answer_core/config.py::from_env` called `json.loads` without importing `json`, and the `NameError` was silently swallowed by a blanket `except Exception`, so the `current_state.json` model fallback never worked — fixed by adding the missing import.
+
+---
+
 ## DEC-016 — 2026-08-06 — Accept any single reasoning marker for S09-GEM-007 in the STAGE_09/STAGE_11 scenario suites
 
 **Context:** During STAGE_09/STAGE_11, scenario S09-GEM-007 required all three reasoning markers ["because", "since", "therefore"]. Gemma and Llama answers contained valid reasoning markers but not always all three, causing flakes.
