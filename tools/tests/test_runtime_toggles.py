@@ -21,6 +21,28 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "router_py"))
 
+import runtime_control
+from runtime_control import _resolve_initial_learner_state
+
+
+def test_learner_defaults_off_without_env(monkeypatch):
+    """Learner resolves to off when neither the disable flag nor env is set."""
+    monkeypatch.delenv("LUCY_AUTO_LEARN", raising=False)
+    flag = (
+        Path(runtime_control.__file__).resolve().parent.parent
+        / "models"
+        / "router"
+        / ".learner_disable"
+    )
+    assert not flag.exists(), "precondition: no disable flag"
+    assert _resolve_initial_learner_state() == "off"
+
+
+def test_learner_on_with_explicit_env(monkeypatch):
+    """Learner resolves to on only when LUCY_AUTO_LEARN=1 is set explicitly."""
+    monkeypatch.setenv("LUCY_AUTO_LEARN", "1")
+    assert _resolve_initial_learner_state() == "on"
+
 
 class ToggleTestError(Exception):
     pass

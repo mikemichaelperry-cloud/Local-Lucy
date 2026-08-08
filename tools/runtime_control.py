@@ -402,9 +402,9 @@ def _resolve_initial_learner_state() -> str:
     disable_flag = router_dir / ".learner_disable"
     if disable_flag.exists():
         return "off"
-    if os.environ.get("LUCY_AUTO_LEARN", "1") == "0":
-        return "off"
-    return "on"
+    if os.environ.get("LUCY_AUTO_LEARN", "0").strip().lower() in ("1", "true", "yes", "on"):
+        return "on"
+    return "off"
 
 
 def update_learner_state(state_file: Path, requested_value: str) -> UpdateResult:

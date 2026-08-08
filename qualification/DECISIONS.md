@@ -277,6 +277,23 @@ Keep the original stage structure; add the new concerns as explicit tasks inside
 
 ---
 
+## DEC-017 — 2026-08-08 — Auto-learn defaults to opt-in
+
+**Context:** Auto-learn had conflicting defaults: `tools/runtime_control.py` resolved the initial learner state to ON when `LUCY_AUTO_LEARN` was unset, while `models/router/background_learner.py` defaulted to OFF. The runtime_control default meant a fresh install could silently self-modify (embedding rebuilds triggered by conversational feedback) without the operator opting in.
+
+**Decision:**
+
+1. Flip `tools/runtime_control.py` (`_resolve_initial_learner_state`) to opt-in: the learner resolves to `"on"` only when `LUCY_AUTO_LEARN` is explicitly set to a truthy value (`1`, `true`, `yes`, `on`); unset means `"off"`, matching `background_learner.py`.
+2. The `.learner_disable` flag continues to force `"off"` regardless of the environment.
+
+**Alternatives considered:**
+
+- Keeping the runtime_control default ON — rejected because it allows silent embedding rebuilds from conversational feedback on fresh installs.
+
+**Consequences:** Fresh installs ship with the learner off; it is enabled via the HMI toggle or `LUCY_AUTO_LEARN=1`. Existing feedback/learner tests set `LUCY_AUTO_LEARN=1` explicitly and are unaffected.
+
+---
+
 ## DEC-016 — 2026-08-06 — Accept any single reasoning marker for S09-GEM-007 in the STAGE_09/STAGE_11 scenario suites
 
 **Context:** During STAGE_09/STAGE_11, scenario S09-GEM-007 required all three reasoning markers ["because", "since", "therefore"]. Gemma and Llama answers contained valid reasoning markers but not always all three, causing flakes.

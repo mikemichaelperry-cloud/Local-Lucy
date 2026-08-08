@@ -80,7 +80,7 @@ lucy-v11/
 | `LUCY_MEMORY_DB_PATH` | `$LUCY_RUNTIME_NAMESPACE_ROOT/state/memory.db` | SQLite memory DB |
 | `LUCY_SESSION_MEMORY` | `0` (HMI memory toggle sets `1`) | Session-memory injection |
 | `LUCY_MEMORY_*` | see `AGENTS.md` | Retrieval knobs: recent turns 12, semantic turns 8, max chars 2000 (engine passes 2400), similarity 0.70, topic-shift 0.50 |
-| `LUCY_AUTO_LEARN` | effectively ON (`runtime_control.py`) | Set `0` during development |
+| `LUCY_AUTO_LEARN` | OFF — opt-in (DEC-017) | Set `1` to enable learning |
 | `QT_QPA_PLATFORM` | `xcb` | Qt platform plugin |
 
 ---

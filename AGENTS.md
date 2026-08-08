@@ -110,8 +110,7 @@ LUCY_RUNTIME_AUTHORITY_ROOT=~/lucy-v11  # Code authority validation
 LUCY_UI_ROOT=~/lucy-v11/ui-v10          # HMI path
 LUCY_OLLAMA_API_URL=http://127.0.0.1:11434/api/generate
 LUCY_LOCAL_MODEL=local-lucy-llama31     # Code default if unset
-LUCY_AUTO_LEARN=0                       # Set 0 during development to prevent mutation
-                                        # (effective default is ON via runtime_control.py)
+LUCY_AUTO_LEARN=0                       # default OFF (opt-in); set 1 to enable learning
 
 # Memory retrieval knobs (tools/memory/memory_service.py; shown with code defaults)
 LUCY_MEMORY_RECENT_TURN_LIMIT=12        # verbatim recent turns injected
@@ -181,7 +180,7 @@ Local Lucy learns from natural-language user feedback.
 - `models/router/user_feedback.jsonl` — Logged corrections
 - `models/router/background_learner.py` — Rebuilds embedding index (medical/vet/finance/legal feedback goes to `pending_review.jsonl` for human review)
 
-**Rule:** Set `LUCY_AUTO_LEARN=0` during development unless explicitly testing learner behavior. The effective default is ON (`runtime_control.py`), so this matters.
+**Rule:** Auto-learn is OFF by default (opt-in, DEC-017). Enable it via the HMI toggle or `LUCY_AUTO_LEARN=1` only when explicitly testing learner behavior.
 
 ---
 
