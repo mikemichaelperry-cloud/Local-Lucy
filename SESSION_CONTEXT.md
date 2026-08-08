@@ -114,8 +114,8 @@ Working tree: clean (only untracked tools/router_py/state/__pycache__/, never co
 
 ### Recent Commits (last 16)
 ```
-<closeout docs commit> docs: consolidation closeout, DEC-018, known_failing_tests tracking
-<code/test fixes commit> fix(tests): repoint stale local_answer patch targets; correct stale model-facing text
+5de2bfc docs: consolidation closeout, DEC-018, known_failing_tests tracking
+2031f4c fix(tests): repoint stale local_answer patch targets; correct stale model-facing text
 bdfdfad fix(config): align self-knowledge context figures with Modelfile num_ctx
 61bec06 chore: prune dead qwen3 router script and stale model references
 3dbb2a2 chore: remove dead LUCY_ROUTER_PY/LUCY_EXEC_PY plumbing
@@ -140,7 +140,7 @@ d99b48e docs: update handoff and architecture for 200k Engineering-mode context 
   - `README.md` `LUCY_AUTO_LEARN` row corrected (default `0`, opt-in, DEC-017).
   - `config/Modelfile.local-lucy-{llama31,gemma4}` SYSTEM prompts corrected (llama31 8B / gemma4 12B, num_ctx 8192; qwen3:14b/2048-token text removed) + `ollama create` NOTE comment added; live Ollama tags intentionally NOT rebuilt. `config/system_prompt.txt` "14B/8B-class" → "8B/12B-class". Manifests regenerated (`make sha`).
   - `qualification/TEST_STATUS.json` gained `known_failing_tests` (empty; must stay empty) + note; DEC-018 added to `qualification/DECISIONS.md`; AGENTS.md footgun 7 now points at `scenario_checks.py`.
-  - Full CPU suite (restricted markers): **0 failed** (see task-7 report for counts); `test_local_answer.py` also green with `-m ""`.
+  - Full CPU suite (restricted markers): **1637 passed, 0 failed**, 7 skipped (10:47); `test_local_answer.py` also green with `-m ""` (78 passed). Unrestricted slow/live subset: 20 pre-existing live/environment failures (verified identical at base `bdfdfad`; see task-7 report).
   - Desktop docs re-synced (`SESSION_CONTEXT.md`, `Local_Lucy_V11_DECISIONS.md`).
 - **TODO changes:** #24 partially advanced (dead vars/config pruned; rename deferred → #29), #27 resolved (DEC-018), #28 resolved (requal-session changes committed), #29 added.
 
