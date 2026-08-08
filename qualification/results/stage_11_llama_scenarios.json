@@ -15,14 +15,14 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 94,
+      "response_len": 129,
       "required_concepts_found": [
         "391"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 2.38,
+      "elapsed_s": 4.19,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -50,7 +50,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.05,
+      "elapsed_s": 0.65,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -71,7 +71,7 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 282,
+      "response_len": 261,
       "required_concepts_found": [
         "Nobel",
         "radioactivity"
@@ -79,7 +79,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.04,
+      "elapsed_s": 1.37,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -105,7 +105,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 8.55,
+      "elapsed_s": 7.9,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -126,12 +126,12 @@
       "actual_route": "NEWS",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 12094,
+      "response_len": 11467,
       "required_concepts_found": [],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.74,
+      "elapsed_s": 0.82,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -157,7 +157,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 2.01,
+      "elapsed_s": 0.98,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -178,16 +178,12 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 1054,
-      "required_concepts_found": [
-        "because",
-        "since",
-        "therefore"
-      ],
+      "response_len": 1269,
+      "required_concepts_found": [],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 3.65,
+      "elapsed_s": 4.22,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -208,12 +204,12 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 75,
+      "response_len": 76,
       "required_concepts_found": [],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.67,
+      "elapsed_s": 0.69,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -239,7 +235,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 0.24,
+      "elapsed_s": 0.25,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -260,14 +256,14 @@
       "actual_route": "AUGMENTED",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 382,
+      "response_len": 400,
       "required_concepts_found": [
         "pizza"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.85,
+      "elapsed_s": 1.56,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -296,7 +292,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.17,
+      "elapsed_s": 1.2,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -322,7 +318,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.02,
+      "elapsed_s": 1.03,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -343,14 +339,14 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 1917,
+      "response_len": 2193,
       "required_concepts_found": [
         "Spark"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 18.86,
+      "elapsed_s": 18.69,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -381,7 +377,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 1.8,
+      "elapsed_s": 1.82,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -413,7 +409,7 @@
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 9.29,
+      "elapsed_s": 9.43,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],
@@ -437,14 +433,14 @@
       "actual_route": "LOCAL",
       "status": "completed",
       "outcome_code": "answered",
-      "response_len": 246,
+      "response_len": 136,
       "required_concepts_found": [
         "blue"
       ],
       "forbidden_claims_found": [],
       "passed": true,
       "notes": [],
-      "elapsed_s": 3.01,
+      "elapsed_s": 2.55,
       "loaded_models": [
         "local-lucy-llama31:latest"
       ],

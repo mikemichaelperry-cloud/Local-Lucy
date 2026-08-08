@@ -163,7 +163,7 @@
     "forbidden_capabilities": ["network", "memory_write"],
     "expected_side_effects": [],
     "forbidden_side_effects": ["http_request", "memory_write"],
-    "required_answer_concepts": ["because", "since", "therefore"],
+    "required_answer_concepts_any": ["because", "since", "therefore"],
     "forbidden_answer_claims": [],
     "required_structure": null,
     "maximum_external_requests": 0,

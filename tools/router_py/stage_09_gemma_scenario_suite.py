@@ -35,6 +35,7 @@ from router_py.ollama_cleanup import (
     unload_all_lucy_models,
     unload_other_lucy_models,
 )
+from router_py.scenario_checks import evaluate_response
 
 GEMMA_MODEL = os.environ.get("LUCY_GEMMA_MODEL", "local-lucy-gemma4:latest")
 LLAMA_MODEL = os.environ.get("LUCY_LLAMA_MODEL", "local-lucy-llama31:latest")
@@ -225,37 +226,9 @@ def _run_scenario(scenario: dict) -> dict:
     response_text = final_outcome.response_text or ""
     required_concepts = scenario.get("required_answer_concepts", [])
     forbidden_claims = scenario.get("forbidden_answer_claims", [])
-    required_structure = scenario.get("required_structure")
-
-    notes: list[str] = []
-    passed = True
-
     expected_route = scenario.get("expected_route")
-    if expected_route and final_outcome.route != expected_route:
-        notes.append(f"route expected {expected_route}, got {final_outcome.route}")
-        passed = False
 
-    # S09-GEM-007 checks for reasoning markers; accept any of the listed markers.
-    if scenario.get("id") == "S09-GEM-007" and required_concepts:
-        if not any(c.lower() in response_text.lower() for c in required_concepts):
-            notes.append(f"missing required reasoning marker (any of: {required_concepts})")
-            passed = False
-    else:
-        for concept in required_concepts:
-            if concept.lower() not in response_text.lower():
-                notes.append(f"missing required concept: {concept}")
-                passed = False
-
-    for claim in forbidden_claims:
-        if claim.lower() in response_text.lower():
-            notes.append(f"forbidden claim present: {claim}")
-            passed = False
-
-    if required_structure == "haiku":
-        lines = [line for line in response_text.strip().splitlines() if line.strip()]
-        if len(lines) != 3:
-            notes.append("haiku does not have 3 lines")
-            passed = False
+    passed, notes = evaluate_response(scenario, final_outcome)
 
     loaded = _lucy_models_loaded()
     non_gemma = [m for m in loaded if _is_non_gemma_lucy_model(m)]
