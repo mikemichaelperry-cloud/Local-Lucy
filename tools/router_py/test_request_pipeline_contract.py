@@ -121,14 +121,14 @@ class TestMemoryRecallQuery:
     """
 
     def test_memory_recall_uses_stored_fact(self, monkeypatch, tmp_path):
-        """Store a fact, recall it."""
+        """An empty SQLite result is honored; the text file must not leak in."""
         monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
         # Use a temp memory file
         mem_file = tmp_path / "test_memory.txt"
         mem_file.write_text("User: My favorite color is blue.\n\n")
         monkeypatch.setenv("LUCY_CHAT_MEMORY_FILE", str(mem_file))
 
-        # Mock SQLite assembly to return empty so we test file-based fallback
+        # Mock SQLite assembly to return empty
         import memory.memory_service as mem_svc
 
         monkeypatch.setattr(
@@ -139,6 +139,37 @@ class TestMemoryRecallQuery:
 
         from router_py.execution_engine import _load_session_memory_context_with_telemetry
 
+        # Post-5591c1a contract: empty SQLite context is honored; text-file fallback only on exception.
+        context, telemetry = _load_session_memory_context_with_telemetry(
+            "What is my favorite color?"
+        )
+        assert context == ""
+        assert "blue" not in context.lower()
+        assert telemetry["memory_context_used"] == "false"
+
+    def test_memory_recall_falls_back_to_text_file_on_sqlite_error(self, monkeypatch, tmp_path):
+        """When SQLite assembly raises, fall back to the text file."""
+        monkeypatch.setenv("LUCY_SESSION_MEMORY", "1")
+        # Use a temp memory file
+        mem_file = tmp_path / "test_memory.txt"
+        mem_file.write_text("User: My favorite color is blue.\n\n")
+        monkeypatch.setenv("LUCY_CHAT_MEMORY_FILE", str(mem_file))
+
+        # Mock SQLite assembly to raise so we test file-based fallback
+        import memory.memory_service as mem_svc
+
+        def _raise(*a, **k):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(
+            mem_svc,
+            "assemble_context_with_telemetry",
+            _raise,
+        )
+
+        from router_py.execution_engine import _load_session_memory_context_with_telemetry
+
+        # Post-5591c1a contract: empty SQLite context is honored; text-file fallback only on exception.
         context, telemetry = _load_session_memory_context_with_telemetry(
             "What is my favorite color?"
         )

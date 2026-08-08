@@ -4,7 +4,7 @@ Integration tests for memory layer dual-write behaviour.
 
 Verifies that:
 1. execution_engine._load_session_memory_context reads from SQLite first
-2. Falls back to text file when SQLite is empty / missing
+2. Falls back to text file only when the SQLite read raises (empty result is honored)
 3. runtime_request.append_chat_memory_turn writes to both SQLite and text file
 """
 
@@ -92,16 +92,32 @@ class TestMemoryIntegration(unittest.TestCase):
         self.assertIn("User: What's the weather?", context)
         self.assertIn("Assistant: It's sunny today.", context)
 
-    def test_execution_engine_falls_back_to_text_file_when_sqlite_empty(self):
-        """If SQLite has no turns, fall back to the text file."""
+    def test_execution_engine_falls_back_to_text_file_when_sqlite_raises(self):
+        """Post-5591c1a: fall back to the text file only when SQLite raises;
+        an empty SQLite result is honored (no text-file leak)."""
         text_path = Path(self.tmp_text_path)
         text_path.write_text(
             "User: Fallback question\nAssistant: Fallback answer\n\n", encoding="utf-8"
         )
 
+        # Empty SQLite result must be honored (no fallback).
         from router_py.execution_engine import _load_session_memory_context
 
         context = _load_session_memory_context()
+
+        self.assertEqual(context, "")
+
+        # Force the SQLite assembly to raise -> text-file fallback fires.
+        orig = ms.assemble_context_with_telemetry
+
+        def _raise(*a, **k):
+            raise RuntimeError("boom")
+
+        ms.assemble_context_with_telemetry = _raise
+        try:
+            context = _load_session_memory_context()
+        finally:
+            ms.assemble_context_with_telemetry = orig
 
         self.assertIn("User: Fallback question", context)
         self.assertIn("Assistant: Fallback answer", context)
